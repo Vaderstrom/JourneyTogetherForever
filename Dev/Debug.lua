@@ -420,11 +420,13 @@ function D:TourneySample(on, n)
         end
       end
     end
-    -- Levels and classes for the entrants list (pretend Heroes have no data of their own).
+    -- Levels and classes for the entrants list (pretend Heroes have no data of their own). Yours as the fellowship
+    -- knows it, so a pretend level shows (it was your real level 2 among levels 18-26; check of 30 Oct 2026).
     local CLASSES = { "WARRIOR", "PALADIN", "HUNTER", "ROGUE", "PRIEST", "SHAMAN", "MAGE", "WARLOCK", "DRUID" }
+    local f = ns.Fellowship:Current()
     local levels, classes = {}, {}
     for i, name in ipairs(seeds) do
-      levels[name] = name == ns.Me() and UnitLevel("player") or 18 + (i * 7) % 9
+      levels[name] = name == ns.Me() and (f and ns.Hero:Level(f, name) or UnitLevel("player")) or 18 + (i * 7) % 9
       classes[name] = name ~= ns.Me() and CLASSES[(i - 1) % #CLASSES + 1] or nil
     end
     self.tourneySample = { format = "single", seeds = seeds, results = results, levels = levels, classes = classes }

@@ -7,7 +7,7 @@
 ## OptionalDeps: Questie
 ## SavedVariablesPerCharacter: JourneyTogetherForeverCharDB
 ## IconTexture: Interface\AddOns\JourneyTogetherForever\Media\LogoSmall
-## X-Curse-Project-ID: 000000
+## X-Curse-Project-ID: 1773988
 ## X-License: MIT
 
 Locales\enUS.lua

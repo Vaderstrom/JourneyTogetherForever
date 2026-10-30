@@ -324,10 +324,13 @@ function T:You(f)
     return out
   end
   local h = Hr:Get(f, me) or {}
+  -- Levels to go count the XP you have, as on the Chapter page ("13 levels" here beside its "12.1"; seen in the
+  -- check of 30 Oct 2026).
+  local function togo(target) return levels(ns.Pace.LevelsTo(lvl, h.xp, h.xpMax, target)) end
 
   -- Below the floor: the catch-up card.
   if lvl < fl then
-    out.state = L.YOU_BELOW:format(levels(fl - lvl))
+    out.state = L.YOU_BELOW:format(togo(fl))
     out.head = L.YOU_HEAD:format(lvl, out.state)
     -- Alone, there are no others waiting (the card said so to a new Captain; seen in the tour).
     local alone = F:Count(f) <= 1
@@ -361,7 +364,7 @@ function T:You(f)
   local state
   if lvl > ch.cap + r.capTol then state = L.YOU_OVER:format(lvl - ch.cap)
   elseif lvl >= ch.cap then state = L.YOU_AT_CAP
-  else state = L.YOU_READY:format(levels(ch.cap - lvl)) end
+  else state = L.YOU_READY:format(togo(ch.cap)) end
   out.head, out.state = L.YOU_HEAD:format(lvl, state), state
   -- Who is behind, and how to help them.
   for i, name in ipairs(below) do

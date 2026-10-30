@@ -69,7 +69,9 @@ end
 
 -- A card: soft background with the game's rounded tooltip border. :SetSelected(on) marks it chosen: lighter than
 -- the others with a warm glow from the top, a gold border and a gold rim round it. (It was a gold wash, darker than
--- the other cards: on the paper it read as faded into the page, 29 Oct 2026.)
+-- the other cards: on the paper it read as faded into the page, 29 Oct 2026.) A card with .strong set before it is
+-- first chosen glows over its whole height: a bar that says something waits (Journey Admin's Publish bar was too pale
+-- to notice; check of 30 Oct 2026).
 local CARD = { bgFile = ns.WHITE, edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", edgeSize = 12,
   insets = { left = 3, right = 3, top = 3, bottom = 3 } }
 local function chosenMarks(f)
@@ -82,7 +84,8 @@ local function chosenMarks(f)
     m[i] = t
   end
   m.glow = f:CreateTexture(nil, "BORDER", nil, -1)
-  m.glow:SetPoint("TOPLEFT", 3, -3); m.glow:SetPoint("TOPRIGHT", -3, -3); m.glow:SetHeight(26)
+  m.glow:SetPoint("TOPLEFT", 3, -3); m.glow:SetPoint("TOPRIGHT", -3, -3)
+  if f.strong then m.glow:SetPoint("BOTTOM", 0, 3) else m.glow:SetHeight(26) end
   return m
 end
 function UI.Card(parent, borderRole, frameType)
@@ -96,7 +99,7 @@ function UI.Card(parent, borderRole, frameType)
       self:SetBackdropBorderColor(Theme:RGBA("gold"))
       self.marks = self.marks or chosenMarks(self)
       for i = 1, 4 do self.marks[i]:SetColorTexture(Theme:RGBA("gold")) end
-      UI.SetGradient(self.marks.glow, "VERTICAL", { 0.85, 0.69, 0.38, 0 }, { 0.85, 0.69, 0.38, 0.28 })
+      UI.SetGradient(self.marks.glow, "VERTICAL", { 0.85, 0.69, 0.38, self.strong and 0.22 or 0 }, { 0.85, 0.69, 0.38, self.strong and 0.5 or 0.28 })
     else
       self:SetBackdropColor(Theme:RGBA(self.bgRole or "card")); self:SetBackdropBorderColor(Theme:RGBA(self.borderRole))
     end
@@ -934,6 +937,16 @@ function UI.Scroll(parent)
     self.contentHeight = h; child:SetHeight(h); update()
   end
   function sf:ToTop() self:SetVerticalScroll(0); update() end
+  -- Scrolls the least so the part from top down h is in view, clear of the fade (Journey Admin's chosen chapter
+  -- stayed out of sight; check of 30 Oct 2026). False while the scroll has no size yet.
+  function sf:Reveal(top, h)
+    local view, pos = self:GetHeight(), self:GetVerticalScroll()
+    if view <= UI.SCROLL_FADE then return false end
+    if top < pos then pos = top
+    elseif top + h > pos + view - UI.SCROLL_FADE then pos = top + h - view + UI.SCROLL_FADE end
+    self:SetVerticalScroll(pos); update()
+    return true
+  end
   UI.scrolls[#UI.scrolls + 1] = sf
   return sf
 end

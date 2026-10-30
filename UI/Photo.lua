@@ -36,7 +36,8 @@ local PH = {
 }
 ns.Photo = PH
 
--- Poses: { text, animation } with the game's animation IDs (0 Stand, 26 Ready1H, 68 EmoteCheer, ...). Emotes loop.
+-- Poses: { text, animation } with the game's animation IDs (0 Stand, 26 Ready1H, 68 EmoteCheer, ...). Emotes loop;
+-- one that plays once starts again (newActor).
 PH.POSES = {
   { "PHOTO_POSE_STAND", 0 }, { "PHOTO_POSE_READY", 26 }, { "PHOTO_POSE_CHEER", 68 }, { "PHOTO_POSE_SALUTE", 113 },
   { "PHOTO_POSE_FLEX", 82 }, { "PHOTO_POSE_ROAR", 74 }, { "PHOTO_POSE_WAVE", 67 }, { "PHOTO_POSE_BOW", 66 },
@@ -118,9 +119,14 @@ local function hold(a, anim)
 end
 local function onLoaded(a) if a.anim then a:SetAnimation(a.anim) end end
 
+-- Some emotes play once and the model then stands: the chosen one stood under "Salute" (check of 30 Oct 2026). When
+-- an animation ends, the pose starts again.
 local function newActor(scene)
   local a = scene:CreateActor()
-  if a.SetScript then pcall(a.SetScript, a, "OnModelLoaded", onLoaded) end
+  if a.SetScript then
+    pcall(a.SetScript, a, "OnModelLoaded", onLoaded)
+    pcall(a.SetScript, a, "OnAnimFinished", onLoaded)
+  end
   return a
 end
 

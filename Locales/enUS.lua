@@ -704,6 +704,7 @@ ns.L = setmetatable({
   IMPORT_HINT = "Paste a journey string (Ctrl+V) and click Import. It becomes your draft until you publish it.",
   IMPORT_BAD = "That is not a journey string.",
   IMPORT_HINT_NEW = "Paste a journey string (Ctrl+V) and click Import. It replaces these chapters.",
+  IMPORT_TEXT = "Paste a journey string that another fellowship exported.",
   ED_SPLIT = "Split in two",
   ED_MERGE = "Merge with next",
   ED_REMOVE = "Remove",

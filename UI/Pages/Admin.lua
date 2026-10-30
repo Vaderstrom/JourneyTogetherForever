@@ -328,6 +328,7 @@ local function build(pf)
   -- The bar under both halves, never scrolled: what is not published yet, Discard and Publish. Gold while there is
   -- a draft.
   pf.bar = UI.Card(pf.left)
+  pf.bar.strong = true
   pf.bar:SetPoint("BOTTOMLEFT", pf.left, "BOTTOMLEFT", 0, 0)
   pf.bar:SetPoint("BOTTOMRIGHT", pf.right, "BOTTOMRIGHT", 0, 0)
   pf.bar:SetHeight(BAR_H)

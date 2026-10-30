@@ -334,11 +334,15 @@ function JED.New(left, right, lw, rw, src)
     ed.shelfBy[d[1]] = b
   end
   ed.shelf:SetHeight(4 + math.ceil(#list / 2) * 26 + 4)
+  -- Whole journey: each preset, and Import, on a line of its own with what it does (the buttons wrapped, Import
+  -- alone on the second line, and Create's tab looked empty; check of 30 Oct 2026).
   ed.startLabel = UI.Text(J, 13, "ink2")
   ed.startLabel:SetText(L.START_OVER)
-  ed.presets = {}
+  ed.presets, ed.whole = {}, {}
   for _, key in ipairs(ns.PRESET_ORDER) do
-    ed.presets[#ed.presets + 1] = UI.TextButton(J, ns.PRESETS[key].title, function() src.replace(ns.BuildJourney(key)) end, "plain", 12)
+    local b = UI.TextButton(J, ns.PRESETS[key].title, function() src.replace(ns.BuildJourney(key)) end, "plain", 12)
+    ed.presets[#ed.presets + 1] = b
+    ed.whole[#ed.whole + 1] = { b = b, about = ns.PRESETS[key].text }
   end
   ed.import = UI.TextButton(J, L.IMPORT, function()
     local dlg
@@ -349,6 +353,15 @@ function JED.New(left, right, lw, rw, src)
       src.replace(j)
     end)
   end, "plain", 12)
+  ed.whole[#ed.whole + 1] = { b = ed.import, about = L.IMPORT_TEXT }
+  -- The buttons in one column as wide as the widest, what each does beside it.
+  ed.wholeW = 0
+  for _, w in ipairs(ed.whole) do ed.wholeW = math.max(ed.wholeW, w.b:GetWidth()) end
+  for _, w in ipairs(ed.whole) do
+    w.b:SetWidth(ed.wholeW)
+    w.text = UI.WrapText(J, 12, "ink2", rw - ed.wholeW - 10, "book")
+    w.text:SetText(w.about)
+  end
 
   -- The ghost that follows the cursor while something is dragged, above everything in the book.
   ed.ghost = UI.Box(W.frame and W.frame.area or left, 1, "band2", 0.95, "goldText", 1)
@@ -640,10 +653,17 @@ function JED:Refresh()
     row.none:SetShown(shown == 0)
     local h = shown == 0 and 46 or (y + 26)
     row:SetHeight(h)
+    if i == sel then row.top, row.h = s.y, h end
     s:Place(row, h, 0)
   end
   self.rows:HideFrom(n + 1)
   self.list:SetContentHeight(s.y)
+  -- A newly chosen chapter (on the ruler, or at the start) comes into view in the list; the list stays where it is
+  -- while that chapter is edited.
+  local chosen = self.rows:Get(sel)
+  if sel ~= self.revealed and chosen and chosen.top and self.list:Reveal(chosen.top, chosen.h) then
+    self.revealed = sel
+  end
 
   -- Right page, This chapter: the chosen chapter.
   local C = self.panes.chapter
@@ -715,20 +735,18 @@ function JED:Refresh()
   r:Place(self.shelf, self.shelf:GetHeight(), 12)
   heights.shelf = r.y
 
-  -- Whole journey: start over from a preset, or Import.
+  -- Whole journey: start over from a preset, or Import; a line each, the button and its text centred on each other.
   local J = self.panes.journey
   r = UI.Stack(J)
-  r:Place(self.startLabel, 16, 4)
-  local x, py = 0, r.y
-  local buttons = {}
-  for _, b in ipairs(self.presets) do buttons[#buttons + 1] = b end
-  buttons[#buttons + 1] = self.import
-  for _, b in ipairs(buttons) do
-    if x > 0 and x + b:GetWidth() > rw then x, py = 0, py + 32 end
-    b:ClearAllPoints(); b:SetPoint("TOPLEFT", J, "TOPLEFT", x, -py)
-    x = x + b:GetWidth() + 4
+  r:Place(self.startLabel, 16, 6)
+  for _, w in ipairs(self.whole) do
+    local th = w.text:GetStringHeight()
+    local h = math.max(28, th)
+    w.b:ClearAllPoints(); w.b:SetPoint("TOPLEFT", J, "TOPLEFT", 0, -(r.y + (h - 28) / 2))
+    w.text:ClearAllPoints(); w.text:SetPoint("TOPLEFT", J, "TOPLEFT", self.wholeW + 10, -(r.y + (h - th) / 2))
+    r:Skip(h + 6)
   end
-  r.y = py + 32 + 12
+  r:Skip(6)
   if src.afterJourney then src.afterJourney(r) end
   heights.journey = r.y
 

@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+- Your standing on the Overview and in the tracker counts the XP you already have, as the Chapter page does: "Ready,
+  12.1 levels to the cap", where it said 13 beside the other page's 12.1.
+- Journey Admin: a chapter chosen on the ruler comes into view in the chapter list (it stayed at the top while you
+  worked on Chapter XV). The Publish bar glows gold over its whole height while there are unpublished changes; only
+  its top edge did.
+- Whole journey (Journey Admin and Create a Fellowship): each preset and Import on a line of its own, with what it
+  does beside it. Import wrapped alone onto a second line, and Create's tab looked empty.
+- Group photo: Salute and other poses that play once start again, so the chosen one no longer stands still.
+- Show me around: in the sample fellowship you are the Tank only if your class can tank; otherwise you are DPS
+  (a Mage was the Tank).
+- The addon is on CurseForge: new versions are uploaded there as well as to GitHub.
+
 ## 0.9.2 beta (30 October 2026)
 - The Your characters panel on the Welcome page: the pale fade at the bottom of the page's list showed through it,
   across a character's name. Lists now fade under the panels, and a panel's list under a question in the book.

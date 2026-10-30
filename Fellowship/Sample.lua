@@ -20,6 +20,10 @@ S.PEOPLE = {
 
 local function full(name) return ns.FullName(name) end
 
+-- Your role in the sample: Tank for a class that can tank, DPS for the rest (a Mage was the sample's Tank; seen in
+-- the check of 30 Oct 2026).
+S.TANKS = { WARRIOR = true, PALADIN = true, DRUID = true, DEATHKNIGHT = true, MONK = true, DEMONHUNTER = true }
+
 -- rank: "leader" or "member" (your rank in the sample).
 function S:Build(rank)
   local F, J = ns.Fellowship, ns.Journey
@@ -38,7 +42,7 @@ function S:Build(rank)
     f.heroes[name] = { level = level, xp = 300 + (#name * 97) % 600, xpMax = 1000, class = class, t = now,
       heard = now - (ago or 0) * 60, offline = ago ~= nil or nil }
   end
-  add(me, myClass, "Tank", 23)
+  add(me, myClass, self.TANKS[myClass] and "Tank" or "DPS", 23)
   for _, p in ipairs(self.PEOPLE) do add(full(p[1]), p[2], p[3], p[4], p[5]) end
   -- Fenna has not been seen for 16 days: away by the rule.
   F:Log(f, L.CHR_FOUNDED:format(f.name, ns.Short(leader)), now - 86400 * 9, "founded", leader)
