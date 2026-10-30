@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.9.3 beta (30 October 2026)
 - Your standing on the Overview and in the tracker counts the XP you already have, as the Chapter page does: "Ready,
   12.1 levels to the cap", where it said 13 beside the other page's 12.1.
 - Journey Admin: a chapter chosen on the ruler comes into view in the chapter list (it stayed at the top while you
