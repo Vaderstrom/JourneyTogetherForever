@@ -576,6 +576,11 @@ local function buildBook(area)
   return book
 end
 
+-- Frame levels over the book's area: the pages (a list's fade is 20 over its scroll frame, UI.Scroll), the panels
+-- laid over them, and the questions and overlays over everything in the book. A panel's own list fade drew over the
+-- question at +60 (30 Oct 2026).
+W.LAYER = { panel = 40, overlay = 100 }
+
 -- A side panel as a bookmarked insert: a loose sheet laid over the right page, a little in from the book's edges,
 -- with a drop shadow, and a ribbon with the panel's icon hanging over its top edge like a bookmark (29 Oct 2026; it
 -- was a strip glued to the book's right edge). It slides in as it opens.
@@ -583,7 +588,7 @@ local function buildPanel(area, key, def)
   local p = UI.Box(area, 2, nil, nil, "gold", 1)
   p.layoutCover = true -- hides the page under it (Dev/Layout.lua)
   p:SetPoint("TOPRIGHT", -22, -20); p:SetPoint("BOTTOMRIGHT", -22, 16); p:SetWidth(380)
-  p:SetFrameLevel(area:GetFrameLevel() + 40)
+  p:SetFrameLevel(area:GetFrameLevel() + W.LAYER.panel)
   p:EnableMouse(true)
   insertPaper(p)
   p.paper = insertPaper
@@ -722,7 +727,7 @@ end
 function W:BuildConfirm(area)
   local c = CreateFrame("Frame", nil, area)
   c:SetAllPoints()
-  c:SetFrameLevel(area:GetFrameLevel() + 60)
+  c:SetFrameLevel(area:GetFrameLevel() + W.LAYER.overlay)
   c:EnableMouse(true)
   local dim = c:CreateTexture(nil, "BACKGROUND")
   dim:SetAllPoints(); dim:SetColorTexture(0, 0, 0, 0.45)
@@ -752,7 +757,7 @@ function W:PickEmblem(color, current, onPick)
   if not p then
     p = CreateFrame("Frame", nil, self.frame.area)
     p:SetAllPoints()
-    p:SetFrameLevel(self.frame.area:GetFrameLevel() + 60)
+    p:SetFrameLevel(self.frame.area:GetFrameLevel() + W.LAYER.overlay)
     p:EnableMouse(true)
     local dim = p:CreateTexture(nil, "BACKGROUND")
     dim:SetAllPoints(); dim:SetColorTexture(0, 0, 0, 0.45)
@@ -786,7 +791,7 @@ function W:Overlay(key, width, height)
   if o then return o end
   o = CreateFrame("Frame", nil, self.frame.area)
   o:SetAllPoints()
-  o:SetFrameLevel(self.frame.area:GetFrameLevel() + 60)
+  o:SetFrameLevel(self.frame.area:GetFrameLevel() + W.LAYER.overlay)
   o:EnableMouse(true)
   local dim = o:CreateTexture(nil, "BACKGROUND")
   dim:SetAllPoints(); dim:SetColorTexture(0, 0, 0, 0.45)

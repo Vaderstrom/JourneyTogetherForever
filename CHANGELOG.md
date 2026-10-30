@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.9.2 beta (30 October 2026)
+- The Your characters panel on the Welcome page: the pale fade at the bottom of the page's list showed through it,
+  across a character's name. Lists now fade under the panels, and a panel's list under a question in the book.
 - Journey Admin is tidier: the right page has three tabs, This chapter (name, levels, dungeons, milestones), Every
   dungeon and Whole journey (Start over, Import, Export), and Publish sits in a bar at the bottom that never scrolls,
   gold while there are unpublished changes. It was at the end of a long scroll, under every dungeon. Create a

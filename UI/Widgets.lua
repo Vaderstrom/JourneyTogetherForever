@@ -895,9 +895,10 @@ function UI.Scroll(parent)
   local thumb = UI.Solid(sf, "OVERLAY", "line", 0.9)
   thumb:SetWidth(3)
   -- While there is more below, the lower edge fades into the page (M25: no half-cut lines). On a frame of its own
-  -- above the content: the scroll frame's own textures draw under its child.
+  -- above the content: the scroll frame's own textures draw under its child. Only a little above it: at +40 the
+  -- Welcome list's fade drew over the Your characters panel (check of 30 Oct 2026; the layers: ns.Window.LAYER).
   local fade = CreateFrame("Frame", nil, sf)
-  fade:SetFrameLevel(sf:GetFrameLevel() + 40)
+  fade:SetFrameLevel(sf:GetFrameLevel() + 20)
   fade:SetPoint("BOTTOMLEFT"); fade:SetPoint("BOTTOMRIGHT")
   fade:SetHeight(UI.SCROLL_FADE)
   fade:SetClipsChildren(true)
