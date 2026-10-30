@@ -40,7 +40,7 @@ function JE.SetCap(j, i, v)
   if i < #j.chapters then return JE.SetBoundary(j, i, v) end
   local c = j.chapters[i]
   if not c then return false end
-  v = ns.Clamp(v, c.floor, 60)
+  v = ns.Clamp(v, c.floor, ns.LevelCap())
   if c.cap == v then return false end
   c.cap = v
   return true

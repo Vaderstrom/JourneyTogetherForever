@@ -190,7 +190,13 @@ function A:MilestoneForm(f)
     o.add:SetPoint("BOTTOMRIGHT", -16, 14)
   end
   local opts = {}
-  for _, a in ipairs(ns.QuestLists:Attunements(f)) do opts[#opts + 1] = { a.name, a.key } end
+  local known
+  for _, a in ipairs(ns.QuestLists:Attunements(f)) do
+    opts[#opts + 1] = { a.name, a.key }
+    known = known or a.key == o.state.attune
+  end
+  -- Molten Core first where the game has it; else the first this game has (WoW Forever has not announced it).
+  if not known then o.state.attune = opts[1] and opts[1][2] end
   o.attune:SetOptions(opts)
   -- Your quests, then the ones the others share ("Wanted: Hogger (Pata)").
   o.quests = ns.Quests:Pickable(f)

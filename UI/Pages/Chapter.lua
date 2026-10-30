@@ -12,6 +12,7 @@ local OA = ns.OtherAddons
 local CELL_W, NAME_W, HEAD_H = 34, 110, 32
 -- A dungeon row and its picture: five rows fit on the page without scrolling (28 Oct 2026).
 local ROW_H, THUMB_W, THUMB_H = 50, 66, 40
+local BRIEF_H = 14 -- a row's third line, how far the dungeon is
 local BIG_PIC_H = 170 -- the chapter's picture when it has no dungeons
 local TRACK_H, NODE_W = 48, 124 -- the stage track and one node in it (four fit the page)
 -- Node colours: done, still to do (the current one takes the banner's colour).
@@ -141,6 +142,11 @@ local function build(pf)
     c.sub = UI.Text(c, 11, "ink2")
     c.sub:SetPoint("TOPLEFT", c.name, "BOTTOMLEFT", 0, -3)
     c.sub:SetWordWrap(false)
+    -- How far it is ("2/5 bosses", "1 still needs it") on a line of its own: after the kind and levels it was cut
+    -- once the row had Lore too ("2/5 b..", check of 30 Oct 2026).
+    c.brief = UI.Text(c, 11, "ink2")
+    c.brief:SetPoint("TOPLEFT", c.sub, "BOTTOMLEFT", 0, -2)
+    c.brief:SetWordWrap(false)
     c.state = UI.Text(c, 12, nil, "body", "RIGHT")
     -- Everything else about the dungeon on hover: who ran it, what is missing, quests picked up.
     c:SetScript("OnEnter", function()
@@ -596,9 +602,11 @@ local function refresh(pf, ctx)
     c.borderRole = color[1]; c:Paint()
     local brief, tip = rowTexts(f, x, st, roleText, counted)
     c.tip, c.roleText = tip, roleText
-    -- The kind in its colour, then the levels and how far it is.
-    local function sub(levels) return ("|cff%s%s|r  ·  %s%s"):format(Theme:HexFor(color[1]), roleText, levels, brief and ("  ·  " .. brief) or "") end
+    -- The kind in its colour, then the levels; how far it is below them.
+    local function sub(levels) return ("|cff%s%s|r  ·  %s"):format(Theme:HexFor(color[1]), roleText, levels) end
     c.sub:SetText(sub(L.CH_LEVELS:format(x.d[3], x.d[4])))
+    c.brief:SetText(brief or "")
+    c.brief:SetShown(brief ~= nil)
     -- At the right: Find group when it is open (the main action), else its state; the Dungeon Journal; and for the
     -- leader a "⋯" menu with Mark cleared and Undo clear.
     c.key = x.key
@@ -617,8 +625,8 @@ local function refresh(pf, ctx)
       end
     end
     local textW = rx - (THUMB_W + 18) - 4
-    c.name:SetWidth(textW); c.sub:SetWidth(textW)
-    -- Next to Find group the line can be too long ("Mandatory · Level 18-21 · 2/5 bo..", seen in the check of 29 Oct
+    c.name:SetWidth(textW); c.sub:SetWidth(textW); c.brief:SetWidth(textW)
+    -- Next to Find group the line can be too long ("Bridge · Chapter III · Level 19-22", seen in the check of 30 Oct
     -- 2026): the levels without "Level" then.
     if c.sub:GetStringWidth() > textW then c.sub:SetText(sub(L.CH_LEVELS_SHORT:format(x.d[3], x.d[4]))) end
     local ok, default = ns.SetDungeonArt(c.pic.tex, x.key, THUMB_W - 2 * UI.PIC_INSET, THUMB_H - 2 * UI.PIC_INSET)
@@ -627,7 +635,9 @@ local function refresh(pf, ctx)
     c.pic.tex:SetShown(ok)
     -- Locked rows are dimmed while the fellowship waits for the floor: the stage above is what matters now.
     c:SetAlpha(st == "locked" and 0.6 or 1)
-    s:Place(c, ROW_H, 4)
+    local h = brief and ROW_H + BRIEF_H or ROW_H
+    c:SetHeight(h)
+    s:Place(c, h, 4)
   end
   pf.rows:HideFrom(shown + 1)
   pf.none:SetShown(ch ~= nil and #list == 0)

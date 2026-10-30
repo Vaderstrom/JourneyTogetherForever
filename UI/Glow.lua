@@ -106,21 +106,36 @@ function UI.Highlight(parent)
 
   -- Around one frame, or around several (from the first one's top left to the last one's bottom right). Frames in
   -- the book are anchored to (they move with the page); others, such as the tracker, get a fixed place on the screen:
-  -- anchoring to them failed in game ("SetPoint would result in anchor family connection").
+  -- anchoring to them failed in game ("SetPoint would result in anchor family connection"). A part of the book the
+  -- game refuses the same way (the leader's tour, check of 30 Oct 2026) gets a fixed place too, and h.refused says
+  -- so. The game refused the fixed place as well in the check of 30 Oct 22:00: then nothing is framed and
+  -- h.refused is "all". False when there is nothing to frame: no place on the screen yet, a secret one, or refused.
   function h:Around(first, last, fixed)
     last = last or first
     self:ClearAllPoints()
+    self.refused = nil
+    if not fixed and not (pcall(self.SetPoint, self, "TOPLEFT", first, "TOPLEFT", -PAD, PAD)
+        and pcall(self.SetPoint, self, "BOTTOMRIGHT", last, "BOTTOMRIGHT", PAD, -PAD)) then
+      self:ClearAllPoints()
+      fixed, self.refused = true, true
+    end
     if fixed then
+      local l, t, r, b = first:GetLeft(), first:GetTop(), last:GetRight(), last:GetBottom()
+      local function none(v) return v == nil or (issecretvalue ~= nil and issecretvalue(v)) end
+      if none(l) or none(t) or none(r) or none(b) then self:Off(); return false end
       local s = UIParent:GetEffectiveScale()
-      local function px(f, v) return (v or 0) * f:GetEffectiveScale() / s end
-      self:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", px(first, first:GetLeft()) - PAD, px(first, first:GetTop()) + PAD)
-      self:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMLEFT", px(last, last:GetRight()) + PAD, px(last, last:GetBottom()) - PAD)
-    else
-      self:SetPoint("TOPLEFT", first, "TOPLEFT", -PAD, PAD)
-      self:SetPoint("BOTTOMRIGHT", last, "BOTTOMRIGHT", PAD, -PAD)
+      local function px(f, v) return v * f:GetEffectiveScale() / s end
+      if not (pcall(self.SetPoint, self, "TOPLEFT", UIParent, "BOTTOMLEFT", px(first, l) - PAD, px(first, t) + PAD)
+          and pcall(self.SetPoint, self, "BOTTOMRIGHT", UIParent, "BOTTOMLEFT", px(last, r) + PAD, px(last, b) - PAD)) then
+        self:ClearAllPoints()
+        self.refused = "all"
+        self:Off()
+        return false
+      end
     end
     self:Show()
     if not ns.Settings or not ns.Settings:Get("reduce") then self.pulse:Play() end
+    return true
   end
   function h:Off() self.pulse:Stop(); self:Hide() end
   return h

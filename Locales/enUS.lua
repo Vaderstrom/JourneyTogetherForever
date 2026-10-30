@@ -546,6 +546,7 @@ ns.L = setmetatable({
   SUB_RAIDS = "The Endgame: after the journey",
   RAIDS_HELP = "The classic raids, open now that the journey is done. A boss kill counts when at least %d Adventurers of the fellowship are in the raid; the rest can be anyone.",
   RAID_SIZE = "%d-player raid",
+  RAID_ANY_SIZE = "Raid",
   RAID_NO_ATTUNE = "No attunement needed",
   RAID_ATTUNED = "Attuned: %s",
   RAID_NOT_ATTUNED = "Still needed by: %s",
@@ -553,6 +554,9 @@ ns.L = setmetatable({
   RAID_YOU_BOSSES = "You: %d of %d bosses",
   RAID_YOU_BOSS = "You: %d of %d boss",
   RAID_CLEARED_BY = "Cleared by %d of %d Adventurers",
+  -- A raid Blizzard has announced for a later day (WoW Forever's open on 9 December 2026).
+  RAID_OPENS = "Opens %s",
+  RAID_NOT_OPEN = "Not open yet. Blizzard opens it on %s; kills count from then.",
   RAID_BOSSES_HEAD = "Bosses",
   RAID_BOSS_HEROES = "%d of %d Adventurers",
   RAID_ATTUNE_HEAD = "Attunement",
@@ -724,6 +728,7 @@ ns.L = setmetatable({
   ED_SHELF_HINT = "Drag one onto a chapter, or click it to add it to Chapter %s. Gold ones fit this chapter's levels.",
   ED_SHELF_IN = "In Chapter %s",
   ED_SHELF_FREE = "Not in the journey",
+  ED_EXPANSION = "Expansion %d",
   ED_SHELF_TIP = "Drag it onto a chapter, or click to add it to the chosen one.",
 
   -- Manage

@@ -82,6 +82,8 @@ end
 
 ns:RegisterEvent("ADDON_LOADED", function(_, name)
   if name ~= ADDON then return end
+  -- The dungeons, raids and quests of the game this copy runs in (WoW Forever or retail), before anything reads them.
+  ns.KeepThisGame()
   -- Account-wide: every character's last known fellowship (for "Your characters").
   _G[DB_NAME] = _G[DB_NAME] or { schema = 1, characters = {}, fellowships = {} }
   -- Per character: this character's membership, personal settings and window position.

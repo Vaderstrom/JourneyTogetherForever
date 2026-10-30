@@ -36,14 +36,18 @@ local PH = {
 }
 ns.Photo = PH
 
--- Poses: { text, animation } with the game's animation IDs (0 Stand, 26 Ready1H, 68 EmoteCheer, ...). Emotes loop;
--- one that plays once starts again (newActor).
+-- Poses: { text, animation, plays once } with the game's animation IDs (0 Stand, 26 Ready1H, 68 EmoteCheer, ...).
+-- The game's Emotes table marks Cheer, Salute, Wave and the like ONESHOT: the model plays them once and stands, so
+-- they start again every AGAIN seconds (PH:Again). Stand, Ready, Dance, Kneel and Sit go on by themselves. Sit is 97
+-- (SitGround, what /sit holds): the check of 30 Oct 2026 found that a player model has no 72 (EmoteSitGround), and
+-- stood.
 PH.POSES = {
-  { "PHOTO_POSE_STAND", 0 }, { "PHOTO_POSE_READY", 26 }, { "PHOTO_POSE_CHEER", 68 }, { "PHOTO_POSE_SALUTE", 113 },
-  { "PHOTO_POSE_FLEX", 82 }, { "PHOTO_POSE_ROAR", 74 }, { "PHOTO_POSE_WAVE", 67 }, { "PHOTO_POSE_BOW", 66 },
-  { "PHOTO_POSE_LAUGH", 70 }, { "PHOTO_POSE_POINT", 84 }, { "PHOTO_POSE_DANCE", 69 }, { "PHOTO_POSE_KNEEL", 75 },
-  { "PHOTO_POSE_SIT", 72 },
+  { "PHOTO_POSE_STAND", 0 }, { "PHOTO_POSE_READY", 26 }, { "PHOTO_POSE_CHEER", 68, true },
+  { "PHOTO_POSE_SALUTE", 113, true }, { "PHOTO_POSE_FLEX", 82, true }, { "PHOTO_POSE_ROAR", 74, true },
+  { "PHOTO_POSE_WAVE", 67, true }, { "PHOTO_POSE_BOW", 66, true }, { "PHOTO_POSE_LAUGH", 70, true },
+  { "PHOTO_POSE_POINT", 84, true }, { "PHOTO_POSE_DANCE", 69 }, { "PHOTO_POSE_KNEEL", 75 }, { "PHOTO_POSE_SIT", 97 },
 }
+PH.AGAIN = 4 -- seconds from one start of a pose that plays once to the next
 -- Backdrops: the world itself (the interface hidden), a dark studio, the chapter's picture, the dungeon's.
 PH.BACKDROPS = { "world", "studio", "chapter", "dungeon" }
 
@@ -113,28 +117,31 @@ end
 ---------------------------------------------------------------------------
 -- The pose an actor holds. A model loads after SetModelByUnit returns and then takes the unit's own stance: you
 -- crouched as on your mount in the twelve-person photo (seen in the check, 30 Oct 2026). It is set again once loaded.
-local function hold(a, anim)
-  a.anim = anim
-  a:SetAnimation(anim)
+local function hold(a, pose)
+  a.anim, a.once, a.since = pose[2], pose[3], GetTime()
+  a:SetAnimation(pose[2])
 end
 local function onLoaded(a) if a.anim then a:SetAnimation(a.anim) end end
-
--- Some emotes play once and the model then stands: the chosen one stood under "Salute" (check of 30 Oct 2026). When
--- an animation ends, the pose starts again: a frame of standing first, as setting the same animation again may not
--- start it over (it still stood in the next check). PH.animEnds counts the ends, for the self-test.
-local function onFinished(a)
-  PH.animEnds = (PH.animEnds or 0) + 1
-  if not a.anim or a.anim == 0 then return end
-  a:SetAnimation(0)
-  C_Timer.After(0, function() if a.anim then a:SetAnimation(a.anim) end end)
-end
 local function newActor(scene)
   local a = scene:CreateActor()
-  if a.SetScript then
-    pcall(a.SetScript, a, "OnModelLoaded", onLoaded)
-    PH.endHook = pcall(a.SetScript, a, "OnAnimFinished", onFinished)
-  end
+  if a.SetScript then pcall(a.SetScript, a, "OnModelLoaded", onLoaded) end
   return a
+end
+
+-- A pose that plays once starts again every AGAIN seconds (a ticker while the photo is open). The game says nothing
+-- when it ends: an actor made in Lua takes no OnAnimFinished handler (check of 30 Oct 2026; only Blizzard's XML
+-- templates have one). A frame of standing first, as setting the same animation again may not start it over. PH.restarts
+-- counts them, for the self-test.
+function PH:Again(now)
+  for _, c in ipairs(self.cast or {}) do
+    local a = c.actor
+    if a.once and now - a.since >= self.AGAIN then
+      a.since = now
+      self.restarts = (self.restarts or 0) + 1
+      a:SetAnimation(0)
+      C_Timer.After(0, function() if a.once then a:SetAnimation(a.anim) end end)
+    end
+  end
 end
 
 -- Loads a member's model when the game can draw them now (also with the photo closed, while grouped). Returns the
@@ -382,7 +389,7 @@ function PH:Open(opts)
     c.x, c.y, c.pose = places[i].x, places[i].y, 1
     c.actor:SetPosition(c.x, c.y, 0)
     c.actor:SetYaw(0)
-    hold(c.actor, self.POSES[1][2])
+    hold(c.actor, self.POSES[1])
     c.actor:Show()
     local label = fr.labels[i] or UI.Text(fr.over, 14, "white", "title", "CENTER")
     shadow(label)
@@ -423,12 +430,14 @@ function PH:Open(opts)
     if PH:IsOpen() and not PH.measured then PH:Fit(); PH:Fit(); PH:Labels() end
     if PH:IsOpen() then PH:Hold() end
   end)
+  if self.again then self.again:Cancel() end
+  self.again = C_Timer.NewTicker(0.25, function() PH:Again(GetTime()) end)
   return true
 end
 
 -- Everyone in their pose again, once the models have loaded (see hold).
 function PH:Hold()
-  for _, c in ipairs(self.cast or {}) do hold(c.actor, self.POSES[c.pose][2]) end
+  for _, c in ipairs(self.cast or {}) do hold(c.actor, self.POSES[c.pose]) end
 end
 
 function PH:IsOpen() return self.frame ~= nil and self.frame:IsShown() end
@@ -438,6 +447,7 @@ function PH:Close()
   self:Look(false)
   self.frame:Hide()
   self.drag = nil
+  if self.again then self.again:Cancel(); self.again = nil end
   self:WorldNames(true)
   self:GameCamera(false)
   if self.hidUI then
@@ -648,7 +658,7 @@ function PH:StepPose(dir)
   local c = self.chosen and self.cast[self.chosen]
   if c then
     c.pose = (c.pose - 1 + dir) % n + 1
-    hold(c.actor, self.POSES[c.pose][2])
+    hold(c.actor, self.POSES[c.pose])
   else
     self.allPose = ((self.allPose or 1) - 1 + dir) % n + 1
     for _, x in ipairs(self.cast) do x.pose = self.allPose end

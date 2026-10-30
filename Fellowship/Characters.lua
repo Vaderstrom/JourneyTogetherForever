@@ -43,9 +43,15 @@ function C:Row(key)
     local ch = ns.Fellowship:CurrentChapter(f)
     row.fname, row.color, row.emblem = f.name, f.color, f.emblem
     row.sub = ch and L.CHAPTER_LINE:format(ns.Journey.Roman(ch.n), ch.name) or L.JOURNEY_COMPLETE
+    -- Without the chapter's name, for a row too narrow for all of it: "as of" must show ("Chapter III: The Wailing
+    -- and the Wolf · as of 12..", check of 30 Oct 2026).
+    row.subShort = ch and L.CHAPTER_ROMAN:format(ns.Journey.Roman(ch.n)) or L.JOURNEY_COMPLETE
     -- Followed live this session (Fellowship/Watch.lua): not "as of" when it was last played.
     local live = ns.Watch and ns.Watch.last[f.id]
-    if not isMe then row.sub = row.sub .. (live and L.ROW_LIVE or L.AS_OF:format(ns.TimeAgo(c.lastSeen))) end
+    if not isMe then
+      local when = live and L.ROW_LIVE or L.AS_OF:format(ns.TimeAgo(c.lastSeen))
+      row.sub, row.subShort = row.sub .. when, row.subShort .. when
+    end
   else
     row.fname = L.NO_FELLOWSHIP
     -- (It said "No fellowship" and "Not in a fellowship" under each other.) The other side's characters say so.

@@ -959,7 +959,8 @@ function UI.Scroll(parent)
   function sf:Reveal(top, h)
     local view, pos = self:GetHeight(), self:GetVerticalScroll()
     if view <= UI.SCROLL_FADE then return false end
-    if top < pos then pos = top
+    -- (A row taller than the view shows its top, where its name is.)
+    if top < pos or h > view - UI.SCROLL_FADE then pos = top
     elseif top + h > pos + view - UI.SCROLL_FADE then pos = top + h - view + UI.SCROLL_FADE end
     self:SetVerticalScroll(pos); update()
     return true

@@ -1,14 +1,48 @@
 # Changelog
 
-## Unreleased
+## 0.10.0 beta (30 October 2026)
+- Each game shows what it offers. WoW Forever: what Blizzard has announced for it, since the game's files hold back
+  what is not out yet. That is 34 dungeons at launch, the Classic ones and the nine new ones, and three raids:
+  Barrow Deeps, Hyjal Summit and Onyxia's Lair. Zul'Gurub, Molten Core, Blackwing Lair, the Ahn'Qiraj raids and
+  Naxxramas are not shown, nor their attunements, until Blizzard announces them.
+  Retail: every dungeon and raid of its Adventure Guide, 142 and 62, with the game's names, levels, pictures and
+  bosses, and none of WoW Forever's attunements or quest lists. The Dungeons and Raids pages, Gatherings, clears and
+  raids as Endgame follow the game.
+- Raids: the three raids of WoW Forever show "Opens 9 December" until then, with no Find group, and their kills count
+  from that day. A boss killed there earlier (by you or another Adventurer) opens the raid at once.
+- Shaper's Terrace, the ninth new dungeon of WoW Forever, is mandatory in the last chapter (levels 58-60). Its bosses
+  are learned as they fall, like the other new dungeons until the game's data has them.
+- Journey editor: on retail the dungeons to place are grouped by expansion, under the game's names for them.
+- Journey editor: a dungeon name too long for its chip (retail's "Dire Maul - Warpwood Quarter") takes the room of
+  the level range, which stays in its tooltip. It was cut off.
+- Show me around no longer stops with an error when the game refuses to put the gold frame anywhere: that step
+  frames nothing, and the tour goes on.
+- Dire Maul: West and North join East, optional, in the Classic chapter at levels 57-60 (Chapter XV).
+- The presets hold every Classic dungeon the game offers. Ragefire Chasm is optional in Heroes Awaken (Chapter II) in
+  both games. On retail its own versions have places too: Scarlet Halls in Chapter VI, Scarlet Monastery in Chapter
+  VII and Stratholme's Service Entrance beside its Main Gate in Chapter XV, all mandatory; Upper Blackrock Spire stays.
+- The presets stay the Classic ones in both games. A chapter keeps a dungeon the game does not have and finishes on
+  level until it has it.
+- Raids: a raid whose size the game does not give says "Raid".
+- Journey Admin: a chapter too tall for the chapter list comes into view at its top.
+- The level cap is the game's: 60 in WoW Forever, the game's own on retail (80). On retail a journey can now reach it
+  in the journey editor; the presets stay 1-60.
+- Boss lists checked against WoW Forever 1.60.1.70685 (no changes).
 - Dungeon and chapter pictures sit in a thin gold frame everywhere, like the picture tiles: the Overview's chapter,
   the chosen Gathering, Since you were last here, How it works on the Welcome page, the dungeon rows on the Chapter
   page and the raid cards. They were pasted onto the page with no frame.
 - Joining a fellowship opens the book on the Overview, where the welcome card is. It showed the page you last had
   open in an earlier fellowship, and that ticked off the card's step at once.
 - Leaving a fellowship takes its welcome card with you: join it again and the card starts afresh, even if you hid it.
-- Group photo: a pose that plays once (Salute) now stands for a moment and then starts over. Setting the same pose
-  again was not enough: in 0.9.3 the Salute still froze.
+- Group photo: a pose that plays once (Cheer, Salute, Wave, Bow and the like) starts again every four seconds. The
+  game does not tell an addon when such a pose ends, so in 0.9.3 the Salute stood still.
+- Group photo: Sit sits. It used an animation player models do not have, so everyone stood.
+- Show me around: when the game will not let the gold frame hold on to a part of the book, the frame is drawn at that
+  part's place on the screen. The tour stopped there with a Lua error.
+- Chapter page: how far a dungeon is ("2/5 bosses", "1 still needs it") has a line of its own under the kind and
+  levels. With Lore on every row it was cut to "2/5 b..".
+- Your characters: another character's row keeps "as of 12 hours ago" when the chapter's name is long; it shows the
+  chapter's number alone then. It was cut to "as of 12..".
 - Lore and Listen always show, as the Dungeon Journal does: Lore on every dungeon row and raid card, Listen on every
   attunement step, chain part and quest. Without Lore Forever or Spoken, a click says to install it; a quest Spoken
   keeps hidden says when it shows. They showed only while those addons ran, so you could not know they were there.

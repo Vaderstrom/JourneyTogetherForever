@@ -70,6 +70,7 @@ function UI.CharacterList(parent, width)
       b.line:SetText(row.line)
       b.fname:SetText(row.fname)
       b.sub:SetText(row.sub)
+      if row.subShort and b.sub:GetStringWidth() > width - 50 then b.sub:SetText(row.subShort) end
       b.crest:SetShown(row.fellowship ~= nil)
       if row.fellowship then b.crest:Set(row.color, row.emblem) end
       b.classCrest:SetShown(row.fellowship == nil)

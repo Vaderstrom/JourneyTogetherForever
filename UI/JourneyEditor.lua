@@ -30,6 +30,9 @@ local function paint(b, bg, bgA, border, text)
   b:SetBackdropColor(Theme:RGBA(bg, bgA)); b:SetBackdropBorderColor(Theme:RGBA(border)); b.text:SetTextColor(Theme:RGBA(text))
 end
 
+-- A text's whole width, also where SetWidth cuts it.
+local function full(fs) return fs.GetUnboundedStringWidth and fs:GetUnboundedStringWidth() or fs:GetStringWidth() end
+
 -- A dungeon chip: drag it somewhere, or click it. b.item = { base = key } (on the shelf) or { key = placement }.
 local function chip(parent, ed, onClick)
   local b = CreateFrame("Button", nil, parent, "BackdropTemplate")
@@ -84,6 +87,14 @@ end
 local PLATE_PAD, PLATE_TOP, PLATE_BELOW = 12, 12, 26 -- PLATE_BELOW: room for the level numbers under the track
 local FOLD_W = 14 -- each side of the fold's shade
 JED.PLATE_PAD = PLATE_PAD
+
+-- The ruler's last level: the game's cap (Forever 60, retail 80), or the journey's last cap when it reaches higher
+-- (a Leader whose account has a higher cap).
+function JED.RulerTop(j)
+  local last = j.chapters[#j.chapters]
+  return math.max(ns.LevelCap(), last and last.cap or 0)
+end
+
 function JED.Plate(parent, width, rulerH)
   local p = UI.Card(parent)
   p:SetSize(width, PLATE_TOP + rulerH + PLATE_BELOW)
@@ -159,9 +170,10 @@ function JED.New(left, right, lw, rw, src)
     seg:SetScript("OnClick", function() src.setSel(seg.i) end)
     ed.segs[i] = seg
   end
-  -- Level marks under the ruler: a short one every 5 levels, a long one every 10.
+  -- Level marks under the ruler: a short one every 5 levels, a long one every 10, up to the game's cap (30 Oct 2026:
+  -- Forever 60, retail 80; marks past the ruler's end are hidden).
   ed.marks = {}
-  for v = 5, 60, 5 do
+  for v = 5, ns.HighestLevel(), 5 do
     local m = UI.Solid(ed.ruler, "BORDER", "ink2", 0.7)
     m:SetWidth(1); m:SetHeight(v % 10 == 0 and 6 or 3)
     ed.marks[#ed.marks + 1] = { tex = m, v = v }
@@ -187,12 +199,12 @@ function JED.New(left, right, lw, rw, src)
     h:SetScript("OnLeave", function() if not ed.drag then GameTooltip:Hide() end end)
     ed.handles[i] = h
   end
-  -- The levels: every 10 (10, 20 ... 60), and where the journey starts (1 with the Prologue).
+  -- The levels: every 10 (10, 20 ... the cap), and where the journey starts (1 with the Prologue).
   ed.ticks = {}
-  for i, v in ipairs({ 0, 10, 20, 30, 40, 50, 60 }) do
+  for v = 0, ns.HighestLevel(), 10 do
     local t = UI.Text(ed.plate, 11, "ink2", "body", "CENTER")
     t:SetText(v)
-    ed.ticks[i] = { fs = t, v = v }
+    ed.ticks[#ed.ticks + 1] = { fs = t, v = v }
   end
   local function act(fn) return function() src.edit(function(j) fn(j, src.sel()) end) end end
   ed.split = UI.TextButton(left, L.ED_SPLIT, function()
@@ -315,15 +327,33 @@ function JED.New(left, right, lw, rw, src)
   ed.shelf:SetWidth(rw)
   ed.shelf.bg = ed.shelf:CreateTexture(nil, "BACKGROUND")
   ed.shelf.bg:SetAllPoints(); ed.shelf.bg:SetTexture(ns.WHITE)
-  local list = {}
-  for _, d in ipairs(ns.DUNGEONS) do list[#list + 1] = d end
-  table.sort(list, function(a, b) if a[3] ~= b[3] then return a[3] < b[3] end return a[2] < b[2] end)
-  ed.shelfChips, ed.shelfBy = {}, {}
+  -- By level; where the game has dungeons of several expansions (retail's Adventure Guide, 30 Oct 2026), grouped by
+  -- expansion under its name (the game's own text).
+  local list, exps = {}, {}
+  local function exp(d) return ns.EXPANSION[d[1]] or 0 end
+  for _, d in ipairs(ns.DUNGEONS) do list[#list + 1] = d; exps[exp(d)] = true end
+  table.sort(list, function(a, b)
+    if exp(a) ~= exp(b) then return exp(a) < exp(b) end
+    if a[3] ~= b[3] then return a[3] < b[3] end
+    return a[2] < b[2]
+  end)
+  local grouped = next(exps, next(exps)) ~= nil
+  ed.shelfChips, ed.shelfBy, ed.shelfHeads = {}, {}, {}
   local cw = math.floor((rw - 6) / 2)
+  local y, col, group = 4, 0, nil
   for i, d in ipairs(list) do
+    if grouped and exp(d) ~= group then
+      if col == 1 then y, col = y + 26, 0 end
+      group = exp(d)
+      local head = UI.SectionHeader(ed.shelf, rw)
+      head:SetPoint("TOPLEFT", 0, -y)
+      head:SetText(_G["EXPANSION_NAME" .. group] or L.ED_EXPANSION:format(group + 1))
+      ed.shelfHeads[#ed.shelfHeads + 1] = head
+      y = y + 29 + 4
+    end
     local b = chip(ed.shelf, ed, function(self) ed:AddHere(self.item.base) end)
     b:SetSize(cw, 22)
-    b:SetPoint("TOPLEFT", ((i - 1) % 2) * (cw + 6), -(4 + math.floor((i - 1) / 2) * 26))
+    b:SetPoint("TOPLEFT", col * (cw + 6), -y)
     b.text:SetText(d[2]); b.text:SetWidth(cw - 60)
     b.sub = UI.Text(b, 12, "ink2", "body", "RIGHT")
     b.sub:SetPoint("RIGHT", -6, 0); b.sub:SetText(d[3] .. "-" .. d[4])
@@ -332,8 +362,11 @@ function JED.New(left, right, lw, rw, src)
     b.item, b.d = { base = d[1] }, d
     ed.shelfChips[i] = b
     ed.shelfBy[d[1]] = b
+    if col == 1 then y = y + 26 end
+    col = 1 - col
   end
-  ed.shelf:SetHeight(4 + math.ceil(#list / 2) * 26 + 4)
+  if col == 1 then y = y + 26 end
+  ed.shelf:SetHeight(y + 4)
   -- Whole journey: each preset, and Import, on a line of its own with what it does (the buttons wrapped, Import
   -- alone on the second line, and Create's tab looked empty; check of 30 Oct 2026).
   ed.startLabel = UI.Text(J, 13, "ink2")
@@ -475,7 +508,7 @@ function JED:DragUpdate()
     if not a then return end
     local lo = j.chapters[1].floor
     local x = cursor(self.ruler) - (self.ruler:GetLeft() or 0)
-    local level = math.floor(lo + x / self.rulerW * math.max(1, 60 - lo) + 0.5)
+    local level = math.floor(lo + x / self.rulerW * math.max(1, JED.RulerTop(j) - lo) + 0.5)
     if level ~= a.cap then self.src.edit(function(jj) JE.SetBoundary(jj, item.boundary, level) end) end
     local h = self.handles[item.boundary]
     if h then self:HandleTip(h) end
@@ -565,10 +598,11 @@ function JED:Refresh()
   end
   local rulerW = self.rulerW
 
-  -- The ruler: every chapter from the first floor to 60, the chosen one in the Leader colour; the marks between.
-  local lo = j.chapters[1].floor
-  local span = math.max(1, 60 - lo)
-  local function xOf(level) return (ns.Clamp(level, lo, 60) - lo) / span * rulerW end
+  -- The ruler: every chapter from the first floor to the game's cap, the chosen one in the Leader colour; the marks
+  -- between.
+  local lo, top = j.chapters[1].floor, JED.RulerTop(j)
+  local span = math.max(1, top - lo)
+  local function xOf(level) return (ns.Clamp(level, lo, top) - lo) / span * rulerW end
   for i, seg in ipairs(self.segs) do
     local c = j.chapters[i]
     seg:SetShown(c ~= nil)
@@ -595,7 +629,7 @@ function JED:Refresh()
     end
   end
   for _, m in ipairs(self.marks) do
-    m.tex:SetShown(m.v > lo)
+    m.tex:SetShown(m.v > lo and m.v <= top)
     m.tex:ClearAllPoints(); m.tex:SetPoint("TOP", self.ruler, "BOTTOMLEFT", xOf(m.v), 0)
   end
   for i, h in ipairs(self.handles) do
@@ -608,11 +642,11 @@ function JED:Refresh()
   -- The first label is where the journey starts (1 with the Prologue); then every 10 levels, where there is room.
   for i, t in ipairs(self.ticks) do
     local v = i == 1 and lo or t.v
-    local shown = i == 1 or (t.v > lo and xOf(t.v) - xOf(lo) >= 16)
+    local shown = i == 1 or (t.v > lo and t.v <= top and xOf(t.v) - xOf(lo) >= 16)
     t.fs:SetShown(shown)
     if shown then
       t.fs:SetText(v)
-      local point = i == 1 and "TOPLEFT" or (i == #self.ticks and "TOPRIGHT" or "TOP")
+      local point = i == 1 and "TOPLEFT" or (t.v == top and "TOPRIGHT" or "TOP")
       t.fs:ClearAllPoints(); t.fs:SetPoint(point, self.ruler, "BOTTOMLEFT", xOf(v), -7)
     end
   end
@@ -728,6 +762,14 @@ function JED:Refresh()
     elseif fits then paint(b, "gold", 0.3, "gold", "ink")
     else paint(b, "page2", 0.95, "bookEdge", #chs > 0 and "ink2" or "ink") end
     b.check:SetShown(here)
+    -- The name gets the room the check does not take. A name still too long (retail's "Dire Maul - Warpwood
+    -- Quarter", check of 30 Oct 2026, 22:00) takes the level range's room too: the tooltip has both.
+    local room = b:GetWidth() - 12 - (here and 18 or 0)
+    local long = full(b.text) > room - full(b.sub) - 4
+    b.sub:SetShown(not long)
+    b.check:ClearAllPoints()
+    if long then b.check:SetPoint("RIGHT", -6, 0) else b.check:SetPoint("RIGHT", b.sub, "LEFT", -4, 0) end
+    b.text:SetWidth(long and room or room - full(b.sub) - 4)
     local romans = {}
     for _, c in ipairs(chs) do romans[#romans + 1] = ns.Journey.Roman(c) end
     b.tip = { d[2], d[3] .. "-" .. d[4] .. "  ·  " .. (#chs > 0 and L.ED_SHELF_IN:format(table.concat(romans, ", ")) or L.ED_SHELF_FREE), L.ED_SHELF_TIP }

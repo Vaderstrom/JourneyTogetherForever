@@ -31,7 +31,10 @@ ns.PRESETS = {
 }
 
 -- Chapters and dungeon places for a preset. Dungeons go to the chapter that matches their best level;
--- outside the Classic preset bridges become mandatory.
+-- outside the Classic preset bridges become mandatory. The presets plan with the catalog's levels and chapters
+-- (ns.PLAN_DUNGEONS, Data/Dungeons.lua), so they are the same in every game: in Forever every catalog dungeon is
+-- placed, also one the game does not list yet (its chapter finishes on level until it does); on retail the ones its
+-- Adventure Guide has, and its own Classic versions (ns.GUIDE_PLAN).
 -- Every preset but Start from scratch begins with the Prologue (27 Oct 2026): levels 1-15, no dungeons, done when
 -- everyone reaches 15. Each chapter keeps its picture (art: the preset chapter's number, or "prologue"), so the
 -- pictures do not move when chapters are added in front.
@@ -47,7 +50,7 @@ function ns.BuildJourney(key)
     chapters[i + off] = { name = name, floor = b[1], cap = b[2], color = ns.PALETTE[(i - 1) % #ns.PALETTE + 1], art = i }
   end
   local place = {}
-  for _, d in ipairs(ns.DUNGEONS) do
+  for _, d in ipairs(ns.PLAN_DUNGEONS or ns.DUNGEONS) do
     local k, min, max, ch, role = d[1], d[3], d[4], d[5], d[6]
     if P ~= "scratch" and ch ~= 0 then
       if P == "classic" and ns.DUNGEON_SPLITS[k] then

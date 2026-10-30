@@ -277,6 +277,8 @@ end)
 -- with poses and one chosen.
 shot("group-photo", "Group photo (the world)", "The interface hidden; everyone side by side at true size, names under their feet, the crest and name top left, the controls at the bottom", function()
   hideOverlays()
+  -- The photo keeps the backdrop it last had (the self-test's was the studio; seen in the check of 30 Oct 2026).
+  ns.Photo.backdrop = "world"
   ns.Photo:Open({ standIns = true })
 end, { wait = 0.8 })
 shot("group-photo-studio", "Group photo (studio, poses)", "The studio backdrop; everyone cheering, the second one chosen (gold name) and saluting", function()
@@ -284,8 +286,12 @@ shot("group-photo-studio", "Group photo (studio, poses)", "The studio backdrop; 
   PH:SetBackdrop("studio")
   PH:Choose(nil)
   PH:StepPose(2)
-  if PH.cast[2] then PH:Choose(2); PH:StepPose(1) end
-end, { wait = 0.8 })
+  -- The salute a moment later, as a click would set it, and close to the shot: it is short, and the shot 0.8 seconds
+  -- after it showed Brannic standing again in three checks of 30 Oct 2026 (it played in the lab).
+  C_Timer.After(0.5, function()
+    if PH:IsOpen() and PH.cast[2] then PH:Choose(2); PH:StepPose(1) end
+  end)
+end, { wait = 0.9 })
 shot("group-photo-twelve", "Group photo (twelve)", "Two rows of six, the back row between the heads in front; the camera a little higher; names under the front row's feet and over the back row's heads", function()
   local PH = ns.Photo
   PH:Close()
@@ -339,7 +345,7 @@ local function attRow(key)
 end
 shot("quests-attune", "Quests (Attunements tab)", "The grid and Molten Core's steps (as seen at level 60)", function()
   ns.QuestLists.viewLevel = 60
-  pf("quests").attSel = attRow("mc"); W():Refresh()
+  pf("quests").attSel = attRow("mc") or 1; W():Refresh() -- (WoW Forever has not announced Molten Core: the first)
 end)
 shot("quests-attune-ony", "Quests (Onyxia's steps)", "A long attunement chain", function()
   pf("quests").attSel = attRow("ony"); W():Refresh()
@@ -480,16 +486,28 @@ shot("raids", "Raids (the Endgame)", "Each raid with its picture, attunement and
   ns.char.endgameSeen[f.id] = time()
   tourReached = f.reached
   f.reached = #f.journey.chapters + 1
+  -- The first raid chosen, as a player opening the page sees it (the self-test chose its own raid before, and the
+  -- right page showed one far down the list; check of 30 Oct 2026, 22:00).
+  if pf("raids") then pf("raids").raid = nil end
   page("raids")
 end)
 shot("raids-mc", "Raids (Molten Core chosen)", "Boss progress after two kills, who is attuned, Find group for a raid", function()
+  -- Molten Core where the game has it; in WoW Forever (no Molten Core announced) the raid with the most bosses.
+  local key = ns.Raid("mc") and "mc"
+  if not key then
+    local most = -1
+    for _, r in ipairs(ns.RAIDS) do
+      local n = #(ns.Clears:DataBosses(r[1]) or {})
+      if n > most then key, most = r[1], n end
+    end
+  end
   for _, n in ipairs(PRETEND) do dev("group " .. n) end
-  dev("kill mc 2")
+  dev("kill " .. key .. " 2")
   dev("group off")
   ns.Picture:Hide()
   page("raids")
-  pf("raids").raid = "mc"; W():Refresh()
-  ns.Endgame:FindGroup(cur(), "mc")
+  pf("raids").raid = key; W():Refresh()
+  ns.Endgame:FindGroup(cur(), key)
 end, { toast = true })
 prep(function() local f = cur(); if f then f.reached = tourReached end; ns.Picture:Hide(); page("overview") end, 0.3)
 prep(function() hideOverlays(); dev("tourney start") end, 0.3)

@@ -17,6 +17,9 @@ local function names(list, me)
   return table.concat(out, ", ")
 end
 
+-- "40-player raid", or "Raid" where the game gives no size (retail's newer raids take 10 to 30 players).
+local function size(r) return r[4] > 0 and L.RAID_SIZE:format(r[4]) or L.RAID_ANY_SIZE end
+
 local function build(pf)
   local W = ns.Window
   local width = W.PAGE_W - 8
@@ -110,27 +113,31 @@ local function refresh(pf, ctx)
     c.key = key
     if key == pf.raid then chosen = r end
     c.name:SetText(r[2])
-    c.size:SetText(L.RAID_SIZE:format(r[4]))
+    c.size:SetText(size(r))
     local ok, default = ns.SetDungeonArt(c.pic.tex, key, width - 8 - 2 * UI.PIC_INSET, PIC_H - 2 * UI.PIC_INSET)
     if default then ns.Pages:SetChapterArt(c.pic.tex, nil, width - 8 - 2 * UI.PIC_INSET, PIC_H - 2 * UI.PIC_INSET, 0.5); ok = true end
     c.pic.tex:SetShown(ok)
     local cleared = 0
     for name in pairs(J:ClearedBy(f, key)) do if f.members[name] then cleared = cleared + 1 end end
     local done = J:Cleared(f, key)
-    c.mark:SetMark(done and "cleared" or "open")
-    c.state:SetText(L.RAID_CLEARED_BY:format(cleared, #counted))
+    -- Not open yet (a date Blizzard announced): the date instead of progress, and no Find group.
+    local open = ns.IsOpen(key, f)
+    c.mark:SetMark(not open and "locked" or (done and "cleared" or "open"))
+    c.state:SetText(open and L.RAID_CLEARED_BY:format(cleared, #counted) or L.RAID_OPENS:format(ns.OpensText(key)))
     c.sel:SetShown(key == pf.raid)
     local st = E:AttuneStatus(f, r)
     local att = not r[5] and L.RAID_NO_ATTUNE
       or (#st.attuned > 0 and L.RAID_ATTUNED:format(names(st.attuned, me)) or L.RAID_NOBODY_ATTUNED)
     local n, of = ns.Clears:Progress(f, key, me)
-    c.info:SetText(att .. "\n" .. (of == 1 and L.RAID_YOU_BOSS or L.RAID_YOU_BOSSES):format(n, of))
+    c.info:SetText(att .. "\n" .. (open and (of == 1 and L.RAID_YOU_BOSS or L.RAID_YOU_BOSSES):format(n, of)
+      or L.RAID_NOT_OPEN:format(ns.OpensText(key))))
     local h = PIC_H + 10 + c.info:GetStringHeight() + 8
     c.group:ClearAllPoints(); c.group:SetPoint("TOPLEFT", 12, -h)
     -- Watching an alt's fellowship (Fellowship/Watch.lua): no Find group, it would form your own.
-    c.group:SetShown(not ctx.watching)
+    local group = open and not ctx.watching
+    c.group:SetShown(group)
     c.dj:ClearAllPoints()
-    if ctx.watching then c.dj:SetPoint("TOPLEFT", 12, -h) else c.dj:SetPoint("LEFT", c.group, "RIGHT", 6, 0) end
+    if group then c.dj:SetPoint("LEFT", c.group, "RIGHT", 6, 0) else c.dj:SetPoint("TOPLEFT", 12, -h) end
     h = h + 34
     c:SetHeight(h)
     s:Place(c, h, 8)
@@ -141,7 +148,7 @@ local function refresh(pf, ctx)
   -- Right: the chosen raid.
   local r = UI.Stack(pf.rscroll.child)
   chosen = chosen or ns.RAIDS[1]
-  pf.head:Set(chosen[2], L.RAID_SIZE:format(chosen[4]))
+  pf.head:Set(chosen[2], size(chosen))
   r:Place(pf.head, pf.head:GetHeight(), 6)
   r:Place(pf.attHead, 29, 4)
   local st = E:AttuneStatus(f, chosen)

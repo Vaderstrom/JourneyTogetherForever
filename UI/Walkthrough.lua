@@ -257,7 +257,7 @@ function WK:Go(i)
   WK.glow:Off()
   if shown then
     reveal(first)
-    WK.glow:Around(first, last, step.outside)
+    shown = WK.glow:Around(first, last, step.outside)
   end
   shade((shown and not step.outside) and WK.glow or nil)
   local n = step.id ~= "DONE" and step.id ~= "INTRO" and step.id ~= "NEW"

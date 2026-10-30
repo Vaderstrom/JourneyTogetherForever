@@ -235,7 +235,7 @@ offline arrive once someone who has them is online. In dungeons and during boss 
 they go out when you leave. Characters you have not played for a while show "as of" when you last did.
 
 ## Status: beta
-This is a beta (0.9.3). Version 1.0 comes when WoW Forever launches: the addon will be tested there, and its
+This is a beta. Version 1.0 comes when WoW Forever launches: the addon will be tested there, and its
 dungeon and raid lists brought in line with Forever's.
 
 Everything above is built and checked with the addon's own self-test and screenshot tour on retail, with one account.

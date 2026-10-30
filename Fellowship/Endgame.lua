@@ -13,10 +13,11 @@ function E:Open(f)
   return f ~= nil and J:CurrentIndex(f) > #f.journey.chapters
 end
 
--- Do kills in key count for this fellowship? A dungeon of its journey, or a raid once the Endgame is open.
+-- Do kills in key count for this fellowship? A dungeon of its journey, or a raid once the Endgame and the raid are
+-- open (WoW Forever's raids open on 9 December 2026: ns.IsOpen).
 function E:Tracked(f, key)
   if f.journey.place[key] then return true end
-  return ns.Raid(key) ~= nil and self:Open(f)
+  return ns.Raid(key) ~= nil and self:Open(f) and ns.IsOpen(key, f)
 end
 
 -- Does this Hero have what the raid needs? (true when it needs no attunement.)

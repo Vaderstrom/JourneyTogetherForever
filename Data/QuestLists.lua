@@ -7,7 +7,8 @@ local _, ns = ...
 -- Attunements and keys: { key, name, kind ("raid" / "key"), side, level (the level from which a Hero can start it;
 -- below it the attunement is not shown to them), item (the key or amulet; having it also counts as done),
 -- steps = { { ids, name } }, drop (true: the key drops, there is no quest), from (a dropped key: the dungeon it
--- drops in; its level is that dungeon's best level from, so it follows Data/Dungeons.lua) }
+-- drops in; its level is that dungeon's best level from, so it follows Data/Dungeons.lua), raid (the raid it is
+-- for, when that is not its key: shown only while the game has that raid) }
 -- tools/update-game-data.ps1 checks every quest ID and item against the game, and each start level against the
 -- first quest's own level.
 ns.ATTUNEMENTS = {
@@ -17,7 +18,7 @@ ns.ATTUNEMENTS = {
     from = "smlib", steps = {} },
   { key = "mc", name = "Molten Core", kind = "raid", level = 55, steps = { { { 7848 }, "Attunement to the Core" } } },
   -- Not an attunement to enter, but Majordomo Executus can only be summoned with the Hydraxian Waterlords' help.
-  { key = "hydraxis", name = "Hydraxian Waterlords (Majordomo)", kind = "raid", level = 55, steps = {
+  { key = "hydraxis", name = "Hydraxian Waterlords (Majordomo)", kind = "raid", raid = "mc", level = 55, steps = {
     { { 6804 }, "Poisoned Water" }, { { 6805 }, "Stormers and Rumblers" }, { { 6821 }, "Eye of the Emberseer" },
     { { 6822 }, "The Molten Core" }, { { 6823 }, "Agent of Hydraxis" }, { { 6824 }, "Hands of the Enemy" } } },
   { key = "ony", name = "Onyxia's Lair", kind = "raid", side = "A", level = 50, item = 16309, steps = {
@@ -126,3 +127,6 @@ ns.DUNGEON_QUESTS = {
     { 5515, "Krastinov's Bag of Horrors" }, { 5343, "Barov Family Fortune", "A" }, { 5341, "Barov Family Fortune", "H" },
     { 4771, "Dawn's Gambit" } },
 }
+
+-- Both lists are WoW Forever's: ns.KeepThisGame (Data/Dungeons.lua) keeps them in Forever only.
+ns.ALL_ATTUNEMENTS, ns.ALL_DUNGEON_QUESTS = ns.ATTUNEMENTS, ns.DUNGEON_QUESTS

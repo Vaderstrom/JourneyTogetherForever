@@ -31,7 +31,7 @@ function M.Clean(list)
       if m.kind == "quest" then
         v = tonumber(v); ok = ok and v ~= nil and v > 0 and v == math.floor(v)
       elseif m.kind == "level" then
-        v = tonumber(v); ok = ok and v ~= nil and v >= 1 and v <= 60 and v == math.floor(v)
+        v = tonumber(v); ok = ok and v ~= nil and v >= 1 and v <= ns.HighestLevel() and v == math.floor(v)
       elseif m.kind == "attune" then
         ok = ok and type(v) == "string" and attuneKnown(v)
       else

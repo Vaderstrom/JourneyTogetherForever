@@ -79,10 +79,12 @@ end
 -- Each role's colour: { on parchment and cards, on dark pictures }. Mandatory gold, bridge blue, optional green.
 J.ROLE_COLOR = { m = { "A8761E", "F0C860" }, b = { "2F6FAE", "8CC0F0" }, o = { "4F7F3F", "A8D090" } }
 
--- Mandatory and bridge dungeons (optional ones never block progress).
+-- Mandatory and bridge dungeons (optional ones never block progress, nor one the game has not opened yet).
 function J:Required(f, n)
   local list = {}
-  for _, x in ipairs(self:InChapter(f, n)) do if x.role ~= "o" then list[#list + 1] = x end end
+  for _, x in ipairs(self:InChapter(f, n)) do
+    if x.role ~= "o" and ns.IsOpen(x.key, f) then list[#list + 1] = x end
+  end
   return list
 end
 
@@ -213,8 +215,10 @@ function J:MaxView(f, me)
 end
 
 -- A dungeon of the journey is open in an earlier chapter, in the current one once it is unlocked, and as a
--- bridge one chapter early. A raid is open once the Endgame is (Fellowship/Endgame.lua).
+-- bridge one chapter early. A raid is open once the Endgame is (Fellowship/Endgame.lua). Neither before the game opens
+-- it (ns.IsOpen: a date Blizzard announced).
 function J:Open(f, key)
+  if not ns.IsOpen(key, f) then return false end
   local p = f.journey.place[key]
   if not p then return ns.Raid(key) ~= nil and ns.Endgame:Open(f) end
   local cur = self:CurrentIndex(f)
@@ -445,8 +449,9 @@ function J.Clean(journey)
     if i > J.MAX_CHAPTERS or type(c) ~= "table" then return nil end
     local floor, cap = tonumber(c.floor), tonumber(c.cap)
     local name = type(c.name) == "string" and strtrim(c.name) or ""
-    -- floor = cap is allowed: a one-level chapter, such as 60-60 for raids.
-    if not floor or not cap or floor < 1 or cap > 60 or floor > cap or name == "" or #name > 48 then return nil end
+    -- floor = cap is allowed: a one-level chapter, such as 60-60 for raids. Up to the game's cap (retail: the newest
+    -- expansion's, so a Leader whose account has it is still heard).
+    if not floor or not cap or floor < 1 or cap > ns.HighestLevel() or floor > cap or name == "" or #name > 48 then return nil end
     -- art: the chapter's picture (a preset chapter's number, or "prologue"); none: by its place, as before.
     local art = c.art == "prologue" and "prologue" or (tonumber(c.art) and math.floor(c.art) >= 1 and math.floor(c.art) <= 30 and math.floor(c.art)) or nil
     out.chapters[i] = { name = name, floor = math.floor(floor), cap = math.floor(cap), color = type(c.color) == "string" and c.color:match("^%x%x%x%x%x%x$") and c.color or ns.PALETTE[(i - 1) % #ns.PALETTE + 1],
@@ -457,7 +462,8 @@ function J.Clean(journey)
     -- Old keys (Blackrock Depths' two parts) become placements of one dungeon, each with its half of the bosses.
     local old = ns.KEY_ALIAS[key]
     if old then key = old end
-    if ns.Dungeon(key) and type(p) == "table" and (p.role == "m" or p.role == "b" or p.role == "o")
+    -- A dungeon of any game: one this game lacks keeps its place, and the pages skip it until the game has it.
+    if ns.KnownKey(key) and type(p) == "table" and (p.role == "m" or p.role == "b" or p.role == "o")
       and tonumber(p.ch) and p.ch >= 1 and p.ch <= #out.chapters then
       out.place[key] = { ch = math.floor(p.ch), role = p.role }
       -- Needed bosses chosen in Journey Admin (boss tokens, see Fellowship/Clears.lua); nil = every boss.

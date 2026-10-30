@@ -178,15 +178,16 @@ local function roadView(parent, width)
   end)
   function v:Set(j, title)
     self.head:SetText(title)
-    local lo = 60
-    for _, c in ipairs(j.chapters) do lo = math.min(lo, c.floor) end
-    local span = math.max(1, 60 - lo)
+    -- From the first floor to the last cap: 60, or higher for a journey stretched to retail's cap (30 Oct 2026).
+    local lo, hi = 60, 60
+    for _, c in ipairs(j.chapters) do lo, hi = math.min(lo, c.floor), math.max(hi, c.cap) end
+    local span = math.max(1, hi - lo)
     for i, seg in ipairs(self.segs) do
       local c = j.chapters[i]
       seg:SetShown(c ~= nil); seg.shine:SetShown(c ~= nil); seg.shade:SetShown(c ~= nil)
       if c then
-        local x0 = (ns.Clamp(c.floor, lo, 60) - lo) / span * rulerW
-        local x1 = (ns.Clamp(c.cap, lo, 60) - lo) / span * rulerW
+        local x0 = (ns.Clamp(c.floor, lo, hi) - lo) / span * rulerW
+        local x1 = (ns.Clamp(c.cap, lo, hi) - lo) / span * rulerW
         seg:ClearAllPoints(); seg:SetPoint("TOPLEFT", self.ruler, "TOPLEFT", x0, 0)
         seg:SetSize(math.max(1, x1 - x0 - 1), 12)
         seg:SetVertexColor(ns.Hex(c.color or "E2B857")); seg:SetAlpha(0.85)
@@ -195,11 +196,14 @@ local function roadView(parent, width)
     -- The end labels sit inside the ruler (as in Journey Admin).
     local first = true
     for i, t in ipairs(self.ticks) do
-      local shown = t.v >= lo
+      -- (The last label is the ruler's end: 60, or the stretched journey's cap.)
+      local lvl = i == #self.ticks and hi or t.v
+      local shown = lvl >= lo
       t.fs:SetShown(shown)
       if shown then
+        t.fs:SetText(lvl)
         local point = first and "TOPLEFT" or (i == #self.ticks and "TOPRIGHT" or "TOP")
-        t.fs:ClearAllPoints(); t.fs:SetPoint(point, self.ruler, "BOTTOMLEFT", (t.v - lo) / span * rulerW, -5)
+        t.fs:ClearAllPoints(); t.fs:SetPoint(point, self.ruler, "BOTTOMLEFT", (lvl - lo) / span * rulerW, -5)
         first = false
       end
     end

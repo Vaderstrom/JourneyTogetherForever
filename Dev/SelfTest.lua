@@ -440,7 +440,8 @@ step("chapter page and Find group", function(c)
   -- Every row names its role in the role's colour; the next chapter's bridges come last.
   local J, last = ns.Journey, nil
   for _, card in ipairs(pf.rows.items) do if card:IsShown() then last = card end end
-  c:Has(pf.rows.items[1].roleText or "", "Mandatory", "the first row says Mandatory")
+  local role = pf.rows.items[1].roleText or ""
+  c:That(role:find("Mandatory", 1, true) or role:find("Optional", 1, true), "the first row names its role: " .. role)
   local bridges = J:EarlyBridges(cur(), J:CurrentIndex(cur()))
   if #bridges > 0 then
     c:Has(last and last.roleText or "", "Bridge", "the next chapter's bridge is listed: " .. bridges[1].d[2])
@@ -573,21 +574,41 @@ step("group photo: everyone together on the whole screen", function(c)
   c:That(ns.char.photoZoom == nil, "the camera goes back as far as it was")
 end)
 
--- A pose that plays once: the chosen one stood under Salute in two checks of 30 Oct 2026. Does the game say when
--- the salute ends (so it can start again)? Read in the report: the count over four seconds.
+-- A pose that plays once: the chosen one stood under Salute in two checks of 30 Oct 2026, and the game takes no
+-- handler for an animation's end. The photo starts it again every PH.AGAIN seconds: over five seconds, at least once.
+local PH_WAIT = 5
+-- Which poses your model has: a hidden model of you, asked in part 2, once it has loaded. A pose the model lacks is
+-- drawn as standing.
+local poseProbe
 step("group photo: Salute starts again (part 1)", function(c)
   local PH = ns.Photo
   c:That(PH:Open({ standIns = true }), "opens")
   PH:SetBackdrop("studio")
   PH:Choose(1)
   while PH.cast[1] and PH.POSES[PH.cast[1].pose][1] ~= "PHOTO_POSE_SALUTE" do PH:StepPose(1) end
-  PH.animEnds = 0
-  c:That(PH.cast[1] ~= nil, "the first one salutes")
-end, 4)
+  PH.restarts = 0
+  c:That(PH.cast[1] ~= nil and PH.cast[1].actor.once == true, "the first one salutes, a pose that plays once")
+  if not poseProbe then
+    poseProbe = CreateFrame("PlayerModel", nil, PH.frame)
+    poseProbe:SetSize(64, 64)
+    poseProbe:SetPoint("BOTTOMLEFT")
+    poseProbe:SetAlpha(0)
+  end
+  poseProbe:SetUnit("player")
+end, PH_WAIT)
 step("group photo: Salute starts again (part 2)", function(c)
   local PH = ns.Photo
-  c:That(PH.endHook == true, "the game takes a handler for an animation's end")
-  c:That(true, ("the salute ended %d times in four seconds (0: the game never said so)"):format(PH.animEnds or 0))
+  c:That((PH.restarts or 0) >= 1, ("the salute started again %d times in %d seconds"):format(PH.restarts or 0, PH_WAIT))
+  if poseProbe.HasAnimation then
+    local has, lacks = {}, {}
+    for _, p in ipairs(PH.POSES) do
+      local list = poseProbe:HasAnimation(p[2]) and has or lacks
+      list[#list + 1] = L[p[1]]
+    end
+    c:That(true, ("your model has: %s; lacks: %s"):format(table.concat(has, ", "), #lacks > 0 and table.concat(lacks, ", ") or "none"))
+  else
+    c:That(true, "this client cannot say which poses a model has")
+  end
   PH:Close()
   c:That(not PH:IsOpen(), "closed")
 end)
@@ -604,7 +625,12 @@ step("quests: tabs and attunements", function(c)
   c:That(open > 0 and pf.aRows.items[1]:IsShown() or pf.aNone:IsShown(), ("%d open at level %d"):format(open, UnitLevel("player") or 0))
   ns.QuestLists.viewLevel = 60
   ns.Window:Refresh()
-  c:That(pf.aRows.items[1] and pf.aRows.items[1]:IsShown(), "attunement rows (as level 60)")
+  -- Our attunements are WoW Forever's; retail has none of them (30 Oct 2026: each game shows only its own).
+  if #ns.ATTUNEMENTS == 0 then
+    c:That(pf.aNone:IsShown(), "none in this game: the tab says so")
+  else
+    c:That(pf.aRows.items[1] and pf.aRows.items[1]:IsShown(), "attunement rows (as level 60)")
+  end
   ns.QuestLists.viewLevel = nil
   local done = {}
   for _, a in ipairs(ns.QuestLists:Attunements(cur())) do
@@ -1030,7 +1056,12 @@ step("quests: Show all brings in far-off quests", function(c)
   local horde = UnitFactionGroup("player") == "Horde"
   local key = horde and "rfc" or "dm"
   local d = ns.Dungeon(key)
-  c:That(ns.QuestLists:DungeonLine(f, key) ~= nil, (d and d[2] or key) .. " has a quest line on the Chapter page")
+  -- Our dungeon quest lists are WoW Forever's: retail shows none.
+  if next(ns.DUNGEON_QUESTS) == nil then
+    c:That(ns.QuestLists:DungeonLine(f, key) == nil, "no quest lists in this game: no quest line on the Chapter page")
+  else
+    c:That(ns.QuestLists:DungeonLine(f, key) ~= nil, (d and d[2] or key) .. " has a quest line on the Chapter page")
+  end
 end)
 
 step("Chronicle filters and totals", function(c)
@@ -1143,10 +1174,16 @@ end, 1)
 step("attunements: start levels and the toast when one opens", function(c)
   local QL = ns.QuestLists
   local side = UnitFactionGroup("player") == "Horde" and "H" or "A"
+  -- Retail has none of our attunements (they are WoW Forever's): none opens there.
+  if #ns.ATTUNEMENTS == 0 then
+    c:Eq(#QL:NewlyAvailable(side, 1, ns.LevelCap()), 0, "none in this game")
+    return
+  end
   local open = QL:NewlyAvailable(side, 54, 55)
   local names = {}
   for _, a in ipairs(open) do names[#names + 1] = a.name end
-  c:Has(table.concat(names, ", "), "Molten Core", "opening at 55")
+  -- Upper Blackrock Spire's key, in both games' lists (Molten Core waits for Blizzard's word in WoW Forever).
+  c:Has(table.concat(names, ", "), "Upper Blackrock Spire", "opening at 55")
   QL:OnLevelUp(55)
   c:That(toastSeen("attune", nil), "a toast for each one")
   QL.viewLevel = 30
@@ -1348,17 +1385,37 @@ step("the Endgame: raids open after the journey", function(c)
   c:That(ns.Pages:InNav("raids", ns.Pages:Context()), "Raids in the sidebar")
   for _, n in ipairs(PRETEND) do dev("group " .. n) end
   local before = f.rules.minHeroes
-  dev("kill mc 2")
-  local n = ns.Clears:Progress(f, "mc", ns.Me())
-  c:Eq(n, 2, "two Molten Core bosses counted")
-  c:That(#E:BossProgress(f, "mc") >= 10, "Molten Core's bosses listed")
-  local st = E:AttuneStatus(f, ns.Raid("mc"))
-  c:That(true, #st.attuned .. " attuned to Molten Core")
-  local picked = E:FindGroup(f, "mc")
+  -- The raid of this game with the most bosses in its data (WoW Forever: Onyxia's Lair; retail: one of its own),
+  -- opened for the test when its day has not come (WoW Forever's raids open on 9 December 2026).
+  local raid, most = nil, -1
+  for _, r in ipairs(ns.RAIDS) do
+    local list = ns.Clears:DataBosses(r[1]) or {}
+    if #list > most then raid, most = r, #list end
+  end
+  c:That(raid ~= nil, "a raid in this game")
+  if not raid then return end
+  local key = raid[1]
+  ST.raid, ST.raidOpened = key, ns.db.opened and ns.db.opened[key]
+  if not ns.IsOpen(key) then
+    c:That(ns.OpensText(key) ~= nil, raid[2] .. " opens on " .. tostring(ns.OpensText(key)))
+    ns.db.opened = ns.db.opened or {}
+    ns.db.opened[key] = time()
+  end
+  -- Find group first: it picks who has not cleared the raid, and Onyxia's Lair is cleared with its one boss.
+  local picked = E:FindGroup(f, key)
   c:That(#picked > 0, "Find group for a raid picks " .. #picked)
+  local want = math.min(2, most)
+  dev("kill " .. key .. " " .. want)
+  local n = ns.Clears:Progress(f, key, ns.Me())
+  c:Eq(n, want, raid[2] .. ": bosses counted")
+  c:That(#E:BossProgress(f, key) >= most, raid[2] .. ": bosses listed")
+  local st = E:AttuneStatus(f, raid)
+  c:That(true, #st.attuned .. " attuned to " .. raid[2])
   dev("group off")
   f.rules.minHeroes = before
   ns.Window:ShowPage("raids")
+  ns.Window.pageFrames.raids.raid = key
+  ns.Window:Refresh()
 end, 1)
 
 shot("raids")
@@ -1367,6 +1424,7 @@ step("the Endgame closes again (the journey is not done)", function(c)
   local f = cur()
   f.reached = ST.reached
   ns.Clears.recent = {}
+  if ST.raid and ns.db.opened then ns.db.opened[ST.raid] = ST.raidOpened end
   c:That(not ns.Endgame:Open(f) or ns.Journey:CurrentIndex(f) > #f.journey.chapters, "closed")
   ns.Window:ShowPage("overview")
 end)
@@ -1608,7 +1666,11 @@ step("walkthrough: every step of both tours", function(c)
       WK:Go(i)
       local s = WK.steps[i]
       if s.page and Win.current ~= s.page then c:That(false, rank .. " " .. s.id .. ": page " .. tostring(Win.current)) end
-      if s.target and s.id ~= "TRACKER" then
+      -- The game refused to anchor the frame there (an error in the checks of 30 Oct 2026, 16:56 and 22:00): which
+      -- part, also for the tracker, which is framed at a fixed place from the start.
+      if WK.glow.refused == "all" then c:That(true, rank .. " " .. s.id .. ": the game refused both places, nothing framed")
+      elseif WK.glow.refused then c:That(true, rank .. " " .. s.id .. ": anchoring refused, framed at a fixed place") end
+      if s.target and s.id ~= "TRACKER" and WK.glow.refused ~= "all" then
         if WK.glow:IsShown() then framed = framed + 1 else c:That(false, rank .. " " .. s.id .. ": nothing framed") end
       end
       if s.id ~= "DONE" and (WK.card.title:GetText() or ""):sub(1, 5) == "WALK_" then c:That(false, rank .. " " .. s.id .. ": no text") end

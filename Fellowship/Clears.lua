@@ -123,13 +123,16 @@ function C:Learn(key, boss)
   ns.db.learned[key] = list
 end
 
--- Dungeons in the instance with this ID, or (for dungeons not in the data yet) this name.
+-- Dungeons in the instance with this ID, or (for dungeons not in the data yet) this name, "The" and marks aside.
 function C:KeysHere(instID, iname)
   local list = {}
+  local plain = iname and ns.PlainName(iname)
   local function check(key, name)
     local m = ns.DUNGEON_MAPS[key]
     local known = m and ns.EncounterData()[m[1]]
-    if (known and instID and m[1] == instID) or (not known and iname and name == iname) then list[#list + 1] = key end
+    if (known and instID and m[1] == instID) or (not known and plain and ns.PlainName(name) == plain) then
+      list[#list + 1] = key
+    end
   end
   for _, d in ipairs(ns.DUNGEONS) do check(d[1], d[2]) end
   for _, r in ipairs(ns.RAIDS) do check(r[1], r[2]) end
@@ -493,6 +496,7 @@ function C:BossDown(encounterID, encounterName)
   if secret(iname) then iname = nil end
   if secret(instID) then instID = nil end
   for _, base in ipairs(self:KeysHere(instID, iname)) do
+    ns.MarkOpen(base) -- a boss died there: it is open, whatever the date said
     for _, key in ipairs(self:Placements(f, base)) do
       if ns.Endgame:Tracked(f, key) then
         local b = self:Match(key, encounterID, encounterName)

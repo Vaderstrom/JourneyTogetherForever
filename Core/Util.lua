@@ -38,10 +38,32 @@ function ns.FullName(name)
 end
 
 -- WoW Forever, or retail (where we test until Forever is out)? The game's project ID says it (Forever:
--- WOW_PROJECT_CAMELOT); without it, Forever's interface numbers are the ones below 100000.
+-- WOW_PROJECT_CAMELOT, 18, defined only there); without it, the interface number: Forever's are 1xxxx (16001 for
+-- 1.60.1), retail's 12xxxx.
 function ns.IsForever()
   if WOW_PROJECT_ID and WOW_PROJECT_CAMELOT then return WOW_PROJECT_ID == WOW_PROJECT_CAMELOT end
-  return (select(4, GetBuildInfo()) or 0) < 100000
+  local toc = select(4, GetBuildInfo()) or 0
+  return toc >= 10000 and toc < 20000
+end
+
+-- The game this copy runs in, as the game data names it (Data/Encounters.lua): "wowf" WoW Forever, "wow" retail.
+function ns.Game() return ns.IsForever() and "wowf" or "wow" end
+
+-- The game's level cap (30 Oct 2026: WoW Forever 60, retail 80): a journey may reach it, the presets stay 1-60.
+-- Forever's is the journey's own 60; retail's is the game's for this account.
+function ns.LevelCap()
+  if ns.IsForever() then return 60 end
+  local cap = GetMaxLevelForPlayerExpansion and GetMaxLevelForPlayerExpansion()
+  if type(cap) ~= "number" or (issecretvalue and issecretvalue(cap)) or cap < 60 then return 60 end
+  return cap
+end
+
+-- The highest cap anyone in this game can have: the newest expansion's (an account without it has a lower one).
+-- Journeys and milestones from other Heroes are checked against it, so a Leader with a higher cap is still heard.
+function ns.HighestLevel()
+  local top = not ns.IsForever() and GetMaxLevelForLatestExpansion and GetMaxLevelForLatestExpansion()
+  if type(top) ~= "number" or (issecretvalue and issecretvalue(top)) then top = 0 end
+  return math.max(ns.LevelCap(), top)
 end
 
 -- Trial accounts and accounts without game time cannot send addon messages (Forever, and retail from 12.1.7), so a
