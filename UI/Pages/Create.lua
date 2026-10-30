@@ -12,7 +12,7 @@ local C = {}
 ns.CreateState = C
 function C:Reset()
   -- The banner starts in the side's colour: Alliance blue, Horde crimson (a Horde fellowship started blue; seen in game).
-  local horde = UnitFactionGroup("player") == "Horde"
+  local horde = ns.Theme:Horde()
   self.step, self.name, self.color, self.emblem, self.role, self.preset = 1, "", ns.BANNERS[horde and 2 or 1][2], ns.Emblems:First(), "DPS", "classic"
   self.rules = ns.Rules.New()
   self.size = "party"

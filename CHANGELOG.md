@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+- Journey Admin is tidier: the right page has three tabs, This chapter (name, levels, dungeons, milestones), Every
+  dungeon and Whole journey (Start over, Import, Export), and Publish sits in a bar at the bottom that never scrolls,
+  gold while there are unpublished changes. It was at the end of a long scroll, under every dungeon. Create a
+  Fellowship's Chapters step has the same tabs.
+- The round icons (the sidebar and the header's buttons) follow the header's art: a Horde character sees them in
+  crimson in every theme. In the Journal and Night themes they were blue under the Horde's art.
+- `/jtf brand` (for the README): the README's pictures, taken on an Alliance character in the Journal theme, with
+  the showcase fellowship "The Lantern Bearers" (a blue banner with the lion), roles that fit the classes, and the
+  game's interface hidden (the tracker shows only in its own picture). Each picture's place on the screen is saved; `tools/brand-shots.lua` and `tools/crop-shots.ps1` cut them into
+  `.github/screenshots`.
+
 ## 0.9.1 beta (30 October 2026)
 A beta: everything below, and the milestones M1 to M9 in the next section. Version 1.0 comes when WoW Forever
 launches and the addon has been tested there, with its dungeon and raid lists brought in line with Forever's.

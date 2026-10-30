@@ -10,6 +10,10 @@ local TR = { SETTLE = 0.7, GAP = 1.3, SKIP = 0.25 } -- SKIP: a shot of another a
 ns.Tour = TR
 
 local PRETEND = { "Brannic", "Elyra", "Corwin" }
+-- The fellowship the tour founds: its name, banner colour and emblem (nil: your side's). /jtf brand gives it a name
+-- and a banner that look well in the README's pictures.
+TR.TOUR_LOOK = { name = "Tour", color = ns.BANNERS[3] and ns.BANNERS[3][2] }
+TR.look = TR.TOUR_LOOK
 local W = function() return ns.Window end
 local function cur() return ns.Fellowship:Current() end
 local function dev(cmd) ns.Dev:Command(cmd) end
@@ -65,7 +69,8 @@ shot("create-1", "Create: step 1 (empty)", "Name, role and four size cards; on t
 end)
 shot("create-1-filled", "Create: step 1 (filled)", "With a name and the Tank role", function()
   local C = ns.CreateState
-  C.name, C.role, C.color = "Tour", "Tank", ns.BANNERS[3] and ns.BANNERS[3][2] or C.color
+  C.name, C.role, C.color = TR.look.name, TR.look.role or "Tank", TR.look.color or C.color
+  C.emblem = TR.look.emblem or C.emblem
   W():Refresh()
 end)
 shot("emblem-picker", "Emblem picker", "Picture crests and the 16 heraldic emblems", function()
@@ -86,10 +91,13 @@ shot("create-3-own", "Create: step 3 (your own journey)", "Your own journey chos
 end)
 shot("create-chapters", "Create: Chapters (the journey editor)", "The ruler with its gold marks, Split / Merge / Remove, chapters with dungeon chips; chapter II and its dungeons", function()
   local C = ns.CreateState
-  C:Goto("chapters"); C.sel = 2; W():Refresh()
+  C:Goto("chapters"); C.sel = 2; W():Refresh(); pf("create").editor:ShowTab("chapter")
 end)
-shot("create-chapters-shelf", "Create: Chapters (the shelf)", "Every dungeon by level, gold where it fits chapter II; Start over and Import", function()
+shot("create-chapters-shelf", "Create: Chapters (Every dungeon)", "The Every dungeon tab: every dungeon by level, gold where it fits chapter II", function()
   pf("create").editor:ScrollToShelf()
+end)
+shot("create-chapters-journey", "Create: Chapters (Whole journey)", "The Whole journey tab: Start over from a preset, Import", function()
+  pf("create").editor:ShowTab("journey")
 end)
 shot("create-4", "Create: review", "The fellowship and the rules as rows (Change), the journey's chapters, Create the fellowship", function()
   ns.CreateState:Goto("review"); W():Refresh()
@@ -124,7 +132,7 @@ prep(function() pf("rules").pkey, pf("rules").pval = "floorTol", nil; ns.Fellows
 
 -- Phase C: the leader of a new fellowship (empty states).
 prep(function()
-  ns.Fellowship:Create({ name = "Tour", role = "Tank", preset = "classic", color = ns.BANNERS[3] and ns.BANNERS[3][2] })
+  ns.Fellowship:Create({ name = TR.look.name, role = TR.look.role or "Tank", preset = "classic", color = TR.look.color, emblem = TR.look.emblem })
   W():Open("overview")
 end, 0.5)
 -- The setup guide a new Companion sees once (the tour marks it seen, so here it is opened by hand).
@@ -148,7 +156,9 @@ end)
 shot("leader-heroes-alone", "Heroes (alone)", "One Hero", function() page("heroes") end)
 shot("leader-manage-alone", "Manage (alone)", "Its three tabs; the Adventurers tab: you, the invite box", function() page("manage") end)
 shot("leader-rules", "Rules (leader)", "The rulebook; no votes yet; the Leader changes the rules in Manage", function() page("rules") end)
-shot("leader-admin", "Journey Admin", "The journey editor: the ruler with its gold marks, chapters with dungeon chips, the chosen chapter", function() page("admin") end)
+shot("leader-admin", "Journey Admin", "The journey editor: the ruler with its gold marks, chapters with dungeon chips, the This chapter tab; the bar at the bottom (Everything is published)", function()
+  page("admin"); pf("admin").editor:ShowTab("chapter")
+end)
 
 -- Phase D: pretend Heroes, levels, runs, quests, votes, Gatherings, the tournament.
 shot("manage-invite-open", "Manage (an open invite)", "Invite sent, received, waiting for an answer", function()
@@ -158,6 +168,8 @@ shot("manage-invite-open", "Manage (an open invite)", "Invite sent, received, wa
 end, { wait = 0.3 })
 prep(function()
   for _, n in ipairs(PRETEND) do dev("hero " .. n .. " accept") end
+  -- /jtf brand: roles that fit their classes (they all join as DPS).
+  for n, role in pairs(TR.look.roles or {}) do ns.Fellowship:SetRoles(full(n), role) end
   -- Everyone through the Prologue together first (levels 1-15): straight to 17 while the others were still at their
   -- own level put three "over the cap" lines in History (seen in the check run).
   dev("level 15")
@@ -391,7 +403,7 @@ end)
 shot("gatherings", "Gatherings", "Upcoming Gatherings with answers; the chosen one with who is coming", function()
   hideOverlays()
   ns.Gatherings:Schedule("wc", "bring potions", time() + 26 * 3600)
-  dev("hero Brannic gather")
+  ns.Dev:Hero("Brannic", "gather", TR.look.gather)
   page("gatherings")
 end)
 shot("overview-gatherings", "Overview (the next Gathering)", "One line about the next Gathering; it opens the page", function()
@@ -413,12 +425,12 @@ end, { toast = true, wait = 0.3 })
 shot("admin-chapter-2", "Journey Admin (chapter 2)", "Another chapter selected, its dungeons", function()
   if tourRules then ns.Fellowship:SetRules(tourRules); tourRules = nil end
   if ns.char.sizeToasted then ns.char.sizeToasted[cur().id] = nil end
-  W():HidePanels(); local A = ns.AdminDraft; A.sel = 2; page("admin")
+  W():HidePanels(); local A = ns.AdminDraft; A.sel = 2; page("admin"); pf("admin").editor:ShowTab("chapter")
 end)
 shot("admin-bosses", "Journey Admin (boss picker)", "Which bosses a clear needs", function()
   ns.AdminDraft:PickBosses(cur(), "dm")
 end)
-shot("admin-shelf", "Journey Admin (the dungeon shelf)", "Every dungeon by level, the ones that fit chapter 2 in gold, to drag onto a chapter", function()
+shot("admin-shelf", "Journey Admin (Every dungeon)", "The Every dungeon tab: every dungeon by level, the ones that fit chapter 2 in gold, to drag onto a chapter", function()
   hideOverlays(); pf("admin").editor:ScrollToShelf()
 end)
 shot("admin-add-again", "Journey Admin (a dungeon again)", "Chapter XV: Blackrock Depths clicked in from the shelf, its third placement (also in XIII, XIV)", function()
@@ -427,7 +439,10 @@ shot("admin-add-again", "Journey Admin (a dungeon again)", "Chapter XV: Blackroc
   A.sel = 15; W():Refresh()
   local ed = pf("admin").editor
   ed:AddHere("brd")
-  top(ed.rscroll)
+  ed:ShowTab("chapter")
+end)
+shot("admin-journey", "Journey Admin (Whole journey)", "The Whole journey tab: Start over, Import, Export; the bar in gold with Discard and Publish", function()
+  pf("admin").editor:ShowTab("journey")
 end)
 shot("admin-export", "Journey Admin (export)", "The journey string to copy", function()
   ns.AdminDraft.sel = 1
@@ -442,7 +457,7 @@ shot("admin-one-level", "Journey Admin (a 60-60 chapter)", "A one-level chapter 
   -- (Split the last chapter, then drag the mark to 60: 58-60 and 60-60.)
   A:Edit(f, function(j) local n = JE.Split(j, #j.chapters); if n then JE.SetBoundary(j, n - 1, 60) end end)
   A.sel = #A:Journey(f).chapters
-  page("admin")
+  page("admin"); pf("admin").editor:ShowTab("chapter")
 end)
 shot("chapter-milestones", "Chapter (milestones)", "A Required level milestone and an Optional one ticked by hand", function()
   hideOverlays(); ns.AdminDraft:Discard()
@@ -651,7 +666,7 @@ end)
 prep(function() ns.Dev.pretendTrial = false; W():Refresh() end)
 shot("sync-restore", "Restore a lost fellowship", "The question after the saved data was lost and an Adventurer still lists you", function()
   local f = cur()
-  W():Confirm(L.RESTORE_Q:format("Brannic", f and f.name or "Tour"), L.RESTORE_OK, function() end)
+  W():Confirm(L.RESTORE_Q:format("Brannic", f and f.name or TR.look.name), L.RESTORE_OK, function() end)
 end)
 prep(function() hideOverlays() end)
 
@@ -694,8 +709,31 @@ prep(function() ns.Settings:Set("fullscreen", false) end)
 ---------------------------------------------------------------------------
 local function trace(err) return tostring(err) .. "\n" .. (debugstack and debugstack(2, 10, 0) or "") end
 
+-- /jtf brand hides the game's interface (chat, bars, the minimap: UIParent faded out) and keeps the addon's own
+-- frames on the screen: the book and the toasts, and the tracker only in its own picture (behind the book, a strip
+-- of it showed past the book's edge; seen in the brand run of 30 Oct 2026).
+local function keepOurs(on, tracker)
+  for _, f in ipairs({ W().frame or false, ns.Toasts.frame or false }) do
+    if f and f.SetIgnoreParentAlpha then f:SetIgnoreParentAlpha(on) end
+  end
+  local t = ns.Tracker.frame
+  if t and t.SetIgnoreParentAlpha then t:SetIgnoreParentAlpha(on and tracker or false) end
+end
+function TR:HideGameUI()
+  self.uiAlpha = UIParent:GetAlpha() or 1
+  UIParent:SetAlpha(0)
+  keepOurs(true)
+end
+function TR:ShowGameUI()
+  if not self.uiAlpha then return end
+  keepOurs(false)
+  UIParent:SetAlpha(self.uiAlpha)
+  self.uiAlpha = nil
+end
+
 function TR:Finish(keep)
   local r = ns.db.tour
+  self:ShowGameUI()
   hideOverlays()
   ns.Toasts:StopMove()
   ns.Theme.forceKey = nil
@@ -709,7 +747,7 @@ function TR:Finish(keep)
   ns.quiet = nil
   -- The pretend Heroes go, then you leave: alone, leaving ends the fellowship.
   local f = cur()
-  if not keep and f and f.name == "Tour" then
+  if not keep and f and f.name == TR.look.name then
     -- The pretend session recap and pictures go with it.
     ns.Moments:Forget(f.id)
     local sessions = ns.Session:List()
@@ -719,28 +757,33 @@ function TR:Finish(keep)
   end
   r.finished = time()
   self.running = false
-  ns:Print(L.TOUR_DONE:format(#r.shots), true)
+  ns:Print((self.brand and L.BRAND_DONE or L.TOUR_DONE):format(#r.shots), true)
+  self.brand, self.look = nil, self.TOUR_LOOK
   local done = self.onDone
   self.onDone = nil
   if done then done() end
 end
 
--- Is this shot taken in this run? opts.areas (a set of area keys): only theirs; the other shots still set their
--- screen up (the next ones build on it), quickly and without a picture.
-local function wanted(s, areas)
+-- Is this shot taken in this run? opts.areas (a set of area keys): only theirs; opts.ids (shot ids, /jtf brand):
+-- only those. The other shots still set their screen up (the next ones build on it), quickly and without a picture.
+local function wanted(s, areas, ids)
+  if ids then return ids[s.id] ~= nil end
   if not areas then return true end
   local area = ns.CheckAreas and ns.CheckAreas:ForShot(s.id)
   return area ~= nil and areas[area] == true
 end
 
--- opts: { areas = { key = true } or nil for all, onDone = function }.
+-- opts: { areas = { key = true } or nil for all, ids = { [shot id] = its entry of TR.BRAND } (only these),
+-- brand = a look (TR.BRAND_LOOK: the founded fellowship and the theme; the game's interface hidden),
+-- onDone = function }.
 function TR:Run(arg, opts)
   if self.running then return end
   if ns.Combat:InCombat() then ns:Print(L.SELFTEST_COMBAT, true) return end
   if cur() then ns:Print(L.SELFTEST_IN_FELLOWSHIP, true) return end
   local keep = arg == "keep"
   opts = opts or {}
-  local areas = opts.areas
+  local areas, ids = opts.areas, opts.ids
+  self.look, self.brand = opts.brand or self.TOUR_LOOK, opts.brand
   self.onDone = opts.onDone
   self.running = true
   self.saved = { theme = ns.Settings:Get("theme"), size = ns.Settings:Get("size"), chat = ns.Settings:Get("chat"),
@@ -748,18 +791,32 @@ function TR:Run(arg, opts)
   -- The setup guide would take over after joining and founding: seen for the tour, as it was afterwards.
   self.savedSetup = ns.char.setupDone
   ns.char.setupDone = true
-  ns.db.tour = { started = time(), shots = {}, problems = {}, areas = areas }
-  ns:Print(L.TOUR_START:format(TR:Count(areas)), true)
+  ns.db.tour = { started = time(), shots = {}, problems = {}, areas = areas, brand = opts.brand and true or nil }
+  if opts.brand then
+    ns:Print(L.BRAND_START:format(TR:Count(areas, ids)), true)
+    -- One theme from the first picture to the last.
+    ns.Settings:Set("theme", opts.brand.theme)
+    ns.Theme:Apply()
+    self:HideGameUI()
+  else
+    ns:Print(L.TOUR_START:format(TR:Count(areas)), true)
+  end
   ns.Settings:Set("chat", "off")
   ns.quiet = true
   -- The pages as a full account sees them (on an account without game time the warning bar covered every shot); the
   -- "trial-bar" shot shows it on its own.
   ns.Dev.pretendTrial = false
+  -- With ids, the run ends after the last of them.
+  local last = #shots
+  if ids then
+    last = 0
+    for k, s in ipairs(shots) do if not s.prep and wanted(s, areas, ids) then last = k end end
+  end
   local i, n = 0, 0
   local function nextShot()
     i = i + 1
     local s = shots[i]
-    if not s then return TR:Finish(keep) end
+    if not s or i > last then return TR:Finish(keep) end
     local res
     local ok, err = xpcall(function() res = s.fn() end, trace)
     if not ok then
@@ -768,7 +825,10 @@ function TR:Run(arg, opts)
       ns:LogError("tour", s.id or "prep", err)
     end
     if s.prep then return C_Timer.After(s.wait or 0.3, nextShot) end
-    if not wanted(s, areas) then return C_Timer.After(TR.SKIP + (s.wait or 0), nextShot) end
+    if not wanted(s, areas, ids) then return C_Timer.After(TR.SKIP + (s.wait or 0), nextShot) end
+    -- /jtf brand: the README file this picture becomes and the part of the screen it keeps.
+    local b = ids and ids[s.id]
+    if TR.brand then keepOurs(true, type(b) == "table" and b.crop == "tracker") end -- (the toasts' frame is made by the first toast)
     -- No picture when the screen could not be set up, or would be the same as the one before: the report says so
     -- (both made pictures that looked like a skipped shot; seen in a review).
     if not ok or res == "same" then
@@ -786,11 +846,14 @@ function TR:Run(arg, opts)
       if errWin then ScriptErrorsFrame:Hide() end
       -- The layout check (Dev/Layout.lua): what the game measures on this screen, before the picture.
       local okScan, layout = pcall(ns.Layout.Scan, ns.Layout)
+      local okCrop, crop = true, nil
+      if type(b) == "table" then okCrop, crop = pcall(TR.CropFor, TR, b) end
       if Screenshot then Screenshot() end
       local list = ns.db.tour.shots
       list[#list + 1] = { n = n, id = s.id, title = s.title, what = s.what, t = time(),
         area = ns.CheckAreas and ns.CheckAreas:ForShot(s.id), layout = okScan and #layout > 0 and layout or nil,
-        errWin = errWin }
+        errWin = errWin, file = type(b) == "table" and b.file or nil, kind = type(b) == "table" and (b.crop or "book") or nil,
+        crop = okCrop and crop or nil }
       C_Timer.After(TR.GAP - TR.SETTLE, nextShot)
     end)
   end
@@ -798,8 +861,81 @@ function TR:Run(arg, opts)
 end
 
 -- How many screenshots the tour takes (for the start message and tests).
-function TR:Count(areas)
+function TR:Count(areas, ids)
   local c = 0
-  for _, s in ipairs(shots) do if not s.prep and wanted(s, areas) then c = c + 1 end end
+  for _, s in ipairs(shots) do if not s.prep and wanted(s, areas, ids) then c = c + 1 end end
   return c
+end
+
+---------------------------------------------------------------------------
+-- /jtf brand: the README's pictures (.github/screenshots)
+---------------------------------------------------------------------------
+-- The tour's shots the README shows, the file each becomes, and what of the screen it keeps (the book with what hangs
+-- outside it, the default; the toast, the tracker, or the whole screen). Plain pictures: the walkthrough's gold frame
+-- around each subject was tried and dropped (30 Oct 2026). tools/brand-shots.lua cuts them.
+TR.BRAND = {
+  { id = "create-2", file = "play-style" },
+  { id = "create-chapters", file = "journey-editor" },
+  { id = "overview-ready", file = "overview" },
+  { id = "chapter", file = "chapter" },
+  { id = "moments", file = "moments" },
+  { id = "group-photo", file = "group-photo", crop = "screen" },
+  { id = "quests-attune", file = "attunements" },
+  { id = "heroes", file = "adventurers" },
+  { id = "rules-vote", file = "rules" },
+  { id = "gatherings", file = "gatherings" },
+  { id = "raids", file = "raids" },
+  { id = "tourney-bracket", file = "tournament" },
+  { id = "toast-chapter", file = "chapter-unlocked", crop = "toast" },
+  { id = "tracker", file = "tracker", crop = "tracker" },
+}
+-- The Journal theme on an Alliance character (chosen 30 Oct 2026): the Alliance's header art and blue icons, and a
+-- fellowship with a blue banner and the lion. Only an Alliance character takes them (your name and model are in some).
+-- Roles that fit the classes (you DPS, Brannic the Warrior tanks, Elyra the Priest heals) and a Gathering with a
+-- player's name for it, instead of the tour's Tank leader, no healer and "Testing together" (30 Oct 2026).
+TR.BRAND_LOOK = { name = L.SAMPLE_NAME, color = ns.BANNERS[1][2], emblem = "Her_Lion", theme = "journal",
+  role = "DPS", roles = { Brannic = "Tank", Elyra = "Healer" }, gather = L.BRAND_GATHER_TEXT }
+-- Room around what a picture keeps, in UIParent units.
+TR.BRAND_PAD = { book = 4, toast = 28, tracker = 14 }
+
+function TR:Brand()
+  if UnitFactionGroup("player") ~= "Alliance" then ns:Print(L.BRAND_FACTION, true) return end
+  local ids = {}
+  for _, b in ipairs(self.BRAND) do ids[b.id] = b end
+  self:Run(nil, { ids = ids, brand = self.BRAND_LOOK })
+end
+
+-- A part of the screen in the screenshot's pixels, from UIParent units (left, bottom, right, top) with room around
+-- it: { x, y (from the top), w, h, sw, sh (the screen's size) }.
+function TR:PixelRect(l, b, r, t, pad)
+  local uw, uh = UIParent:GetWidth(), UIParent:GetHeight()
+  local sw, sh
+  if GetPhysicalScreenSize then sw, sh = GetPhysicalScreenSize() end
+  if not sw or not sh or sh <= 0 then sw, sh = uw, uh end
+  local k, fl = sh / uh, math.floor
+  pad = pad or 0
+  l, b = math.max(0, l - pad), math.max(0, b - pad)
+  r, t = math.min(uw, r + pad), math.min(uh, t + pad)
+  return { x = fl(l * k + 0.5), y = fl((uh - t) * k + 0.5), w = fl((r - l) * k + 0.5), h = fl((t - b) * k + 0.5), sw = sw, sh = sh }
+end
+
+-- A shown frame's or text's rectangle in UIParent units: left, bottom, right, top.
+local function uiRect(f)
+  if not f or not f.IsShown or not f:IsShown() then return nil end
+  local l, b = f:GetLeft(), f:GetBottom()
+  if not l or not b then return nil end
+  local es = f.GetEffectiveScale and f:GetEffectiveScale() or f:GetParent():GetEffectiveScale()
+  local s = es / UIParent:GetEffectiveScale()
+  return l * s, b * s, (l + f:GetWidth()) * s, (b + f:GetHeight()) * s
+end
+
+-- What a branding picture keeps (nil: the whole screen).
+function TR:CropFor(b)
+  local kind = b.crop or "book"
+  local l, bo, r, t
+  if kind == "book" then l, bo, r, t = W():Extents()
+  elseif kind == "toast" then l, bo, r, t = uiRect(ns.Toasts.frame)
+  elseif kind == "tracker" then l, bo, r, t = uiRect(ns.Tracker.frame) end
+  if not l then return nil end
+  return self:PixelRect(l, bo, r, t, self.BRAND_PAD[kind])
 end

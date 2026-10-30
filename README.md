@@ -55,13 +55,15 @@ Four steps, and you can change everything later:
 **Journey Admin** (the Leader) is the journey editor, also used for your own journey while creating the fellowship:
 - A **ruler** from 1 to 60 with every chapter in its colour. Drag a gold mark to move the level two chapters share;
   **Split in two**, **Merge with next** and **Remove** chapters.
-- Drag dungeons from the **shelf** (every dungeon by level, gold where it fits) onto a chapter. A dungeon can sit in
+- The right page has three tabs: **This chapter** (its name, levels, dungeons and milestones), **Every dungeon** and
+  **Whole journey** (start over, Import, Export).
+- Drag dungeons from **Every dungeon** (all of them by level, gold where it fits) onto a chapter. A dungeon can sit in
   more than one chapter (Blackrock Depths in three, for its parts).
 - Each dungeon is Mandatory, Bridge or Optional, and you can choose **which bosses** a clear needs.
 - **Milestones**, up to ten per chapter, Required or Optional: a quest everyone has handed in, a level everyone
   reaches, an attunement or key, or one the Leader ticks off by hand.
 - **Export** the journey as a string to share with another fellowship, or **Import** one. Changes are a draft until
-  you publish them; everyone gets a toast.
+  you press **Publish**, in a bar at the bottom that never scrolls; everyone gets a toast.
 
 ![Journey Admin: the ruler, the chapters with their dungeons, and the chosen chapter](.github/screenshots/journey-editor.jpg)
 

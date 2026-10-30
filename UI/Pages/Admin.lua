@@ -232,18 +232,24 @@ local function kindLine(m)
 end
 A.KindLine = kindLine
 
+-- The bar with Publish under both halves (30 Oct 2026: Publish lay at the end of a long scroll, under every dungeon).
+local BAR_H = 46
+
 local function build(pf)
   local W = ns.Window
   local width = W.PAGE_W - 8
   local function cur() return F:Current() end
-  -- The editor works on the draft (made from the published journey on the first change).
-  pf.editor = ns.JourneyEditor.New(pf.left, pf.right, width, width, {
+  -- The editor, above the bar; it works on the draft (made from the published journey on the first change).
+  local edL, edR = CreateFrame("Frame", nil, pf.left), CreateFrame("Frame", nil, pf.right)
+  edL:SetPoint("TOPLEFT"); edL:SetPoint("BOTTOMRIGHT", 0, BAR_H + 12)
+  edR:SetPoint("TOPLEFT"); edR:SetPoint("BOTTOMRIGHT", 0, BAR_H + 12)
+  pf.editor = ns.JourneyEditor.New(edL, edR, width, width, {
     journey = function() local f = cur(); return f and A:Journey(f) end,
     edit = function(fn, quiet)
       local f = cur()
       if not f then return end
       A:Edit(f, fn, quiet)
-      if quiet then pf.draftText:SetText(L.DRAFT_N:format(A:Changes(f))) end
+      if quiet then pf.showDraft() end
     end,
     replace = function(j)
       local f = cur()
@@ -255,14 +261,14 @@ local function build(pf)
     importHint = L.IMPORT_HINT,
     spread = true, -- the ruler across both pages (28 Oct 2026)
     afterChapter = function(r) pf.placeMilestones(r) end,
-    afterAll = function(r) pf.placeDraft(r) end,
+    afterJourney = function(r) pf.placeExport(r) end,
   })
   local ed = pf.editor
-  local R = ed.right
+  local R = ed.panes.chapter
   -- (Names the tests, the tour and the self-test use.)
   pf.name, pf.floor, pf.cap, pf.drows, pf.presets, pf.import = ed.name, ed.floor, ed.cap, ed.drows, ed.presets, ed.import
 
-  -- Milestones of the chosen chapter, after its dungeons.
+  -- Milestones of the chosen chapter, after its dungeons (in This chapter).
   pf.msHead = UI.SectionHeader(R, width)
   pf.msHead:SetText(L.MS_ADMIN_HEAD)
   pf.msNone = UI.WrapText(R, 12, "ink2", width, "book")
@@ -306,30 +312,38 @@ local function build(pf)
     r:Place(pf.msAdd, 28, 16)
   end
 
-  -- The draft: what is not published yet, Export, Discard and Publish.
-  pf.draft = UI.Card(R)
-  pf.draft:SetWidth(width)
-  pf.draftText = UI.WrapText(pf.draft, 13, "ink", width - 24, "book")
-  pf.draftText:SetPoint("TOPLEFT", 12, -10)
-  pf.export = UI.TextButton(R, L.EXPORT, function()
+  -- Export, in Whole journey: the journey as a string to copy.
+  local J = ed.panes.journey
+  pf.exportLabel = UI.Text(J, 13, "ink2")
+  pf.exportLabel:SetText(L.EXPORT_TITLE)
+  pf.export = UI.TextButton(J, L.EXPORT, function()
     local f = cur()
     if f then W:TextDialog(L.EXPORT_TITLE, L.EXPORT_HINT, ns.Journey.Export(A:Journey(f))) end
-  end, "plain")
-  pf.discard = UI.TextButton(R, L.DISCARD, function() A:Discard() end, "plain")
-  pf.publish = UI.TextButton(R, L.PUBLISH, function() A:Publish(cur()) end, "primary")
-  function pf.placeDraft(r)
+  end, "plain", 12)
+  function pf.placeExport(r)
+    r:Place(pf.exportLabel, 16, 4)
+    r:Place(pf.export, 28, 12)
+  end
+
+  -- The bar under both halves, never scrolled: what is not published yet, Discard and Publish. Gold while there is
+  -- a draft.
+  pf.bar = UI.Card(pf.left)
+  pf.bar:SetPoint("BOTTOMLEFT", pf.left, "BOTTOMLEFT", 0, 0)
+  pf.bar:SetPoint("BOTTOMRIGHT", pf.right, "BOTTOMRIGHT", 0, 0)
+  pf.bar:SetHeight(BAR_H)
+  pf.publish = UI.TextButton(pf.bar, L.PUBLISH, function() A:Publish(cur()) end, "primary")
+  pf.publish:SetPoint("RIGHT", -9, 0)
+  pf.discard = UI.TextButton(pf.bar, L.DISCARD, function() A:Discard() end, "plain")
+  pf.discard:SetPoint("RIGHT", pf.publish, "LEFT", -6, 0)
+  pf.draftText = UI.Text(pf.bar, 13, "ink", "book")
+  pf.draftText:SetPoint("LEFT", 14, 0)
+  function pf.showDraft()
     local f = cur()
     if not f then return end
     local n = A:Changes(f)
     pf.draftText:SetText(A.jd and (n == 1 and L.DRAFT_1 or L.DRAFT_N:format(n)) or L.PUBLISHED)
-    pf.draft:SetHeight(pf.draftText:GetStringHeight() + 20)
-    r:Place(pf.draft, pf.draft:GetHeight(), 8)
-    local fy = r.y
-    pf.export:ClearAllPoints(); pf.export:SetPoint("TOPLEFT", R, "TOPLEFT", 0, -fy)
     pf.publish:SetShown(A.jd ~= nil); pf.discard:SetShown(A.jd ~= nil)
-    pf.publish:ClearAllPoints(); pf.publish:SetPoint("TOPRIGHT", R, "TOPRIGHT", 0, -fy)
-    pf.discard:ClearAllPoints(); pf.discard:SetPoint("RIGHT", pf.publish, "LEFT", -4, 0)
-    r:Skip(36)
+    pf.bar:SetSelected(A.jd ~= nil)
   end
 end
 
@@ -342,6 +356,7 @@ local function refresh(pf, ctx)
   pf.sel = true
   A.sel = ns.Clamp(A.sel, 1, #A:Journey(f).chapters)
   pf.editor:Refresh()
+  pf.showDraft()
 end
 
 -- A tool, not a page to read: the flat sheet, its title across the top (29 Oct 2026).

@@ -112,7 +112,7 @@ function D:Hero(name, what, arg)
   elseif what == "gather" then
     -- The pretend Hero sets up a Gathering in 16 minutes (so the reminder comes after about a minute).
     ns.Comm:Inject(full, "OP", { fid = f.id, v = f.v + 1, op = { k = "gather", a = "new", id = full .. "-" .. time(),
-      text = L.DEV_GATHER_TEXT, at = time() + 16 * 60 }, t = time() })
+      text = arg and arg ~= "" and arg or L.DEV_GATHER_TEXT, at = time() + 16 * 60 }, t = time() })
   elseif what == "propose" then
     -- The pretend Hero proposes one Hero fewer for a run (or 4 if it is at the lowest).
     local value = f.rules.minHeroes > 2 and f.rules.minHeroes - 1 or 4

@@ -1,8 +1,8 @@
 -- The journey editor (SPEC §4.11; 28 Oct 2026): one editor for Create a Fellowship ("Your own journey") and Journey
 -- Admin. Left page: the road, a ruler of every chapter's levels with a gold mark between each two chapters (drag it
 -- to move the level they share), Split / Merge / Remove, and a row per chapter with its dungeons as chips. Right
--- page: the chosen chapter (name, floor and cap, its dungeons with role and bosses), the shelf of every dungeon, and
--- Start over. Drag a dungeon from the shelf or a chapter onto a chapter row (or onto this chapter's list) to put it
+-- page, in tabs: the chosen chapter (name, floor and cap, its dungeons with role and bosses), the shelf of every
+-- dungeon, and the whole journey (Start over, Import). Drag a dungeon from the shelf or a chapter onto a chapter row (or onto this chapter's list) to put it
 -- there; drag it onto the shelf to take it out. Everything can also be done with clicks.
 -- The editor changes a journey only through its source (see JED.New): Create edits its own copy, Journey Admin a
 -- draft. Every frame is made when the page is built, so nothing is created during combat (the drag ghost too).
@@ -58,13 +58,23 @@ end
 -- src = {
 --   journey() -> the journey to show, edit(fn, quiet) -> fn(journey) on the editable copy, then a redraw unless quiet,
 --   replace(journey) -> a whole new journey (Start over, Import), sel() / setSel(i) -> the chosen chapter,
---   importHint (optional), afterChapter(stack) and afterAll(stack) (optional: more on the right page, Journey Admin's
---   milestones and its draft),
+--   importHint (optional), afterChapter(stack) and afterJourney(stack) (optional: more in the This chapter and Whole
+--   journey tabs, Journey Admin's milestones and Export; their frames go on ed.panes.chapter and ed.panes.journey),
 -- }
 -- src.spread: the ruler runs across both pages (Journey Admin, 28 Oct 2026: wider, easier to drag), and the right
 -- page's content starts under it.
 local SPINE = 52 -- between the left page's area and the right page's (each page keeps a 26 margin)
 local GAP = 14 -- between the ruler's plate and the right page's content
+-- The right page's tabs (30 Oct 2026: it was one long scroll, and Journey Admin's Publish lay under every dungeon).
+local TABS = { "chapter", "shelf", "journey" }
+local TABS_H = 28 + 10 -- the tabs and the room under them
+
+-- The tabs at the right page's top (under the plate across both pages), the scrolling tab under them.
+local function placeRight(ed)
+  ed.tabs:ClearAllPoints(); ed.tabs:SetPoint("TOPLEFT", ed.rightPage, "TOPLEFT", 0, -ed.drop)
+  ed.rscroll:ClearAllPoints()
+  ed.rscroll:SetPoint("TOPLEFT", 0, -(ed.drop + TABS_H)); ed.rscroll:SetPoint("BOTTOMRIGHT")
+end
 
 -- The ruler's look (29 Oct 2026; Create's journey views use it too). It lies on one of the book's cards (UI.Card,
 -- the rounded frame of the Overview and the dungeon cards: the leather plate looked out of place inside the book).
@@ -226,17 +236,23 @@ function JED.New(left, right, lw, rw, src)
   end)
 
   ---------------------------------------------------------------------------
-  -- Right page: the chosen chapter, its dungeons, the shelf, Start over (and what the source adds).
+  -- Right page, in three tabs: This chapter (its name, floor and cap, its dungeons, and what the source adds), Every
+  -- dungeon (the shelf) and Whole journey (Start over, Import, and what the source adds). Each tab is a pane in the
+  -- scrolling area; only the open one shows.
   ---------------------------------------------------------------------------
+  ed.tab = "chapter"
+  ed.tabs = UI.Tabs(right, { { L.ED_TAB_CHAPTER, "chapter" }, { L.ED_SHELF, "shelf" }, { L.ED_TAB_JOURNEY, "journey" } },
+    function() return ed.tab end, function(v) ed:ShowTab(v) end, rw)
   ed.rscroll = UI.Scroll(right)
-  if src.spread then
-    ed.drop = PLATE_H + GAP
-    ed.rscroll:SetPoint("TOPLEFT", 0, -ed.drop); ed.rscroll:SetPoint("BOTTOMRIGHT")
-  else
-    ed.rscroll:SetAllPoints()
+  ed.drop = src.spread and (PLATE_H + GAP) or 0
+  placeRight(ed)
+  ed.panes = {}
+  for _, k in ipairs(TABS) do
+    local p = CreateFrame("Frame", nil, ed.rscroll.child)
+    p:SetPoint("TOPLEFT"); p:SetSize(rw, 1)
+    ed.panes[k] = p
   end
-  local R = ed.rscroll.child
-  ed.right = R
+  local R, S, J = ed.panes.chapter, ed.panes.shelf, ed.panes.journey
   ed.chHead = UI.SectionHeader(R, rw)
   ed.nameLabel = UI.Text(R, 13, "ink2")
   ed.nameLabel:SetText(L.CHAPTER_NAME)
@@ -293,11 +309,9 @@ function JED.New(left, right, lw, rw, src)
   ed.empty = UI.WrapText(R, 13, "ink2", rw, "book")
   ed.empty:SetText(L.ADMIN_NO_DUNGEONS)
   -- The shelf: every dungeon by level; the ones that fit the chosen chapter in gold. Also where a dungeon is dropped
-  -- to take it out of its chapter.
-  ed.shelfHead = UI.SectionHeader(R, rw)
-  ed.shelfHead:SetText(L.ED_SHELF)
-  ed.shelfHint = UI.WrapText(R, 12, "ink2", rw, "book")
-  ed.shelf = CreateFrame("Frame", nil, R)
+  -- to take it out of its chapter. (Its tab is its heading.)
+  ed.shelfHint = UI.WrapText(S, 12, "ink2", rw, "book")
+  ed.shelf = CreateFrame("Frame", nil, S)
   ed.shelf:SetWidth(rw)
   ed.shelf.bg = ed.shelf:CreateTexture(nil, "BACKGROUND")
   ed.shelf.bg:SetAllPoints(); ed.shelf.bg:SetTexture(ns.WHITE)
@@ -320,13 +334,13 @@ function JED.New(left, right, lw, rw, src)
     ed.shelfBy[d[1]] = b
   end
   ed.shelf:SetHeight(4 + math.ceil(#list / 2) * 26 + 4)
-  ed.startLabel = UI.Text(R, 13, "ink2")
+  ed.startLabel = UI.Text(J, 13, "ink2")
   ed.startLabel:SetText(L.START_OVER)
   ed.presets = {}
   for _, key in ipairs(ns.PRESET_ORDER) do
-    ed.presets[#ed.presets + 1] = UI.TextButton(R, ns.PRESETS[key].title, function() src.replace(ns.BuildJourney(key)) end, "plain", 12)
+    ed.presets[#ed.presets + 1] = UI.TextButton(J, ns.PRESETS[key].title, function() src.replace(ns.BuildJourney(key)) end, "plain", 12)
   end
-  ed.import = UI.TextButton(R, L.IMPORT, function()
+  ed.import = UI.TextButton(J, L.IMPORT, function()
     local dlg
     dlg = W:TextDialog(L.IMPORT_TITLE, src.importHint or L.IMPORT_HINT_NEW, "", L.IMPORT, function(text)
       local j = ns.Journey.Import(text)
@@ -381,13 +395,16 @@ function JED:PickBosses(key)
   end)
 end
 
--- Scrolls the right page to the shelf (the tour's screenshots).
-function JED:ScrollToShelf()
-  local sf = self.rscroll
-  sf:SetVerticalScroll(math.max(0, math.min(self.shelfY or 0, (sf.contentHeight or 0) - (sf:GetHeight() or 0))))
-  local wheel = sf:GetScript("OnMouseWheel")
-  if wheel then wheel(sf, 0) end
+-- Opens a tab of the right page, at its top. The tab stays open when another chapter is chosen (add dungeons to one
+-- chapter after another).
+function JED:ShowTab(tab)
+  self.tab = tab
+  self:Refresh()
+  self.rscroll:ToTop()
 end
+
+-- The Every dungeon tab (the tour's screenshots).
+function JED:ScrollToShelf() self:ShowTab("shelf") end
 
 -- The tooltip on a mark between two chapters: the two chapters' levels.
 function JED:HandleTip(h)
@@ -426,9 +443,10 @@ function JED:Target()
       if row and row:IsShown() and row:IsMouseOver() then return { kind = "chapter", i = i, frame = row } end
     end
   end
+  -- (Visible: only the open tab's drop place counts.)
   if self.rscroll:IsMouseOver() then
-    if self.dropHere:IsShown() and self.dropHere:IsMouseOver() then return { kind = "chapter", i = self.src.sel(), frame = self.dropHere } end
-    if self.shelf:IsShown() and self.shelf:IsMouseOver() then return { kind = "shelf", frame = self.shelf } end
+    if self.dropHere:IsVisible() and self.dropHere:IsMouseOver() then return { kind = "chapter", i = self.src.sel(), frame = self.dropHere } end
+    if self.shelf:IsVisible() and self.shelf:IsMouseOver() then return { kind = "shelf", frame = self.shelf } end
   end
 end
 
@@ -502,8 +520,8 @@ function JED:Paint()
   self.shelf.bg:SetVertexColor(Theme:RGBA("B0321E", self.hover == self.shelf and 0.2 or 0))
 end
 
--- Draws everything. The right page's stack is handed to src.afterChapter and src.afterAll, which place their own
--- frames on self.right; the editor then sets the scroll height.
+-- Draws everything. The right page's tabs' stacks are handed to src.afterChapter and src.afterJourney, which place
+-- their own frames on self.panes.chapter and self.panes.journey; the editor then sets the open tab's scroll height.
 function JED:Refresh()
   local src = self.src
   local j = src.journey()
@@ -525,7 +543,7 @@ function JED:Refresh()
     local drop = (top and bottom and top - bottom > 0) and math.floor(top - bottom + GAP) or (PLATE_H + GAP)
     if drop ~= self.drop then
       self.drop = drop
-      self.rscroll:ClearAllPoints(); self.rscroll:SetPoint("TOPLEFT", 0, -drop); self.rscroll:SetPoint("BOTTOMRIGHT")
+      placeRight(self)
     end
     local pl, lr, rl = self.plate:GetLeft(), self.leftPage:GetRight(), self.rightPage:GetLeft()
     local fold = (pl and lr and rl and rl > lr) and ((lr + rl) / 2 - pl) or (lw + SPINE / 2)
@@ -627,8 +645,9 @@ function JED:Refresh()
   self.rows:HideFrom(n + 1)
   self.list:SetContentHeight(s.y)
 
-  -- Right page: the chosen chapter.
-  local r = UI.Stack(self.right)
+  -- Right page, This chapter: the chosen chapter.
+  local C = self.panes.chapter
+  local r = UI.Stack(C)
   self.chHead:SetText(L.CHAPTER_ROMAN:format(ns.Journey.Roman(sel)))
   r:Place(self.chHead, 29, 8)
   r:Place(self.nameLabel, 16, 2)
@@ -637,8 +656,8 @@ function JED:Refresh()
   local fy = r.y
   r:Place(self.floorLabel, 16, 2)
   r:Place(self.floor, 26, 10)
-  self.capLabel:ClearAllPoints(); self.capLabel:SetPoint("TOPLEFT", self.right, "TOPLEFT", rw / 2, -fy)
-  self.cap:ClearAllPoints(); self.cap:SetPoint("TOPLEFT", self.right, "TOPLEFT", rw / 2, -(fy + 18))
+  self.capLabel:ClearAllPoints(); self.capLabel:SetPoint("TOPLEFT", C, "TOPLEFT", rw / 2, -fy)
+  self.cap:ClearAllPoints(); self.cap:SetPoint("TOPLEFT", C, "TOPLEFT", rw / 2, -(fy + 18))
   self.floor:Refresh(); self.cap:Refresh()
   local issues = ns.Journey.Issues(j, sel)
   for i, text in ipairs(issues) do
@@ -669,14 +688,14 @@ function JED:Refresh()
   self.drows:HideFrom(shown + 1)
   self.empty:SetShown(shown == 0)
   if shown == 0 then r:Place(self.empty, self.empty:GetStringHeight(), 6) end
-  self.dropHere:ClearAllPoints(); self.dropHere:SetPoint("TOPLEFT", self.right, "TOPLEFT", 0, -dy)
+  self.dropHere:ClearAllPoints(); self.dropHere:SetPoint("TOPLEFT", C, "TOPLEFT", 0, -dy)
   self.dropHere:SetHeight(math.max(30, r.y - dy))
   r:Skip(12)
   if src.afterChapter then src.afterChapter(r) end
+  local heights = { chapter = r.y }
 
-  -- The shelf.
-  self.shelfY = r.y
-  r:Place(self.shelfHead, 29, 4)
+  -- Every dungeon: the shelf.
+  r = UI.Stack(self.panes.shelf)
   self.shelfHint:SetText(L.ED_SHELF_HINT:format(ns.Journey.Roman(sel)))
   r:Place(self.shelfHint, self.shelfHint:GetStringHeight(), 6)
   for _, b in ipairs(self.shelfChips) do
@@ -694,8 +713,11 @@ function JED:Refresh()
     b.tip = { d[2], d[3] .. "-" .. d[4] .. "  ·  " .. (#chs > 0 and L.ED_SHELF_IN:format(table.concat(romans, ", ")) or L.ED_SHELF_FREE), L.ED_SHELF_TIP }
   end
   r:Place(self.shelf, self.shelf:GetHeight(), 12)
+  heights.shelf = r.y
 
-  -- Start over from a preset, or Import.
+  -- Whole journey: start over from a preset, or Import.
+  local J = self.panes.journey
+  r = UI.Stack(J)
   r:Place(self.startLabel, 16, 4)
   local x, py = 0, r.y
   local buttons = {}
@@ -703,11 +725,18 @@ function JED:Refresh()
   buttons[#buttons + 1] = self.import
   for _, b in ipairs(buttons) do
     if x > 0 and x + b:GetWidth() > rw then x, py = 0, py + 32 end
-    b:ClearAllPoints(); b:SetPoint("TOPLEFT", self.right, "TOPLEFT", x, -py)
+    b:ClearAllPoints(); b:SetPoint("TOPLEFT", J, "TOPLEFT", x, -py)
     x = x + b:GetWidth() + 4
   end
   r.y = py + 32 + 12
-  if src.afterAll then src.afterAll(r) end
-  self.rscroll:SetContentHeight(r.y + 8)
+  if src.afterJourney then src.afterJourney(r) end
+  heights.journey = r.y
+
+  for k, p in pairs(self.panes) do
+    p:SetHeight(math.max(1, heights[k]))
+    p:SetShown(k == self.tab)
+  end
+  self.tabs:Refresh()
+  self.rscroll:SetContentHeight(heights[self.tab] + 8)
   self:Paint()
 end

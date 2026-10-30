@@ -95,9 +95,10 @@ function ns.IconArt(path)
   if cell then
     local col, row = (cell - 1) % 4, math.floor((cell - 1) / 4)
     local a, z = ns.ICON_DISC[1], ns.ICON_DISC[2]
-    -- The Horde theme: the same set with crimson discs instead of blue (Media\IconSetHorde, made by
-    -- tools/convert-art.ps1; the blue looked out of place in red; 27 Oct 2026).
-    local file = (ns.Theme and ns.Theme:Key() == "horde") and "IconSetHorde" or "IconSet"
+    -- The Horde: the same set with crimson discs instead of blue (Media\IconSetHorde, made by
+    -- tools/convert-art.ps1; the blue looked out of place in red; 27 Oct 2026). They follow the side of the header
+    -- art, in every theme: a Horde character in the Journal theme had blue icons under Horde art (30 Oct 2026).
+    local file = (ns.Theme and ns.Theme:Horde()) and "IconSetHorde" or "IconSet"
     return ns.MEDIA .. file, (col + a) / 4, (col + z) / 4, (row + a) / 4, (row + z) / 4
   end
   return path, 0.08, 0.92, 0.08, 0.92
@@ -219,9 +220,10 @@ end
 
 function E:Has(key) return self.set ~= nil and self.set[key] == true end
 -- The emblem a new fellowship starts with: your side's heraldry, the lion for the Alliance and the crossed axes
--- for the Horde. (It was the first emblem the game had, and before the scan a game icon; seen in game.)
+-- for the Horde. (It was the first emblem the game had, and before the scan a game icon; seen in game.) The side
+-- is the theme's, which is your faction's except in /jtf tour and /jtf brand (they force a side's look).
 function E:First()
-  return UnitFactionGroup("player") == "Horde" and "Her_Axes" or "Her_Lion"
+  return ns.Theme:Horde() and "Her_Axes" or "Her_Lion"
 end
 function E:Valid(key) return type(key) == "string" and #key <= 64 and key:match("^[%w_]+$") ~= nil end
 
