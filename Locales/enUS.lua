@@ -588,10 +588,15 @@ ns.L = setmetatable({
 
   -- Dungeon Journal
   DJ_MISSING = "Install the DungeonJournal addon to see loot, quests and where to find them.",
-  -- Lore Forever and Spoken (UI/OtherAddons.lua): their buttons show only while the addon runs.
+  -- Lore Forever and Spoken (UI/OtherAddons.lua): their buttons always show; without the addon, a toast.
   LORE_TIP = "The story of this place, in Lore Forever",
+  LORE_FOREVER = "Lore Forever",
+  LORE_MISSING = "Install the Lore Forever addon to read the story of this place.",
   LISTEN = "Listen in Spoken",
   LISTEN_TIP = "Read and listen to this quest in Spoken",
+  SPOKEN = "Spoken",
+  LISTEN_MISSING = "Install the Spoken addon to read and listen to quests.",
+  LISTEN_HIDDEN = "Spoken shows a quest once you have taken it. To see the others, turn on \"unlock unstarted quests\" in Spoken's settings.",
 
   -- Clears and History
   H_RUN = "%s: %s",

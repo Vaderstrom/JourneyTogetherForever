@@ -52,7 +52,7 @@ function C:Run(text)
   local list = {}
   for key in pairs(areas or {}) do list[#list + 1] = key end
   table.sort(list)
-  ns.db.check = { started = time(), selftest = selftest, shots = shots, areas = #list > 0 and list or nil }
+  ns.db.check = { started = time(), loaded = ns.loadedAt, selftest = selftest, shots = shots, areas = #list > 0 and list or nil }
   self.running = true
   local count = shots and ns.Tour:Count(areas) or 0
   ns:Print(L.CHECK_START:format(selftest and L.CHECK_WITH_SELFTEST or "", count,

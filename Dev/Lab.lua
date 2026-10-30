@@ -110,6 +110,15 @@ local function invited()
   return true
 end
 
+-- The Overview once you are in the Test fellowship: Testleader answers the accept after a moment, and a fixed second
+-- could open the book before the fellowship had come (30 Oct 2026).
+local function whenJoined(tries)
+  local f = cur()
+  if f and f.id == ns.Dev.TEST_ID then open("overview"); Lab:Refresh() return end
+  if tries <= 0 then say("Testleader did not answer the invitation: try the scenario again.") return end
+  C_Timer.After(0.25, function() whenJoined(tries - 1) end)
+end
+
 Lab.SCENARIOS = {
   { "Getting started: Welcome", "No fellowship: the Welcome page, Create a Fellowship and Join, Your characters.", function()
     if outside() then start("welcome") end
@@ -122,7 +131,7 @@ Lab.SCENARIOS = {
     ns.db.lab = { fid = ns.Dev.TEST_ID, started = time() }
     C_Timer.After(0.3, function()
       ns.Fellowship:AcceptInvite(ns.Dev.TEST_ID, "DPS")
-      C_Timer.After(1, function() open("overview"); Lab:Refresh() end)
+      whenJoined(20)
     end)
   end },
   { "Getting started as the Leader", "A new fellowship, alone: Getting started on the Overview, the Prologue on the Chapter page.", function()

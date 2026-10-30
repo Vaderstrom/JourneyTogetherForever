@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+- Dungeon and chapter pictures sit in a thin gold frame everywhere, like the picture tiles: the Overview's chapter,
+  the chosen Gathering, Since you were last here, How it works on the Welcome page, the dungeon rows on the Chapter
+  page and the raid cards. They were pasted onto the page with no frame.
+- Joining a fellowship opens the book on the Overview, where the welcome card is. It showed the page you last had
+  open in an earlier fellowship, and that ticked off the card's step at once.
+- Leaving a fellowship takes its welcome card with you: join it again and the card starts afresh, even if you hid it.
+- Group photo: a pose that plays once (Salute) now stands for a moment and then starts over. Setting the same pose
+  again was not enough: in 0.9.3 the Salute still froze.
+- Lore and Listen always show, as the Dungeon Journal does: Lore on every dungeon row and raid card, Listen on every
+  attunement step, chain part and quest. Without Lore Forever or Spoken, a click says to install it; a quest Spoken
+  keeps hidden says when it shows. They showed only while those addons ran, so you could not know they were there.
+- `/jtf check` notes when the game read the addon's files, and the check report says "OLD CODE" when they changed
+  after that: a check run without a /reload sees the old code.
+
 ## 0.9.3 beta (30 October 2026)
 - Your standing on the Overview and in the tracker counts the XP you already have, as the Chapter page does: "Ready,
   12.1 levels to the cap", where it said 13 beside the other page's 12.1.

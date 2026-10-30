@@ -299,6 +299,9 @@ end
 function F:AfterChange(f)
   if ns.char.fellowshipId == f.id and (f.disbanded or not f.members[ns.Me()]) then
     ns.char.fellowshipId = nil
+    -- The getting-started card goes with the membership: joining again starts it afresh (the lab's Test fellowship
+    -- keeps one id, so its welcome card stayed ticked or hidden from one run to the next; 30 Oct 2026).
+    if ns.char.started then ns.char.started[f.id] = nil end
     if not self.leaving then ns:Toast(nil, L.GONE_T, (f.disbanded and L.GONE_DISBANDED or L.GONE_REMOVED):format(f.name)) end
   end
   self:Changed()

@@ -22,15 +22,17 @@ local function bar(parent)
 end
 
 -- A step's Listen button (Spoken, UI/OtherAddons.lua) at its right, for an attunement's steps and a chain's parts.
--- p:SetQuest(ids) shows it when Spoken has one of the quests, and the text makes room for it.
+-- p:SetQuest(ids) shows it on every step done by a quest, Spoken or not (a click without it says to install it),
+-- and the text makes room for it.
 local function addListen(p, width)
-  p.listen = UI.RoundButton(p, 22, "listen", function() if p.qid then OA:Listen(p.qid) end end)
+  p.listen = UI.RoundButton(p, 22, "listen", function() if p.qids then OA:Listen(p.qids) end end)
   p.listen:SetPoint("TOPRIGHT", 0, 0)
   UI.Tooltip(p.listen, L.LISTEN_TIP)
   function p:SetQuest(ids)
-    self.qid = OA:SpokenQuest(ids)
-    self.listen:SetShown(self.qid ~= nil)
-    local w = width - 34 - (self.qid and 28 or 0)
+    if type(ids) == "table" and #ids == 0 then ids = nil end
+    self.qids = ids
+    self.listen:SetShown(ids ~= nil)
+    local w = width - 34 - (ids and 28 or 0)
     self.title:SetWidth(w); self.heroes:SetWidth(w)
   end
 end
@@ -624,8 +626,8 @@ local function refresh(pf, ctx)
     pf.share:SetShown(share ~= nil)
     pf.share:SetEnabled(share == "ok")
     if share then buttons[#buttons + 1] = pf.share end
-    -- Listen in Spoken: a quest whose words Spoken shows (a chain has the button on each of its parts).
-    pf.listenID = not pick.chain and OA:SpokenQuest(tonumber(tostring(pick.id):match("^q:(%d+)$"))) or nil
+    -- Listen in Spoken: every single quest, Spoken or not (a chain has the button on each of its parts).
+    pf.listenID = not pick.chain and tonumber(tostring(pick.id):match("^q:(%d+)$")) or nil
     pf.listen:SetShown(pf.listenID ~= nil)
     if pf.listenID then buttons[#buttons + 1] = pf.listen end
     if #buttons > 0 then

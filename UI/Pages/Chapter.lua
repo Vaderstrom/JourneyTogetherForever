@@ -128,15 +128,13 @@ local function build(pf)
     -- The dungeon's picture (its loading screen); a click opens the DungeonJournal addon.
     c.pic = CreateFrame("Button", nil, c)
     c.pic:SetSize(THUMB_W, THUMB_H); c.pic:SetPoint("LEFT", 9, 0)
-    c.pic.bg = c.pic:CreateTexture(nil, "BACKGROUND")
-    c.pic.bg:SetAllPoints(); c.pic.bg:SetColorTexture(0.1, 0.07, 0.04, 1)
     c.pic.tex = c.pic:CreateTexture(nil, "ARTWORK")
-    c.pic.tex:SetAllPoints()
     local phl = c.pic:CreateTexture(nil, "HIGHLIGHT")
-    phl:SetAllPoints(); phl:SetColorTexture(1, 0.9, 0.6, 0.15)
+    phl:SetColorTexture(1, 0.9, 0.6, 0.15)
+    UI.FramePicture(c.pic, c.pic.tex, phl)
     c.pic:SetScript("OnClick", function() W:DungeonJournal(c.key) end)
     c.mark = UI.Mark(c.pic, 14)
-    c.mark:SetPoint("BOTTOMLEFT", 2, 2)
+    c.mark:SetPoint("BOTTOMLEFT", 4, 4)
     c.name = UI.Text(c, 14, "ink", "title")
     c.name:SetPoint("TOPLEFT", THUMB_W + 18, -9)
     c.name:SetWordWrap(false)
@@ -156,7 +154,7 @@ local function build(pf)
     -- The Dungeon Journal as a book icon (a symbol, as in the first mockup; the text button was wide).
     c.dj = UI.RoundButton(c, 26, "journal", function() W:DungeonJournal(c.key) end)
     UI.Tooltip(c.dj, L.DUNGEON_JOURNAL)
-    -- The dungeon's story in Lore Forever, while it runs (UI/OtherAddons.lua).
+    -- The dungeon's story in Lore Forever; without it, a click says to install it (UI/OtherAddons.lua).
     c.lore = UI.RoundButton(c, 26, "lore", function() OA:Lore(c.key) end)
     UI.Tooltip(c.lore, L.LORE_TIP)
     c.group = UI.TextButton(c, L.FIND_GROUP, function()
@@ -610,7 +608,6 @@ local function refresh(pf, ctx)
     c.state:SetShown(st ~= "open")
     c.state:SetText(st == "cleared" and L.STATE_CLEARED or L.STATE_LOCKED)
     c.state:SetTextColor(Theme:RGBA(st == "cleared" and "3E7A3A" or "ink2"))
-    c.lore:SetShown(OA:HasLore())
     local rx = width - 8
     for _, w in ipairs({ c.menu, c.group, c.state, c.dj, c.lore }) do
       if w:IsShown() then
@@ -624,9 +621,9 @@ local function refresh(pf, ctx)
     -- Next to Find group the line can be too long ("Mandatory · Level 18-21 · 2/5 bo..", seen in the check of 29 Oct
     -- 2026): the levels without "Level" then.
     if c.sub:GetStringWidth() > textW then c.sub:SetText(sub(L.CH_LEVELS_SHORT:format(x.d[3], x.d[4]))) end
-    local ok, default = ns.SetDungeonArt(c.pic.tex, x.key, THUMB_W, THUMB_H)
+    local ok, default = ns.SetDungeonArt(c.pic.tex, x.key, THUMB_W - 2 * UI.PIC_INSET, THUMB_H - 2 * UI.PIC_INSET)
     -- No picture of its own (only the game's blurry default tile): the chapter's illustration instead.
-    if default then ns.Pages:SetChapterArt(c.pic.tex, ns.Pages:ArtOf(f, view), THUMB_W, THUMB_H, 0.6); ok = true end
+    if default then ns.Pages:SetChapterArt(c.pic.tex, ns.Pages:ArtOf(f, view), THUMB_W - 2 * UI.PIC_INSET, THUMB_H - 2 * UI.PIC_INSET, 0.6); ok = true end
     c.pic.tex:SetShown(ok)
     -- Locked rows are dimmed while the fellowship waits for the floor: the stage above is what matters now.
     c:SetAlpha(st == "locked" and 0.6 or 1)

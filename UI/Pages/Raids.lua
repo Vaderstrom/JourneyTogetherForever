@@ -29,18 +29,17 @@ local function build(pf)
     c:SetWidth(width)
     c.pic = CreateFrame("Button", nil, c)
     c.pic:SetHeight(PIC_H); c.pic:SetPoint("TOPLEFT", 4, -4); c.pic:SetPoint("TOPRIGHT", -4, -4)
-    c.pic.bg = c.pic:CreateTexture(nil, "BACKGROUND")
-    c.pic.bg:SetAllPoints(); c.pic.bg:SetColorTexture(0.1, 0.07, 0.04, 1)
     c.pic.tex = c.pic:CreateTexture(nil, "ARTWORK")
-    c.pic.tex:SetAllPoints()
+    local hl = c.pic:CreateTexture(nil, "HIGHLIGHT")
+    hl:SetColorTexture(1, 0.9, 0.6, 0.1)
+    UI.FramePicture(c.pic, c.pic.tex, hl)
+    local p = UI.PIC_INSET
     local fade = c.pic:CreateTexture(nil, "ARTWORK", nil, 2)
-    fade:SetPoint("BOTTOMLEFT"); fade:SetPoint("BOTTOMRIGHT"); fade:SetHeight(PIC_H * 0.6)
+    fade:SetPoint("BOTTOMLEFT", p, p); fade:SetPoint("BOTTOMRIGHT", -p, p); fade:SetHeight(PIC_H * 0.6)
     UI.SetGradient(fade, "VERTICAL", { 0.05, 0.03, 0.01, 0.9 }, { 0.05, 0.03, 0.01, 0 })
     local top = c.pic:CreateTexture(nil, "ARTWORK", nil, 2)
-    top:SetPoint("TOPLEFT"); top:SetPoint("TOPRIGHT"); top:SetHeight(26)
+    top:SetPoint("TOPLEFT", p, -p); top:SetPoint("TOPRIGHT", -p, -p); top:SetHeight(26)
     UI.SetGradient(top, "VERTICAL", { 0.05, 0.03, 0.01, 0 }, { 0.05, 0.03, 0.01, 0.6 })
-    local hl = c.pic:CreateTexture(nil, "HIGHLIGHT")
-    hl:SetAllPoints(); hl:SetColorTexture(1, 0.9, 0.6, 0.1)
     c.pic:SetScript("OnClick", function() pf.raid = c.key; W:Refresh() end)
     c.mark = UI.Mark(c.pic, 14)
     c.mark:SetPoint("BOTTOMLEFT", 10, 11)
@@ -63,7 +62,7 @@ local function build(pf)
     end, "primary", 12)
     c.dj = UI.RoundButton(c, 28, "journal", function() W:DungeonJournal(c.key) end)
     UI.Tooltip(c.dj, L.DUNGEON_JOURNAL)
-    -- The raid's story in Lore Forever, while it runs (UI/OtherAddons.lua).
+    -- The raid's story in Lore Forever; without it, a click says to install it (UI/OtherAddons.lua).
     c.lore = UI.RoundButton(c, 28, "lore", function() OA:Lore(c.key) end)
     UI.Tooltip(c.lore, L.LORE_TIP)
     c.lore:SetPoint("LEFT", c.dj, "RIGHT", 6, 0)
@@ -112,8 +111,8 @@ local function refresh(pf, ctx)
     if key == pf.raid then chosen = r end
     c.name:SetText(r[2])
     c.size:SetText(L.RAID_SIZE:format(r[4]))
-    local ok, default = ns.SetDungeonArt(c.pic.tex, key, width - 8, PIC_H)
-    if default then ns.Pages:SetChapterArt(c.pic.tex, nil, width - 8, PIC_H, 0.5); ok = true end
+    local ok, default = ns.SetDungeonArt(c.pic.tex, key, width - 8 - 2 * UI.PIC_INSET, PIC_H - 2 * UI.PIC_INSET)
+    if default then ns.Pages:SetChapterArt(c.pic.tex, nil, width - 8 - 2 * UI.PIC_INSET, PIC_H - 2 * UI.PIC_INSET, 0.5); ok = true end
     c.pic.tex:SetShown(ok)
     local cleared = 0
     for name in pairs(J:ClearedBy(f, key)) do if f.members[name] then cleared = cleared + 1 end end
@@ -132,7 +131,6 @@ local function refresh(pf, ctx)
     c.group:SetShown(not ctx.watching)
     c.dj:ClearAllPoints()
     if ctx.watching then c.dj:SetPoint("TOPLEFT", 12, -h) else c.dj:SetPoint("LEFT", c.group, "RIGHT", 6, 0) end
-    c.lore:SetShown(OA:HasLore())
     h = h + 34
     c:SetHeight(h)
     s:Place(c, h, 8)

@@ -573,6 +573,25 @@ step("group photo: everyone together on the whole screen", function(c)
   c:That(ns.char.photoZoom == nil, "the camera goes back as far as it was")
 end)
 
+-- A pose that plays once: the chosen one stood under Salute in two checks of 30 Oct 2026. Does the game say when
+-- the salute ends (so it can start again)? Read in the report: the count over four seconds.
+step("group photo: Salute starts again (part 1)", function(c)
+  local PH = ns.Photo
+  c:That(PH:Open({ standIns = true }), "opens")
+  PH:SetBackdrop("studio")
+  PH:Choose(1)
+  while PH.cast[1] and PH.POSES[PH.cast[1].pose][1] ~= "PHOTO_POSE_SALUTE" do PH:StepPose(1) end
+  PH.animEnds = 0
+  c:That(PH.cast[1] ~= nil, "the first one salutes")
+end, 4)
+step("group photo: Salute starts again (part 2)", function(c)
+  local PH = ns.Photo
+  c:That(PH.endHook == true, "the game takes a handler for an animation's end")
+  c:That(true, ("the salute ended %d times in four seconds (0: the game never said so)"):format(PH.animEnds or 0))
+  PH:Close()
+  c:That(not PH:IsOpen(), "closed")
+end)
+
 step("quests: tabs and attunements", function(c)
   dev("hero Brannic quests")
   ns.Window:ShowPage("quests")
@@ -1099,6 +1118,16 @@ step("other addons: DungeonJournal, Attune, Questie, Lore Forever and Spoken", f
   ns.Window:ShowPage("quests")
   local pf = ns.Window.pageFrames.quests
   c:That(qs == "on" and pf.questie:IsShown() or qs ~= "on", "Questie credited on the Quests page when running")
+  -- Lore on every dungeon row, Lore Forever or not; without it a click says to install it (30 Oct 2026).
+  ns.Window:ShowPage("chapter")
+  local row
+  for _, r in ipairs(ns.Window.pageFrames.chapter.rows.items) do if not row and r:IsShown() and r.key then row = r end end
+  if not row then return c:That(true, "no dungeon rows in this chapter: Lore not checked") end
+  c:That(row.lore:IsShown(), "Lore on the Chapter page's dungeon rows")
+  if not lore then
+    row.lore:GetScript("OnClick")(row.lore)
+    c:That(toastSeen(nil, "Install the Lore Forever addon"), "without Lore Forever, a click says to install it")
+  end
 end)
 
 ---------------------------------------------------------------------------

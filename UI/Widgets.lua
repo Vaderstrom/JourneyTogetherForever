@@ -209,6 +209,23 @@ function UI.PictureTile(parent, w, h, art, onClick)
   return t
 end
 
+-- The picture tiles' frame for any picture on a frame: a dark ground, the picture 2 pixels in and a 2-pixel gold
+-- edge round it, so no picture lies bare on the page (the Overview's, the Gathering's and the dungeon thumbnails were
+-- pasted on without one; check of 30 Oct 2026). The textures given (the picture and its fades) are moved in.
+UI.PIC_INSET = 2
+function UI.FramePicture(f, ...)
+  local bg = f:CreateTexture(nil, "BACKGROUND", nil, -8)
+  bg:SetAllPoints(); bg:SetColorTexture(0.1, 0.07, 0.04, 1)
+  local p = UI.PIC_INSET
+  for i = 1, select("#", ...) do
+    local t = select(i, ...)
+    t:ClearAllPoints(); t:SetPoint("TOPLEFT", p, -p); t:SetPoint("BOTTOMRIGHT", -p, p)
+  end
+  f.edge = UI.Box(f, p, nil, nil, "gold", 0.85)
+  f.edge:SetAllPoints()
+  return f.edge
+end
+
 -- A one-line tooltip on hover (icon buttons say what they do).
 function UI.Tooltip(frame, text)
   frame:HookScript("OnEnter", function()

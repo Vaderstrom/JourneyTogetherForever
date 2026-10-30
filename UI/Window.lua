@@ -1337,6 +1337,10 @@ ns:On("FELLOWSHIP", function()
   -- Only a real change (an invitation arriving is a FELLOWSHIP event too, and it sent the Join page back to
   -- Welcome while wasInFellow was still unknown; seen in the tour).
   if W.wasInFellow ~= nil and inFellow ~= W.wasInFellow then W.startView = "welcome" end
+  -- Just joined someone else's fellowship: the Overview, where the welcome card is. The book kept the page of an
+  -- earlier fellowship, and showing it ticked the card's step at once (the lab, 30 Oct 2026).
+  local f = ns.Fellowship:Current()
+  if W.wasInFellow == false and f and f.leader ~= ns.Me() then W.page = "overview" end
   -- Just founded or joined: the setup guide first, then the page the book was going to.
   local G = ns.SetupGuide
   if W.wasInFellow == false and inFellow and G and G:Pending() then

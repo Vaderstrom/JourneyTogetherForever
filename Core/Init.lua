@@ -3,6 +3,9 @@ local ADDON, ns = ...
 local L = ns.L
 ns.ADDON = ADDON
 ns.MEDIA = "Interface\\AddOns\\" .. ADDON .. "\\Media\\"
+-- When the game read these files (login or /reload). The check report compares it with the files on disk, so a check
+-- run without a /reload after a change says it saw the old code (it happened twice on 30 Oct 2026).
+ns.loadedAt = time()
 
 -- The developer's copy (29 Oct 2026): the folder JourneyTogetherForever-Dev with its own TOC sits next to the
 -- released addon, so either can be turned off in the AddOns list. It keeps its own saved data (the two files would

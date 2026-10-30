@@ -120,12 +120,19 @@ end
 local function onLoaded(a) if a.anim then a:SetAnimation(a.anim) end end
 
 -- Some emotes play once and the model then stands: the chosen one stood under "Salute" (check of 30 Oct 2026). When
--- an animation ends, the pose starts again.
+-- an animation ends, the pose starts again: a frame of standing first, as setting the same animation again may not
+-- start it over (it still stood in the next check). PH.animEnds counts the ends, for the self-test.
+local function onFinished(a)
+  PH.animEnds = (PH.animEnds or 0) + 1
+  if not a.anim or a.anim == 0 then return end
+  a:SetAnimation(0)
+  C_Timer.After(0, function() if a.anim then a:SetAnimation(a.anim) end end)
+end
 local function newActor(scene)
   local a = scene:CreateActor()
   if a.SetScript then
     pcall(a.SetScript, a, "OnModelLoaded", onLoaded)
-    pcall(a.SetScript, a, "OnAnimFinished", onLoaded)
+    PH.endHook = pcall(a.SetScript, a, "OnAnimFinished", onFinished)
   end
   return a
 end

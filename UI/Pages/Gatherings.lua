@@ -83,12 +83,9 @@ local function build(pf)
   -- The chosen Gathering: its picture with what and when on it.
   local band = CreateFrame("Frame", nil, R)
   band:SetSize(width, PIC_H)
-  band.bg = band:CreateTexture(nil, "BACKGROUND")
-  band.bg:SetAllPoints(); band.bg:SetColorTexture(0.1, 0.07, 0.04, 1)
   band.art = band:CreateTexture(nil, "ARTWORK")
-  band.art:SetAllPoints()
   local fade = band:CreateTexture(nil, "ARTWORK", nil, 2)
-  fade:SetAllPoints()
+  UI.FramePicture(band, band.art, fade)
   UI.SetGradient(fade, "VERTICAL", { 0.055, 0.03, 0.01, 0.9 }, { 0.055, 0.03, 0.01, 0.05 })
   band.when = UI.Text(band, 12, "E8C878")
   band.when:SetPoint("BOTTOMLEFT", 14, 34)
@@ -194,8 +191,9 @@ local function refresh(pf, ctx)
   for _, row in ipairs(pf.who) do row:SetShown(has) end
   pf.cancel:SetShown(has and G:CanCancel(f, chosen))
   if has then
-    local ok = chosen.key and ns.SetDungeonArt(pf.band.art, chosen.key, width, PIC_H)
-    if not ok then ns.Pages:SetChapterArt(pf.band.art, ns.Pages:ArtOf(f, ns.Journey:CurrentIndex(f)), width, PIC_H, 0.5) end
+    local pw, ph = width - 2 * UI.PIC_INSET, PIC_H - 2 * UI.PIC_INSET
+    local ok = chosen.key and ns.SetDungeonArt(pf.band.art, chosen.key, pw, ph)
+    if not ok then ns.Pages:SetChapterArt(pf.band.art, ns.Pages:ArtOf(f, ns.Journey:CurrentIndex(f)), pw, ph, 0.5) end
     pf.band.when:SetText(G.When(chosen.at))
     pf.band.what:SetText(G.What(chosen))
     r:Place(pf.band, PIC_H, 10)

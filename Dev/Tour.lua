@@ -231,7 +231,7 @@ prep(function()
   for _, n in ipairs(PRETEND) do dev("group " .. n) end
   dev("kill dm 2")
 end, 0.5)
-shot("chapter-partial", "Chapter (a dungeon partly done)", "The Deadmines' row after two kills: how many bosses, in the clears table too", function()
+shot("chapter-partial", "Chapter (a dungeon partly done)", "The Deadmines' row after two kills: how many bosses (the clears table shows only whole clears)", function()
   page("chapter"); top(pf("chapter").lscroll)
 end)
 shot("chronicle", "Chronicle (all)", "Runs with counted / not counted, the journey's dungeons so far", function() chronicle("all") end)

@@ -422,10 +422,9 @@ local function build(pf)
   band:SetSize(width, 112)
   pf.band = band
   band.art = band:CreateTexture(nil, "BACKGROUND")
-  band.art:SetAllPoints()
-  band.w = width
   local fade = band:CreateTexture(nil, "BORDER")
-  fade:SetAllPoints()
+  UI.FramePicture(band, band.art, fade)
+  band.w, band.h = width - 2 * UI.PIC_INSET, 112 - 2 * UI.PIC_INSET
   UI.SetGradient(fade, "VERTICAL", { 0.055, 0.03, 0.01, 0.88 }, { 0.055, 0.03, 0.01, 0.05 })
   band.num = UI.Text(band, 11, "E8C878")
   band.num:SetPoint("BOTTOMLEFT", 14, 50)
@@ -543,7 +542,7 @@ local function refresh(pf, ctx)
   -- The chosen chapter.
   local ch = f.journey.chapters[sel]
   local r = UI.Stack(pf.rscroll.child)
-  ns.Pages:SetChapterArt(pf.band.art, ns.Pages:ArtOf(f, sel), pf.band.w, 112, 0.55)
+  ns.Pages:SetChapterArt(pf.band.art, ns.Pages:ArtOf(f, sel), pf.band.w, pf.band.h, 0.55)
   pf.band.num:SetText(L.CHAPTER_ROMAN:format(J.Roman(sel)):upper())
   pf.band.title:SetText(ch and ch.name or L.BN_JOURNEY_DONE)
   pf.band.line:SetText(ch and J:LevelsLine(f, ch) or "")
