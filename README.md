@@ -2,8 +2,6 @@
 
 Level together. Chapter by chapter.
 
-Designed and developed by **Vaderstrom**.
-
 A World of Warcraft addon for a group of friends who want to level from 1 to 60 together, without anyone running ahead
 or falling behind. You create a **fellowship**, invite your Adventurers, and walk the road to 60 as a book of
 **chapters**. Each chapter has a level floor, a level cap and the dungeons you clear as a group. When the chapter is
@@ -205,8 +203,10 @@ fought before the round ends goes to whoever was online longer that round.
 ![A tournament bracket](.github/screenshots/tournament.jpg)
 
 ### Discord
-Post the fellowship's progress to your Discord channel through the separate app **WoW Addon Webhooks for Discord**
-(this addon's plugin is in `Webhooks/`). It keeps a **board picture** of the fellowship up to date (the chapter, its
+Post the fellowship's progress to your Discord channel through the separate app
+[**WoW Addon Webhooks for Discord**](https://github.com/Vaderstrom/WoW-Addon-Webhooks-for-Discord) (download it from
+[its releases](https://github.com/Vaderstrom/WoW-Addon-Webhooks-for-Discord/releases/latest); this addon's plugin is in
+`Webhooks/`). It keeps a **board picture** of the fellowship up to date (the chapter, its
 steps, every Adventurer, the dungeons, who you are waiting for, the latest news) and can post when a chapter is
 complete, when a dungeon is cleared, and the pictures you took after a final boss. The addon writes its news when you
 log out; the app reads it from your saved data and posts nothing you have not chosen.
@@ -249,10 +249,11 @@ Download the zip from the latest GitHub release and unpack it into
 fully after installing or updating, then type `/jtf`.
 
 ## License and credits
-Journey Together Forever is designed and developed by **Vaderstrom**. Copyright (c) 2026 Vaderstrom.
-
-MIT License, see `LICENSE`.
+MIT License, see `LICENSE`. Copyright (c) 2026 Vaderstrom.
 
 - Dungeon and boss data (`Data/Encounters.lua`) comes from the game's own data tables, via [wago.tools](https://wago.tools).
 - Questie, Dungeon Journal, Attune and Lore Forever are other people's addons. Journey Together Forever only opens
   them when you have them installed; none of their data is included.
+
+Journey Together Forever is designed and developed by **Vaderstrom**. Claude, Anthropic's AI assistant, has assisted in
+its development.
