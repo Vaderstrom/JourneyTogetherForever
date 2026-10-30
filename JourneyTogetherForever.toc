@@ -1,0 +1,105 @@
+## Interface: 120105, 16001
+## Title: |cffe2b857Journey Together|r Forever
+## Notes: Level together with your fellowship, chapter by chapter.
+## Author: Vaderstrom
+## Version: @project-version@
+## SavedVariables: JourneyTogetherForeverDB
+## OptionalDeps: Questie
+## SavedVariablesPerCharacter: JourneyTogetherForeverCharDB
+## IconTexture: Interface\AddOns\JourneyTogetherForever\Media\LogoSmall
+## X-Curse-Project-ID: 000000
+## X-License: MIT
+
+Locales\enUS.lua
+Core\Init.lua
+Core\Util.lua
+Core\Settings.lua
+Core\Combat.lua
+Core\Serialize.lua
+Core\Comm.lua
+Data\Dungeons.lua
+Data\Encounters.lua
+Data\Presets.lua
+Data\QuestLists.lua
+Data\QuestChains.lua
+Rules\Rules.lua
+Rules\Permissions.lua
+Rules\Milestones.lua
+Rules\Journey.lua
+Rules\JourneyEdit.lua
+Rules\Tournament.lua
+Fellowship\Fellowship.lua
+Fellowship\Sync.lua
+Fellowship\Hero.lua
+Fellowship\Pace.lua
+Fellowship\Clears.lua
+Fellowship\Moments.lua
+Fellowship\Quests.lua
+Fellowship\QuestLists.lua
+Fellowship\Progress.lua
+Fellowship\Together.lua
+Fellowship\Session.lua
+Fellowship\Endgame.lua
+Fellowship\Attention.lua
+Fellowship\Gatherings.lua
+Fellowship\Votes.lua
+Fellowship\Since.lua
+Fellowship\Tourney.lua
+Fellowship\Characters.lua
+Fellowship\Board.lua
+Fellowship\Watch.lua
+Fellowship\Sample.lua
+Fellowship\Friends.lua
+UI\Theme.lua
+UI\Sound.lua
+UI\Icons.lua
+UI\Widgets.lua
+UI\Glow.lua
+UI\RulesForm.lua
+UI\JourneyEditor.lua
+UI\CharacterList.lua
+UI\Models.lua
+UI\OtherAddons.lua
+UI\Pages.lua
+UI\Pages\Welcome.lua
+UI\Pages\Create.lua
+UI\Pages\Join.lua
+UI\Pages\Heroes.lua
+UI\Pages\Gatherings.lua
+UI\Pages\Manage.lua
+UI\Pages\Rules.lua
+UI\Pages\Overview.lua
+UI\Pages\Since.lua
+UI\Pages\Setup.lua
+UI\Pages\Chapter.lua
+UI\Pages\Raids.lua
+UI\Pages\Chronicle.lua
+UI\Pages\Moments.lua
+UI\Pages\History.lua
+UI\Pages\Quests.lua
+UI\Pages\Tourney.lua
+UI\Pages\Admin.lua
+UI\Window.lua
+UI\GatherForm.lua
+UI\Toast.lua
+UI\Share.lua
+UI\Picture.lua
+UI\Photo.lua
+UI\Tracker.lua
+UI\Minimap.lua
+UI\Pages\Settings.lua
+UI\Walkthrough.lua
+UI\Panels\Inbox.lua
+UI\Panels\Characters.lua
+Dev\Debug.lua
+Dev\Peers.lua
+Dev\Areas.lua
+Dev\Gallery.lua
+Dev\Layout.lua
+Dev\SelfTest.lua
+Dev\Tour.lua
+Dev\Check.lua
+Dev\ManualSteps.lua
+Dev\Manual.lua
+Dev\Lab.lua
+Core\Slash.lua

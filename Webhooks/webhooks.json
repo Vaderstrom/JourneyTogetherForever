@@ -1,0 +1,38 @@
+{
+  "contract": 1,
+  "id": "journey-together-forever",
+  "name": "Journey Together Forever",
+  "author": "Vaderstrom",
+  "savedVariables": "JourneyTogetherForever",
+  "outbox": "JourneyTogetherForeverDB.webhooks",
+  "copies": { "JourneyTogetherForever-Dev": { "savedVariables": "JourneyTogetherForever-Dev", "outbox": "JourneyTogetherForeverDevDB.webhooks" } },
+  "group": "fellowship",
+  "empty": "None of your characters is in a fellowship yet. Start or join one in the game, type /reload, then press Look again.",
+  "kinds": [
+    { "id": "board", "type": "kept", "name": "Progress board",
+      "help": "One picture of the fellowship, kept up to date.", "default": true },
+    { "id": "chapter", "type": "news", "name": "Chapter complete",
+      "help": "A new post each time the fellowship completes a chapter.", "default": true, "mention": true },
+    { "id": "clear", "type": "news", "name": "Dungeon cleared",
+      "help": "A new post for every dungeon clear, with who cleared it.", "default": true },
+    { "id": "picture", "type": "news", "name": "Pictures from runs",
+      "help": "The pictures you take with Take a picture after a final boss: the screenshot itself, with who was there. Not posted until you draw a line from it.", "default": false }
+  ],
+  "fields": {
+    "chapter": [ { "id": "n", "name": "Chapter", "type": "number" } ],
+    "clear": [ { "id": "dungeon", "name": "Dungeon", "type": "text" }, { "id": "who", "name": "Who", "type": "names" } ],
+    "picture": [ { "id": "dungeon", "name": "Dungeon", "type": "text" }, { "id": "who", "name": "Who", "type": "names" } ]
+  },
+  "templates": { "board": "card.html" },
+  "weekly": {
+    "name": "Weekly summary",
+    "help": "Sundays at 20:00: levels gained, dungeons cleared and chapters completed that week.",
+    "head": "{group} this week:",
+    "number": "{name} {from} → {to}",
+    "news": [
+      { "kind": "clear", "text": "Dungeons cleared: {list}" },
+      { "kind": "chapter", "text": "Chapters completed: {list}" }
+    ],
+    "separator": " · "
+  }
+}

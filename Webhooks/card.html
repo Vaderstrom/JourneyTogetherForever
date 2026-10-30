@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Journey Together board</title>
+<!--
+  The board picture WoW Addon Webhooks for Discord posts (docs/SAVED-DATA.md). The app opens this page in its sandbox and
+  calls webhookCard.render with the board the addon saved. The pictures come from the addon's Media folder through
+  ctx.asset; a missing one is left out. The card's look and drawing are in board.css and board.js, shared with the
+  sample boards in docs/mockup/companion-board.html.
+-->
+<link rel="stylesheet" href="board.css">
+<style>html, body { margin: 0; background: transparent; }</style>
+<script src="board.js"></script>
+</head>
+<body>
+<!-- Keys the magenta background of the heraldry sheet out (alpha from the green channel: magenta has none). -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <filter id="keyMagenta" color-interpolation-filters="sRGB">
+    <feColorMatrix type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 3.2 0 0 -0.2"/>
+  </filter>
+</svg>
+<div id="board"></div>
+<script>
+(function () {
+  'use strict';
+  // The emblems of Media\Emblems (4 x 4, ns.Emblems.HERALDRY order).
+  const HERALDRY = ['Her_Lion', 'Her_Eagle', 'Her_Wolf', 'Her_Dragon', 'Her_Stag', 'Her_Boar', 'Her_Swords', 'Her_Axes',
+    'Her_Hammers', 'Her_Star', 'Her_Crown', 'Her_Tower', 'Her_Oak', 'Her_Sun', 'Her_Moon', 'Her_Flame'];
+
+  window.webhookCard = {
+    async render(board, ctx) {
+      const media = (name) => (name ? ctx.asset('Media/' + name + '.tga') : null);
+      // The dungeons' loading screens from the game's own files (d.art, as the game crops them), asked for first; an
+      // app without ctx.game, or a file the game does not have here, leaves our own tile or nothing.
+      const screens = {};
+      if (typeof ctx.game === 'function') {
+        await Promise.all((board.dungeons || []).filter((d) => d.art && d.art.game)
+          .map(async (d) => { screens[d.art.game] = await ctx.game(d.art.game); }));
+      }
+      const art = {
+        chapter: (name) => media(name),
+        dungeon(key, d) {
+          const src = d && d.art && screens[d.art.game];
+          if (src) return { src, crop: d.art.crop, aspect: d.art.aspect };
+          return key ? media('Dungeon' + key.charAt(0).toUpperCase() + key.slice(1)) : null;
+        },
+        emblem(name) {
+          const cell = HERALDRY.indexOf(name);
+          const sheet = cell >= 0 ? media('Emblems') : null;
+          if (sheet) return { sheet, cell };
+          const crest = name === 'Pic_Alliansens' ? media('CrestAlliansens') : null;
+          return crest ? { picture: crest } : null;
+        },
+        frame: media('WindowFrame'),
+      };
+      window.JTFBoard.render(board, { now: ctx.now, art });
+      return window.JTFBoard.ready();
+    },
+  };
+})();
+</script>
+</body>
+</html>

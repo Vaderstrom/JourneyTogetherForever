@@ -1,0 +1,157 @@
+/* The Journey Together board picture (docs/SAVED-DATA.md): drawn by board.js, for card.html (the picture WoW Addon
+   Webhooks for Discord posts) and docs/mockup/companion-board.html (the sample boards). */
+:root {
+  /* The book's Journal theme (UI/Theme.lua, mockup THEMES.journal) and fixed frame colours. */
+  --frame: #2A1C10; --page1: #F6EAD0; --page2: #E4CF9F; --ink: #3B2410; --ink2: #6B5536; --line: #C2A271;
+  --card: rgba(255,250,235,0.55); --gold: #D8B060; --gold-hi: #FFE6A8; --gold-soft: #E8C878; --cream: #F3E3BE;
+  /* Standings (Journey:Counts) and stage nodes (UI/Pages/Chapter.lua). */
+  --below: #B0321E; --ready: #2E7A3E; --cap: #B8742A; --over: #C0392B; --done: #3E7A3A;
+  --title-font: 'Friz Quadrata TT', 'Cinzel', Georgia, serif;
+  --body-font: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+}
+
+/* ---------- The card ---------- */
+/* The book's own frame (Media\WindowFrame; the mockup's copy is docs/mockup/assets/window-frame.png), cut like UI.DialogFrame in the game: nine
+   pieces with corners of 40/256 of the art drawn 48 px, the leather 16 px outside the card's content and 2 over
+   its edge, the gold corners over the content's corners. Outside the leather the picture is transparent. */
+#board { width: 1000px; box-sizing: border-box; position: relative; overflow: hidden; padding: 16px;
+  background: transparent; color: var(--ink); font-family: var(--body-font); }
+#board::after { content: ''; position: absolute; inset: 0; z-index: 20; pointer-events: none;
+  border: 48px solid transparent; border-image: var(--frame-img) 15.625% stretch; }
+#board > .inner { background: var(--frame); }
+#board * { box-sizing: border-box; }
+.t { white-space: pre-wrap; }       /* board texts keep the addon's spacing ("  ·  ") */
+.clip { white-space: pre; overflow: hidden; text-overflow: ellipsis; }
+
+/* The banner colour along the left edge. */
+.edge { position: absolute; left: 16px; top: 16px; bottom: 16px; width: 14px; z-index: 3;
+  background: linear-gradient(90deg, rgba(255,255,255,0.18), rgba(0,0,0,0.25)), var(--banner);
+  border-right: 2px solid var(--gold); box-shadow: 1px 0 0 #120A04; }
+.inner { margin-left: 16px; }
+
+/* Header: crest, fellowship name, chapter chip and name, the chapter's picture fading in on the right. */
+.head { position: relative; height: 96px; display: flex; align-items: center; gap: 16px; padding: 0 22px 0 18px;
+  border-bottom: 2px solid var(--gold); background: var(--frame); overflow: hidden; }
+.head .art { position: absolute; right: 0; top: 0; height: 100%; width: 62%; object-fit: cover; object-position: center 40%; }
+.head .shade { position: absolute; inset: 0;
+  background: linear-gradient(90deg, rgba(14,8,2,0.97) 0%, rgba(14,8,2,0.9) 38%, rgba(14,8,2,0.55) 62%, rgba(14,8,2,0.2) 85%, rgba(14,8,2,0.08) 100%); }
+.head > :not(.art):not(.shade) { position: relative; }
+.crest { width: 58px; height: 72px; flex: none; display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(180deg, var(--banner), rgba(0,0,0,0.6)), var(--banner); border: 2px solid var(--gold);
+  clip-path: polygon(0 0, 100% 0, 100% 80%, 50% 100%, 0 80%); filter: drop-shadow(0 2px 4px #000);
+  font-size: 26px; color: #FFF3D6; }
+.crest .cell { width: 40px; height: 40px; margin-top: -8px; position: relative; overflow: hidden; }
+.crest .cell img { position: absolute; width: 400%; height: 400%; filter: url(#keyMagenta) drop-shadow(0 1px 1px rgba(0,0,0,0.6)); }
+.crest .pic { width: 46px; height: 46px; margin-top: -8px; object-fit: contain; }
+.crest .glyph { margin-top: -8px; }
+.names { flex: 1; min-width: 0; }
+.fname { font-family: var(--title-font); font-size: 30px; line-height: 1.1; color: var(--gold-hi); text-shadow: 0 2px 4px #000; }
+.chline { display: flex; align-items: center; gap: 12px; margin-top: 6px; min-width: 0; }
+.chip { flex: none; padding: 2px 12px; border-radius: 999px; font-size: 13px; color: var(--cream); background: rgba(0,0,0,0.5);
+  border: 1px solid rgba(216,176,96,0.45); }
+.chname { min-width: 0; font-family: var(--title-font); font-size: 19px; color: var(--gold-soft); text-shadow: 0 1px 3px #000; }
+
+/* Paper. */
+.paper { background: linear-gradient(180deg, var(--page1), var(--page1) 70%, var(--page2)); }
+.track { position: relative; display: flex; justify-content: center; padding: 14px 20px 10px;
+  background: radial-gradient(ellipse at 50% 0%, var(--page1) 0%, var(--page1) 55%, var(--page2) 140%);
+  border-bottom: 1px solid var(--line); }
+.node { position: relative; width: 168px; display: flex; flex-direction: column; align-items: center; }
+.node .ring { position: relative; z-index: 1; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center;
+  justify-content: center; font-family: var(--title-font); font-size: 13px; color: #fff; }
+.node .lbl { margin-top: 5px; font-size: 12px; line-height: 1.3; text-align: center; color: var(--ink2); padding: 0 4px; }
+.node .link { position: absolute; top: 13px; left: calc(50% + 17px); width: calc(100% - 34px); height: 2px; }
+.node.done .ring { background: var(--done); box-shadow: 0 0 0 2px var(--done); font-size: 15px; }
+.node.done .link { background: var(--done); }
+.node.current .ring { background: var(--banner); box-shadow: 0 0 0 2px var(--gold), 0 0 10px rgba(216,176,96,0.8); }
+.node.current .lbl { color: var(--ink); font-weight: 600; }
+.node.todo .ring { background: var(--card); box-shadow: 0 0 0 2px rgba(194,162,113,0.85); color: var(--ink2); }
+.node.todo .lbl { opacity: 0.85; }
+.node.todo .link, .node.current .link { background: rgba(194,162,113,0.9); }
+
+/* The two pages of the spread. */
+.spread { display: flex; background: linear-gradient(90deg, var(--page2) 0%, var(--page1) 5%, var(--page1) 52.5%,
+  var(--page2) 56.6%, rgba(0,0,0,0.22) 56.8%, var(--page2) 57%, var(--page1) 61%, var(--page1) 95%, var(--page2) 100%); }
+.page { padding: 12px 24px 16px; min-width: 0; }
+.page.left { width: 56.8%; }
+.page.right { width: 43.2%; padding-left: 22px; }
+.page.single { width: 100%; padding: 16px 60px 20px; }
+.page.single .sec { max-width: 640px; margin-left: auto; margin-right: auto; }
+.sec { margin-bottom: 12px; }
+.sec:last-child { margin-bottom: 0; }
+.label { display: flex; align-items: center; gap: 10px; margin: 0 0 6px; color: var(--line); }
+.label span { flex: 1; height: 1px; }
+.label span:first-child { background: linear-gradient(90deg, transparent, var(--line)); }
+.label span:last-child { background: linear-gradient(90deg, var(--line), transparent); }
+.label h2 { margin: 0; font-family: var(--title-font); font-weight: normal; font-size: 16px; letter-spacing: 0.5px; color: var(--ink); }
+.label i { font-style: normal; font-size: 11px; }
+
+/* Adventurers. */
+.hero { display: flex; align-items: center; gap: 9px; height: 31px; border-bottom: 1px dotted var(--line); }
+.hero .dot { width: 12px; height: 12px; flex: none; border-radius: 50%; box-shadow: 0 0 0 1px rgba(0,0,0,0.35); }
+.hero .nm { width: 108px; flex: none; font-family: var(--title-font); font-size: 15px; }
+.hero .lv { width: 28px; flex: none; text-align: right; font-family: var(--title-font); font-size: 20px; line-height: 1; color: var(--ink); }
+.hero .lvbar { flex: 1; min-width: 60px; height: 7px; border-radius: 4px; background: rgba(194,162,113,0.45); overflow: hidden;
+  box-shadow: inset 0 1px 1px rgba(0,0,0,0.18); }
+.hero .lvbar i { display: block; height: 100%; border-radius: 4px; }
+.hero .note { flex: none; max-width: 205px; text-align: right; font-size: 12.5px; color: var(--ink2); }
+.hero.s-below .note { color: var(--below); font-weight: 600; }
+.hero.s-below .lvbar { box-shadow: inset 0 0 0 1px rgba(176,50,30,0.6); }
+.hero.s-over .note { color: var(--over); font-weight: 600; }
+.hero.small { height: 25px; opacity: 0.78; }
+.hero.small .dot { width: 9px; height: 9px; margin-left: 1.5px; margin-right: 1.5px; }
+.hero.small .nm { font-size: 13px; }
+.hero.small .lv { font-size: 15px; }
+.hero.small .lvbar { height: 5px; }
+.hero.small .note { font-size: 11.5px; max-width: 235px; }
+.hero.first-small { margin-top: 8px; border-top: 1px solid var(--line); }
+.more { padding-top: 5px; font-size: 12.5px; font-style: italic; color: var(--ink2); }
+
+/* Dungeons. */
+.dun { display: flex; align-items: center; gap: 10px; height: 58px; margin-bottom: 6px; padding: 4px 10px 4px 4px; border-radius: 4px;
+  background: var(--card); border: 1px solid var(--rolec); box-shadow: inset 4px 0 0 var(--rolec); padding-left: 8px; }
+.dun .pic { width: 84px; height: 48px; flex: none; border-radius: 3px; overflow: hidden; position: relative;
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.4); background: linear-gradient(135deg, #5A4426, #2A1C10); }
+.dun .pic img { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* Part of a loading screen: board.js sizes and places the whole picture so that part fills the box. */
+.dun .pic img.part { position: absolute; max-width: none; object-fit: fill; }
+.dun .pic .ph { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 18px;
+  color: rgba(216,176,96,0.55); background: radial-gradient(circle at 50% 40%, rgba(216,176,96,0.18), transparent 70%); }
+.dun .mid { flex: 1; min-width: 0; }
+.dun .dn { font-family: var(--title-font); font-size: 15px; color: var(--ink); }
+.dun .role { display: inline-block; margin-top: 3px; padding: 0 8px; border-radius: 999px; font-size: 11px; line-height: 17px;
+  color: var(--roleink); border: 1px solid var(--rolec); background: rgba(255,250,235,0.5); }
+.dun .st { flex: none; text-align: right; font-size: 12.5px; color: var(--ink2); max-width: 130px; }
+.dun.cleared .st { color: var(--done); font-weight: 600; }
+.dun.locked { opacity: 0.62; }
+.dun.locked .pic img { filter: grayscale(0.7); }
+.dun .mk { margin-right: 4px; }
+
+/* A chapter without dungeons: its picture with the banner's sentence. */
+.levelpic { position: relative; height: 150px; border-radius: 4px; overflow: hidden; border: 1px solid var(--line);
+  background: linear-gradient(135deg, #5A4426, #2A1C10); box-shadow: 0 2px 6px rgba(0,0,0,0.25); }
+.levelpic img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.levelpic .txt { position: absolute; left: 0; right: 0; bottom: 0; padding: 22px 14px 10px; font-size: 13px; line-height: 1.4;
+  color: var(--cream); background: linear-gradient(180deg, transparent, rgba(14,8,2,0.88) 45%); }
+
+/* Waiting for: the book's waiting colour. */
+.wait { padding: 9px 12px; border-radius: 4px; border: 1px solid rgba(184,116,42,0.7); border-left: 4px solid var(--cap);
+  background: rgba(184,116,42,0.12); font-size: 13px; line-height: 1.45; color: var(--ink); }
+
+/* Latest. */
+.latest { margin: 0; padding: 0; list-style: none; }
+.latest li { display: flex; gap: 8px; padding: 4px 0; border-bottom: 1px dotted var(--line); font-size: 12.5px; line-height: 1.4; color: var(--ink); }
+.latest li:last-child { border-bottom: 0; }
+.latest li::before { content: "❦"; flex: none; color: var(--line); font-size: 11px; line-height: 17px; }
+
+/* The Endgame: the title on its own page. */
+.done-title { text-align: center; margin: 4px 0 14px; }
+.done-title .medal { width: 62px; height: 62px; margin: 0 auto 8px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  font-size: 28px; color: #3B2410; background: radial-gradient(circle at 40% 35%, #F6DE9A, #C08A3A 60%, #6A4410);
+  box-shadow: 0 0 0 2px #6A4410, 0 0 14px rgba(216,176,96,0.6); }
+.done-title h1 { margin: 0; font-family: var(--title-font); font-weight: normal; font-size: 26px; color: var(--ink); }
+
+/* Footer: how old the data is and whose game it came from. */
+.foot { height: 32px; display: flex; align-items: center; justify-content: center; padding: 0 18px; font-size: 12.5px;
+  color: var(--gold-soft); border-top: 2px solid var(--gold); background: linear-gradient(180deg, #2A1C10, #1A1008); }
+.foot.stale { color: #FFE6A8; font-weight: 600; background: linear-gradient(180deg, #B02A1C, #6E120A); }
