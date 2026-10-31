@@ -9,7 +9,8 @@ ignore:
   - CLAUDE.md
   - .luacheckrc
   - .github
+  - RELEASE-NOTES.md
 
 manual-changelog:
-  filename: CHANGELOG.md
+  filename: RELEASE-NOTES.md
   markup-type: markdown
