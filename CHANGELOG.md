@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.12.0 beta (1 November 2026)
+- What's New: once after an update (or when you found your first fellowship), a page over the book with this
+  update's news: the big one in a round picture inside a gold ring, two picture cards beside it. `/jtf news` shows it
+  again.
+- The rulebook gives each challenge its own block with its icon: its rule, then who broke it, the lives left, the Ring
+  and the race clock each on a line of their own, the candles under Shared lives. On the right page, under Propose a
+  change, tiles show where the challenges stand: lives left, the race clock, the Ring and rules broken.
+- A broken rule, the Ring, the race and a challenge turned off now toast with the challenge's own icon and its name
+  on top (boots for Walk everywhere, a ring, a coin ...); the skull is for falls only.
+- Found a fellowship → Challenges: hovering a challenge shows its icon, name and whole rule on the right page, in the
+  book's type, instead of a tooltip over it. Each banner has a faint emblem low on its cloth.
+- Adventurers page: Recent history lists the falls too, with a skull, and every line has its icon.
+- Chronicle → Firsts: only the next open level names who is closest; the higher ones say Nobody yet.
+- A fall's toast names its challenge above the title (HARDCORE FELLOWSHIP, SHARED LIVES) instead of the Settings line
+  "A challenge: a fall, a broken rule, the Ring".
+
 ## 0.11.0 beta (1 November 2026)
 - A memorial page for the Fallen: clicking a Fallen Adventurer shows "In memory of …" instead of the gear, with where
   and when they fell, their days in the fellowship, the dungeons they cleared and the firsts they earned.

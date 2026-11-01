@@ -39,6 +39,7 @@ A.LIST = {
     shots = { "walk-offer", "walk-intro", "walk-stand", "walk-chapter", "walk-manage", "walk-header", "walk-tracker", "walk-rulesadmin", "walk-member-invite",
       "walk-member-rules", "walk-done" } },
   { key = "since", title = "Since you were last here", checks = { "since you were last here" }, shots = { "since" } },
+  { key = "news", title = "What's New: once after each update", checks = { "what's new" }, shots = { "news" } },
   { key = "chapter", title = "Chapter, dungeons and clears",
     checks = { "chapter page and Find group", "chapter page:", "clears:", "mark cleared", "prologue:", "catching up:" },
     shots = { "leader-chapter-new", "chapter-waiting", "chapter", "chapter-tooltip", "chapter-next",

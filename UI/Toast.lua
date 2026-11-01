@@ -22,12 +22,13 @@ end
 
 -- Returns "off" (Reduce effects or this event turned off) or "shown". page (optional): the book's page a click opens.
 -- more (optional): { dungeon = key (its picture on the left), kicker = text, who = a line under the text,
--- solemn = true (a Fallen, the last shared life: darker, slower, with a bell; SPEC §9) }.
+-- solemn = true (a Fallen, the last shared life: darker, slower, with a bell; SPEC §9), icon = a path of ns.ICONS (in
+-- place of its kind's: a challenge's own) }.
 function T:Push(kind, title, text, page, more)
   if Settings:Get("reduce") or (kind and not Settings:ToastOn(kind)) then return "off" end
   more = more or {}
   local t = { kind = kind, title = title, text = text, page = page, dungeon = more.dungeon, kicker = more.kicker, who = more.who,
-    solemn = more.solemn }
+    solemn = more.solemn, icon = more.icon }
   -- The banner is made at login. Only after a /reload during combat can it be missing: then it shows after combat.
   if not self.frame and Combat:InCombat() then
     Combat:AfterCombat(function() T:Show(t) end)
@@ -281,7 +282,10 @@ function T:Fill(t)
     local fs = ns.Fellowship:Current()
     ns.Pages:SetChapterArt(f.pic, fs and ns.Pages:ArtOf(fs, ns.Journey:CurrentIndex(fs)), 676, 108, 0.45)
   end
-  UI.SetIcon(f.icon, ns.ICONS["toast_" .. (t.kind or "default")] or ns.ICONS.toast_default)
+  -- Its own icon, else its kind's (also when the game does not have its own).
+  if not (t.icon and UI.SetIcon(f.icon, t.icon)) then
+    UI.SetIcon(f.icon, ns.ICONS["toast_" .. (t.kind or "default")] or ns.ICONS.toast_default)
+  end
   local fs = big and ns.Fellowship:Current()
   f.crest:SetShown(fs ~= nil and fs ~= false)
   local badge = not f.crest:IsShown() and not pictured

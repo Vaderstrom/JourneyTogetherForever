@@ -89,6 +89,53 @@ local function ruleOptions()
   return opts
 end
 
+-- A challenge in the rulebook (the check of 1 Nov 2026, 14:32: eleven rules ran together as one paragraph): its icon in
+-- a gold ring, its name and rule, then who broke it (in red) and what stands now, each on a line of its own.
+-- :Set(item of ns.Challenges:Book) returns the height.
+local BLOCK_ICON, BLOCK_IN = 26, 38
+local BROKEN = "B0321E"
+local function chalBlock(parent, width)
+  local b = CreateFrame("Frame", nil, parent)
+  b:SetWidth(width)
+  b.ring = UI.Round(b, "BORDER", BLOCK_ICON + 4)
+  b.ring:SetPoint("TOPLEFT", 0, 0)
+  Theme:Fill(b.ring, "gold", 0.9)
+  b.icon = UI.Round(b, "ARTWORK", BLOCK_ICON)
+  b.icon:SetPoint("CENTER", b.ring)
+  b.name = UI.WrapText(b, 14, "ink", width - BLOCK_IN, "title")
+  b.name:SetPoint("TOPLEFT", BLOCK_IN, -2)
+  b.rule = UI.WrapText(b, 13, "ink", width - BLOCK_IN, "book")
+  b.rule:SetPoint("TOPLEFT", b.name, "BOTTOMLEFT", 0, -3)
+  b.broken = UI.WrapText(b, 12, BROKEN, width - BLOCK_IN, "book")
+  b.notes = UI.WrapText(b, 12, "ink2", width - BLOCK_IN, "book")
+  function b:Set(it)
+    self.key = it.key
+    if not UI.SetIcon(self.icon, ns.Challenges:Icon(it.key)) then UI.SetIcon(self.icon, ns.ICONS.hist_challenge) end
+    self.name:SetText(it.title)
+    self.rule:SetText(it.rule)
+    local h = 2 + self.name:GetStringHeight() + 3 + self.rule:GetStringHeight()
+    self.broken:SetShown(it.broken ~= nil)
+    if it.broken then
+      self.broken:SetText(it.broken)
+      self.broken:ClearAllPoints(); self.broken:SetPoint("TOPLEFT", BLOCK_IN, -(h + 5))
+      h = h + 5 + self.broken:GetStringHeight()
+    end
+    self.notes:SetShown(#it.notes > 0)
+    if #it.notes > 0 then
+      self.notes:SetText(table.concat(it.notes, "\n"))
+      self.notes:ClearAllPoints(); self.notes:SetPoint("TOPLEFT", BLOCK_IN, -(h + 5))
+      h = h + 5 + self.notes:GetStringHeight()
+    end
+    h = math.ceil(math.max(h, BLOCK_ICON + 4))
+    self:SetHeight(h)
+    return h
+  end
+  return b
+end
+
+-- The challenges' tiles on the right page (UI.NumberTile), two to a row.
+local TILE_H, TILE_GAP = 58, 8
+
 local function buildBook(pf)
   local W = ns.Window
   local width = W.PAGE_W - 10
@@ -106,10 +153,14 @@ local function buildBook(pf)
     local a = { head = UI.SectionHeader(Lc, width), text = UI.WrapText(Lc, 13, "ink", width, "book") }
     pf.articles[i] = a
   end
-  -- The challenges chosen at founding (SPEC §9), an article after the rules when the fellowship has or had one.
-  pf.chal = { head = UI.SectionHeader(Lc, width), text = UI.WrapText(Lc, 13, "ink", width, "book") }
-  -- Under it, the shared lives as candles (UI.Lives).
-  pf.chal.lives = UI.Lives(Lc, width)
+  -- The challenges chosen at founding (SPEC §9), an article after the rules when the fellowship has or had one: a
+  -- line on them, a block for each challenge on (the shared lives' candles under its own), then the lines of none.
+  pf.chal = { head = UI.SectionHeader(Lc, width), intro = UI.WrapText(Lc, 13, "ink", width, "book"),
+    after = UI.WrapText(Lc, 13, "ink", width, "book") }
+  pf.chal.blocks = UI.Pool(function() return chalBlock(Lc, width) end)
+  pf.chal.lives = UI.Lives(Lc, width - BLOCK_IN)
+  -- The words of the whole article, as one paragraph (the self-test looks in it).
+  function pf.chal:Text() return self.book and self.book.text or "" end
 
   -- Right: change a rule.
   pf.cHead = UI.Heading(Rc, width, L.CHANGE_RULE, "")
@@ -151,6 +202,12 @@ local function buildBook(pf)
   pf.watchText:SetText(L.PROPOSE_WATCH)
   pf.dHead = UI.SectionHeader(Rc, width)
   pf.dHead:SetText(L.DECIDED_VOTES)
+  -- Under Propose a change, while a challenge is on: where the challenges stand, as number tiles.
+  pf.tilesHead = UI.SectionHeader(Rc, width)
+  pf.tilesHead:SetText(L.CHAL_TILES)
+  pf.tiles = {}
+  local tw = math.floor((width - TILE_GAP) / 2)
+  for i = 1, 4 do pf.tiles[i] = UI.NumberTile(Rc, tw, TILE_H) end
 end
 
 local function refreshBook(pf, ctx)
@@ -182,18 +239,35 @@ local function refreshBook(pf, ctx)
     s:Place(art.text, art.text:GetStringHeight(), 12)
   end
   local chal = ns.Challenges:Book(f, hl)
-  pf.chal.head:SetShown(chal ~= nil); pf.chal.text:SetShown(chal ~= nil)
-  if chal then
-    pf.chal.head:SetText(ns.Journey.Roman(#R.BOOK + 1) .. ".  " .. chal.title)
-    s:Place(pf.chal.head, 29, 4)
-    pf.chal.text:SetText(chal.text)
-    s:Place(pf.chal.text, pf.chal.text:GetStringHeight(), 12)
-  end
+  local c = pf.chal
+  c.book = chal
+  c.head:SetShown(chal ~= nil); c.intro:SetShown(chal ~= nil)
   local lives = chal and ns.Challenges:LivesView(f)
-  pf.chal.lives:SetShown(lives ~= nil)
-  if lives then
-    pf.chal.lives:SetTip(lives.title, lives.lines)
-    s:Place(pf.chal.lives, pf.chal.lives:Set(lives.total, lives.left), 12)
+  c.lives:Hide()
+  local nb = 0
+  if chal then
+    c.head:SetText(ns.Journey.Roman(#R.BOOK + 1) .. ".  " .. chal.title)
+    s:Place(c.head, 29, 4)
+    c.intro:SetText(chal.intro)
+    s:Place(c.intro, c.intro:GetStringHeight(), 12)
+    for _, it in ipairs(chal.items) do
+      local b = c.blocks:Get(nb + 1)
+      if not b then break end
+      nb = nb + 1
+      s:Place(b, b:Set(it), 12)
+      if it.key == "shared" and lives then
+        c.lives:SetTip(lives.title, lives.lines)
+        s:Skip(-4)
+        s:Place(c.lives, c.lives:Set(lives.total, lives.left), 14, BLOCK_IN)
+      end
+    end
+  end
+  c.blocks:HideFrom(nb + 1)
+  local after = chal ~= nil and #chal.after > 0
+  c.after:SetShown(after)
+  if after then
+    c.after:SetText(table.concat(chal.after, "\n"))
+    s:Place(c.after, c.after:GetStringHeight(), 12)
   end
   pf.lscroll:SetContentHeight(s.y + 8)
 
@@ -269,6 +343,28 @@ local function refreshBook(pf, ctx)
     t:Place(pf.leaderBox, h, 4)
   else
     t:Place(pf.watchText, pf.watchText:GetStringHeight(), 4)
+  end
+
+  -- Where the challenges stand: the lives left, the race clock, the Ring, the rules broken.
+  local tiles = ns.Challenges:Tiles(f) or {}
+  pf.tilesHead:SetShown(#tiles > 0)
+  if #tiles > 0 then
+    t:Skip(10)
+    t:Place(pf.tilesHead, 29, 8)
+    for i, tile in ipairs(pf.tiles) do
+      local x = tiles[i]
+      tile:SetShown(x ~= nil)
+      if x then
+        tile.key = x.key
+        tile:Set(x.value); tile:SetLabel(x.label); tile:SetIcon(x.icon)
+        tile:ClearAllPoints()
+        tile:SetPoint("TOPLEFT", pf.rscroll.child, "TOPLEFT", ((i - 1) % 2) * (tile:GetWidth() + TILE_GAP),
+          -(t.y + math.floor((i - 1) / 2) * (TILE_H + TILE_GAP)))
+      end
+    end
+    t:Skip(math.ceil(#tiles / 2) * (TILE_H + TILE_GAP))
+  else
+    for _, tile in ipairs(pf.tiles) do tile:Hide() end
   end
 
   pf.dHead:SetShown(#done > 0)

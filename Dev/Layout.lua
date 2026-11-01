@@ -12,7 +12,14 @@ local _, ns = ...
 local LO = { MAX = 12, OVERLAP = 0.3, SLACK = 2 }
 ns.Layout = LO
 
-local function shown(r) return r.IsVisible and r:IsVisible() and (r.GetEffectiveAlpha == nil or (r:GetEffectiveAlpha() or 1) > 0.05) end
+-- How opaque a region is on screen. A text has no GetEffectiveAlpha in the game: its own alpha times its frame's (a
+-- text faded to nothing under Create's hovered challenge counted as an overlap; check of 1 Nov 2026, 15:23).
+local function alphaOf(r)
+  if r.GetEffectiveAlpha then return r:GetEffectiveAlpha() or 1 end
+  local p = r.GetParent and r:GetParent()
+  return (r.GetAlpha and r:GetAlpha() or 1) * (p and alphaOf(p) or 1)
+end
+local function shown(r) return r.IsVisible and r:IsVisible() and alphaOf(r) > 0.05 end
 
 -- left, bottom, right, top of a region, or nil when the game does not place it.
 local function box(r)

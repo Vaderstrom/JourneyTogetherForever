@@ -69,9 +69,22 @@ ns.ICONS = {
   hist_ring = I .. "INV_Jewelry_Ring_03",
   hist_race = I .. "Ability_Rogue_Sprint",
   toast_challenge = I .. "INV_Misc_Bone_HumanSkull_01",
-  -- Create's challenge cards: one life each, a shared pool.
+  -- Each challenge's own (the rulebook, its toasts, Create's banners): one life each, a shared pool, the Ring, boots,
+  -- a quest note, a sprint, a bag, a white shirt, a copper coin, iron, a banner, a heal, a dungeon. A file the game
+  -- does not have falls back to the challenges' general icon.
   chal_hardcore = I .. "INV_Misc_Bone_HumanSkull_01",
   chal_shared = I .. "Spell_Holy_SealOfSacrifice",
+  chal_ring = I .. "INV_Jewelry_Ring_03",
+  chal_walk = I .. "INV_Boots_01",
+  chal_questless = I .. "INV_Misc_Note_01",
+  chal_race = I .. "Ability_Rogue_Sprint",
+  chal_fellowfound = I .. "INV_Misc_Bag_10",
+  chal_white = I .. "INV_Shirt_White_01",
+  chal_pauper = I .. "INV_Misc_Coin_05",
+  chal_ironman = I .. "INV_Ingot_Iron",
+  chal_oneclass = I .. "INV_Banner_02",
+  chal_nohealers = I .. "Spell_Holy_FlashHeal",
+  chal_dungeons = I .. "Achievement_Dungeon_ClassicDungeonMaster",
   boss = "Interface\\TargetingFrame\\UI-TargetingFrame-Skull",
   -- Following another character's fellowship: a spyglass on the bar.
   watch = I .. "INV_Misc_Spyglass_03",

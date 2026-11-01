@@ -7,6 +7,8 @@ ns.COMMANDS = {
   { "/jtf", L.CMD_TOGGLE }, { "/jtf chapter", L.CMD_CHAPTER }, { "/jtf adventurers", L.CMD_HEROES },
   { "/jtf quests", L.CMD_QUESTS }, { "/jtf photo", L.CMD_PHOTO }, { "/jtf settings", L.CMD_SETTINGS },
 }
+-- In the help only (Settings' list of commands has no room for it; What's New shows by itself after an update).
+ns.COMMAND_NEWS = { "/jtf news", L.CMD_NEWS }
 -- Command word -> page. Members are called Adventurers since 27 Oct 2026; "heroes" and "companions" still work.
 local PAGES = { chapter = "chapter", heroes = "heroes", companions = "heroes", adventurers = "heroes", quests = "quests" }
 
@@ -20,6 +22,7 @@ SlashCmdList.JOURNEYTOGETHERFOREVER = function(msg)
   elseif PAGES[cmd] then W:Open(PAGES[cmd]) -- shows the start page when that page is not yours
   elseif cmd == "settings" then W:OpenSettings()
   elseif cmd == "photo" then ns.Photo:Open()
+  elseif cmd == "news" then ns.News:Open()
   elseif cmd == "debug" then ns.Dev:Command(rest)
   elseif cmd == "check" then ns.Check:Run(rest)
   elseif cmd == "tests" then ns.Manual:Command(rest)
@@ -29,5 +32,6 @@ SlashCmdList.JOURNEYTOGETHERFOREVER = function(msg)
   elseif cmd == "lab" then ns.Lab:Toggle() -- the developer's test lab (Dev/Lab.lua); not in the help
   else
     for _, c in ipairs(ns.COMMANDS) do ns:Print(c[1] .. "  -  " .. c[2], true) end
+    ns:Print(ns.COMMAND_NEWS[1] .. "  -  " .. ns.COMMAND_NEWS[2], true)
   end
 end

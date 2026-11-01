@@ -105,6 +105,8 @@ local CLOTH_TOP, CLOTH_BOTTOM = { 0.17, 0.11, 0.06, 0.97 }, { 0.09, 0.06, 0.035,
 -- Each banner's picture (the dungeons' loading screens): Stratholme's dead for Survival, Blackrock Depths (where the
 -- Ring ends) for Story and Travel, the Deadmines' gold for Gear, Gold & More.
 C.GROUP_ART = { survival = "strat", story = "brd", more = "dm" }
+-- And a faint emblem low on its cloth, under the rows (the check of 1 Nov 2026, 14:32): a skull, the Ring, a coin.
+C.GROUP_EMBLEM = { survival = "chal_hardcore", story = "chal_ring", more = "chal_pauper" }
 
 local function chalBanner(parent, w, group)
   local b = CreateFrame("Frame", nil, parent)
@@ -143,11 +145,16 @@ local function chalBanner(parent, w, group)
     l:SetStartPoint(side, b, side == "BOTTOMLEFT" and 1 or -1, BANNER_TAIL)
     l:SetEndPoint("BOTTOM", b, 0, 0)
   end
+  b.emblem = UI.Round(b, "BORDER", 64, 1)
+  b.emblem:SetPoint("BOTTOM", b, "BOTTOM", 0, BANNER_TAIL + 10)
+  local found = UI.SetIcon(b.emblem, ns.ICONS[C.GROUP_EMBLEM[group]])
+  b.emblem:SetDesaturated(true); b.emblem:SetVertexColor(1, 0.86, 0.58); b.emblem:SetAlpha(0.16)
+  b.emblem:SetShown(found)
   return b
 end
 
--- A box to tick (the game's check box) with words beside it; the whole row is the button. Hovering it shows .tipTitle
--- and .tipText (set by Refresh).
+-- A box to tick (the game's check box) with words beside it; the whole row is the button. Hovering it calls
+-- onHover(row), leaving it onHover(nil): the right page shows its .tipTitle, .tipText and .tipNote (set by Refresh).
 local function chalTickBox(r, size)
   r.box = r:CreateTexture(nil, "ARTWORK")
   r.box:SetSize(size, size)
@@ -157,7 +164,7 @@ local function chalTickBox(r, size)
   local hi = r:CreateTexture(nil, "HIGHLIGHT")
   hi:SetAllPoints(); hi:SetColorTexture(1, 0.9, 0.6, 0.08)
 end
-local function chalRow(parent, w, key, onClick)
+local function chalRow(parent, w, key, onClick, onHover)
   local r = CreateFrame("Button", nil, parent)
   r:SetSize(w, ROW_MIN)
   r.key = key
@@ -171,14 +178,8 @@ local function chalRow(parent, w, key, onClick)
   r.sub:SetPoint("TOPLEFT", r.name, "BOTTOMLEFT", 0, -2)
   Theme:TextColor(r.sub, "chipText", 0.8)
   r:SetScript("OnClick", function() ns.Sound("choose"); onClick() end)
-  r:SetScript("OnEnter", function(self)
-    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-    GameTooltip:SetText(self.tipTitle or "", 1, 0.82, 0)
-    if self.tipText then GameTooltip:AddLine(self.tipText, 1, 1, 1, true) end
-    if self.tipNote then GameTooltip:AddLine(self.tipNote, 1, 0.45, 0.35, true) end
-    GameTooltip:Show()
-  end)
-  r:SetScript("OnLeave", function() GameTooltip:Hide() end)
+  r:SetScript("OnEnter", function(self) onHover(self) end)
+  r:SetScript("OnLeave", function() onHover(nil) end)
   return r
 end
 -- Under a chosen row, what it asks: a smaller tick (Hardcore's PvP realm), or a number with what is suggested.
@@ -657,7 +658,8 @@ local function build(pf)
     b:SetPoint("TOPLEFT", (i - 1) * (bw + gap), -cy)
     b:SetPoint("BOTTOMLEFT", (i - 1) * (bw + gap), 0)
     for _, key in ipairs(g.list) do
-      local r = chalRow(b, rowW, key, function() C:ToggleChallenge(key); W:Refresh() end)
+      local r = chalRow(b, rowW, key, function() C:ToggleChallenge(key); W:Refresh() end,
+        function(row) pf.peeking = row; pf:Peek() end)
       b.rows[#b.rows + 1] = r
       pf.chalRows[key] = r
     end
@@ -688,6 +690,41 @@ local function build(pf)
   pf.chalLater = UI.WrapText(r5, 12, "ink2", width, "book")
   pf.chalLater:SetPoint("TOPLEFT", pf.chalNote, "BOTTOMLEFT", 0, -10)
   pf.chalLater:SetText(L.CHAL_LATER)
+  -- Hovering a challenge: its rule here, in the book's type, in place of what the fellowship takes on (the check of
+  -- 1 Nov 2026, 14:32; a tooltip covered this page). Its icon in a gold ring, its banner, its name, its rule and,
+  -- in red, why it is greyed (Ironman takes it with it; you chose Healer).
+  local pk = CreateFrame("Frame", nil, r5)
+  pk:SetPoint("TOPLEFT", 0, -48); pk:SetSize(width, 200)
+  pk.ring = UI.Round(pk, "BORDER", 52)
+  pk.ring:SetPoint("TOPLEFT", 0, 0)
+  Theme:Fill(pk.ring, "gold", 0.9)
+  pk.icon = UI.Round(pk, "ARTWORK", 46)
+  pk.icon:SetPoint("CENTER", pk.ring)
+  pk.group = UI.Text(pk, 11, "ink2", "body")
+  pk.group:SetPoint("TOPLEFT", 64, -6)
+  pk.name = UI.WrapText(pk, 18, "ink", width - 64, "title")
+  pk.name:SetPoint("TOPLEFT", 64, -22)
+  pk.rule = UI.WrapText(pk, 15, "ink", width, "book")
+  pk.note = UI.WrapText(pk, 13, "B0321E", width, "book")
+  pk:Hide()
+  pf.peek = pk
+  function pf:Peek()
+    local row = self.peeking
+    local on = row ~= nil
+    self.peek:SetShown(on)
+    for _, w in ipairs({ self.chalName, self.chalText, self.chalLives, self.chalNote, self.chalLater }) do w:SetAlpha(on and 0 or 1) end
+    if not on then return end
+    local p = self.peek
+    if not UI.SetIcon(p.icon, Ch:Icon(row.key)) then UI.SetIcon(p.icon, ns.ICONS.hist_challenge) end
+    p.group:SetText(L["CHAL_GROUP_" .. Ch.GROUP_OF[row.key]:upper()]:upper())
+    p.name:SetText(row.tipTitle or "")
+    p.rule:SetText(row.tipText or "")
+    local nameH = math.max(60, 22 + p.name:GetStringHeight() + 8)
+    p.rule:ClearAllPoints(); p.rule:SetPoint("TOPLEFT", 0, -nameH)
+    p.note:SetShown(row.tipNote ~= nil)
+    p.note:SetText(row.tipNote or "")
+    p.note:ClearAllPoints(); p.note:SetPoint("TOPLEFT", p.rule, "BOTTOMLEFT", 0, -12)
+  end
 
   -- Step 4, left: the fellowship (banner, name, who leads it) and the rules as rows, each part with Change.
   local s4 = pf.body.review
@@ -732,6 +769,8 @@ local function build(pf)
     C:Reset()
     W.startView = "welcome"
     W:Refresh()
+    -- A first fellowship: What's New, once (UI/News.lua).
+    ns.News:ShowIfDue()
   end, "primary", 14)
   pf.create:SetPoint("BOTTOMRIGHT", 0, 0)
 end
@@ -821,6 +860,7 @@ local function refresh(pf)
 
   -- Challenges: every banner's rows ticked or not, under a chosen row what it asks (the PvP realm, Shared lives'
   -- number: what the size suggests until changed, Pauper's gold), and on the right what the fellowship takes on.
+  if key ~= "challenges" and pf.peeking then pf.peeking = nil; pf:Peek() end
   if key == "challenges" then
     local Ch = ns.Challenges
     local chosen = C:Challenges()
@@ -879,6 +919,8 @@ local function refresh(pf)
     else
       pf.chalNote:SetPoint("TOPLEFT", pf.chalText, "BOTTOMLEFT", 0, -16)
     end
+    -- (Still pointing at a row: its rule as it is now, the lives or the gold just changed.)
+    pf:Peek()
   end
 
   -- Review.

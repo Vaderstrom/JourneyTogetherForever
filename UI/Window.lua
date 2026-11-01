@@ -1003,6 +1003,8 @@ function W:Open(page)
       if pf then UI.ScrollsToTop(pf) end
     end
     if W.frame:IsShown() then W:Refresh() else W.frame:Show() end
+    -- Once after an update: What's New over the book (UI/News.lua), not over the setup guide.
+    if page ~= "setup" and ns.News then ns.News:ShowIfDue() end
     -- A fellowship found again after lost saved data (Fellowship/Sync.lua): ask now.
     if ns.Sync and ns.Sync.restore then ns.Sync:OfferRestore() end
   end)

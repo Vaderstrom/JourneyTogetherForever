@@ -251,7 +251,7 @@ function C:ApplyFall(f, by, op, t)
   local r = f.ring
   if e.fatal and r and not r.state and r.who == by then
     r.state, r.tEnd, r.why = "lost", t, "fell"
-    if fresh(f, t) then ns:Toast("challenge", L.T_RING_LOST, self:RingText(f), "chronicle", { solemn = true }) end
+    if fresh(f, t) then ns:Toast("challenge", L.T_RING_LOST, self:RingText(f), "chronicle", self:ToastOf("ring", { solemn = true })) end
   end
   ns:Fire("CHALLENGES")
   return true
@@ -266,7 +266,7 @@ function C:ApplyBreak(f, by, op, t)
   table.insert(f.broken, e)
   while #f.broken > self.BROKEN_MAX do table.remove(f.broken, 1) end
   if fresh(f, t) then
-    ns:Toast("challenge", by == ns.Me() and L.T_BROKE_YOU or L.T_BROKE, self:BreakText(e), "chronicle")
+    ns:Toast("challenge", by == ns.Me() and L.T_BROKE_YOU or L.T_BROKE, self:BreakText(e), "chronicle", self:ToastOf(key))
   end
   ns:Fire("CHALLENGES")
   return true
@@ -279,7 +279,7 @@ function C:ApplyRing(f, by, op, t)
   local r = f.ring
   if r and (r.state or r.t <= t) then return false end
   f.ring = { who = by, t = t, item = str(op.item), id = tonumber(op.id), guid = type(op.guid) == "string" and #op.guid <= 64 and op.guid or nil }
-  if fresh(f, t) then ns:Toast("challenge", L.T_RING, self:RingText(f), "chronicle") end
+  if fresh(f, t) then ns:Toast("challenge", L.T_RING, self:RingText(f), "chronicle", self:ToastOf("ring")) end
   ns:Fire("CHALLENGES")
   return true
 end
@@ -291,7 +291,7 @@ function C:ApplyRingEnd(f, by, op, t)
   r.state, r.tEnd, r.why = op.state, t, op.state == "lost" and "gone" or nil
   if fresh(f, t) then
     ns:Toast("challenge", r.state == "done" and L.T_RING_DONE or L.T_RING_LOST, self:RingText(f), "chronicle",
-      { solemn = r.state == "lost" or nil })
+      self:ToastOf("ring", { solemn = r.state == "lost" or nil }))
   end
   ns:Fire("CHALLENGES")
   return true
@@ -306,7 +306,7 @@ function C:ApplyRace(f, _, _, t)
     local best = ns.db.raceRecord
     if not best or f.race.secs < best.secs then ns.db.raceRecord = { secs = f.race.secs, name = f.name, t = t } end
   end
-  if fresh(f, t) then ns:Toast("challenge", L.T_RACE, L.CH_RACE:format(C.Span(f.race.secs)), "chronicle") end
+  if fresh(f, t) then ns:Toast("challenge", L.T_RACE, L.CH_RACE:format(C.Span(f.race.secs)), "chronicle", self:ToastOf("race")) end
   ns:Fire("CHALLENGES")
   return true
 end
@@ -322,7 +322,7 @@ function C:ApplyOff(f, by, op, t)
   f.challenges[key] = nil
   if not next(f.challenges) then f.challenges = nil end
   if by ~= ns.Me() and fresh(f, t) then
-    ns:Toast("challenge", L.T_CHAL_OFF, L.T_CHAL_OFF_TEXT:format(ns.Short(by), self:Name(key, v)), "rules")
+    ns:Toast("challenge", L.T_CHAL_OFF, L.T_CHAL_OFF_TEXT:format(ns.Short(by), self:Name(key, v)), "rules", self:ToastOf(key))
   end
   ns:Fire("CHALLENGES")
   return true
@@ -459,7 +459,19 @@ function C:FallToast(f, e)
   if e.fatal then text = text .. " " .. L.T_FALLEN_HONOURED end
   if e.out then text = text .. " " .. L.T_SHARED_OUT_TEXT
   elseif e.life then text = text .. " " .. L.CH_SHARED_LEFT:format(e.pool or 0, self:SharedLives(f) or 0) end
-  return title, text, "chronicle", { solemn = (e.fatal or e.out) and true or nil }
+  -- Above the title, the challenge the fall is about (it said the Settings line "A challenge: a fall, a broken rule,
+  -- the Ring"; check of 1 Nov 2026, 15:23); the skull stays.
+  local kicker = (e.out or not e.fatal) and self:Name("shared") or self:Name("hardcore", f.challenges and f.challenges.hardcore)
+  return title, text, "chronicle", { solemn = (e.fatal or e.out) and true or nil, kicker = kicker }
+end
+
+-- A challenge's toast (a broken rule, the Ring, the race, turned off): the challenge's own icon and its name as the
+-- small line above the title (the check of 1 Nov 2026, 14:32: they had the skull of a death, which stays for falls).
+function C:Icon(key) return ns.ICONS["chal_" .. key] or ns.ICONS.hist_challenge end
+function C:ToastOf(key, more)
+  more = more or {}
+  more.icon, more.kicker = self:Icon(key), self:Name(key)
+  return more
 end
 
 -- What a broken rule's x stands for when the addon did not get it (a name the game hid).
@@ -573,46 +585,93 @@ function C:Entries(f)
   return out
 end
 
--- The rulebook's article (the Rules page): { title, text }, or nil when the fellowship never had a challenge.
--- hl(s) marks a value.
+-- The rulebook's article (the Rules page), or nil when the fellowship never had a challenge: { title, intro, items,
+-- after, text }. items: a block for each challenge on, { key, title, name, rule, broken, notes } (name: the title
+-- marked as a value): who broke it ("Broken by Pata.") and what stands now (the lives left, the Ring, the race
+-- clock), each a line of its own (the check of 1 Nov
+-- 2026, 14:32: eleven rules ran together as one paragraph). after: the lines of no challenge on (the Fallen, starting
+-- anew, a challenge turned off). text: all of it as one paragraph. hl(s) marks a value.
 function C:Book(f, hl)
   if not self:Ever(f) then return nil end
   hl = hl or function(s) return s end
-  local parts = { L.CHAL_BOOK_INTRO }
+  local items, after, byKey = {}, {}, {}
   for _, k in ipairs(self.LIST) do
     if self:Has(f, k) then
-      parts[#parts + 1] = L.CHAL_BOOK_ONE:format(hl(self:Name(k, f.challenges[k])), self:Rule(k, f.challenges[k]))
+      local name = self:Name(k, f.challenges[k])
+      local it = { key = k, title = name, name = hl(name), rule = self:Rule(k, f.challenges[k]), notes = {} }
       local by = self:BrokenBy(f, k)
-      for i, name in ipairs(by) do by[i] = ns.Short(name) end
-      if #by > 0 then parts[#parts + 1] = L.CHAL_BOOK_BROKEN:format(table.concat(by, ", ")) end
+      for i, who in ipairs(by) do by[i] = ns.Short(who) end
+      if #by > 0 then it.broken = L.CHAL_BOOK_BROKEN:format(table.concat(by, ", ")) end
+      items[#items + 1], byKey[k] = it, it
     end
+  end
+  -- A line under its challenge's block, or after the blocks when that challenge is off now.
+  local function note(key, line)
+    local list = byKey[key] and byKey[key].notes or after
+    list[#list + 1] = line
   end
   if self:Has(f, "shared") then
     local out = self:LivesOut(f)
-    if out then parts[#parts + 1] = L.CHAL_BOOK_OUT:format(day(out.t), ns.Short(out.who), out.lvl or 0)
-    else parts[#parts + 1] = L.CHAL_BOOK_LEFT:format(hl(tostring(self:SharedLeft(f))), self:SharedLives(f)) end
+    if out then note("shared", L.CHAL_BOOK_OUT:format(day(out.t), ns.Short(out.who), out.lvl or 0))
+    else note("shared", L.CHAL_BOOK_LEFT:format(hl(tostring(self:SharedLeft(f))), self:SharedLives(f))) end
   end
   local r = f.ring
   if r then
-    if r.state then parts[#parts + 1] = self:RingText(f) .. " " .. L.CHAL_BOOK_ON:format(day(r.tEnd or r.t))
-    else parts[#parts + 1] = L.CHAL_BOOK_RING:format(hl(ns.Short(r.who)), r.item or L.RING_A_RING) end
+    if r.state then note("ring", self:RingText(f) .. " " .. L.CHAL_BOOK_ON:format(day(r.tEnd or r.t)))
+    else note("ring", L.CHAL_BOOK_RING:format(hl(ns.Short(r.who)), r.item or L.RING_A_RING)) end
   elseif self:Has(f, "ring") then
-    parts[#parts + 1] = L.CHAL_BOOK_RING_NONE
+    note("ring", L.CHAL_BOOK_RING_NONE)
   end
   if f.race then
-    parts[#parts + 1] = L.CH_RACE:format(hl(C.Span(f.race.secs)))
+    note("race", L.CH_RACE:format(hl(C.Span(f.race.secs))))
   elseif self:Has(f, "race") and self:RaceStart(f) then
-    parts[#parts + 1] = L.CHAL_BOOK_RACE:format(hl(C.Span(time() - self:RaceStart(f))))
+    note("race", L.CHAL_BOOK_RACE:format(hl(C.Span(time() - self:RaceStart(f)))))
     local best = self:Record()
-    if best then parts[#parts + 1] = L.CHAL_BOOK_RECORD:format(hl(C.Span(best.secs)), best.name or "?") end
+    if best then note("race", L.CHAL_BOOK_RECORD:format(hl(C.Span(best.secs)), best.name or "?")) end
   end
   local fallen = {}
   for _, e in ipairs(f.falls or {}) do if e.fatal then fallen[#fallen + 1] = ns.Short(e.who) end end
-  if #fallen > 0 then parts[#parts + 1] = L.CHAL_BOOK_FALLEN:format(table.concat(fallen, ", ")) end
-  if self:Survival(f) then parts[#parts + 1] = L.CHAL_BOOK_ANEW end
+  if #fallen > 0 then after[#after + 1] = L.CHAL_BOOK_FALLEN:format(table.concat(fallen, ", ")) end
+  if self:Survival(f) then after[#after + 1] = L.CHAL_BOOK_ANEW end
   for _, k in ipairs(self.LIST) do
     local o = f.challengesOff and f.challengesOff[k]
-    if o then parts[#parts + 1] = L.CHAL_BOOK_OFF:format(self:Name(k, o.v), day(o.t), ns.Short(o.by or f.leader)) end
+    if o then after[#after + 1] = L.CHAL_BOOK_OFF:format(self:Name(k, o.v), day(o.t), ns.Short(o.by or f.leader)) end
   end
-  return { title = L.CHAL_BOOK, text = table.concat(parts, " ") }
+  local parts = { L.CHAL_BOOK_INTRO }
+  for _, it in ipairs(items) do
+    parts[#parts + 1] = L.CHAL_BOOK_ONE:format(it.name, it.rule)
+    if it.broken then parts[#parts + 1] = it.broken end
+    for _, line in ipairs(it.notes) do parts[#parts + 1] = line end
+  end
+  for _, line in ipairs(after) do parts[#parts + 1] = line end
+  return { title = L.CHAL_BOOK, intro = L.CHAL_BOOK_INTRO, items = items, after = after, text = table.concat(parts, " ") }
+end
+
+-- The rulebook's tiles (the Rules page's right page, UI.NumberTile): what stands now, at a glance. { { key, value,
+-- label, icon } }: the shared lives left, the race clock, the Ring and the rules broken (always, with any challenge
+-- on). nil when none is on.
+function C:Tiles(f)
+  local broken, on = 0, false
+  for _, k in ipairs(self.LIST) do
+    if self:Has(f, k) then on, broken = true, broken + #self:BrokenBy(f, k) end
+  end
+  if not on then return nil end
+  local out = {}
+  local total = self:SharedLives(f)
+  if total then
+    out[#out + 1] = { key = "shared", value = L.TILE_OF:format(self:SharedLeft(f), total), label = L.TILE_LIVES, icon = self:Icon("shared") }
+  end
+  local start = self:Has(f, "race") and self:RaceStart(f)
+  if f.race or start then
+    out[#out + 1] = { key = "race", value = C.Span(f.race and f.race.secs or time() - start),
+      label = f.race and L.TILE_RACE_DONE or L.TILE_RACE, icon = self:Icon("race") }
+  end
+  if self:Has(f, "ring") then
+    local r = f.ring
+    local held = r and not r.state
+    local v = held and ns.Short(r.who) or (not r and L.TILE_RING_NONE) or (r.state == "done" and L.TILE_RING_DONE) or L.TILE_RING_LOST
+    out[#out + 1] = { key = "ring", value = v, label = held and L.CARD_RING_BEARER or L.TILE_RING, icon = self:Icon("ring") }
+  end
+  out[#out + 1] = { key = "broken", value = broken, label = L.TILE_BROKEN, icon = ns.ICONS.hist_broke }
+  return out
 end

@@ -86,6 +86,7 @@ UI\Window.lua
 UI\GatherForm.lua
 UI\Toast.lua
 UI\Share.lua
+UI\News.lua
 UI\Picture.lua
 UI\Photo.lua
 UI\Tracker.lua

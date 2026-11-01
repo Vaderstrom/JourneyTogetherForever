@@ -1319,6 +1319,7 @@ ns.L = setmetatable({
   CMD_QUESTS = "Open shared quests",
   CMD_SETTINGS = "Open the settings",
   CMD_PHOTO = "Take a group photo",
+  CMD_NEWS = "What's new in this update",
 
   -- Toast events
   TOAST_CHAPTER = "A chapter unlocks",
@@ -1494,6 +1495,16 @@ ns.L = setmetatable({
   CHAL_BOOK_ON = "That was on %s.",
   CHAL_BOOK_RACE = "The clock has run for %s.",
   CHAL_BOOK_RECORD = "The time to beat on this account: %s, by %s.",
+  CHAL_TILES = "Where the challenges stand",
+  TILE_OF = "%d / %d",
+  TILE_LIVES = "Lives left",
+  TILE_RACE = "Race clock",
+  TILE_RACE_DONE = "Race to 60",
+  TILE_RING = "The Ring",
+  TILE_RING_NONE = "Not found",
+  TILE_RING_DONE = "Destroyed",
+  TILE_RING_LOST = "Lost",
+  TILE_BROKEN = "Rules broken",
   MG_CHAL_INCLUDED = "Held by Ironman Fellowship",
   SPAN_DAY = "1 day",
   SPAN_DAYS = "%d days",
@@ -2023,6 +2034,14 @@ ns.L = setmetatable({
   DEV_NOT_COMPANION = "Debug: %s is not in your fellowship. Invite %s under Manage, then /jtf debug hero <Name> accept.",
   DEV_NOT_INVITED = "Debug: %s has no open invite. Invite them under Manage first.",
   DEV_ALREADY_IN = "Debug: %s is already in the fellowship.",
+  NEWS_TITLE = "What's New",
+  NEWS_SUB = "In this update",
+  NEWS_BIG_TITLE = "Challenge modes",
+  NEWS_BIG_TEXT = "Found a fellowship with up to thirteen challenges, from Hardcore Fellowship and Shared lives to Lord of the Rings and Race to 60. The rulebook keeps the score.",
+  NEWS_A_TITLE = "Fellowship firsts",
+  NEWS_A_TEXT = "The first to reach each level, ride a mount or hold 100 gold earns a medal in the Chronicle.",
+  NEWS_B_TITLE = "Friend of the fellowship",
+  NEWS_B_TEXT = "Invite someone who plays along now and then. A Friend never holds anyone back.",
 }, { __index = function(_, key) return key end })
 
 -- Other languages: a file Locales/<code>.lua (listed in the TOC after this one) calls

@@ -113,13 +113,14 @@ shot("create-challenges", "Create: Challenges", "Three banners side by side, eve
   C.challenges, C.pvp = { hardcore = true, shared = true }, true
   C:Goto("challenges"); W():Refresh()
 end)
--- X3-X5 (the owner, 1 Nov 2026): a challenge's tooltip, then many across the three banners.
-shot("create-challenges-tip", "Create: Challenges (a tooltip)", "Hovering Lord of the Rings in the Story and Travel banner: its name and its whole rule", function()
+-- X3-X5 (the owner, 1 Nov 2026): a challenge hovered, then many across the three banners.
+shot("create-challenges-tip", "Create: Challenges (one hovered)", "Hovering Lord of the Rings in the Story and Travel banner: on the right page its icon in a gold ring, STORY AND TRAVEL, its name and its whole rule in the book's type, no tooltip; a faint emblem low on each banner (a skull, the Ring, a coin)", function()
   local r = W().pageFrames.create.chalRows.ring
   r:GetScript("OnEnter")(r)
 end)
 shot("create-challenges-many", "Create: Challenges (many at once)", "Lord of the Rings and Walk everywhere; Ironman Fellowship (White gear only greyed, with it), Pauper with its gold, One class only (your class): every row stays on its banner's cloth, and the right page holds them all above Next", function()
-  if GameTooltip then GameTooltip:Hide() end
+  local r = W().pageFrames.create.chalRows.ring
+  r:GetScript("OnLeave")(r)
   local C = ns.CreateState
   C.challenges.ring, C.challenges.walk, C.challenges.ironman, C.challenges.pauper, C.challenges.oneclass = true, true, true, true, true
   W():Refresh()
@@ -222,6 +223,13 @@ shot("since", "Since you were last here", "What changed, who levelled, where the
   ns.Since:Mark(); dev("hero Elyra level 19"); dev("hero Brannic level 20")
   ns.Since.current = ns.Since:Digest(cur()); page("since")
 end)
+-- What's New (the check of 1 Nov 2026, 14:32): once after an update, over the book.
+shot("news", "What's New", "Over the book on parchment in its frame: What's New in gold, the big news (Challenge modes) in a round picture inside the gold ring, two picture cards (Fellowship firsts, Friend of the fellowship) with loading screens, Continue", function()
+  local keep = ns.db.newsSeen
+  ns.News:Show()
+  ns.db.newsSeen = keep
+end)
+prep(function() hideOverlays() end)
 shot("chapter", "Chapter", "The stage track, the banner, every dungeon as a row without scrolling; the level track, then where the Adventurers stand", function()
   dev("hero Corwin level 17"); page("chapter"); top(pf("chapter").lscroll)
 end)
@@ -275,7 +283,7 @@ prep(function()
   end
   ns.Firsts:Check(f); ns.Moments:Check(f)
 end)
-shot("chronicle-firsts", "Chronicle (Firsts)", "The firsts as medals: Earned (who, when), then Still open, greyed (an open level names who is closest); the tallies on the right as podiums, the top three in gold, silver, bronze", function()
+shot("chronicle-firsts", "Chronicle (Firsts)", "The firsts as medals: Earned (who, when), then Still open, greyed (only the next open level names who is closest); the tallies on the right as podiums, the top three in gold, silver, bronze", function()
   chronicle("first")
 end)
 -- M25: a session recap kept for this character (a pretend one with Brannic and Elyra), as the toast's click opens it.
@@ -448,7 +456,7 @@ prep(function()
   f.challenges, f.challengesOff, f.falls = { hardcore = true, shared = 10 }, nil, nil
   dev("hero Brannic fall")
 end)
-shot("heroes-fallen", "Adventurers (a Fallen Adventurer)", "Hardcore: Brannic's card a memorial (greyed crest with a skull, violet, no Online), last; Fallen, with the place, day and foe on the line (his level is the card's number); 1 Fallen beside the roles", function()
+shot("heroes-fallen", "Adventurers (a Fallen Adventurer)", "Hardcore: Brannic's card a memorial (greyed crest with a skull, violet, no Online), last; Fallen, with the place, day and foe on the line (his level is the card's number); 1 Fallen beside the roles; Recent history on the left: his fall with a skull, every line with its icon", function()
   pf("heroes").sel = nil; page("heroes"); top(pf("heroes").scroll)
 end)
 shot("inspect-fallen", "Inspect a Fallen Adventurer (his memorial)", "In memory of Brannic: his greyed crest with a skull on the dimmed stage, where, when and fighting whom, honoured in the Chronicle; no gear. Right: Days together, Fallen, his journey (joined, fell, dungeons, firsts), no XP or Invite", function()
@@ -456,7 +464,7 @@ shot("inspect-fallen", "Inspect a Fallen Adventurer (his memorial)", "In memory 
 end)
 prep(function() pf("heroes").sel = nil end)
 shot("chronicle-fallen", "Chronicle (a memorial)", "In memory of Brannic: level, place, day and foe; a shared life lost, 9 of 10 left", function() chronicle("all") end)
-shot("chronicle-firsts-fallen", "Chronicle (Firsts, under a challenge)", "First to fall in violet with a silver ring, not gold; an open level medal names who is closest (\"is closest (22)\")", function()
+shot("chronicle-firsts-fallen", "Chronicle (Firsts, under a challenge)", "First to fall in violet with a silver ring, not gold; only the next open level medal names who is closest (\"is closest (22)\"), the higher ones Nobody yet", function()
   chronicle("first")
 end)
 -- The candles as the Overview opens after Brannic's fall: his goes out now (the lives seen were 10), so the shot catches
@@ -466,8 +474,10 @@ shot("overview-lives", "Overview (shared lives)", "The shared lives as a row of 
   ns.char.livesSeen[cur().id] = 10
   page("overview"); top(pf("overview").lscroll)
 end)
-shot("rules-challenges", "Rules (the challenges)", "The rulebook's last article: Hardcore and Shared lives, the lives left, the Fallen, starting anew", function()
-  page("rules"); bottom(pf("rules").lscroll)
+-- (The tiles had shots of their own, the same pictures as these: they are in sight beside the article; check of
+-- 1 Nov 2026, 15:23.)
+shot("rules-challenges", "Rules (the challenges)", "The rulebook's last article: a block for Hardcore and one for Shared lives, each with its icon in a gold ring, the lives left on their own line and the candles under it; the Fallen and starting anew after them. Right, under Propose a change: Where the challenges stand, tiles two to a row: Lives left 9 / 10, Rules broken 0", function()
+  page("rules"); bottom(pf("rules").lscroll); bottom(pf("rules").rscroll)
 end)
 shot("manage-rules-challenges", "Manage: Rules (challenges)", "Each challenge with Turn off (for good; it asks first), above the size and the play style", function()
   page("rulesadmin"); top(pf("rulesadmin").lscroll)
@@ -485,8 +495,8 @@ shot("heroes-broken", "Adventurers (broken challenges, the Ring)", "Brannic's ca
   pf("heroes").sel = nil; page("heroes"); top(pf("heroes").scroll)
 end)
 shot("chronicle-broken", "Chronicle (broken rules, the Ring)", "Brannic took a flight path, breaking Walk everywhere; used a potion, breaking Ironman Fellowship; found the Ring", function() chronicle("all") end)
-shot("rules-challenges-more", "Rules (the challenges, X3-X5)", "The article: each rule, Broken by Brannic, who carries the Ring, Race to 60's clock", function()
-  page("rules"); bottom(pf("rules").lscroll)
+shot("rules-challenges-more", "Rules (the challenges, X3-X5)", "The article: a block for each challenge with its icon; Broken by Brannic in red under Walk everywhere and Ironman Fellowship, who carries the Ring, Race to 60's clock, each on its own line. The tiles: Race clock, Ring-bearer Brannic, Rules broken 2", function()
+  page("rules"); bottom(pf("rules").lscroll); bottom(pf("rules").rscroll)
 end)
 shot("manage-rules-ironman", "Manage: Rules (Ironman Fellowship)", "Hardcore Fellowship and White gear only: Held by Ironman Fellowship instead of Turn off", function()
   page("rulesadmin"); top(pf("rulesadmin").lscroll)
@@ -720,10 +730,10 @@ shot("toast-fallen", "Toast: an Adventurer has fallen", "Hardcore: Brannic has f
   local e = { who = full("Brannic"), t = time(), lvl = ns.Hero:Level(cur(), full("Brannic")) or 22, zone = GetZoneText and GetZoneText() or nil, foe = L.DEV_FOE, fatal = true, left = 0 }
   ns.Toasts:Push("challenge", ns.Challenges:FallToast(cur(), e))
 end, { toast = true })
-shot("toast-broken", "Toast: a challenge is broken", "Brannic took a flight path, breaking Walk everywhere", function()
+shot("toast-broken", "Toast: a challenge is broken", "Brannic took a flight path, breaking Walk everywhere: Walk everywhere's boots, not the skull, and WALK EVERYWHERE above the title", function()
   ns.Toasts:StopMove(); W():Close()
   local e = { who = full("Brannic"), t = time(), what = "taxi", key = "walk" }
-  ns.Toasts:Push("challenge", L.T_BROKE, ns.Challenges:BreakText(e), "chronicle")
+  ns.Toasts:Push("challenge", L.T_BROKE, ns.Challenges:BreakText(e), "chronicle", ns.Challenges:ToastOf("walk"))
 end, { toast = true })
 shot("toast-endgame", "Toast: the Endgame is open (big)", "After the journey: the raids", toast("journey", L.TOAST_ENDGAME,
   L.TOAST_ENDGAME_TEXT), { toast = true })
@@ -896,7 +906,7 @@ function TR:ShowGameUI()
 end
 
 function TR:Finish(keep)
-  local r = ns.db.tour
+  local r = self.rec
   self:ShowGameUI()
   hideOverlays()
   ns.Toasts:StopMove()
@@ -956,7 +966,11 @@ function TR:Run(arg, opts)
   -- The setup guide would take over after joining and founding: seen for the tour, as it was afterwards.
   self.savedSetup = ns.char.setupDone
   ns.char.setupDone = true
-  ns.db.tour = { started = time(), shots = {}, problems = {}, areas = areas, brand = opts.brand and true or nil }
+  -- A branding run keeps its own list (JourneyTogetherForeverDB.brand), so /jtf check and /jtf brand can run one
+  -- after the other before a single /reload.
+  local rec = { started = time(), shots = {}, problems = {}, areas = areas, brand = opts.brand and true or nil }
+  self.rec = rec
+  if opts.brand then ns.db.brand = rec else ns.db.tour = rec end
   if opts.brand then
     ns:Print(L.BRAND_START:format(TR:Count(areas, ids)), true)
     -- One theme from the first picture to the last.
@@ -986,7 +1000,7 @@ function TR:Run(arg, opts)
     local res
     local ok, err = xpcall(function() res = s.fn() end, trace)
     if not ok then
-      local list = ns.db.tour.problems
+      local list = rec.problems
       list[#list + 1] = { id = s.id or "prep", err = err }
       ns:LogError("tour", s.id or "prep", err)
     end
@@ -998,7 +1012,7 @@ function TR:Run(arg, opts)
     -- No picture when the screen could not be set up, or would be the same as the one before: the report says so
     -- (both made pictures that looked like a skipped shot; seen in a review).
     if not ok or res == "same" then
-      local list = ns.db.tour.shots
+      local list = rec.shots
       list[#list + 1] = { id = s.id, title = s.title, what = s.what, t = time(), area = ns.CheckAreas and ns.CheckAreas:ForShot(s.id),
         none = ok and "same" or "error" }
       return C_Timer.After(TR.SKIP, nextShot)
@@ -1015,7 +1029,7 @@ function TR:Run(arg, opts)
       local okCrop, crop = true, nil
       if type(b) == "table" then okCrop, crop = pcall(TR.CropFor, TR, b) end
       if Screenshot then Screenshot() end
-      local list = ns.db.tour.shots
+      local list = rec.shots
       list[#list + 1] = { n = n, id = s.id, title = s.title, what = s.what, t = time(),
         area = ns.CheckAreas and ns.CheckAreas:ForShot(s.id), layout = okScan and #layout > 0 and layout or nil,
         errWin = errWin, file = type(b) == "table" and b.file or nil, kind = type(b) == "table" and (b.crop or "book") or nil,
@@ -1039,14 +1053,23 @@ end
 -- The tour's shots the README shows, the file each becomes, and what of the screen it keeps (the book with what hangs
 -- outside it, the default; the toast, the tracker, or the whole screen). Plain pictures: the walkthrough's gold frame
 -- around each subject was tried and dropped (30 Oct 2026). tools/brand-shots.lua cuts them.
+-- 0.11 and after (the owner, 1 Nov 2026): the challenges, the rulebook's challenge article, the memorial page, the
+-- firsts' cabinet and What's New.
 TR.BRAND = {
   { id = "create-2", file = "play-style" },
+  { id = "create-challenges-tip", file = "challenges" },
   { id = "create-chapters", file = "journey-editor" },
   { id = "overview-ready", file = "overview" },
   { id = "chapter", file = "chapter" },
+  { id = "rules-challenges-more", file = "challenges-rulebook" },
+  { id = "inspect-fallen", file = "memorial" },
+  { id = "chronicle-firsts", file = "firsts" },
+  { id = "news", file = "whats-new" },
   { id = "moments", file = "moments" },
   { id = "group-photo", file = "group-photo", crop = "screen" },
-  { id = "quests-attune", file = "attunements" },
+  -- Only in WoW Forever: retail has no attunements since 30 Oct 2026 (its picture was an empty page; brand run of
+  -- 1 Nov 2026). The README keeps the picture of 30 Oct until a run in Forever.
+  { id = "quests-attune", file = "attunements", forever = true },
   { id = "heroes", file = "adventurers" },
   { id = "rules-vote", file = "rules" },
   { id = "gatherings", file = "gatherings" },
@@ -1067,7 +1090,9 @@ TR.BRAND_PAD = { book = 4, toast = 28, tracker = 14 }
 function TR:Brand()
   if UnitFactionGroup("player") ~= "Alliance" then ns:Print(L.BRAND_FACTION, true) return end
   local ids = {}
-  for _, b in ipairs(self.BRAND) do ids[b.id] = b end
+  for _, b in ipairs(self.BRAND) do
+    if not b.forever or ns.IsForever() then ids[b.id] = b end
+  end
   self:Run(nil, { ids = ids, brand = self.BRAND_LOOK })
 end
 

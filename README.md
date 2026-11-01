@@ -117,11 +117,20 @@ honest from level 1.
   and destroy it there), **Walk everywhere**, **Questless** and **Race to 60** (your account keeps the best time).
 - **Gear, Gold & More**: **Fellowship-found**, **White gear only**, **Pauper** (you set the gold), **Ironman
   Fellowship**, **One class only**, **No healers** and **Dungeons only**.
+
+![Founding: three banners, every challenge in sight; hover one for its rule](.github/screenshots/challenges.jpg)
+
 - The addon can't stop anyone, but it notices: a broken rule is written in the Chronicle and shown on that
   Adventurer's card, and they play on. One class only and No healers are held at the door.
+- The rulebook has an article for the challenges: each with its rule, who broke it, the lives left, the Ring and the
+  race clock, and tiles for where the challenges stand. The Leader can turn one off in Manage, for good.
+
+![The rulebook's challenges: who broke what, the Ring-bearer, the race clock, and where the challenges stand](.github/screenshots/challenges-rulebook.jpg)
+
 - **The Fallen**: an Adventurer whose last life is spent stays in the fellowship, honoured with a memorial page, and
   may bring a new character who starts at level 1.
-- The rulebook has an article for the challenges, and the Leader can turn one off in Manage, for good.
+
+![In memory of Brannic: a Fallen Adventurer's page](.github/screenshots/memorial.jpg)
 
 ### The Adventurers
 - Every Adventurer with role, class, level, XP and rested XP, and a **presence mark** like the game's friends list:
@@ -186,6 +195,8 @@ tracker show the next one.
 - **History**: the fellowship's own story: founded, who joined and left, Leaders, rules and votes, Gatherings and the
   tournament.
 
+![Firsts: a cabinet of medals, and the tallies](.github/screenshots/firsts.jpg)
+
 ![Moments](.github/screenshots/moments.jpg)
 
 ### Group photo
@@ -247,11 +258,15 @@ log out; the app reads it from your saved data and posts nothing you have not ch
   fellowship, for your rank.
 - Settings for every toast, the tracker's lines, chat messages, the cap warning, sounds, reduced effects and the
   minimap button.
+- **What's New**: once after an update, a page over the book with the update's news. `/jtf news` shows it again.
+
+![What's New, once after each update](.github/screenshots/whats-new.jpg)
 
 ## Commands
 - `/jtf`: open or close the book (or click the minimap button)
 - `/jtf chapter`, `/jtf heroes`, `/jtf quests`: open those pages
 - `/jtf photo`: the group photo
+- `/jtf news`: What's New
 - `/jtf settings`: Settings
 
 ## Playing at different times
