@@ -18,13 +18,20 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-      # The notes on GitHub and CurseForge are the whole CHANGELOG.md, the same text on both (the owner, 1 Nov 2026).
-      # The run stops when it has no section for this version ("## 0.10.0 beta (...)" for v0.10.0-beta), or when it
-      # grows past what a GitHub release can hold (125,000 characters).
+      # CurseForge shows the whole CHANGELOG.md on each file; each GitHub release shows only its own version's section
+      # ("## 0.10.0 beta (...)" for v0.10.0-beta), so GitHub's releases together hold the same history (the owner,
+      # 1 Nov 2026). The packager writes the whole file to both; the last step sets GitHub's to the section. The run
+      # stops when there is no section for this version, or when CHANGELOG.md grows past what a GitHub release can
+      # hold for that moment (125,000 characters).
       - name: Release notes
         run: |
           version="${GITHUB_REF_NAME#v}"
           version="${version/-/ }"
-          if ! grep -q "^## $version " CHANGELOG.md; then echo "CHANGELOG.md has no section \"## $version\""; exit 1; fi
+          awk -v h="## $version " 'index($0, h) == 1 { on = 1; print; next } on && /^## / { exit } on' CHANGELOG.md > "$RUNNER_TEMP/notes.md"
+          if [ ! -s "$RUNNER_TEMP/notes.md" ]; then echo "CHANGELOG.md has no section \"## $version\""; exit 1; fi
           if [ "$(wc -c < CHANGELOG.md)" -gt 125000 ]; then echo "CHANGELOG.md is too long for a GitHub release"; exit 1; fi
       - uses: BigWigsMods/packager@e50a250f8705041e40f2fa1ddcb280a686d65aa0 # v2.6.1
+      - name: GitHub release notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --notes-file "$RUNNER_TEMP/notes.md"
