@@ -31,7 +31,8 @@ function A:Items(f)
   -- Not seen for a while (not yet away), and away by the rule.
   local names = F:Members(f)
   for _, name in ipairs(names) do
-    if name ~= me then
+    -- (Not a Friend of the fellowship: they drop in now and then, SPEC §1.1. Nor the Fallen: their journey ended.)
+    if name ~= me and not J:Uncounted(f, name) then
       local days = math.floor((time() - Hr:LastSeen(f, name)) / DAY)
       local away = J:Away(f, name)
       if away == "auto" then add("away", L.NA_AWAY_AUTO:format(ns.Short(name), days))

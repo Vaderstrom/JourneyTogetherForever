@@ -4,6 +4,7 @@
 -- by feature area (Dev/Areas.lua) with the screenshot files, and writes review/index.html to look through them.
 --   /jtf check                  everything: all checks, all screenshots (about 4 minutes)
 --   /jtf check setup join       all checks, then only those areas' screenshots (to look again after a fix)
+--   /jtf check models           an area that stands alone (Dev/Areas.lua): only its checks and screenshots
 --   /jtf check quick            checks only, no screenshots (about a minute)
 --   /jtf check shots [areas]    screenshots only (all, or those areas)
 --   /jtf check areas            the areas, with how many checks and screenshots each has
@@ -52,14 +53,16 @@ function C:Run(text)
   local list = {}
   for key in pairs(areas or {}) do list[#list + 1] = key end
   table.sort(list)
-  ns.db.check = { started = time(), loaded = ns.loadedAt, selftest = selftest, shots = shots, areas = #list > 0 and list or nil }
+  local only = ns.CheckAreas:Alone(areas) and areas or nil
+  ns.db.check = { started = time(), loaded = ns.loadedAt, selftest = selftest, shots = shots, areas = #list > 0 and list or nil,
+    only = only and true or nil }
   self.running = true
   local count = shots and ns.Tour:Count(areas) or 0
   ns:Print(L.CHECK_START:format(selftest and L.CHECK_WITH_SELFTEST or "", count,
     #list > 0 and table.concat(list, ", ") or L.CHECK_ALL_AREAS), true)
   local function tour()
     if not shots then return C:Finish() end
-    ns.Tour:Run("", { areas = areas, onDone = function() C:Finish() end })
+    ns.Tour:Run("", { areas = areas, only = only, onDone = function() C:Finish() end })
   end
-  if selftest then ns.SelfTest:Run("", { onDone = tour }) else tour() end
+  if selftest then ns.SelfTest:Run("", { only = only, onDone = tour }) else tour() end
 end

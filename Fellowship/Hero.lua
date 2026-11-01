@@ -72,7 +72,9 @@ function Hr:MyState()
   return { level = lvl, xp = xp, xpMax = xpMax, rested = GetXPExhaustion() or 0,
     zone = GetZoneText and GetZoneText() or nil, class = class, className = className, race = race, guild = guild,
     gm = guild ~= nil and rankIndex == 0 or nil, run = f and ns.Progress:InRun(f) or nil,
-    pace = ns.Pace and ns.Pace:PerHour() or nil, ver = ns.VERSION, t = time(), alts = self:MyAlts() }
+    pace = ns.Pace and ns.Pace:PerHour() or nil, ver = ns.VERSION, t = time(), alts = self:MyAlts(),
+    -- My deeds and tallies, for the fellowship's firsts (Fellowship/Firsts.lua).
+    deeds = ns.Firsts and (ns.Firsts:State()) or nil, tally = ns.Firsts and select(2, ns.Firsts:State()) or nil }
 end
 
 -- The other characters on this account the addon has seen: they may watch this fellowship while you play them.
@@ -137,6 +139,13 @@ function Hr:Store(f, name, s, heardAt, relayed)
     for _, a in ipairs(s.alts) do if type(a) == "string" and #a <= 64 and #alts < 20 then alts[#alts + 1] = a end end
     h.alts = alts
   end
+  -- Deeds for the firsts: only the known ones, as times; the tallies as counts (Fellowship/Firsts.lua).
+  if type(s.deeds) == "table" and ns.Firsts then
+    local d = {}
+    for k in pairs(ns.Firsts.KNOWN) do d[k] = num(s.deeds[k]) end
+    h.deeds = d
+  end
+  if type(s.tally) == "table" then h.tally = { falls = num(s.tally.falls), quests = num(s.tally.quests) } end
   h.t = num(s.t) or time()
   -- (Passed on: when they were last heard by whoever passed it on; a failed whisper to them still stands.)
   if relayed then h.heard = heardAt or h.heard else h.heard, h.offline = heardAt or time(), nil end
@@ -191,6 +200,8 @@ end
 -- Status text and colour (the mockup's status): away, below the floor, over the cap, at the cap, online, seen.
 -- Uses the current chapter (the first chapter until chapter progress arrives with M4).
 function Hr:Status(f, name)
+  if f.falls and ns.Challenges:Fallen(f, name) then return L.STATUS_FALLEN, Hr.FALLEN end
+  if F:IsFriend(f, name) then return L.STATUS_FRIEND, Hr.FRIEND end
   local away = ns.Journey:Away(f, name)
   if away then return away == "forced" and L.STATUS_AWAY_FORCED or L.STATUS_AWAY, "ink2" end
   local text, color = self:Standing(f, name)
@@ -199,8 +210,14 @@ function Hr:Status(f, name)
   return L.STATUS_SEEN:format(ns.TimeAgo(self:LastSeen(f, name))), "ink2"
 end
 
--- Where a Hero stands in the chapter: below the floor, over or at the cap, or the journey done; nil in between.
+-- Where a Hero stands in the chapter: below the floor, over or at the cap, or the journey done; nil in between. The
+-- Fallen of a survival challenge (SPEC §9): Fallen, in a muted violet (honoured, not an error). A Friend of the
+-- fellowship (SPEC §1.1): in a calm teal, never a warning (they stand outside the floor and the cap).
+Hr.FALLEN = "6E5A82"
+Hr.FRIEND = "3A7A78"
 function Hr:Standing(f, name)
+  if f.falls and ns.Challenges:Fallen(f, name) then return L.STATUS_FALLEN, Hr.FALLEN end
+  if F:IsFriend(f, name) then return L.STATUS_FRIEND, Hr.FRIEND end
   local ch = F:CurrentChapter(f)
   if not ch then return L.STATUS_DONE, "3E9A52" end
   local lvl, r = self:Level(f, name), f.rules

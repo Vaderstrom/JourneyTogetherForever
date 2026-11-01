@@ -50,6 +50,7 @@ ns.ICONS = {
   bn_rested = I .. "Spell_Nature_Sleep",
   bn_group = I .. "INV_Misc_GroupNeedMore",
   bn_away = I .. "Spell_Nature_TimeStop",
+  bn_friend = I .. "Achievement_GuildPerk_EverybodysFriend",
   -- History (the mockup's ⚔ ✓ ↺ ✦ !) and the Dungeon Journal's bosses (☠)
   hist_run = I .. "Ability_DualWield",
   hist_mark = "Interface\\RaidFrame\\ReadyCheck-Ready",
@@ -57,8 +58,36 @@ ns.ICONS = {
   hist_chapter = I .. "INV_Misc_Book_09",
   hist_cap = I .. "Spell_Shadow_DeathScream",
   hist_session = I .. "INV_Misc_GroupNeedMore",
+  hist_first = I .. "Achievement_General",
+  toast_first = I .. "Achievement_General",
+  -- Challenges (SPEC §9): a memorial for the Fallen, a life lost, a challenge turned off, a broken rule, the Ring,
+  -- Race to 60 done.
+  hist_fallen = I .. "INV_Misc_Bone_HumanSkull_01",
+  hist_life = I .. "Spell_Holy_SealOfSacrifice",
+  hist_challenge = I .. "Ability_Warrior_Challange",
+  hist_broke = I .. "Spell_Shadow_CurseOfTounges",
+  hist_ring = I .. "INV_Jewelry_Ring_03",
+  hist_race = I .. "Ability_Rogue_Sprint",
+  toast_challenge = I .. "INV_Misc_Bone_HumanSkull_01",
+  -- Create's challenge cards: one life each, a shared pool.
+  chal_hardcore = I .. "INV_Misc_Bone_HumanSkull_01",
+  chal_shared = I .. "Spell_Holy_SealOfSacrifice",
   boss = "Interface\\TargetingFrame\\UI-TargetingFrame-Skull",
+  -- Following another character's fellowship: a spyglass on the bar.
+  watch = I .. "INV_Misc_Spyglass_03",
+  -- The firsts as medals (SPEC §8), one picture each.
+  first_lvl10 = I .. "Achievement_Level_10", first_lvl20 = I .. "Achievement_Level_20",
+  first_lvl30 = I .. "Achievement_Level_30", first_lvl40 = I .. "Achievement_Level_40",
+  first_lvl50 = I .. "Achievement_Level_50", first_lvl60 = I .. "Achievement_Level_60",
+  first_fall = I .. "INV_Misc_Bone_HumanSkull_01", first_rare = I .. "INV_Misc_Gem_Sapphire_02",
+  first_epic = I .. "INV_Misc_Gem_Amethyst_02", first_mount = I .. "Ability_Mount_RidingHorse",
+  first_gold100 = I .. "INV_Misc_Coin_01", first_prof150 = I .. "INV_Misc_Gear_01",
+  first_prof225 = I .. "INV_Misc_Gear_01", first_prof300 = I .. "INV_Misc_Gear_01", first_pvp = I .. "Ability_DualWield",
 }
+
+-- A shared life (UI.Lives): the shared lives' own flame, as beside "Shared lives" (the game's candle icons came out as
+-- white pearls at this size; check of 1 Nov 2026, 11:30), else the first candle the game has.
+ns.CANDLES = { ns.ICONS.chal_shared, I .. "INV_Misc_Candle_03", I .. "INV_Misc_Candle_01" }
 
 -- Our own painted icon set (M20, art/incoming/icon-sheet: a 4 x 4 sheet in the medallion style, converted to
 -- Media\IconSet). Each cell replaces the game icons below that name it. Turned on only together with the file
@@ -273,6 +302,15 @@ end
 -- "|T...|t": an icon inside a line of text.
 function ns.InlineTexture(path, size)
   return ("|T%s:%d:%d:0:0:64:64:5:59:5:59|t"):format(path, size or 12, size or 12)
+end
+
+-- A class's round icon (the game's class circles) inside a line of text, or "" for a class the game does not list.
+function ns.ClassIconMarkup(token, size)
+  local c = token and CLASS_ICON_TCOORDS and CLASS_ICON_TCOORDS[token]
+  if not c then return "" end
+  size = size or 12
+  return ("|TInterface\\TargetingFrame\\UI-Classes-Circles:%d:%d:0:0:256:256:%d:%d:%d:%d|t"):format(size, size,
+    math.floor(c[1] * 256), math.floor(c[2] * 256), math.floor(c[3] * 256), math.floor(c[4] * 256))
 end
 
 ns.CIRCLE_MASK ="Interface\\CharacterFrame\\TempPortraitAlphaMask"

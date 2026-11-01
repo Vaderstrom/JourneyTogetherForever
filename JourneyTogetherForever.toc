@@ -34,6 +34,9 @@ Fellowship\Hero.lua
 Fellowship\Pace.lua
 Fellowship\Clears.lua
 Fellowship\Moments.lua
+Fellowship\Firsts.lua
+Fellowship\Challenges.lua
+Fellowship\ChallengeWatch.lua
 Fellowship\Quests.lua
 Fellowship\QuestLists.lua
 Fellowship\Progress.lua

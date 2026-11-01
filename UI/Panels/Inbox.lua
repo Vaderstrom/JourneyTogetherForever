@@ -11,7 +11,7 @@ function Inbox:Items()
   for _, item in ipairs(ns.Fellowship:MyInvites()) do
     -- Accept / Decline here too (the item was text only; seen in the tour). The role is the Join page's choice.
     local fid = item.fid
-    items[#items + 1] = { text = L.INBOX_INVITE:format(ns.Short(item.inv.leader or item.inv.from), item.inv.name), important = true,
+    items[#items + 1] = { text = (item.inv.friend and L.INBOX_INVITE_FRIEND or L.INBOX_INVITE):format(ns.Short(item.inv.leader or item.inv.from), item.inv.name), important = true,
       actions = { { L.ACCEPT, function() ns.Fellowship:AcceptInvite(fid, ns.CreateState.role) end, "primary" },
         { L.DECLINE, function() ns.Fellowship:DeclineInvite(fid) end, "plain" } } }
   end

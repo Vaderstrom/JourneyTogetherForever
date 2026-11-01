@@ -182,6 +182,27 @@ local function op(f, full, o, mode)
 end
 D.op = op
 
+-- What a pretend broken rule names (/jtf break <what>): the outsider, the green item, the quest, the place.
+local BREAK_X = { trade = "DEV_BREAK_X", mail = "DEV_BREAK_X", mailto = "DEV_BREAK_X", gear = "DEV_BREAK_GEAR",
+  quest = "DEV_BREAK_QUEST", xp = "DEV_BREAK_ZONE", prof = "DEV_BREAK_PROF", potion = "DEV_BREAK_POTION" }
+function D.BreakX(what)
+  if what == "gold" then
+    local f = ns.Fellowship:Current()
+    return tostring(((f and f.challenges and f.challenges.pauper) or 10) + 5)
+  end
+  local key = BREAK_X[what]
+  return key and L[key] or nil
+end
+local function breakWhat(arg)
+  local w = (arg or ""):lower()
+  if ns.Challenges.WHAT[w] then return w end
+  local list = {}
+  for k in pairs(ns.Challenges.WHAT) do list[#list + 1] = k end
+  table.sort(list)
+  ns:Debug(L.DEV_BREAK_USAGE:format(table.concat(list, ", ")))
+  return nil
+end
+
 function D:HeroMore(f, full, what, arg)
   local me = ns.Me()
   local target = arg ~= "" and arg and ns.FullName(ns.CleanName(arg)) or me
@@ -238,6 +259,22 @@ function D:HeroMore(f, full, what, arg)
   elseif what == "swap" then
     -- They play another character on their account: /jtf debug hero <Name> swap <Alt>
     op(f, full, { k = "swap", name = target ~= me and target or ns.FullName(ns.Short(full) .. "alt"), class = self:PretendClass(full), level = UnitLevel("player") })
+  elseif what == "fall" then
+    -- They die under a survival challenge (SPEC §9): at their level, where you are, fighting a Defias Pillager.
+    op(f, full, { k = "fell", n = ns.Challenges:FallsOf(f, full) + 1, lvl = ns.Hero:Level(f, full),
+      zone = GetZoneText and GetZoneText() or nil, foe = L.DEV_FOE })
+  elseif what == "break" then
+    -- They break a challenge's rule (SPEC §9): /jtf debug hero <Name> break taxi|trade|gear|quest|...
+    local w = breakWhat(arg)
+    if w then op(f, full, { k = "broke", what = w, x = D.BreakX(w) }) end
+  elseif what == "ring" then
+    -- Lord of the Rings: they find the Ring, or it ends: /jtf debug hero <Name> ring [done|lost]
+    local a = (arg or ""):lower()
+    if a == "done" or a == "lost" then op(f, full, { k = "ringend", state = a })
+    else op(f, full, { k = "ring", item = L.DEV_RING, guid = "dev-ring" }) end
+  elseif what == "friend" then
+    -- They become a Friend of the fellowship, or play on as an Adventurer: /jtf debug hero <Name> friend [off]
+    op(f, full, { k = "friend", name = full, on = (arg or ""):lower() ~= "off", level = ns.Hero:Level(f, full) })
   elseif what == "clash" or what == "gap" then
     -- Sync edge cases: a change made at the same time as one of yours (same version), or one after a change you
     -- missed (version two ahead: your client asks for the whole fellowship).
@@ -533,6 +570,18 @@ function D:Command(msg)
     ns:Debug(L.DEV_COMBAT:format(ns.Combat.simulated and L.ON or L.OFF))
   elseif cmd == "toast" then
     ns.Toasts:Example()
+  elseif cmd == "fall" then
+    -- You die, as the game's PLAYER_DEAD (the first to fall, the tally, and a survival challenge's fall).
+    ns.Firsts:Fell()
+  elseif cmd == "break" then
+    -- You break a challenge's rule, as Fellowship/ChallengeWatch.lua would notice it: /jtf break taxi|trade|gear|...
+    local w = breakWhat(a)
+    if w then ns.ChallengeWatch.Broke(w, D.BreakX(w)) end
+  elseif cmd == "ring" then
+    -- Lord of the Rings: you find the Ring, or it ends: /jtf ring [done|lost]
+    local x = a:lower()
+    if x == "done" or x == "lost" then ns.Fellowship:Do({ k = "ringend", state = x })
+    else ns.Fellowship:Do({ k = "ring", item = L.DEV_RING, guid = "dev-ring" }) end
   elseif cmd == "session" then
     self:Session()
   elseif cmd == "share" then

@@ -168,8 +168,31 @@ function JED.New(left, right, lw, rw, src)
     seg.n = UI.Text(seg, 11, "white", "title", "CENTER")
     seg.n:SetPoint("CENTER", 0, 0)
     seg:SetScript("OnClick", function() src.setSel(seg.i) end)
+    -- Pointing at a part names its chapter and levels (the narrow ones at the end carry no number; U11).
+    seg:SetScript("OnEnter", function(self)
+      local c = self.c
+      if not c then return end
+      GameTooltip:SetOwner(self, "ANCHOR_TOP")
+      GameTooltip:SetText(L.CHAPTER_ROMAN:format(ns.Journey.Roman(self.i)) .. ": " .. (c.name or ""), 1, 1, 1)
+      GameTooltip:AddLine(L.CH_LEVELS:format(c.floor, c.cap), 0.9, 0.8, 0.6)
+      GameTooltip:Show()
+    end)
+    seg:SetScript("OnLeave", function() GameTooltip:Hide() end)
     ed.segs[i] = seg
   end
+  -- The chosen chapter enlarged where the parts are too narrow for its number (chapters XI-XV squeezed together at the
+  -- end of the ruler; U11, 31 Oct 2026): a taller, wider part over the track with its number. It takes no clicks.
+  ed.lens = CreateFrame("Frame", nil, ed.ruler)
+  ed.lens:SetFrameLevel(ed.ruler:GetFrameLevel() + 6)
+  ed.lens.edge = UI.Solid(ed.lens, "BACKGROUND", "FFE08A")
+  ed.lens.edge:SetPoint("TOPLEFT", -1, 1); ed.lens.edge:SetPoint("BOTTOMRIGHT", 1, -1)
+  ed.lens.fill = ed.lens:CreateTexture(nil, "ARTWORK")
+  ed.lens.fill:SetAllPoints(); ed.lens.fill:SetTexture(ns.WHITE)
+  ed.lens.fill:SetVertexColor(ns.Hex(Theme.ACCENT.leader))
+  ed.lens.n = UI.Text(ed.lens, 13, "white", "title", "CENTER")
+  ed.lens.n:SetPoint("CENTER", 0, 0)
+  ed.lens.n:SetShadowOffset(1, -1); ed.lens.n:SetShadowColor(0, 0, 0, 0.8)
+  ed.lens:Hide()
   -- Level marks under the ruler: a short one every 5 levels, a long one every 10, up to the game's cap (30 Oct 2026:
   -- Forever 60, retail 80; marks past the ruler's end are hidden).
   ed.marks = {}
@@ -613,7 +636,22 @@ function JED:Refresh()
       local w = math.max(10, xOf(c.cap) - xOf(c.floor) - 1)
       seg:ClearAllPoints(); seg:SetPoint("TOPLEFT", self.ruler, "TOPLEFT", math.min(xOf(c.floor), rulerW - w), 0)
       seg:SetSize(w, RULER_H)
+      seg.c = c
       seg.n:SetText(w >= 22 and ns.Journey.Roman(i) or "")
+      if i == sel then
+        -- Too narrow for its number: the lens, centred on it and kept on the ruler.
+        local lensW = math.max(w, 40)
+        self.lens:SetShown(w < 34)
+        if w < 34 then
+          local cx = math.min(xOf(c.floor), rulerW - w) + w / 2
+          self.lens:SetSize(lensW, RULER_H + 8)
+          self.lens:ClearAllPoints()
+          self.lens:SetPoint("LEFT", self.ruler, "LEFT", ns.Clamp(cx - lensW / 2, 0, rulerW - lensW), 0)
+          self.lens.n:SetText(ns.Journey.Roman(i))
+          -- Its own part under the lens carries no number: "XV" stood twice (check of 31 Oct 22:14).
+          seg.n:SetText("")
+        end
+      end
       -- Dark numbers on the pale chapters, white on the chosen one (white on yellow could not be read; 28 Oct 2026).
       -- The chosen one lies above its neighbours, so its bright edge shows on both sides.
       seg:SetFrameLevel(self.ruler:GetFrameLevel() + (i == sel and 2 or 1))

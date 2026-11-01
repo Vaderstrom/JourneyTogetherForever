@@ -28,6 +28,14 @@ function F:Count(f)
   return n
 end
 
+-- The Adventurers and the Friends of the fellowship apart (the Adventurers page counts them so, SPEC §1.1).
+function F:Friends(f)
+  local n = 0
+  for _, m in pairs(f.members) do if m.friend then n = n + 1 end end
+  return n
+end
+function F:Adventurers(f) return self:Count(f) - self:Friends(f) end
+
 -- Sorted member names: the leader, then the Adventurers, each by name.
 function F:Members(f)
   local list = {}
@@ -124,6 +132,8 @@ function F:Sanitize(f)
   f.officers = {}
   f.invites = type(f.invites) == "table" and f.invites or {}
   f.inviteFrom = type(f.inviteFrom) == "table" and f.inviteFrom or {}
+  -- Invited as a Friend of the fellowship (SPEC §1.1): name = true.
+  f.inviteFriend = type(f.inviteFriend) == "table" and f.inviteFriend or {}
   f.rules = R.Clean(f.rules)
   f.chronicle = type(f.chronicle) == "table" and f.chronicle or {}
   f.heroes = type(f.heroes) == "table" and f.heroes or {}
@@ -134,6 +144,7 @@ function F:Sanitize(f)
   f.votes = type(f.votes) == "table" and f.votes or {}
   f.reached = tonumber(f.reached) and math.floor(f.reached) or nil
   f.reopenV = tonumber(f.reopenV)
+  f.founded = tonumber(f.founded)
   f.undone = type(f.undone) == "table" and f.undone or {}
   f.history = cleanHistory(f.history)
   f.ticks = type(f.ticks) == "table" and f.ticks or {}
@@ -145,27 +156,41 @@ function F:Sanitize(f)
   f.seen = seen
   f.journey = ns.Journey.Clean(f.journey) or ns.BuildJourney("classic")
   ns.Journey.MigrateKeys(f)
-  for name, m in pairs(f.members) do if type(m) ~= "table" then f.members[name] = { role = "DPS" } end end
+  -- Challenges chosen at founding, turned off since, the falls, broken rules, the Ring and the race (Fellowship/Challenges.lua).
+  ns.Challenges:Sanitize(f)
+  for name, m in pairs(f.members) do
+    if type(m) ~= "table" then f.members[name] = { role = "DPS" }
+    elseif m.friend ~= nil then m.friend = (m.friend and name ~= f.leader) or nil end
+  end
   return f
+end
+
+-- A Friend of the fellowship (the owner, 1 Nov 2026; SPEC §1.1): in the fellowship and in the runs, but never counted
+-- for the floor, the votes, the firsts, the tournament or the challenges. The Leader always counts.
+function F:IsFriend(f, name)
+  local m = f and f.members[name]
+  return m ~= nil and m.friend == true
 end
 
 ---------------------------------------------------------------------------
 -- Founding
 ---------------------------------------------------------------------------
--- o: name, color, emblem, role, preset, rules
+-- o: name, color, emblem, role, preset, rules, journey, challenges ({ hardcore = true, shared = 10, ... }; only now:
+-- they cannot be added later, SPEC §9)
 function F:Create(o)
   if ns.Trial() then ns:Toast(nil, L.TRIAL_T, L.TRIAL) end
   local me, now = ns.Me(), time()
   local info = self:MyInfo()
   local f = {
-    id = (UnitGUID("player") or me) .. "-" .. now, v = 1,
+    id = (UnitGUID("player") or me) .. "-" .. now, v = 1, founded = now,
     name = cleanName(o.name) or L.DEFAULT_FELLOWSHIP_NAME:format(ns.Short(me)),
     faction = (UnitFactionGroup("player")), color = validBanner(o.color) and o.color or ns.BANNERS[1][2],
     emblem = validEmblem(o.emblem) and o.emblem or ns.Emblems:First(), leader = me, officers = {},
     members = { [me] = { role = F.ROLES[o.role] and o.role or "DPS", joined = now, class = info.class, level = info.level, guild = info.guild, gm = info.gm } },
     -- (o.journey: one shaped while creating it, "Your own journey"; otherwise the preset's.)
-    invites = {}, inviteFrom = {}, rules = R.Clean(o.rules), journey = (o.journey and ns.Journey.Clean(o.journey)) or ns.BuildJourney(o.preset),
+    invites = {}, inviteFrom = {}, inviteFriend = {}, rules = R.Clean(o.rules), journey = (o.journey and ns.Journey.Clean(o.journey)) or ns.BuildJourney(o.preset),
     chronicle = {}, heroes = {}, runs = {}, kills = {}, undone = {}, history = {}, ticks = {}, seen = {}, updated = now,
+    challenges = ns.Challenges.Clean(o.challenges),
   }
   self:Log(f, L.CHR_FOUNDED:format(f.name, ns.Short(me)), now, "founded", me)
   ns.db.fellowships[f.id] = f
@@ -183,24 +208,30 @@ function F:Apply(f, op, by, t)
   if type(op) ~= "table" then return false end
   t = tonumber(t) or time()
   local k, n = op.k, op.name
+  f.inviteFriend = f.inviteFriend or {} -- (a copy from before Friends of the fellowship)
   if k == "invite" then
     if not P.Can(f, by, "invite") or type(n) ~= "string" or f.members[n] then return false end
     f.invites[n] = t
     f.inviteFrom[n] = by
+    f.inviteFriend[n] = op.friend and true or nil
     self:Log(f, L.CHR_INVITED:format(ns.Short(n)), t, "invited", n)
   elseif k == "uninvite" then
     if not P.Can(f, by, "uninvite", n) or not f.invites[n] then return false end
-    f.invites[n], f.inviteFrom[n] = nil, nil
+    f.invites[n], f.inviteFrom[n], f.inviteFriend[n] = nil, nil, nil
   elseif k == "join" then
     -- Made by the Hero who received the accept: that Hero must be allowed to invite, and the invite must exist.
     if not P.Can(f, by, "answer") or not f.invites[n] or f.members[n] or not F.ROLES[op.role] then return false end
-    f.invites[n], f.inviteFrom[n] = nil, nil
-    f.members[n] = { role = op.role, joined = t, class = op.class, level = tonumber(op.level), guild = op.guild, gm = op.gm }
-    ns.Journey:MarkNewcomer(f, n, op.level)
+    local friend = f.inviteFriend[n] or nil
+    -- (One class only and No healers are held, not marked: Fellowship/Challenges.lua.)
+    if not ns.Challenges:Allows(f, op.class, op.role, nil, friend) then return false end
+    f.invites[n], f.inviteFrom[n], f.inviteFriend[n] = nil, nil, nil
+    f.members[n] = { role = op.role, joined = t, class = op.class, level = tonumber(op.level), guild = op.guild, gm = op.gm, friend = friend }
+    -- (A Friend never counts, so never catches up either.)
+    if not friend then ns.Journey:MarkNewcomer(f, n, op.level) end
     -- "X was invited" is folded into "X joined the fellowship".
     local invited = L.CHR_INVITED:format(ns.Short(n))
     for i = #f.chronicle, 1, -1 do if f.chronicle[i].text == invited then table.remove(f.chronicle, i) end end
-    self:Log(f, L.CHR_JOINED:format(ns.Short(n)), t, "joined", n)
+    self:Log(f, (friend and L.CHR_JOINED_FRIEND or L.CHR_JOINED):format(ns.Short(n)), t, "joined", n)
   elseif k == "leave" then
     if not P.Can(f, by, "leave") then return false end
     f.members[by] = nil
@@ -210,8 +241,9 @@ function F:Apply(f, op, by, t)
     f.members[n] = nil
     self:Log(f, L.CHR_REMOVED:format(ns.Short(n)), t, "removed", n)
   elseif k == "lead" then
-    if not P.Can(f, by, "lead", n) then return false end
+    if not P.Can(f, by, "lead", n) or not F:CanLead(f, n) then return false end
     f.leader = n
+    f.members[n].friend = nil -- the Leader always counts
     self:Log(f, L.CHR_LEADS:format(ns.Short(n)), t, "leads", n)
   elseif k == "rename" then
     local name = cleanName(op.name)
@@ -245,16 +277,33 @@ function F:Apply(f, op, by, t)
     -- Role and secondary role ("" for none); the secondary role cannot be the same as the role.
     local second = op.second or ""
     if not P.Can(f, by, "roles", n) or not F.ROLES[op.role] or (second ~= "" and (not F.ROLES[second] or second == op.role)) then return false end
+    local m = f.members[n]
+    if not ns.Challenges:Allows(f, m.class, op.role, second, m.friend) then return false end
     f.members[n].role, f.members[n].second = op.role, second ~= "" and second or nil
   elseif k == "away" then
     -- Away by yourself ("self") or marked by the leader ("forced"); on = false clears it.
     if not P.Can(f, by, "away", n) then return false end
     f.members[n].away = op.on and (by == n and "self" or "forced") or nil
+  elseif k == "friend" then
+    -- Become a Friend of the fellowship, or play on as an Adventurer: yourself only, and never the Leader. (Back only
+    -- at or below the chapter's cap is the page's rule, F:SetFriend: a copy that saw another level must not refuse it.)
+    if not P.Can(f, by, "friend", n) or not f.members[n] then return false end
+    local on = op.on and true or nil
+    if f.members[n].friend == on then return false end
+    local m = f.members[n]
+    if not on and not ns.Challenges:Allows(f, m.class, m.role, m.second) then return false end
+    f.members[n].friend = on
+    -- Counting again starts from where they stand: a catch-up if they are below the floor.
+    f.members[n].catching = nil
+    if not on then ns.Journey:MarkNewcomer(f, n, tonumber(op.level) or ns.Hero:Level(f, n)) end
+    self:Log(f, (on and L.CHR_FRIEND_ON or L.CHR_FRIEND_OFF):format(ns.Short(n)), t, on and "friendon" or "friendoff", n)
   elseif k == "swap" then
-    -- Play another character on the same account: it takes this Hero's place, rank and roles.
-    if not P.Can(f, by, "swap") or type(n) ~= "string" or f.members[n] or f.invites[n] then return false end
+    -- Play another character on the same account: it takes this Hero's place, rank and roles. Not a Fallen one's:
+    -- they stay, honoured, and a new character joins by invitation (SPEC §9).
+    if not P.Can(f, by, "swap") or type(n) ~= "string" or f.members[n] or f.invites[n] or ns.Challenges:Fallen(f, by) then return false end
     local m = f.members[by]
-    f.members[n] = { role = m.role, second = m.second, joined = m.joined, class = op.class, level = tonumber(op.level) }
+    if not ns.Challenges:Allows(f, op.class, m.role, m.second, m.friend) then return false end
+    f.members[n] = { role = m.role, second = m.second, joined = m.joined, class = op.class, level = tonumber(op.level), friend = m.friend }
     ns.Journey:MarkNewcomer(f, n, op.level)
     f.members[by] = nil
     if f.leader == by then f.leader = n end
@@ -262,19 +311,21 @@ function F:Apply(f, op, by, t)
     self:Log(f, L.CHR_SWAP:format(ns.Short(by), ns.Short(n)), t, f.leader == n and "swapleader" or "swap", n)
   elseif k == "tourney" then
     -- The Guild Master tournament: start, sign up, a duel won, sign-up or a round over (Fellowship/Tourney.lua).
-    if not P.Rank(f, by) or not ns.Tourney:Apply(f, op, by, t) then return false end
+    if not P.Rank(f, by) or self:IsFriend(f, by) or not ns.Tourney:Apply(f, op, by, t) then return false end
   elseif k == "gather" then
     -- Gatherings (Fellowship/Gatherings.lua): any Hero schedules, answers for themselves; organizer, leader and
     -- the leader cancel.
     if not P.Rank(f, by) or not ns.Gatherings:Apply(f, op, by, t) then return false end
   elseif k == "vote" then
     -- Rule votes (Fellowship/Votes.lua): any Hero proposes and votes; a majority changes the rule.
-    if not P.Rank(f, by) or not ns.Votes:Apply(f, op, by, t) then return false end
+    -- (Not a Friend of the fellowship: the rules are the counted Adventurers'.)
+    if not P.Rank(f, by) or self:IsFriend(f, by) or not ns.Votes:Apply(f, op, by, t) then return false end
   elseif k == "takeover" then
     -- The longest-serving Adventurer takes over when the leader has not been seen for the rule's days (Progress.lua).
     if not ns.Progress:CanTakeOver(f, by) then return false end
     local old = f.leader
     f.leader = by
+    f.members[by].friend = nil
     self:Log(f, L.CHR_TAKEOVER:format(ns.Short(by), ns.Short(old), f.rules.takeover), t, "takeover", by)
   elseif k == "tick" then
     -- A milestone ticked off by hand (Rules/Milestones.lua): the leader.
@@ -286,6 +337,22 @@ function F:Apply(f, op, by, t)
     -- Mark cleared, Undo clear, one Hero's clear (Fellowship/Clears.lua): the leader.
     if not P.Can(f, by, "clears") or type(op.key) ~= "string" or not ns.Endgame:Tracked(f, op.key) then return false end
     if not ns.Clears:ApplyOp(f, op, by, t) then return false end
+  elseif k == "fell" then
+    -- An Adventurer's own death, under a survival challenge (Fellowship/Challenges.lua): only they record it.
+    if not P.Rank(f, by) or not ns.Challenges:ApplyFall(f, by, op, t) then return false end
+  elseif k == "broke" then
+    -- An Adventurer broke one of the challenges' rules (Fellowship/ChallengeWatch.lua): only they record it.
+    if not P.Rank(f, by) or not ns.Challenges:ApplyBreak(f, by, op, t) then return false end
+  elseif k == "ring" or k == "ringend" then
+    -- Lord of the Rings: the Ring found, destroyed or lost, by its finder (Fellowship/ChallengeWatch.lua).
+    local C = ns.Challenges
+    if not P.Rank(f, by) or not (k == "ring" and C:ApplyRing(f, by, op, t) or k == "ringend" and C:ApplyRingEnd(f, by, op, t)) then return false end
+  elseif k == "raced" then
+    -- Race to 60: everyone reached the cap (any Adventurer's addon sees it first).
+    if not P.Rank(f, by) or not ns.Challenges:ApplyRace(f, by, op, t) then return false end
+  elseif k == "chaloff" then
+    -- The Leader turns a challenge off: for good (it cannot be added again).
+    if not P.Can(f, by, "rules") or not ns.Challenges:ApplyOff(f, by, op, t) then return false end
   else
     return false
   end
@@ -329,7 +396,7 @@ end
 ---------------------------------------------------------------------------
 -- Returns "sent", "member", "invited", "realm" (a realm messages cannot reach), "busy" (messages are not allowed now:
 -- a fight, a dungeon) or nil (not allowed / no name). Whether it arrived comes a few seconds later (Fellowship/Sync.lua).
-function F:Invite(text)
+function F:Invite(text, friend)
   local f = self:Current()
   local name = ns.FullName(ns.CleanName(text))
   if not f or not name or not P.Can(f, ns.Me(), "invite") then return nil end
@@ -349,7 +416,7 @@ function F:Invite(text)
     ns:Toast(nil, L.ALREADY_INVITED, L.ALREADY_INVITED_TEXT:format(ns.Short(name)))
     return "invited"
   end
-  if not self:Do({ k = "invite", name = name }) then return nil end
+  if not self:Do({ k = "invite", name = name, friend = friend and true or nil }) then return nil end
   ns.Sync:SendInvite(f, name)
   return "sent"
 end
@@ -381,9 +448,16 @@ function F:AcceptInvite(fid, role)
     ns:Toast(nil, L.ACCEPT_FAILED, L.ACCEPT_BUSY)
     return
   end
+  -- One class only and No healers: the invite says so, and the inviter's addon would refuse it anyway.
+  local info = self:MyInfo()
+  local ok, why = ns.Challenges:Allows({ challenges = { oneclass = inv.oneclass, nohealers = inv.nohealers } }, info.class,
+    F.ROLES[role] and role or "DPS", nil, inv.friend)
+  if not ok then
+    ns:Toast(nil, L.ACCEPT_FAILED, why)
+    return false
+  end
   local p = { from = inv.from }
   self.pendingJoin[fid] = p
-  local info = self:MyInfo()
   ns.Comm:Send(inv.from, "ACC", { fid = fid, role = F.ROLES[role] and role or "DPS", class = info.class, level = info.level, guild = info.guild, gm = info.gm }, true)
   ns.char.invites[fid] = nil
   C_Timer.After(ns.Sync.ACCEPT_WAIT, function()
@@ -403,19 +477,28 @@ function F:DeclineInvite(fid)
   self:Changed()
 end
 
--- Who leads when the leader leaves: the Adventurer who joined first (those who are away last; ties by name). nil
--- when the leader is the only one.
+-- Who leads when the leader leaves: the Adventurer who joined first (those who are away last, Friends of the
+-- fellowship after them, the Fallen last of all; ties by name). nil when the leader is the only one.
+-- (A Fallen was next to lead: "Brannic leads the fellowship after you"; seen in the check of 1 Nov 2026, 11:30.)
 function F:Successor(f)
   local best, bestKey
   for name, m in pairs(f.members) do
-    if name ~= f.leader then
-      local key = { m.away and 1 or 0, m.joined or 0, name }
+    if name ~= f.leader and self:CanLead(f, name) then
+      local fallen = f.falls and ns.Challenges:Fallen(f, name)
+      local key = { (fallen and 3) or (m.friend and 2) or (m.away and 1) or 0, m.joined or 0, name }
       if not best or key[1] < bestKey[1] or (key[1] == bestKey[1] and (key[2] < bestKey[2] or (key[2] == bestKey[2] and key[3] < bestKey[3]))) then
         best, bestKey = name, key
       end
     end
   end
   return best
+end
+
+-- May name lead f? Not a Friend of the fellowship of another class under One class only, or a Healer under No
+-- healers: the Leader always counts (Fellowship/Challenges.lua).
+function F:CanLead(f, name)
+  local m = f.members[name]
+  return m ~= nil and (not m.friend or ns.Challenges:Allows(f, m.class, m.role, m.second))
 end
 
 -- Leaving. A leader hands the fellowship to F:Successor first, so it goes on for everyone else; a leader who is the
@@ -452,6 +535,27 @@ function F:SetRules(rules) return self:Do({ k = "rules", rules = rules }) end
 function F:Disband() return yourself(function() return self:Do({ k = "disband" }) end) end
 function F:SetRoles(name, role, second) return self:Do({ k = "role", name = name, role = role, second = second or "" }) end
 function F:SetAway(name, on) return self:Do({ k = "away", name = name, on = on and true or false }) end
+
+-- Become a Friend of the fellowship (on), or play on as an Adventurer. Returns true, or false and why: "leader" (the
+-- Leader always counts), "cap" (back only at or below the current chapter's cap, so nobody skips ahead), "fallen".
+function F:FriendBlock(f, on)
+  local me = ns.Me()
+  if not f or not f.members[me] then return "none" end
+  if f.leader == me then return "leader" end
+  if ns.Challenges:Fallen(f, me) then return "fallen" end
+  if not on then
+    local ch = ns.Journey:Current(f)
+    if ch and ns.Hero:Level(f, me) > ch.cap + f.rules.capTol then return "cap" end
+  end
+  return nil
+end
+
+function F:SetFriend(on)
+  local f = self:Current()
+  local why = self:FriendBlock(f, on)
+  if why then return false, why end
+  return self:Do({ k = "friend", name = ns.Me(), on = on and true or false, level = ns.Hero:Level(f, ns.Me()) })
+end
 function F:Tick(id, on) return self:Do({ k = "tick", id = id, on = on and true or false }) end
 
 -- Play another character (27 Oct 2026): from the alt, not the main. While you play an alt, Your characters offers
@@ -469,6 +573,10 @@ function F:CanTake(main)
   local own = self:Current()
   if own then return false, L.TAKE_LEAVE_FIRST:format(own.name) end
   if f.faction and f.faction ~= UnitFactionGroup("player") then return false, L.TAKE_FACTION:format(f.faction) end
+  if ns.Challenges:Fallen(f, main) then return false, L.TAKE_FALLEN:format(ns.Short(main)) end
+  local m, _, class = f.members[main], UnitClass("player")
+  local ok, why = ns.Challenges:Allows(f, class, m.role, m.second, m.friend)
+  if not ok then return false, why end
   return true
 end
 
@@ -519,9 +627,12 @@ function F:TournamentState(f)
   if not f.rules.gmT then return "off" end
   local guild, gm = nil, false
   for _, m in pairs(f.members) do
-    if not m.guild or (guild and m.guild ~= guild) then return "paused-guild" end
-    guild = m.guild
-    if m.gm then gm = true end
+    -- (A Friend of the fellowship is not in the tournament, so not in its guild rule either.)
+    if not m.friend then
+      if not m.guild or (guild and m.guild ~= guild) then return "paused-guild" end
+      guild = m.guild
+      if m.gm then gm = true end
+    end
   end
   return gm and "on" or "paused-gm", guild
 end
@@ -537,8 +648,9 @@ function F:Context()
   local me = ns.Me()
   local rank = P.Rank(f, me)
   return {
-    inFellow = true, f = f, me = me, isLeader = rank == "leader",
-    tActive = self:TournamentState(f) == "on", name = f.name, color = f.color, emblem = f.emblem, heroes = self:Count(f),
+    inFellow = true, f = f, me = me, isLeader = rank == "leader", isFriend = self:IsFriend(f, me),
+    tActive = self:TournamentState(f) == "on", name = f.name, color = f.color, emblem = f.emblem,
+    heroes = self:Adventurers(f), friends = self:Friends(f),
     chapter = self:CurrentChapter(f),
   }
 end

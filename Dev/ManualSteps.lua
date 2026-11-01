@@ -25,6 +25,22 @@ local function member(name)
   return f ~= nil and f.members[full(name)] ~= nil
 end
 
+-- Challenges for a test step (nil: none), with nothing broken yet; and what broke one of them.
+local function trial(ch)
+  local f = cur()
+  if not f then return end
+  f.challenges, f.challengesOff, f.falls, f.broken, f.ring, f.race = ch and ns.Challenges.Clean(ch), nil, nil, nil, nil, nil
+  ns.Window:Refresh()
+end
+local function brokeBy(key)
+  return function()
+    local f = cur()
+    local e = f and ns.Challenges:Broke(f, ns.Me(), key)
+    if not e then return false, "not broken (yet)" end
+    return true, ns.Challenges:BreakText(e)
+  end
+end
+
 local function realms()
   local list = GetAutoCompleteRealms and GetAutoCompleteRealms() or {}
   ns:Print(#list > 0 and table.concat(list, ", ") or "(no connected realms: only your own)", true)
@@ -270,7 +286,7 @@ ns.ManualSteps = {
       return n > 0, n .. " sessions kept"
     end },
   { id = "share", section = "Playing together",
-    todo = "Adventurers page: under the name box, click Friend without the addon? Share it. Then press Whisper the link with a friend's name, and press Escape in the chat box (nothing is sent).",
+    todo = "Adventurers page: under the name box, click Someone without the addon? Share it. Then press Whisper the link with a friend's name, and press Escape in the chat box (nothing is sent).",
     see = "The window: the addon's page (Ctrl+C copies it) and Whisper the link; the chat box opens with /w and the link. /jtf debug share shows the window an unanswered invite opens.",
     cmds = { "/jtf debug share Kim" } },
   { id = "milestone-pick", section = "Playing together",
@@ -279,6 +295,70 @@ ns.ManualSteps = {
     cmds = { "/jtf debug hero Brannic quests" } },
   { id = "week", section = "Playing together", todo = "Open Gatherings.",
     see = "The right page: The week ahead, seven days, each with its Gatherings or Schedule; Schedule opens the form at that day. Long lists fade at their lower edge while there is more below." },
+
+  -- Challenges (SPEC §9): a real death, which /jtf check cannot do. Shows whether the game's Death Recap or your
+  -- target gives the addon the foe (the game no longer tells an addon who killed you).
+  { id = "real-death", section = "Challenges",
+    todo = "Press Hardcore for this test, target an enemy and let it kill you (a low-level character is quickest). Release, then press Back to normal.",
+    see = "A toast \"You have fallen\" with your level, the place and \"fighting\" the enemy you had targeted; your card on the Adventurers page says Fallen with the same; the Chronicle has the memorial line.",
+    cmds = {
+      { "Hardcore for this test", function() local f = cur(); if f then f.challenges, f.challengesOff, f.falls = { hardcore = true }, nil, nil end end },
+      { "Back to normal", function() local f = cur(); if f then f.challenges, f.challengesOff, f.falls = nil, nil, nil end end },
+    },
+    auto = function()
+      local f = cur()
+      local e = f and ns.Challenges:Fallen(f, ns.Me())
+      if not e then return false, "not fallen (yet)" end
+      return e.foe ~= nil, ("fallen at level %s in %s, foe: %s; the Death Recap gives: %s"):format(tostring(e.lvl), tostring(e.zone),
+        tostring(e.foe), tostring((ns.Challenges.Recap())))
+    end },
+
+  -- X3-X5: what breaks a rule happens in the game, so these are real deeds. Each button sets the test fellowship's
+  -- challenges for the step (and clears what was broken); Back to normal takes them off again.
+  { id = "real-walk", section = "Challenges",
+    todo = "Press Walk everywhere for this test, then take a flight path (or use your hearthstone).",
+    see = "A toast \"You broke a challenge\": you took a flight path (or used a hearthstone), breaking Walk everywhere; the Chronicle has the line, your card says Broke Walk everywhere.",
+    cmds = { { "Walk everywhere for this test", function() trial({ walk = true }) end }, { "Back to normal", function() trial(nil) end } },
+    auto = brokeBy("walk") },
+  { id = "real-gear-gold", section = "Challenges",
+    todo = "Press White gear and Pauper for this test (a limit of 1 gold), put on a green item and hold more than 1 gold.",
+    see = "Two toasts: you put on the item, breaking White gear only; you held more than 1 gold, breaking Pauper.",
+    cmds = { { "White gear and Pauper for this test", function() trial({ white = true, pauper = 1 }) end }, { "Back to normal", function() trial(nil) end } },
+    auto = function()
+      local f = cur()
+      local w, p = f and ns.Challenges:Broke(f, ns.Me(), "white"), f and ns.Challenges:Broke(f, ns.Me(), "pauper")
+      return w ~= nil and p ~= nil, ("White gear only: %s; Pauper: %s"):format(w and (w.x or "?") or "not yet", p and (p.x or "?") or "not yet")
+    end },
+  { id = "real-ironman", section = "Challenges",
+    todo = "Press Ironman for this test, then do one of: spend a talent point, learn a profession, drink a potion, or eat food until Well Fed. Press Ironman again before the next (it clears the break).",
+    see = "Each time a toast: breaking Ironman Fellowship, with what you did. A specialization alone breaks nothing.",
+    cmds = { { "Ironman for this test", function() trial({ ironman = true }) end }, { "Back to normal", function() trial(nil) end } },
+    auto = brokeBy("ironman") },
+  { id = "real-quest-xp", section = "Challenges",
+    todo = "Press Questless and Dungeons only for this test, turn in a quest outside a dungeon, then kill something outside one.",
+    see = "Questless broken by the quest (an attunement or a key would not); Dungeons only broken by the experience, once a dungeon of the journey is open (before that, nothing).",
+    cmds = { { "Questless and Dungeons only for this test", function() trial({ questless = true, dungeons = true }) end }, { "Back to normal", function() trial(nil) end } },
+    auto = function()
+      local f = cur()
+      local q, x = f and ns.Challenges:Broke(f, ns.Me(), "questless"), f and ns.Challenges:Broke(f, ns.Me(), "dungeons")
+      return q ~= nil and x ~= nil, ("Questless: %s; Dungeons only: %s (dungeons begun: %s)"):format(q and (q.x or "?") or "not yet",
+        x and (x.x or "?") or "not yet", tostring(f and ns.ChallengeWatch.DungeonsBegun(f)))
+    end },
+  { id = "real-ring", section = "Challenges",
+    todo = "Press Lord of the Rings for this test, then buy a ring from a vendor or loot one. Then sell or destroy it here, outside Blackrock Mountain.",
+    see = "\"The Ring is found\" (you are its bearer, the card says Ring-bearer); then \"The Ring is lost\". A ring from a quest or the auction house is no Ring. (Destroyed inside Blackrock Mountain instead: \"The Ring is destroyed\".)",
+    cmds = { { "Lord of the Rings for this test", function() trial({ ring = true }) end }, { "Back to normal", function() trial(nil) end } },
+    auto = function()
+      local f = cur()
+      local r = f and f.ring
+      if not r then return false, "no Ring yet" end
+      return r.state ~= nil, ("%s found %s; %s"):format(ns.Short(r.who), tostring(r.item), r.state or "carried")
+    end },
+  { id = "real-fellowfound", section = "Challenges",
+    todo = "Press Fellowship-found for this test, then post an item at the auction house (or take mail from someone outside the fellowship).",
+    see = "Breaking Fellowship-found: you used the auction house (or took mail from them). Only looking at the auction house breaks nothing. A trade needs a second player: docs/E2E-CHECKS.md.",
+    cmds = { { "Fellowship-found for this test", function() trial({ fellowfound = true }) end }, { "Back to normal", function() trial(nil) end } },
+    auto = brokeBy("fellowfound") },
 
   -- Sync edge cases
   { id = "sync-line", section = "Sync edge cases", todo = "Show the sync state.",

@@ -48,7 +48,7 @@ local function refresh(pf)
     if not c then break end
     shown = i
     local inv = item.inv
-    c.text:SetText(L.INVITE_TEXT:format(ns.Short(inv.leader or inv.from), inv.name, inv.heroes or 1))
+    c.text:SetText((inv.friend and L.INVITE_TEXT_FRIEND or L.INVITE_TEXT):format(ns.Short(inv.leader or inv.from), inv.name, inv.heroes or 1))
     local th = c.text:GetStringHeight()
     c.accept:ClearAllPoints(); c.accept:SetPoint("TOPLEFT", 12, -(th + 22))
     c.decline:ClearAllPoints(); c.decline:SetPoint("LEFT", c.accept, "RIGHT", 8, 0)

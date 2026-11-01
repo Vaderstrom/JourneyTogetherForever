@@ -167,6 +167,8 @@ local function refreshYou(c, f, watching)
     local function at(v) return ns.Clamp((v - lo) / (hi - lo), 0, 1) end
     local p = at(lvl + frac)
     local color = lvl < fl and "B0321E" or (lvl > cap + f.rules.capTol and "C0392B" or (lvl >= cap and "B8742A" or "2E7A3E"))
+    -- (A Friend of the fellowship is never behind or over: their own calm colour, SPEC §1.1.)
+    if y.friend then color = Hr.FRIEND end
     c.lvl:SetText(lvl)
     c.lvl:ClearAllPoints(); c.lvl:SetPoint("TOPLEFT", c, "TOPLEFT", 12, -(top - 2))
     c.lvlKey:ClearAllPoints(); c.lvlKey:SetPoint("TOP", c.lvl, "BOTTOM", 0, -1)
@@ -363,6 +365,47 @@ local function refreshGatherings(b, f, stack)
   stack:Place(b, h, 6)
 end
 
+-- Shared lives (SPEC §9): how many are left, as a row of candles (UI.Lives) the whole fellowship watches; the
+-- tooltip names each life lost. A click opens the rulebook, where the Challenges article is.
+local function buildLives(parent, width)
+  local b = CreateFrame("Button", nil, parent)
+  b:SetSize(width, 52)
+  b.icon = UI.Round(b, "ARTWORK", 22)
+  b.icon:SetPoint("TOPLEFT", 0, -2)
+  UI.SetIcon(b.icon, ns.ICONS.chal_shared)
+  local open = function() ns.Window:ShowPage("rules") end
+  b.more = UI.TextButton(b, L.LIVES_OPEN, open, "link", 13)
+  b.more:SetPoint("TOPRIGHT", 0, -2)
+  b.text = UI.Text(b, 13, "ink", "book")
+  b.text:SetPoint("TOPLEFT", 30, -5)
+  b.candles = UI.Lives(b, width - 30)
+  b.candles:SetPoint("TOPLEFT", 30, -26)
+  b.candles.onClick = open
+  local hl = b:CreateTexture(nil, "HIGHLIGHT")
+  hl:SetAllPoints(); hl:SetColorTexture(1, 0.9, 0.6, 0.1)
+  b:SetScript("OnClick", open)
+  return b
+end
+
+local function refreshLives(b, f, stack)
+  local v = ns.Challenges:LivesView(f)
+  b:SetShown(v ~= nil)
+  if not v then return end
+  b.text:SetText(v.title)
+  b.candles:SetTip(v.title, v.lines)
+  local h = 26 + b.candles:Set(v.total, v.left) + 4
+  -- A life lost since you last looked: its candle goes out now, once (remembered for each fellowship, by this
+  -- character). Not for the walkthrough's sample.
+  if not f.sample then
+    ns.char.livesSeen = type(ns.char.livesSeen) == "table" and ns.char.livesSeen or {}
+    local seen = tonumber(ns.char.livesSeen[f.id])
+    if seen and v.left < seen then b.candles:Snuff(seen, v.left) end
+    ns.char.livesSeen[f.id] = v.left
+  end
+  b:SetHeight(h)
+  stack:Place(b, h, 6)
+end
+
 local function build(pf)
   local W = ns.Window
   local width = W.PAGE_W - 8
@@ -374,6 +417,7 @@ local function build(pf)
   pf.you = buildYou(Lc, width)
   pf.start = buildStart(Lc, width)
   pf.gather = buildGatherings(Lc, width)
+  pf.lives = buildLives(Lc, width)
   pf.contents = UI.Text(Lc, 12, "ink2")
   pf.contents:SetText(L.CONTENTS)
   pf.tocDone = UI.TextButton(Lc, "", function() pf.allCh = true; W:Refresh() end, "link", 13)
@@ -483,6 +527,7 @@ local function refresh(pf, ctx)
   end
   pf.gather:SetShown(not ctx.watching)
   if not ctx.watching then refreshGatherings(pf.gather, f, s) end
+  refreshLives(pf.lives, f, s)
   s:Skip(10)
   s:Place(pf.contents, 16, 4)
   -- Done chapters fold into one line and only the next few show, unless the player opens them all (fourteen rows

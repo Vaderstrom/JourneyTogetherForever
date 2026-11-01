@@ -32,7 +32,10 @@ end
 -- Signed-up Heroes, in the order they signed up.
 function Tn:Signed(f, t)
   local list = {}
-  for name, at in pairs(t.signed or {}) do if f.members[name] then list[#list + 1] = { name = name, at = at } end end
+  for name, at in pairs(t.signed or {}) do
+    local m = f.members[name]
+    if m and not m.friend then list[#list + 1] = { name = name, at = at } end
+  end
   table.sort(list, function(a, b) if a.at ~= b.at then return a.at < b.at end return a.name < b.name end)
   local out = {}
   for i, x in ipairs(list) do out[i] = x.name end

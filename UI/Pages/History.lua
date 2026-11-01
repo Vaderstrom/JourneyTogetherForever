@@ -4,7 +4,7 @@
 local _, ns = ...
 local L = ns.L
 local UI = ns.UI
-local F = ns.Fellowship
+local F, J, Theme = ns.Fellowship, ns.Journey, ns.Theme
 
 local FILTERS = { { L.HI_ALL, "all" }, { L.HI_MEMBERS, "members" }, { L.HI_RULES, "rules" }, { L.HI_EVENTS, "events" } }
 -- The icon of each kind of line (older lines without a kind: the page's own).
@@ -40,6 +40,24 @@ local function founded(f)
   return tonumber(tostring(f.id):match("%-(%d+)$")), nil
 end
 
+-- The chapters reached so far and the day each began (U9, 31 Oct 2026): the first chapter when the fellowship was
+-- founded, every later one at its first "chapter" line in the journey's History (a chapter opened again after an Undo
+-- keeps its first day). Oldest first: { { n, name, time } }; time nil when no line says.
+function ns.HistoryChapters(f, foundedAt)
+  local chapters = f.journey and f.journey.chapters or {}
+  local cur = math.min(ns.Journey:CurrentIndex(f), #chapters)
+  local first = {}
+  for _, e in ipairs(f.history or {}) do
+    local n = e.type == "chapter" and tonumber(e.ch)
+    if n and (not first[n] or e.time < first[n]) then first[n] = e.time end
+  end
+  local out = {}
+  for n = 1, cur do
+    out[#out + 1] = { n = n, name = chapters[n] and chapters[n].name or "", time = n == 1 and foundedAt or first[n] }
+  end
+  return out
+end
+
 local function build(pf)
   local W = ns.Window
   local width = W.PAGE_W - 8
@@ -70,17 +88,29 @@ local function build(pf)
   pf.head = UI.Heading(R, width, L.HI_SO_FAR, nil, 20)
   pf.founded = UI.WrapText(R, 14, "ink", width, "book")
   pf.founded:SetJustifyH("CENTER")
+  -- Number tiles (U6, UI.NumberTile): Adventurers now, have joined (the invitation), have left, Gatherings.
   pf.stats = {}
-  for i = 1, 4 do
-    local box = UI.Card(R)
-    box:SetSize((width - 8) / 2, 58)
-    box.v = UI.Text(box, 22, "ink", "title", "CENTER")
-    box.v:SetPoint("TOP", 0, -8)
-    box.k = UI.Text(box, 12, "ink2", "body", "CENTER")
-    box.k:SetPoint("TOP", box.v, "BOTTOM", 0, -4)
-    box.k:SetText(L["HI_STAT_" .. i])
-    pf.stats[i] = box
+  for i, icon in ipairs({ "heroes", "inbox", "bn_away", "gatherings" }) do
+    pf.stats[i] = UI.NumberTile(R, (width - 8) / 2, 58, L["HI_STAT_" .. i], ns.ICONS[icon])
   end
+  -- The chapters so far (U9): a line down the left with a gold dot per chapter, its name and the day it began.
+  pf.chHead = UI.SectionHeader(R, width)
+  pf.chHead:SetText(L.HI_CHAPTERS)
+  pf.chRows = UI.Pool(function()
+    local d = CreateFrame("Frame", nil, R)
+    d:SetSize(width, 22)
+    d.stem = UI.Solid(d, "BORDER", "gold", 0.6)
+    d.stem:SetWidth(2); d.stem:SetPoint("TOP", d, "TOPLEFT", 10, 0); d.stem:SetPoint("BOTTOM", d, "BOTTOMLEFT", 10, 0)
+    d.dot = UI.Round(d, "ARTWORK", 10)
+    d.dot:SetPoint("CENTER", d, "LEFT", 10, 0)
+    d.n = UI.Text(d, 12, "ink2", "title")
+    d.n:SetPoint("LEFT", 26, 0)
+    d.name = UI.Text(d, 13, "ink")
+    d.name:SetPoint("LEFT", d.n, "RIGHT", 6, 0)
+    d.day = UI.Text(d, 12, "ink2", "body", "RIGHT")
+    d.day:SetPoint("RIGHT")
+    return d
+  end)
   pf.leadHead = UI.SectionHeader(R, width)
   pf.leadHead:SetText(L.HI_LEADERS)
   pf.leads = UI.Pool(function()
@@ -147,13 +177,34 @@ local function refresh(pf, ctx)
     elseif e.k == "gather" then n[4] = n[4] + 1 end
   end
   local y = r.y
-  for i, box in ipairs(pf.stats) do
-    box.v:SetText(n[i])
-    box:ClearAllPoints()
-    box:SetPoint("TOPLEFT", pf.rscroll.child, "TOPLEFT", ((i - 1) % 2) * ((width - 8) / 2 + 8), -(y + math.floor((i - 1) / 2) * 66))
-    box:Show()
+  for i, tile in ipairs(pf.stats) do
+    tile:Set(n[i])
+    tile:ClearAllPoints()
+    tile:SetPoint("TOPLEFT", pf.rscroll.child, "TOPLEFT", ((i - 1) % 2) * ((width - 8) / 2 + 8), -(y + math.floor((i - 1) / 2) * 66))
+    tile:Show()
   end
   r:Skip(132 + 10)
+  -- The chapters so far: the current one in gold with "now".
+  local chs = ns.HistoryChapters(f, t)
+  r:Place(pf.chHead, 29, 6)
+  for i, c in ipairs(chs) do
+    local d = pf.chRows:Get(i)
+    if not d then break end
+    local now = i == #chs
+    d.n:SetText(J.Roman(c.n))
+    d.name:SetText(c.name)
+    d.day:SetText(now and L.HI_CH_NOW:format(c.time and ns.Moments.Day(c.time) or "-") or (c.time and ns.Moments.Day(c.time) or ""))
+    Theme:Fill(d.dot, now and "gold" or "line", 1)
+    d.name:SetTextColor(Theme:RGBA(now and "accentText" or "ink"))
+    -- The line joins the dots: from the first dot down to the last.
+    d.stem:ClearAllPoints()
+    d.stem:SetPoint("TOP", d, "TOPLEFT", 10, i == 1 and -11 or 0)
+    d.stem:SetPoint("BOTTOM", d, "BOTTOMLEFT", 10, now and 11 or -2)
+    d.stem:SetShown(#chs > 1)
+    r:Place(d, 22, 2)
+  end
+  pf.chRows:HideFrom(#chs + 1)
+  r:Skip(10)
   r:Place(pf.leadHead, 29, 6)
   local led = leaders(f)
   local nl = 0

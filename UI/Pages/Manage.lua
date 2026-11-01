@@ -103,7 +103,7 @@ local function build(pf)
   pf.nameLabel = UI.Text(R1, 13, "ink2")
   pf.nameLabel:SetText(L.CHARACTER_NAME)
   local function send()
-    if F:Invite(pf.invite:GetText()) == "sent" then pf.invite:SetText("") end
+    if F:Invite(pf.invite:GetText(), pf.asFriendOn) == "sent" then pf.invite:SetText(""); pf.asFriendOn = nil; pf.asFriend:Refresh() end
   end
   pf.invite = UI.EditBox(R1, width - 110, 48, L.CHARACTER_NAME, send)
   -- Friends, Battle.net friends and guild members whose name starts with what is typed (online first).
@@ -117,6 +117,9 @@ local function build(pf)
   end, function(e) pf.invite:SetText(e.text) end)
   pf.invite.edit:HookScript("OnEditFocusGained", function() ns.Friends:Request() end)
   pf.send = UI.TextButton(R1, L.SEND_INVITE, send, "primary", 13)
+  -- Invite as a Friend of the fellowship (SPEC §1.1).
+  pf.asFriend = UI.LabeledCheck(R1, width, L.INVITE_AS_FRIEND, L.INVITE_AS_FRIEND_TIP,
+    function() return pf.asFriendOn end, function(on) pf.asFriendOn = on or nil end)
   -- Friends without the addon (M25): the share window, for the name in the box.
   pf.share = UI.TextButton(R1, L.SHARE_ADDON, function() ns.Share:Open(pf.invite:GetText()) end, "plain", 12)
   pf.noPerm = UI.WrapText(R1, 12, "ink2", width)
@@ -179,8 +182,8 @@ local function refresh(pf, ctx)
     if hex then r.name:SetTextColor(ns.Hex(hex)) else r.name:SetTextColor(Theme:RGBA("ink")) end
     r.level:SetText(m.level and L.LEVEL_N:format(m.level) or "")
     local isLead = name == f.leader
-    r.lead:SetText(isLead and L.RANK_LEADER or L.RANK_MEMBER)
-    r.lead:SetTextColor(Theme:RGBA(isLead and "accentText" or "ink2"))
+    r.lead:SetText(isLead and L.RANK_LEADER or (m.friend and L.RANK_FRIEND or L.RANK_MEMBER))
+    r.lead:SetTextColor(Theme:RGBA(isLead and "accentText" or (m.friend and ns.Hero.FRIEND or "ink2")))
     r.lead:Show()
     r.menu:Update()
     r:SetWidth(width)
@@ -195,12 +198,14 @@ local function refresh(pf, ctx)
   t:Place(pf.ihead, pf.ihead:GetHeight(), 4)
   local canInvite = P.Can(f, me, "invite")
   pf.noPerm:SetShown(not canInvite)
-  for _, w in ipairs({ pf.nameLabel, pf.invite, pf.send, pf.share }) do w:SetShown(canInvite) end
+  for _, w in ipairs({ pf.nameLabel, pf.invite, pf.send, pf.asFriend, pf.share }) do w:SetShown(canInvite) end
   if canInvite then
     t:Place(pf.nameLabel, 16, 2)
     local y = t.y
     t:Place(pf.invite, 28, 4)
     pf.send:ClearAllPoints(); pf.send:SetPoint("TOPRIGHT", pf.rscroll.child, "TOPRIGHT", 0, -y + 3)
+    pf.asFriend:Refresh()
+    t:Place(pf.asFriend, 24, 2)
     t:Place(pf.share, pf.share:GetHeight(), 10)
   else
     t:Place(pf.noPerm, pf.noPerm:GetStringHeight(), 10)
@@ -214,7 +219,7 @@ local function refresh(pf, ctx)
     if not r then break end
     n = i
     r.who = name
-    r.name:SetText(ns.Short(name))
+    r.name:SetText(ns.Short(name) .. (f.inviteFriend and f.inviteFriend[name] and L.INV_AS_FRIEND or ""))
     -- What this client knows about the invite it sent: sending, or received by their addon. (Offline or no answer
     -- removes the invite and says so.)
     local st = ns.Sync:InviteStatus(name)

@@ -106,6 +106,10 @@ local function buildBook(pf)
     local a = { head = UI.SectionHeader(Lc, width), text = UI.WrapText(Lc, 13, "ink", width, "book") }
     pf.articles[i] = a
   end
+  -- The challenges chosen at founding (SPEC §9), an article after the rules when the fellowship has or had one.
+  pf.chal = { head = UI.SectionHeader(Lc, width), text = UI.WrapText(Lc, 13, "ink", width, "book") }
+  -- Under it, the shared lives as candles (UI.Lives).
+  pf.chal.lives = UI.Lives(Lc, width)
 
   -- Right: change a rule.
   pf.cHead = UI.Heading(Rc, width, L.CHANGE_RULE, "")
@@ -177,6 +181,20 @@ local function refreshBook(pf, ctx)
     art.text:SetText(text)
     s:Place(art.text, art.text:GetStringHeight(), 12)
   end
+  local chal = ns.Challenges:Book(f, hl)
+  pf.chal.head:SetShown(chal ~= nil); pf.chal.text:SetShown(chal ~= nil)
+  if chal then
+    pf.chal.head:SetText(ns.Journey.Roman(#R.BOOK + 1) .. ".  " .. chal.title)
+    s:Place(pf.chal.head, 29, 4)
+    pf.chal.text:SetText(chal.text)
+    s:Place(pf.chal.text, pf.chal.text:GetStringHeight(), 12)
+  end
+  local lives = chal and ns.Challenges:LivesView(f)
+  pf.chal.lives:SetShown(lives ~= nil)
+  if lives then
+    pf.chal.lives:SetTip(lives.title, lives.lines)
+    s:Place(pf.chal.lives, pf.chal.lives:Set(lives.total, lives.left), 12)
+  end
   pf.lscroll:SetContentHeight(s.y + 8)
 
   -- Right page: how a change is made, the open votes, Propose (or the Leader's way), the votes decided this week.
@@ -195,7 +213,7 @@ local function refreshBook(pf, ctx)
     local r = pf.vRows:Get(n + 1)
     if not r then break end
     n = n + 1
-    placeVote(r, f, v, t, not ctx.watching)
+    placeVote(r, f, v, t, not ctx.watching and not ctx.isFriend)
   end
   pf.vNone:SetShown(#open == 0)
   if #open == 0 then t:Place(pf.vNone, pf.vNone.h, 6) end
@@ -204,13 +222,16 @@ local function refreshBook(pf, ctx)
   t:Place(pf.pHead, 29, 6)
   -- Adventurers propose; the Leader changes the rules in Manage; nothing for a follower. The walkthrough's sample
   -- shows the form, but Propose does nothing there (its proposal would go to your own fellowship).
-  local showForm = not follow and not ctx.isLeader
+  -- A Friend of the fellowship reads the votes (SPEC §1.1): the rules are the counted Adventurers'.
+  local friend = ctx.isFriend and not follow
+  local showForm = not follow and not ctx.isLeader and not friend
   pf.canPropose = showForm and not ctx.demo
   local form = { pf.ruleLabel, pf.rule, pf.valueLabel, pf.value, pf.propose, pf.now }
   for _, w in ipairs(form) do w:SetShown(showForm) end
   pf.pNote:Hide()
   pf.leaderBox:SetShown(ctx.isLeader and not follow)
-  pf.watchText:SetShown(follow)
+  pf.watchText:SetShown(follow or friend)
+  pf.watchText:SetText(friend and L.PROPOSE_FRIEND or L.PROPOSE_WATCH)
   if showForm then
     local key, now = pf.pkey, f.rules[pf.pkey]
     local opts, keep = {}, false
@@ -305,6 +326,30 @@ local function buildAdmin(pf)
     end)
   end, "primary", 12)
   pf.undo = UI.TextButton(pf.draftBox, L.DISCARD, function() pf.draft = nil; W:Refresh() end, "plain", 12)
+  -- The challenges chosen at founding (SPEC §9): none can be added; each can be turned off, for good (asks first).
+  pf.chalHead = UI.SectionHeader(Lc, width)
+  pf.chalHead:SetText(L.MG_CHAL_HEAD)
+  pf.chalText = UI.WrapText(Lc, 12, "ink2", width, "book")
+  pf.chalText:SetText(L.MG_CHAL_TEXT)
+  pf.chalRows = UI.Pool(function()
+    local r = CreateFrame("Frame", nil, Lc)
+    r:SetSize(width, 28)
+    r.name = UI.Text(r, 13, "ink")
+    r.name:SetPoint("LEFT", 4, 0)
+    r.off = UI.TextButton(r, L.MG_CHAL_TURN_OFF, function()
+      local key = r.key
+      if not key then return end
+      W:Confirm(L.MG_CHAL_CONFIRM:format(ns.Challenges:Name(key, r.v)), L.MG_CHAL_TURN_OFF, function()
+        ns.Challenges:TurnOff(key)
+        W:Refresh()
+      end)
+    end, "plain", 12)
+    r.off:SetPoint("RIGHT")
+    -- (One Ironman Fellowship holds: not turned off while it is on.)
+    r.held = UI.Text(r, 12, "ink2", nil, "RIGHT")
+    r.held:SetPoint("RIGHT", -4, 0); r.held:SetText(L.MG_CHAL_INCLUDED)
+    return r
+  end)
   -- Fellowship size and play style (27 Oct 2026), each one choice above the full form: the size sets the numbers
   -- (Adventurers per run, who must clear, away time), the style the slack. Both go into the draft.
   local function apply(fn)
@@ -374,6 +419,33 @@ local function refreshAdmin(pf, ctx)
     s:Place(pf.draftBox, h + 36, 8)
   end
   s:Skip(8)
+  -- The challenges: each one on with Turn off, the ones turned off with their day.
+  local Ch = ns.Challenges
+  local ever = Ch:Ever(f)
+  pf.chalHead:SetShown(ever); pf.chalText:SetShown(ever)
+  local n = 0
+  if ever then
+    s:Place(pf.chalHead, 29, 6)
+    s:Place(pf.chalText, pf.chalText:GetStringHeight(), 6)
+    for _, k in ipairs(Ch.LIST) do
+      local on, was = Ch:Has(f, k), f.challengesOff and f.challengesOff[k]
+      if on or was then
+        local r = pf.chalRows:Get(n + 1)
+        if not r then break end
+        n = n + 1
+        r.key, r.v = on and k or nil, on and f.challenges[k] or nil
+        r.name:SetText(on and Ch:Name(k, f.challenges[k]) or L.MG_CHAL_WAS_OFF:format(Ch:Name(k, was.v), Ch.Day(was.t)))
+        r.name:SetTextColor(Theme:RGBA(on and "ink" or "ink2"))
+        local held = on and Ch:IncludedBy(f, k) ~= nil
+        r.off:SetShown(on and not held and not ctx.watching)
+        r.held:SetShown(held)
+        r:Show()
+        s:Place(r, 28, 2)
+      end
+    end
+    s:Skip(10)
+  end
+  pf.chalRows:HideFrom(n + 1)
   -- The size (how many you are, and which size the rules were made for), the play style, then the full form.
   local rules = pf.draft or f.rules
   s:Place(pf.sizeHead, 29, 6)

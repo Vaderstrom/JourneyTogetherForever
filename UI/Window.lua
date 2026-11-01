@@ -1232,7 +1232,10 @@ function W:Refresh()
   end
 end
 
--- The bar across the header while watching: whose fellowship, how fresh, and the way back.
+-- The bar across the header while watching: whose fellowship, how fresh, and the way back. Not your own at a glance:
+-- the header under a cool moonlit veil, the bar in silver blue with a spyglass (the gold bar alone was easy to miss;
+-- check of 1 Nov 2026).
+W.WATCH_EDGE, W.WATCH_TEXT = "8FB4D8", "A9C8E8"
 function W:RefreshWatchBar()
   local WT, h = ns.Watch, self.frame and self.frame.header
   -- (Not for the walkthrough's sample fellowship: the guide card says what it is.)
@@ -1240,12 +1243,18 @@ function W:RefreshWatchBar()
   local bar = self.watchBar
   if not bar then
     if not on or Combat:InCombat() then return end
-    bar = UI.Box(h, 1, "dark", 0.82, "gold", 0.9)
+    h.watchVeil = h:CreateTexture(nil, "BACKGROUND", nil, 3)
+    h.watchVeil:SetAllPoints()
+    UI.SetGradient(h.watchVeil, "HORIZONTAL", { 0.06, 0.12, 0.24, 0.6 }, { 0.12, 0.24, 0.42, 0.42 })
+    bar = UI.Box(h, 1, "dark", 0.82, W.WATCH_EDGE, 0.9)
     bar:SetSize(470, 46)
     bar:SetPoint("TOP", h, "TOP", 60, -12)
     bar:SetFrameLevel(h:GetFrameLevel() + 20)
-    bar.title = UI.Text(bar, 11, "gold", "body")
-    bar.title:SetPoint("TOPLEFT", 12, -8)
+    bar.icon = UI.Round(bar, "ARTWORK", 30)
+    bar.icon:SetPoint("LEFT", 9, 0)
+    UI.SetIcon(bar.icon, ns.ICONS.watch)
+    bar.title = UI.Text(bar, 11, W.WATCH_TEXT, "body")
+    bar.title:SetPoint("TOPLEFT", 48, -8)
     bar.line = UI.Text(bar, 12, "chipText", "body")
     bar.line:SetPoint("TOPLEFT", bar.title, "BOTTOMLEFT", 0, -3)
     bar.back = UI.TextButton(bar, L.WATCH_BACK, function() ns.Watch:Close() end, "plain", 12)
@@ -1256,6 +1265,7 @@ function W:RefreshWatchBar()
     self.watchBar = bar
   end
   bar:SetShown(on)
+  h.watchVeil:SetShown(on)
   if on then
     local f = WT:Fellowship()
     bar.title:SetText(L.WATCH_TITLE:format(ns.Short(WT.as)):upper())

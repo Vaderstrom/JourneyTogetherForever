@@ -1,5 +1,6 @@
 -- The list of characters on the account (the mockup's myChars), used on the Welcome page and in the
--- "Your characters" panel. Clicking a character in another fellowship shows its summary below the list.
+-- "Your characters" panel. Characters in a fellowship on top, the others behind a button (31 Oct 2026).
+-- Clicking a character in another fellowship shows its summary below the list.
 local _, ns = ...
 local L = ns.L
 local UI, Theme = ns.UI, ns.Theme
@@ -53,12 +54,21 @@ function UI.CharacterList(parent, width)
   box.note = UI.WrapText(box, 12, "ink2", width - 24)
   local hint = UI.WrapText(parent, 12, "ink2", width)
   hint:SetText(L.ALT_HINT)
+  -- Characters without a fellowship are hidden until this is clicked (ns.Characters:Shown); it hides them again.
+  list.none = UI.WrapText(parent, 13, "ink", width, "book")
+  list.none:SetText(L.CHARS_NONE_YET)
+  list.toggle = UI.TextButton(parent, "", function()
+    ns.Characters.showAll = not ns.Characters.showAll
+    ns.Window:Refresh()
+  end, "link", 12)
 
   function list:Refresh()
     local stack = UI.Stack(parent)
-    local keys = ns.Characters:List()
+    local keys, _, none = ns.Characters:Shown()
     local light = Theme:Current().light
     local shown = 0
+    self.none:SetShown(none)
+    if none then stack:Place(self.none, self.none:GetStringHeight(), 8) end
     for i, key in ipairs(keys) do
       local b = self.rows:Get(i)
       if not b then break end
@@ -81,6 +91,12 @@ function UI.CharacterList(parent, width)
       stack:Place(b, 58, 4)
     end
     self.rows:HideFrom(shown + 1)
+    local label = ns.Characters:ToggleLabel()
+    self.toggle:SetShown(label ~= nil)
+    if label then
+      self.toggle:SetLabel(label)
+      stack:Place(self.toggle, 20, 4)
+    end
     local s = self.selected and ns.Characters:Summary(self.selected)
     box:SetShown(s ~= nil)
     hint:SetShown(s == nil)

@@ -16,12 +16,15 @@
     { "id": "clear", "type": "news", "name": "Dungeon cleared",
       "help": "A new post for every dungeon clear, with who cleared it.", "default": true },
     { "id": "picture", "type": "news", "name": "Pictures from runs",
-      "help": "The pictures you take with Take a picture after a final boss: the screenshot itself, with who was there. Not posted until you draw a line from it.", "default": false }
+      "help": "The pictures you take with Take a picture after a final boss: the screenshot itself, with who was there. Not posted until you draw a line from it.", "default": false },
+    { "id": "first", "type": "news", "name": "Firsts",
+      "help": "The fellowship's firsts: the first to reach level 20, to fall, to wear an epic, to ride a mount. Not posted until you draw a line from it.", "default": false }
   ],
   "fields": {
     "chapter": [ { "id": "n", "name": "Chapter", "type": "number" } ],
     "clear": [ { "id": "dungeon", "name": "Dungeon", "type": "text" }, { "id": "who", "name": "Who", "type": "names" } ],
-    "picture": [ { "id": "dungeon", "name": "Dungeon", "type": "text" }, { "id": "who", "name": "Who", "type": "names" } ]
+    "picture": [ { "id": "dungeon", "name": "Dungeon", "type": "text" }, { "id": "who", "name": "Who", "type": "names" } ],
+    "first": [ { "id": "who", "name": "Who", "type": "names" } ]
   },
   "templates": { "board": "card.html" },
   "weekly": {

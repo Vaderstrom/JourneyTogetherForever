@@ -176,7 +176,7 @@ end
 -- In the background: the members in your group whom the game can draw now.
 function PH:Tick()
   local f = F:Current()
-  if not f or not self.frame or not (IsInGroup and IsInGroup()) then return end
+  if not f or not self.frame then return end
   for name in pairs(f.members) do
     if name ~= ns.Me() then self:Load(name) end
   end
@@ -279,7 +279,8 @@ function PH:Build()
   f.sub:SetPoint("TOPLEFT", f.title, "BOTTOMLEFT", 0, -6)
   shadow(f.sub)
 
-  -- The controls: a dark band at the bottom, the hint and who is missing above it. All hidden for the photo.
+  -- The controls: a dark band at the bottom, the hint above it. All hidden for the photo. Who is not there is not
+  -- named (the owner, 31 Oct 2026: a photo shows only who is there).
   f.chrome = CreateFrame("Frame", nil, f.over)
   f.chrome:SetAllPoints()
   local bar = CreateFrame("Frame", nil, f.chrome)
@@ -315,9 +316,6 @@ function PH:Build()
   f.hint:SetPoint("BOTTOM", bar, "TOP", 0, 10)
   f.hint:SetText(L.PHOTO_HINT)
   shadow(f.hint)
-  f.missing = UI.Text(f.chrome, 13, "goldText", "body", "CENTER")
-  f.missing:SetPoint("BOTTOM", f.hint, "TOP", 0, 8)
-  shadow(f.missing)
   -- Looking around: what to do, and the way back to the photo.
   f.looking = CreateFrame("Frame", nil, f.over)
   f.looking:SetPoint("BOTTOMLEFT"); f.looking:SetPoint("BOTTOMRIGHT"); f.looking:SetHeight(90)
@@ -391,7 +389,8 @@ function PH:Open(opts)
     c.actor:SetYaw(0)
     hold(c.actor, self.POSES[1])
     c.actor:Show()
-    local label = fr.labels[i] or UI.Text(fr.over, 14, "white", "title", "CENTER")
+    -- 20 with the class icon in front, like the game's nameplates (U16, 31 Oct 2026: 14 was hard to read at 4K).
+    local label = fr.labels[i] or UI.Text(fr.over, PH.NAME_SIZE, "white", "title", "CENTER")
     shadow(label)
     fr.labels[i] = label
     c.label = label
@@ -405,7 +404,6 @@ function PH:Open(opts)
   local where = d and d[2] or (ch and L.PHOTO_CHAPTER:format(ns.Journey.Roman(ch.n), ch.name) or L.BN_JOURNEY_DONE)
   fr.sub:SetText(L.PHOTO_SUB:format(where, date(L.MO_DAY)))
   fr.caption:SetShown(self.showCaption)
-  fr.missing:SetText(#missing > 0 and L.PHOTO_MISSING:format(ns.Clears.AndList(self:Shorts(missing))) or "")
   -- The camera: a first guess, everyone in, the middle of the front row at chest height; PH:Fit measures and
   -- corrects it once the scene is on the screen.
   self.dist, self.tx, self.ty, self.tz = PH.Distance(#cast, self.ROW, self.GAP), 0, 0, 1.05
@@ -470,7 +468,10 @@ end
 -- puts them back at the next login.
 -- Hostile, interactive and special NPCs and pets have names of their own ("Gnoll Assailant" stood over the photo in
 -- the check of 30 Oct 2026); a name this client does not have is left alone.
-PH.WORLD_CVARS = { "nameplateShowAll", "nameplateShowEnemies", "nameplateShowFriends", "UnitNameNPC",
+-- (nameplateShowFriendlyPlayers / Npcs: Midnight's names, as the client lists them; retail 12.1.5 has no
+-- nameplateShowFriends, 31 Oct 2026.)
+PH.WORLD_CVARS = { "nameplateShowAll", "nameplateShowEnemies", "nameplateShowFriends", "nameplateShowFriendlyPlayers",
+  "nameplateShowFriendlyNpcs", "UnitNameNPC",
   "UnitNameOwn", "UnitNameFriendlyPlayerName", "UnitNameEnemyPlayerName", "UnitNameNonCombatCreatureName",
   "UnitNameHostleNPC", "UnitNameInteractiveNPC", "UnitNameFriendlySpecialNPCName", "UnitNameFriendlyPetName",
   "UnitNameFriendlyGuardianName", "UnitNameFriendlyTotemName", "UnitNameFriendlyMinionName", "UnitNameEnemyPetName",
@@ -703,6 +704,7 @@ end
 function PH:Labels()
   local fr = self.frame
   if not fr then return end
+  local f = F:Current()
   local s = fr.scene
   local eff = s:GetEffectiveScale()
   local top = (self.height or self.HEIGHT) * 1.02
@@ -712,12 +714,23 @@ function PH:Labels()
     local show = self.showNames and px ~= nil and py ~= nil
     c.label:SetShown(show == true)
     if show then
-      c.label:SetText(ns.Short(c.name))
+      c.label:SetText(PH.NameText(f, c.name))
       c.label:ClearAllPoints()
       if front then c.label:SetPoint("TOP", s, "BOTTOMLEFT", px / eff, py / eff - 6)
       else c.label:SetPoint("BOTTOM", s, "BOTTOMLEFT", px / eff, py / eff + 4) end
     end
   end
+end
+
+-- A name under (or over) its Adventurer: the class icon, then the name in the class colour (U16). Pretend ones of the
+-- developer tools have no class: the name alone, in white.
+PH.NAME_SIZE = 20
+function PH.NameText(f, name)
+  local token = f and select(2, ns.Hero:ClassName(f, name)) or nil
+  local icon = ns.ClassIconMarkup(token, PH.NAME_SIZE)
+  local hex = ns.ClassHex(token, false)
+  local short = ns.Short(name)
+  return (icon ~= "" and (icon .. " ") or "") .. (hex and ("|cff" .. hex .. short .. "|r") or short)
 end
 
 -- Left-drag turns the one chosen; right-drag moves the camera.

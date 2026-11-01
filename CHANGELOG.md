@@ -1,5 +1,89 @@
 # Changelog
 
+## 0.11.0 beta (1 November 2026)
+- A memorial page for the Fallen: clicking a Fallen Adventurer shows "In memory of …" instead of the gear, with where
+  and when they fell, their days in the fellowship, the dungeons they cleared and the firsts they earned.
+- The shared lives' candles flicker softly, and a life lost since you last looked goes out with a curl of smoke when
+  the Overview opens. Reduce effects keeps them still.
+- Friends of the fellowship are counted apart on the Adventurers page: "3 Adventurers … and 1 Friend", with "1 Friend"
+  beside the roles.
+- Chronicle → Firsts: an open level medal names who is closest ("is closest (22)"). Under a survival challenge,
+  "First to fall" is silver in violet instead of gold.
+- The Discord board keeps the Fallen, last, as a greyed memorial row with a skull and the level they fell at.
+- Eleven more challenges when founding a fellowship, on three banners side by side (Survival, Story and Travel, Gear,
+  Gold & More), so every challenge is in sight at once; hover one for its rule: Lord of the Rings, Walk everywhere, Questless, Race to 60, Fellowship-found, White gear only, Pauper
+  (you set the gold), Ironman Fellowship, One class only, No healers and Dungeons only.
+- A broken rule is written in the Chronicle ("Brannic took a flight path, breaking Walk everywhere."), toasted, and
+  shown on that Adventurer's card; they play on. The rulebook says who broke what.
+- Lord of the Rings: the first ring that comes into anyone's bags is the Ring. Carry it to Blackrock Mountain and
+  destroy it there; lose it anywhere else, or fall with it, and the quest fails.
+- Race to 60: the Chronicle keeps the time from founding to everyone at 60, and your account keeps the best one.
+- One class only and No healers are held at the door: another class can't join, and nobody can take the Healer role.
+- Ironman Fellowship takes Hardcore Fellowship and White gear only with it; they can't be turned off while it is on.
+- Friend of the fellowship: invite someone who wants to play along now and then without holding anyone back (tick
+  "As a Friend of the fellowship" by Send invite), or become one yourself on your own page. A Friend never counts for
+  the floor, the votes, the firsts, the tournament or the challenges, but fills a slot in a dungeon run and shows in
+  the tallies. Back to Adventurer at or below the chapter's cap.
+- The Fallen's card is a memorial: a greyed crest with a skull, a violet card, last in the list, and counted apart
+  ("1 Fallen") beside the roles.
+- Shared lives as a row of candles on the Overview, in the rulebook and when founding; the tooltip names each life lost.
+- A Fallen or the last shared life gets a heavier toast: darker, slower, and a bell.
+- Following another character's fellowship: the header is tinted and the bar has a spyglass.
+- Chronicle → Firsts is a cabinet of medals: the earned ones with who and when, then those still open. The tallies show
+  the top three, in gold, silver and bronze.
+- Inspect: the average item level shows "–" until gear is shared, and its tooltip says what it is.
+- The shared lives' candles are bigger and show the shared lives' own flame, lit or snuffed (they looked like pearls).
+- The Fallen no longer show in the counts under the Overview ("4 Below the floor" with one Fallen), never count as
+  away, are not offered to group with, and are never next in line to lead or take over while someone plays on.
+- The skull on a Fallen's crest no longer covers the first letter of the line beside it.
+- "You and 1 other Adventurer are below the floor." (it said "Adventurers").
+- The button for someone without the addon now says "Someone without the addon? Share it", so it doesn't read as part
+  of "As a Friend of the fellowship" just above it.
+- A Fallen card on the Adventurers page: the memorial line no longer runs into "Fallen", and leaves out the level
+  (the card's own number), so the foe fits; the whole line is in its tooltip.
+- Tournament: names on the bracket cards are no longer cut off when the class icon and "You" stand beside them.
+- The firsts' message names who it is for ("A first for Brannic") and has its own icon.
+- Challenges: Create a Fellowship has a new step where the Leader can take on one or both challenges: Hardcore
+  Fellowship (one life each; on a PvP realm, tick it and it's called Hardcore PvP Fellowship) and Shared lives (the
+  fellowship's lives together; the size suggests how many). They can't be added later. They show in the review and
+  in the rulebook, and the Leader can turn one off in Manage → Rules (for good, and the Chronicle says so).
+- The Fallen: under a survival challenge, an Adventurer whose last life is spent stays in the fellowship, honoured: a
+  memorial line in the Chronicle with level, place and day (and who they were fighting, as best the addon can tell), a
+  toast, and "Fallen" on their card. They no longer hold the fellowship back, and may bring a new character, who joins
+  at level 1. When the shared lives run out, the challenge is lost and the journey goes on.
+- Fellowship firsts: the first to reach level 10, 20 ... 60, to fall, to wear a rare or an epic item, to ride a mount,
+  to hold 100 gold, to bring a profession to 150, 225 or 300, and to win a PvP kill. They show in the Chronicle (a new
+  Firsts filter), as Moments cards and as a toast, and the Chronicle keeps light-hearted tallies: who has fallen most,
+  run most dungeons and turned in most quests. Only what happens after joining counts.
+- Discord: a new news kind, Firsts (off until you draw a line from it in Addon Webhooks).
+- The tracker on the screen: an icon on each line, and a little bar under your line: red on the way to the floor,
+  green from the floor to the cap.
+- Chronicle: three or more chapters unlocked in a row read as one line ("Chapters VII to XV unlocked"); click it to
+  see each one.
+- Group photo: bigger names, in class colours with the class icon in front.
+- Tournament: larger match cards with each Adventurer's class icon and level.
+- A Gathering's reminder and a newly open attunement show the dungeon's or raid's picture, like a clear does.
+- History: "Chapters so far", every chapter the fellowship reached and the day it began.
+- Settings fold into sections: click a heading to open or fold it. The toasts and the tracker take turns, and a
+  folded heading says what is set.
+- Journey Admin: where the chapters squeeze together on the ruler, the chosen one is shown larger with its number;
+  pointing at any part names its chapter and levels.
+- The level track names everyone with a class icon in front, in dark ink that reads in every theme.
+- The level track is back, on the Chapter page and the Adventurers page: the chapter's floor and cap with everyone on
+  one line. Adventurers at the same level share one marker with their number, and a line under it names them.
+- Clearing a dungeon or a raid shows its picture, the same one as on the Chapter and Raids pages, with its name and
+  who was in the group, each name in its class colour. A place without a picture of its own shows the message
+  without one. A raid clear now says "Raid cleared" and opens the Raids page.
+- Number tiles in the game's style: the counts on the Adventurers page, Inspect, History and the Chronicle show a
+  large gold number over a small icon and its label, like the game's achievement summary, easy to read in every theme.
+- Adventurers in 3D: an Adventurer's real model also shows when you are not grouped, once they have been near you:
+  your target, your focus, under your mouse, or with their nameplate showing. As before, it stays until you log out.
+- Inspect: without a model yet, the crest says how to see them in 3D and when they were last near you ("Last near
+  you 2 days ago."), kept from one session to the next.
+- Group photo: only the Adventurers who are there. It no longer names who is missing.
+- Your characters (the Welcome page and the header's panel): characters in a fellowship come first. The ones without
+  a fellowship are hidden; "Show 3 characters without a fellowship" shows them, and "Hide" hides them again.
+
 ## 0.10.0 beta (30 October 2026)
 - Each game shows what it offers. WoW Forever: what Blizzard has announced for it, since the game's files hold back
   what is not out yet. That is 34 dungeons at launch, the Classic ones and the nine new ones, and three raids:

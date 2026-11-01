@@ -10,23 +10,44 @@ local W = ns.Window
 -- (Rows 28 high since Full screen joined The book: the left page still fits without scrolling.)
 local ROW, GRID, GAP = 28, 22, 10
 
--- One page's column: headings, rows and grids placed from the top down.
+-- One page's column: folding sections (U10, 31 Oct 2026: the page read as a wall of checkboxes), each a heading and
+-- a body of rows and grids placed from the top down. A click on a heading opens or folds its section; folded, the
+-- heading says in a few words what is set ("10 of 12 on"). Sections of one group (the right page's toasts and
+-- tracker) take turns: opening one folds the other, so a page never needs scrolling. What is open is kept for the
+-- character (ns.char.setFold).
+local FOLD_ICON = { [true] = "Interface\\Buttons\\UI-PlusButton-Up", [false] = "Interface\\Buttons\\UI-MinusButton-Up" }
 local function column(pf, parent, width)
-  local c = { y = 0 }
-  function c:Head(text, help)
+  local c = { sections = {} }
+  -- A heading with its fold button; the section's body follows. sum() gives the folded line, foldedAtFirst the start.
+  function c:Head(id, text, help, opts)
+    opts = opts or {}
     local h = UI.SectionHeader(parent, width)
-    h:SetPoint("TOPLEFT", 0, -self.y)
     h:SetText(text)
+    h.text:ClearAllPoints(); h.text:SetPoint("LEFT", 20, 1)
+    h.icon = h:CreateTexture(nil, "ARTWORK")
+    h.icon:SetSize(16, 16); h.icon:SetPoint("LEFT", 0, 1)
     if help then h:SetHelp(help) end
-    self.y = self.y + 31
+    h.sum = UI.Text(h, 12, "ink2")
+    h.sum:SetPoint("LEFT", h.help or h.text, "RIGHT", 8, 0)
+    -- The fold button covers the icon and the title (the "?" and what sits at the right keep their own clicks).
+    h.click = CreateFrame("Button", nil, h)
+    h.click:SetPoint("TOPLEFT"); h.click:SetPoint("BOTTOMLEFT")
+    h.click:SetScript("OnClick", function() pf:Fold(id) end)
+    local sec = { id = id, head = h, body = CreateFrame("Frame", nil, parent), y = 0, group = opts.group, sum = opts.sum,
+      folded = opts.folded == true }
+    sec.body:SetWidth(width)
+    c.sections[#c.sections + 1] = sec
+    pf.sections[id] = sec
+    c.cur = sec
     return h
   end
-  function c:Gap() self.y = self.y + GAP end
+  function c:Gap() self.cur.y = self.cur.y + GAP end
   -- A row: the label (and its "?") on the left, the control at the right.
   function c:Row(label, control, help)
-    local r = CreateFrame("Frame", nil, parent)
+    local sec = self.cur
+    local r = CreateFrame("Frame", nil, sec.body)
     r:SetSize(width, ROW)
-    r:SetPoint("TOPLEFT", 0, -self.y)
+    r:SetPoint("TOPLEFT", 0, -sec.y)
     r.label = UI.Text(r, 13, "ink")
     r.label:SetPoint("LEFT")
     r.label:SetText(label)
@@ -35,15 +56,17 @@ local function column(pf, parent, width)
       r.help:SetPoint("LEFT", r.label, "RIGHT", 6, 0)
       r.help:SetHelp(label, help)
     end
+    -- On the row, so it folds away with its section.
+    control:SetParent(r)
     control:ClearAllPoints()
     control:SetPoint("RIGHT", r, "RIGHT", 0, 0)
     pf.controls[#pf.controls + 1] = control
-    self.y = self.y + ROW
+    sec.y = sec.y + ROW
     return r
   end
   -- A small checkbox with its label after it: the toasts' and the tracker's lists, two to a line.
   local function tick(label, get, set, help)
-    local f = CreateFrame("Frame", nil, parent)
+    local f = CreateFrame("Frame", nil, c.cur.body)
     f:SetSize(width / 2, GRID)
     f.box = UI.Checkbox(f, get, set)
     f.box:SetSize(22, 22)
@@ -60,28 +83,69 @@ local function column(pf, parent, width)
     return f
   end
   function c:Grid(items)
-    local out = {}
+    local sec, out = self.cur, {}
     for i, it in ipairs(items) do
       local f = tick(it[1], it[2], it[3])
-      f:SetPoint("TOPLEFT", ((i - 1) % 2) * width / 2, -(self.y + math.floor((i - 1) / 2) * GRID))
+      f:SetPoint("TOPLEFT", ((i - 1) % 2) * width / 2, -(sec.y + math.floor((i - 1) / 2) * GRID))
       out[it.key or i] = f
     end
-    self.y = self.y + math.ceil(#items / 2) * GRID
+    sec.y = sec.y + math.ceil(#items / 2) * GRID
     return out
   end
   function c:Tick(label, get, set, help)
+    local sec = self.cur
     local f = tick(label, get, set, help)
     f:SetWidth(width)
-    f:SetPoint("TOPLEFT", 0, -(self.y + 1))
-    self.y = self.y + GRID + 2
+    f:SetPoint("TOPLEFT", 0, -(sec.y + 1))
+    sec.y = sec.y + GRID + 2
     return f
+  end
+  function c:Skip(n) self.cur.y = self.cur.y + n end
+
+  local function folded(sec)
+    local st = ns.char and ns.char.setFold
+    if st and st[sec.id] ~= nil then return st[sec.id] end
+    return sec.folded
+  end
+  -- Places the sections from the top down; returns the column's height.
+  function c:Layout()
+    local y = 0
+    for i, sec in ipairs(self.sections) do
+      local h, shut = sec.head, folded(sec)
+      h:ClearAllPoints(); h:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, -y)
+      if not h.icon:SetTexture(FOLD_ICON[shut]) then h.icon:SetColorTexture(0, 0, 0, 0) end
+      h.click:SetWidth(20 + h.text:GetStringWidth() + 4)
+      local line = shut and sec.sum and sec.sum() or ""
+      h.sum:SetText(line)
+      h.sum:SetShown(line ~= "")
+      y = y + 31
+      sec.body:SetShown(not shut)
+      if not shut then
+        sec.body:ClearAllPoints(); sec.body:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, -y)
+        sec.body:SetHeight(math.max(1, sec.y))
+        y = y + sec.y
+      end
+      if i < #self.sections then y = y + GAP end
+    end
+    self.y = y
+    return y
+  end
+  -- The tallest this column gets: every section open, but only the tallest of a group (they take turns).
+  function c:MaxHeight()
+    local y, groups = 0, {}
+    for i, sec in ipairs(self.sections) do
+      y = y + 31 + (i < #self.sections and GAP or 0)
+      if sec.group then groups[sec.group] = math.max(groups[sec.group] or 0, sec.y) else y = y + sec.y end
+    end
+    for _, h in pairs(groups) do y = y + h end
+    return y
   end
   return c
 end
 
 local function build(pf)
   local width = W.PAGE_W - 8
-  pf.controls = {}
+  pf.controls, pf.sections = {}, {}
   local function check(key) return function() return Settings:Get(key) end, function(v) Settings:Set(key, v) end end
   local function dropdown(parent, options, key)
     return UI.Dropdown(parent, 150, options, function() return Settings:Get(key) end, function(v) Settings:Set(key, v) end)
@@ -94,7 +158,8 @@ local function build(pf)
   -- Left: the book, messages, help and commands.
   local Lp = pf.left
   local left = column(pf, Lp, width)
-  left:Head(L.SET_BOOK)
+  local THEMES = { journal = L.THEME_JOURNAL, night = L.THEME_NIGHT, faction = L.THEME_FACTION }
+  left:Head("book", L.SET_BOOK, nil, { sum = function() return THEMES[Settings:Get("theme")] or "" end })
   left:Row(L.THEME, dropdown(Lp, { { L.THEME_JOURNAL, "journal" }, { L.THEME_NIGHT, "night" }, { L.THEME_FACTION, "faction" } }, "theme"), L.THEME_HINT)
   local function langNote() return Settings:Get("lang") == "sv" and L.LANG_NOTE_SV or L.LANG_NOTE_EN end
   pf.lang = left:Row(L.LANGUAGE, UI.Dropdown(Lp, 150, { { L.LANG_EN, "en" }, { L.LANG_SV, "sv" } }, function() return Settings:Get("lang") end,
@@ -103,8 +168,9 @@ local function build(pf)
   left:Row(L.FULLSCREEN, pf.fullBox, L.FULLSCREEN_HINT)
   left:Row(L.SOUNDS, UI.Checkbox(Lp, check("sounds")), L.SOUNDS_HINT)
   left:Row(L.REDUCE_EFFECTS, UI.Checkbox(Lp, check("reduce")), L.REDUCE_EFFECTS_HINT)
-  left:Gap()
-  left:Head(L.SET_MESSAGES)
+  local CHATS = { all = L.CHAT_ALL, important = L.CHAT_IMPORTANT, off = L.CHAT_OFF }
+  left:Head("messages", L.SET_MESSAGES, nil,
+    { sum = function() return L.SET_SUM_CHAT:format(CHATS[Settings:Get("chat")] or "") end })
   left:Row(L.CHAT_MESSAGES, dropdown(Lp, { { L.CHAT_ALL, "all" }, { L.CHAT_IMPORTANT, "important" }, { L.CHAT_OFF, "off" } }, "chat"))
   -- The cap warning and when it comes, on one line: the slider, then the box that turns it on.
   local warn = CreateFrame("Frame", nil, Lp)
@@ -119,8 +185,7 @@ local function build(pf)
   pf.controls[#pf.controls] = warn.box
   pf.controls[#pf.controls + 1] = warn.slider
   left:Row(L.PICTURE_PROMPT, UI.Checkbox(Lp, check("picture")), L.PICTURE_PROMPT_HINT)
-  left:Gap()
-  left:Head(L.SET_HELP)
+  left:Head("help", L.SET_HELP)
   -- The setup guide and the walkthrough again (only in a fellowship: they are part of the book).
   pf.setupAgain = UI.TextButton(Lp, L.SETUP_AGAIN, function()
     if not ns.Fellowship:Current() then return end
@@ -137,22 +202,31 @@ local function build(pf)
   pf.minimapBox = UI.Checkbox(Lp, check("minimap"))
   left:Row(L.MINIMAP_BUTTON, pf.minimapBox, L.MINIMAP_HINT)
   -- The commands, two to a line: the command in the accent colour, what it does after it.
-  left.y = left.y + 6
+  left:Skip(6)
+  local helpSec = left.cur
   for i, cmd in ipairs(ns.COMMANDS) do
-    local x, y = ((i - 1) % 2) * width / 2, -(left.y + math.floor((i - 1) / 2) * 18)
-    local code = UI.Text(Lp, 12, "accent")
+    local x, y = ((i - 1) % 2) * width / 2, -(helpSec.y + math.floor((i - 1) / 2) * 18)
+    local code = UI.Text(helpSec.body, 12, "accent")
     code:SetPoint("TOPLEFT", x, y)
     code:SetText(cmd[1])
-    local what = UI.Text(Lp, 12, "ink2")
+    local what = UI.Text(helpSec.body, 12, "ink2")
     what:SetPoint("LEFT", code, "RIGHT", 8, 0)
     what:SetText(cmd[2])
   end
-  left.y = left.y + math.ceil(#ns.COMMANDS / 2) * 18
+  left:Skip(math.ceil(#ns.COMMANDS / 2) * 18)
 
   -- Right: the progress toasts and the tracker.
   local Rp = pf.right
   local right = column(pf, Rp, width)
-  local toasts = right:Head(L.PROGRESS_TOASTS, L.PROGRESS_TOASTS_HINT)
+  local function count(list, on)
+    local n = 0
+    for _, k in ipairs(list) do if on(k) then n = n + 1 end end
+    return n
+  end
+  local toasts = right:Head("toasts", L.PROGRESS_TOASTS, L.PROGRESS_TOASTS_HINT, { group = "right", sum = function()
+    local t = Settings.TOAST_EVENTS
+    return L.SET_SUM_ON:format(count(t, function(k) return Settings:ToastOn(k) end), #t)
+  end })
   pf.example = UI.TextButton(Rp, L.EXAMPLE_TOAST, function() ns.Toasts:Example() end, "link", 12)
   pf.example:SetPoint("BOTTOMRIGHT", toasts, "BOTTOMRIGHT", 0, 7)
   local items = {}
@@ -162,7 +236,7 @@ local function build(pf)
   end
   pf.toastRows = {}
   for kind, f in pairs(right:Grid(items)) do pf.toastRows[kind] = f.box end
-  right.y = right.y + 2
+  right:Skip(2)
   -- Toast position: Move shows a banner to drag; Done ends it; Reset puts it back at the top.
   local place = CreateFrame("Frame", nil, Rp)
   place.move = UI.TextButton(place, L.TOAST_MOVE, function()
@@ -180,9 +254,13 @@ local function build(pf)
   place:Refresh()
   pf.toastPlace = place
   right:Row(L.TOAST_POSITION, place, L.TOAST_POSITION_HINT)
-  right:Gap()
-  -- The tracker: turned on at the heading; its lines and how it behaves under it, faded while it is off.
-  local tracker = right:Head(L.TRACKER, L.TRACKER_HINT)
+  -- The tracker: turned on at the heading; its lines and how it behaves under it, faded while it is off. Folded at
+  -- first: the toasts and the tracker take turns.
+  local tracker = right:Head("tracker", L.TRACKER, L.TRACKER_HINT, { group = "right", folded = true, sum = function()
+    if not Settings:Get("tracker") then return L.SET_SUM_OFF end
+    local t = Settings.TRACKER_LINES
+    return L.SET_SUM_LINES:format(count(t, function(k) return Settings:TrackerLineOn(k) end), #t)
+  end })
   pf.trackerBox = UI.Checkbox(Rp, check("tracker"))
   pf.trackerBox:SetPoint("RIGHT", tracker, "RIGHT", 3, 3)
   pf.controls[#pf.controls + 1] = pf.trackerBox
@@ -193,7 +271,7 @@ local function build(pf)
   end
   pf.trackerRows, pf.trackerParts = {}, {}
   for key, f in pairs(right:Grid(lines)) do pf.trackerRows[key] = f.box; pf.trackerParts[#pf.trackerParts + 1] = f end
-  right.y = right.y + 4
+  right:Skip(4)
   local function opt(label, key, help, default)
     local get = default and function() return Settings:Get(key) ~= false end or function() return Settings:Get(key) end
     local f = right:Tick(label, get, function(v) Settings:Set(key, v) end, help)
@@ -204,7 +282,23 @@ local function build(pf)
   pf.trackerPeek = opt(L.TRACKER_PEEK, "trackerPeek", L.TRACKER_PEEK_HINT, true)
   pf.trackerCombat = opt(L.TRACKER_HIDE_COMBAT, "trackerHideCombat")
   pf.trackerInstance = opt(L.TRACKER_HIDE_INSTANCE, "trackerHideInstance", L.TRACKER_HIDE_INSTANCE_HINT)
-  pf.heights = { left = left.y, right = right.y }
+  pf.heights = { left = left:MaxHeight(), right = right:MaxHeight() }
+  function pf.layout() left:Layout(); right:Layout() end
+  -- Opens or folds a section; opening one of a group folds the others.
+  function pf:Fold(id, open)
+    local sec = self.sections[id]
+    if not sec or not ns.char then return end
+    local st = ns.char.setFold or {}
+    ns.char.setFold = st
+    local shut = sec.body:IsShown()
+    if open ~= nil then shut = not open end
+    st[id] = shut
+    if not shut and sec.group then
+      for oid, other in pairs(self.sections) do if oid ~= id and other.group == sec.group then st[oid] = true end end
+    end
+    self.layout()
+  end
+  pf.layout()
 end
 
 local function refresh(pf)
@@ -213,6 +307,7 @@ local function refresh(pf)
   pf.lang.help:SetHelp(L.LANGUAGE, Settings:Get("lang") == "sv" and L.LANG_NOTE_SV or L.LANG_NOTE_EN)
   local on = Settings:Get("tracker") and true or false
   for _, f in ipairs(pf.trackerParts) do f:SetAlpha(on and 1 or 0.45) end
+  pf.layout()
 end
 
 -- Leaving the page (or closing the book) ends moving the toast.

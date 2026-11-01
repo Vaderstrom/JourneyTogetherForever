@@ -217,6 +217,8 @@ end
 
 -- The status chip of an entry and its colour (nil: no chip).
 function C:Status(e)
+  -- (Entries made elsewhere bring their own chip: the challenges' falls, Fellowship/Challenges.lua.)
+  if e.chip then return e.chip, e.chipColor end
   if e.type == "run" then
     if e.ok then return L.ST_COUNTED, "2E7A3E" end
     if e.reason == "locked" then return L.ST_LOCKED, "B0321E" end
@@ -229,8 +231,9 @@ function C:Status(e)
   return nil
 end
 
-C.ICON = { run = "hist_run", mark = "hist_mark", undo = "hist_undo", chapter = "hist_chapter", cap = "hist_cap",
-  session = "hist_session" }
+C.ICON = { first = "hist_first", run = "hist_run", mark = "hist_mark", undo = "hist_undo", chapter = "hist_chapter", cap = "hist_cap",
+  session = "hist_session", fallen = "hist_fallen", life = "hist_life", challenge = "hist_challenge", broke = "hist_broke",
+  ring = "hist_ring", race = "hist_race" }
 
 -- History entries for a filter ("all", "run", "leader", "cap").
 function C:Entries(f, filter)
@@ -448,8 +451,34 @@ Comm:On("KILLS", function(sender, d)
   F:Changed()
 end)
 
-function C:ClearedToast(key)
-  ns:Toast("clear", L.TOAST_CLEARED, L.TOAST_CLEARED_TEXT:format(dname(key)), "chapter")
+C.WHO_MAX = 8 -- names on a clear message; the rest are "and 12 more"
+
+-- "In the group: you, Brannic, Elyra and Corwin." for a clear message: you first (as the Chapter page's lists), each
+-- name in its class colour. nil without names (the Leader marked it cleared: nobody was there).
+function C:GroupLine(f, names)
+  if type(names) ~= "table" or #names == 0 then return nil end
+  local me, list = ns.Me(), {}
+  if has(names, me) then list[1] = me end
+  for _, n in ipairs(names) do if n ~= me then list[#list + 1] = n end end
+  local out = {}
+  for i, n in ipairs(list) do
+    if i > self.WHO_MAX and #list > self.WHO_MAX + 1 then out[#out + 1] = L.TOAST_CLEAR_MORE:format(#list - i + 1); break end
+    local text = n == me and L.NAME_YOU or ns.Short(n)
+    local hex = f and ns.ClassHex(select(2, ns.Hero:ClassName(f, n)))
+    out[i] = hex and ("|cff" .. hex .. text .. "|r") or text
+  end
+  local joined = #out == 1 and out[1] or (table.concat(out, ", ", 1, #out - 1) .. L.AND .. out[#out])
+  return L.TOAST_CLEAR_GROUP:format(joined)
+end
+
+-- The clear message (U7, 31 Oct 2026): the dungeon's or raid's picture, its name, and who was there. names: the
+-- Adventurers in the group (none when the Leader marked it cleared). newly: who cleared it now, while the fellowship
+-- has not yet (nil: it counts for the whole fellowship). A click opens the Chapter page, or the Raids page.
+function C:ClearedToast(f, key, names, newly)
+  local raid = ns.Raid(ns.BaseKey(key)) ~= nil
+  local text = newly and L.TOAST_CLEAR_FOR:format(andList(newly)) or L.TOAST_CLEAR_ALL
+  return ns:Toast("clear", dname(key), text, raid and "raids" or "chapter",
+    { dungeon = key, kicker = raid and L.TOAST_RAID_CLEARED or L.TOAST_CLEARED, who = self:GroupLine(f, names) })
 end
 
 -- Boss b of key died with this character in the group: record it, tell the other Heroes, show it at once.
@@ -472,8 +501,8 @@ function C:Kill(f, key, b)
       ns:Print(L.KILL_NOT:format(b.name, (self:Status(e))), true)
     end
   end
-  if done then self:ClearedToast(key)
-  elseif #newly > 0 then ns:Toast("clear", L.TOAST_CLEARED, L.TOAST_CLEARED_FOR:format(dname(key), andList(newly)), "chapter") end
+  if done then self:ClearedToast(f, key, names)
+  elseif #newly > 0 then self:ClearedToast(f, key, names, newly) end
   -- The final boss (the last in the game's list), or the kill that finished the clear: a picture of the group?
   if ns.Picture and (self:IsFinal(key, b) or done) then ns.Picture:Offer(key) end
   F:Changed()
@@ -550,7 +579,7 @@ function C:ApplyOp(f, op, by, t)
   else
     return false
   end
-  if not was and J:Cleared(f, key) then self:ClearedToast(key) end
+  if not was and J:Cleared(f, key) then self:ClearedToast(f, key) end
   if back and not J:Cleared(f, key) then
     J:Reopen(f, back)
     F:Log(f, L.CHR_REOPENED:format(ns.Journey.Roman(back), f.journey.chapters[back].name), t, "reopened", by)
@@ -588,7 +617,7 @@ Comm:On("RUN", function(sender, d)
   if not inGroup then return end
   if d.b:sub(1, 1) == "n" then C:Learn(d.key, d.b:sub(2)) end
   local _, _, done = C:Record(f, d.key, t, names, d.b)
-  if done and f == F:Current() then C:ClearedToast(d.key) end
+  if done and f == F:Current() then C:ClearedToast(f, d.key, names) end
   F:Changed()
 end)
 

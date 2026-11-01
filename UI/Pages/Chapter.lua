@@ -226,6 +226,8 @@ local function build(pf)
   pf.rscroll:SetAllPoints()
   local R = pf.rscroll.child
   pf.head = UI.Heading(R, width, L.WHERE_STAND, nil)
+  -- The level track above the list (U5, 31 Oct 2026): the chapter's floor and cap with everyone on one line.
+  pf.levelTrack = UI.LevelTrack(R, width)
   pf.stand = UI.Standings(R, width)
 
   -- Dungeon clears: a card with a header row (Hero, dungeons) and one row per Hero.
@@ -677,6 +679,8 @@ local function refresh(pf, ctx)
   -- Where the Heroes stand.
   local r = UI.Stack(pf.rscroll.child)
   r:Place(pf.head, pf.head:GetHeight(), 4)
+  local th = pf.levelTrack:Set(f, view, 6)
+  if th > 0 then r:Place(pf.levelTrack, th, 12) end
   pf.stand:Set(f, view, r)
   refreshMatrix(pf, ctx, list, r, width)
   pf.rscroll:SetContentHeight(r.y + 8)

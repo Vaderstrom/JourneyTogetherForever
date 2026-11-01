@@ -163,13 +163,18 @@ function QL:DungeonLine(f, key)
   return L.DQ_LINE:format(table.concat(parts, ", "))
 end
 
+-- The place an attunement or key belongs to, for its picture (U8, 31 Oct 2026): the raid, the dungeon the key drops in
+-- (the Dire Maul key: Dire Maul East, not the Deadmines), or its own key. A place without a picture keeps the icon.
+function QL.PlaceOf(a) return a.raid or a.from or a.key end
+
 -- A level up that opens an attunement: a toast with where to see it (Quests → Attunements). In a fellowship or not.
 function QL:OnLevelUp(newLevel)
   newLevel = tonumber(newLevel)
   if not newLevel then return end
   local s = SIDE[UnitFactionGroup("player") or ""]
   for _, a in ipairs(self:NewlyAvailable(s, newLevel - 1, newLevel)) do
-    ns:Toast("attune", L.TOAST_ATTUNE_TITLE:format(a.name), a.kind == "raid" and L.TOAST_ATTUNE_RAID or L.TOAST_ATTUNE_KEY, "quests")
+    ns:Toast("attune", L.TOAST_ATTUNE_TITLE:format(a.name), a.kind == "raid" and L.TOAST_ATTUNE_RAID or L.TOAST_ATTUNE_KEY, "quests",
+      { dungeon = QL.PlaceOf(a) })
   end
 end
 ns:RegisterEvent("PLAYER_LEVEL_UP", function(_, level) QL:OnLevelUp(level) end)

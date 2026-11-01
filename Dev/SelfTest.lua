@@ -69,11 +69,16 @@ local function shot(name, show)
   end }
 end
 
+-- The game and character the report comes from (also when only an area that stands alone runs).
+function ST.Env()
+  return { version = ns.VERSION, build = select(4, GetBuildInfo()), faction = (UnitFactionGroup("player")),
+    level = UnitLevel("player"), locale = GetLocale and GetLocale() }
+end
+
 -- What the game offers (the parts we could not check outside the game).
 step("game APIs", function(c)
   local r = report()
-  r.env = { version = ns.VERSION, build = select(4, GetBuildInfo()), faction = (UnitFactionGroup("player")),
-    level = UnitLevel("player"), locale = GetLocale and GetLocale() }
+  r.env = ST.Env()
   local apis = {
     InviteUnit = (C_PartyInfo and C_PartyInfo.InviteUnit) or InviteUnit, QuestLogPushQuest = QuestLogPushQuest,
     IsPushableQuest = C_QuestLog and C_QuestLog.IsPushableQuest, SendTell = (ChatFrameUtil and ChatFrameUtil.SendTell) or ChatFrame_SendTell,
@@ -190,7 +195,7 @@ step("create: each step on both pages, Your own journey adds Chapters", function
   if W:IsOpen() then W:Refresh() else W:Open() end
   local pf = W.pageFrames.create
   c:Eq(W.current, "create", "Create a Fellowship is open")
-  c:Eq(#C:Steps(), 4, "four steps")
+  c:Eq(#C:Steps(), 5, "five steps")
   bothPages(c, pf, "fellowship")
   c:That(pf.crest:IsShown() and pf.emblemGrid:IsShown(), "step 1: your banner and every emblem on the right page")
   c:That(pf.next:IsShown() and not pf.prev:IsShown() and not pf.create:IsShown(), "step 1: Next, no Back")
@@ -208,7 +213,7 @@ step("create: each step on both pages, Your own journey adds Chapters", function
   c:Eq(C:StepKey(), "journey", "step 3: the journey")
   bothPages(c, pf, "journey")
   C:ChooseOwn(); W:Refresh()
-  c:Eq(#C:Steps(), 5, "Your own journey: five steps")
+  c:Eq(#C:Steps(), 6, "Your own journey: six steps")
   c:Eq(C.journey and #C.journey.chapters, #ns.BuildJourney(suggest[2]).chapters, "a copy of the suggested journey")
   click(pf.next)
   c:Eq(C:StepKey(), "chapters", "step 4: Chapters")
@@ -260,11 +265,133 @@ step("create: the journey editor (Split, Merge, the marks, a dungeon in and out)
   c:That(ed.shelfBy and ed.shelfBy.dm ~= nil, "the shelf has every dungeon")
 end)
 
+-- X1 (SPEC §9): the challenges, after the journey. None by default; they combine; Shared lives starts at what the size
+-- suggests (a duo: 4) and the Leader may change it; the review shows them. Three banners side by side, every challenge
+-- in sight at once (the owner, 1 Nov 2026).
+local function chalRow(pf, key) return pf.chalRows[key] end
+-- Every row of a banner stays on its cloth, above the pointed tail.
+local function onCloth(b)
+  local last = b.rows[#b.rows]
+  return last:GetBottom() and b:GetBottom() and last:GetBottom() >= b:GetBottom() + b.tail
+end
+step("challenges: Create's step, three banners, they combine, the size suggests the shared lives", function(c)
+  local W, C, Ch = ns.Window, ns.CreateState, ns.Challenges
+  local pf = W.pageFrames.create
+  local row = function(key) return chalRow(pf, key) end
+  click(pf.next)
+  c:Eq(C:StepKey(), "challenges", "step 5: the challenges")
+  bothPages(c, pf, "challenges")
+  c:Eq(C:Challenges(), nil, "none by default")
+  c:Eq(#pf.banners, 3, "three banners: Survival, Story and Travel, Gear, Gold & More")
+  local n, all = 0, true
+  for _, k in ipairs(Ch.LIST) do
+    if row(k) then n = n + 1; all = all and row(k):IsVisible() end
+  end
+  c:Eq(n, #Ch.LIST, "a row for each challenge (" .. #Ch.LIST .. ")")
+  c:That(all, "every challenge in sight at once")
+  for i, g in ipairs(Ch.GROUPS) do
+    c:Eq(#pf.banners[i].rows, #g.list, L["CHAL_GROUP_" .. g.key:upper()] .. ": its " .. #g.list .. " challenges")
+  end
+  c:That(not pf.lives:IsShown() and not pf.pvp:IsShown(), "nothing asked before a challenge is chosen")
+  click(row("hardcore")); click(row("shared"))
+  c:That(row("hardcore").chosen and row("shared").chosen, "Hardcore and Shared lives chosen together")
+  c:That(row("hardcore").check:IsShown() and row("hardcore").tint:IsShown(), "a chosen row is ticked and lit")
+  if inGame() then
+    local b = pf.banners
+    c:That(b[2]:GetLeft() > b[1]:GetRight() and b[3]:GetLeft() > b[2]:GetRight(), "the banners stand side by side")
+    c:That(math.abs(b[1]:GetTop() - b[3]:GetTop()) < 1 and math.abs(b[1]:GetBottom() - b[3]:GetBottom()) < 1, "as long as each other")
+    c:That(b[1].pic:GetTexture() ~= nil, "each banner hangs from its picture")
+    c:That(b[1]:GetBottom() > pf.prev:GetTop(), "the banners end above Back")
+  end
+  c:Has(row("ring").tipText, L.CHAL_RING_RULE, "hovering a challenge tells its rule")
+  c:That(pf.lives:IsShown(), "Shared lives asks how many")
+  c:Eq(C:Lives(), Ch.SHARED_SUGGEST.duo, "a duo: the suggested number of lives")
+  c:Eq(pf.lives.note:GetText(), L.CHAL_LIVES_SUGGEST:format(ns.Rules.SizeWord("duo"), Ch.SHARED_SUGGEST.duo), "and says what is suggested for a duo")
+  click(pf.lives.up)
+  c:Eq(C:Challenges() and C:Challenges().shared, Ch.SHARED_SUGGEST.duo + 1, "one more, by the arrow")
+  c:Has(row("shared").tipText, L.CHAL_SHARED_RULE:format(C:Lives()), "the tooltip has the lives chosen")
+  c:Has(pf.chalText:GetText(), L.CHAL_HARDCORE_RULE, "what Hardcore Fellowship means, on the right page")
+  c:That(pf.pvp:IsShown(), "Hardcore Fellowship asks whether it's a PvP realm")
+  click(pf.pvp)
+  c:Eq(C:Challenges() and C:Challenges().hardcore, "pvp", "on a PvP realm")
+  c:Eq(row("hardcore").name:GetText(), L.CHAL_HARDCORE_PVP, "the row is called Hardcore PvP Fellowship")
+  c:Has(pf.chalName:GetText(), L.CHAL_HARDCORE_PVP, "and so is the line on the right")
+  c:Has(pf.chalText:GetText(), L.CHAL_HARDCORE_PVP_RULE, "and any death counts, also one to another player")
+  if inGame() then
+    c:That(pf.pvp:GetBottom() >= row("hardcore"):GetBottom(), "the PvP realm tick under Hardcore, inside its row")
+    c:That(row("shared"):GetTop() <= row("hardcore"):GetBottom(), "Shared lives comes under it")
+  end
+  c:That(pf.chalNote:IsShown(), "the Fallen and starting anew, on the right page")
+  c:That(pf.chalLives:IsShown() and pf.chalLives:Lit() == C:Lives(), "the shared lives as a row of candles, all lit (" .. C:Lives() .. ")")
+  if inGame() then
+    c:That(onCloth(pf.banners[1]), "Survival holds its rows, the tick and the lives on its cloth")
+    c:That(pf.chalLater:GetBottom() > pf.next:GetTop(), "the right page's text stays above Next")
+  end
+end)
+
+-- X3-X5 (the owner, 1 Nov 2026): the other two banners. Ironman Fellowship takes Hardcore Fellowship and White gear
+-- only with it; Pauper asks for the gold; One class only is the Leader's class; No healers is not for a Leader who
+-- heals. Gear, Gold & More holds all seven with the most it can ask.
+step("challenges: Story and Gear banners, Ironman takes two with it, Pauper's gold", function(c)
+  local W, C, Ch = ns.Window, ns.CreateState, ns.Challenges
+  local pf = W.pageFrames.create
+  local row = function(key) return chalRow(pf, key) end
+  click(row("ring")); click(row("walk"))
+  c:That(row("ring").chosen and row("walk").chosen and row("hardcore").chosen, "they combine across the banners")
+  c:Has(pf.chalText:GetText(), L.CHAL_RING_RULE, "the Ring's rule on the right page")
+  c:Has(pf.chalName:GetText(), L.CHAL_WALK, "Walk everywhere in the line")
+  click(row("ironman"))
+  c:That(row("white").chosen, "Ironman Fellowship takes White gear only with it")
+  c:Eq(row("white").sub:GetText(), L.CHAL_WITH_IRONMAN, "and says so")
+  c:Eq(row("white").tipNote, L.CHAL_INCLUDED, "its tooltip too")
+  click(row("white"))
+  c:That(row("white").chosen, "it can't be taken off while Ironman is chosen")
+  local ch = C:Challenges()
+  c:That(ch.hardcore == "pvp" and ch.white and ch.ironman, "Hardcore PvP Fellowship and White gear only come with it")
+  c:That(pf.pvp:IsShown(), "the PvP realm tick stays with Hardcore")
+  click(row("pauper"))
+  c:That(pf.gold:IsShown(), "Pauper asks for the gold")
+  c:Eq(C:Gold(), Ch.PAUPER_SUGGEST, "10 gold suggested")
+  c:Eq(pf.gold.note:GetText(), L.CHAL_GOLD_SUGGEST:format(Ch.PAUPER_SUGGEST), "and says so")
+  click(pf.gold.up)
+  c:Eq(C:Challenges().pauper, 15, "a step up: 15")
+  c:Eq(pf.gold.stepper.value:GetText(), L.CHAL_GOLD_N:format(15), "15 gold between the arrows")
+  c:Has(pf.chalName:GetText(), L.CHAL_PAUPER_N:format(15), "Pauper (15 gold) in the line")
+  click(row("oneclass"))
+  c:Eq(C:Challenges().oneclass, ns.Fellowship:MyInfo().class, "One class only: the Leader's class")
+  c:Has(row("oneclass").sub:GetText(), Ch.ClassName(ns.Fellowship:MyInfo().class), "the row names it")
+  local role = C.role
+  C.role = "Healer"; W:Refresh()
+  click(row("nohealers"))
+  c:That(not row("nohealers").chosen, "No healers can't be chosen by a Leader who heals")
+  c:Eq(row("nohealers").sub:GetText(), L.CHAL_HEALER_YOU, "the row says why")
+  c:Eq(row("nohealers").tipNote, L.CHAL_HEALER_LEADER, "and its tooltip what to do")
+  -- (The most Gear, Gold & More can ask at once: Ironman's White gear, Pauper's gold, your class, the healer.)
+  if inGame() then c:That(onCloth(pf.banners[3]), "Gear, Gold & More holds all seven on its cloth, with all they ask") end
+  C.role = role; W:Refresh()
+  click(row("nohealers"))
+  c:That(row("nohealers").chosen, "another role: it can")
+  c:Has(pf.chalNote:GetText(), L.CHAL_NOTE_HELD, "the right page: those two are held at the door")
+  if inGame() then
+    for i = 1, 3 do c:That(onCloth(pf.banners[i]), L["CHAL_GROUP_" .. Ch.GROUPS[i].key:upper()] .. ": every row on the cloth") end
+    c:That(pf.chalLater:GetBottom() > pf.next:GetTop(), "the right page holds them all, above Next")
+  end
+  -- (Back to what the next steps expect: Survival's two, and nothing else.)
+  for _, k in ipairs({ "ring", "walk", "ironman", "pauper", "oneclass", "nohealers" }) do C.challenges[k] = nil end
+  C.gold = nil
+  W:Refresh()
+end)
+
 step("create: review, Change goes back; nothing is created", function(c)
   local W, C = ns.Window, ns.CreateState
   local pf = W.pageFrames.create
   click(pf.next)
-  c:Eq(C:StepKey(), "review", "step 5: review")
+  c:Eq(C:StepKey(), "review", "step 6: review")
+  c:Has(pf.reviewChal:GetText(), L.CHAL_HARDCORE_PVP, "the review lists the challenges")
+  if inGame() then c:That(pf.reviewChal:GetBottom() > pf.prev:GetTop(), "the challenges' line stays above Back") end
+  click(pf.changeChal)
+  c:Eq(C:StepKey(), "challenges", "Change opens the challenges")
+  C:Goto("review"); W:Refresh()
   bothPages(c, pf, "review")
   c:That(pf.create:IsShown() and not pf.next:IsShown(), "Create the fellowship, on the right page")
   c:Has(pf.reviewRoad.head.text:GetText(), L.PRESET_OWN, "the review shows Your own journey")
@@ -367,6 +494,15 @@ step("levels and the You card (catch-up)", function(c)
   local y = ns.Together:You(cur())
   c:Has(y.head, "13", "You card head")
   c:Eq(y.lines[1] and y.lines[1].text, L.YOU_LAST, "you are the last one")
+  -- One more below the floor: "1 other Adventurer" ("1 other Adventurers" in the check of 1 Nov 2026, 11:30).
+  local corwin = ns.Hero:Get(cur(), full("Corwin"))
+  if corwin then
+    local was = corwin.level
+    corwin.level = 13
+    local y2 = ns.Together:You(cur())
+    corwin.level = was
+    c:Eq(y2.lines[1] and y2.lines[1].text, L.YOU_BELOW_TOO_1, "you and one other below the floor")
+  end
   c:Has(y.lines[2] and y.lines[2].text, "at your pace", "an estimate")
   -- Where to catch up (M25): the journey's dungeons good for your level, third so the Overview shows it.
   if #ns.Together:GoodFor(cur(), 13) > 0 then
@@ -390,6 +526,65 @@ step("level track: where you stand and where the Adventurers stand", function(c)
     -- 332 with three next steps and Invite to group, and it fit well in the tour (27 Oct 2026); 379 with Play now's
     -- box since M25, which still fit (check of 29 Oct 2026).
     c:That(you:GetHeight() < 400, ("the card stays compact (%d)"):format(you:GetHeight()))
+  end
+end)
+
+-- U5: the level track on the Chapter and Adventurers pages. Adventurers at one level share one marker with their
+-- number and a line of names; no marker or level number is left over from an earlier draw (the check of 31 Oct 2026
+-- caught level numbers that stayed behind).
+local function trackSeen(c, where, t, levels)
+  local markers, numbers = 0, 0
+  for _, d in ipairs(t.markers.items) do
+    if d:IsShown() then
+      markers = markers + 1
+      if d.lv:IsVisible() then numbers = numbers + 1 end
+    end
+  end
+  c:Eq(markers, #levels, where .. ": one marker per level")
+  -- U12: each name after its class icon, in dark ink (in the game, where the class icons are).
+  if inGame() and t.lines.items[1] then
+    c:Has(t.lines.items[1]:GetText() or "", "|T", where .. ": class icons before the names")
+  end
+  c:That(numbers <= markers, where .. ": no level number without its marker")
+  local lines = 0
+  for _, fs in ipairs(t.lines.items) do if fs:IsShown() then lines = lines + 1 end end
+  c:That(lines >= 1, where .. ": a line of names under the track")
+end
+
+step("level track: the Chapter and Adventurers pages, one marker per level", function(c)
+  local f = cur()
+  local n = ns.Journey:CurrentIndex(f)
+  local tr = ns.Journey:TrackLevels(f, n)
+  c:That(tr ~= nil and #tr.levels >= 1, "the track has its Adventurers")
+  local shared
+  for _, e in ipairs(tr and tr.levels or {}) do if #e.names > 1 then shared = e end end
+  ns.Window:ShowPage("chapter")
+  local cp = ns.Window.pageFrames.chapter
+  c:That(cp.levelTrack:IsShown(), "on the Chapter page")
+  trackSeen(c, "Chapter page", cp.levelTrack, tr.levels)
+  if shared then
+    local found
+    for _, d in ipairs(cp.levelTrack.markers.items) do
+      if d:IsShown() and d.n:GetText() == tostring(#shared.names) then found = true end
+    end
+    c:That(found, ("%d Adventurers at level %d share one marker with their number"):format(#shared.names, shared.level))
+  end
+  -- A chapter far ahead stretches the track; its floor and cap then share one label instead of overlapping.
+  local far = #f.journey.chapters
+  cp.sel = far
+  ns.Window:Refresh()
+  trackSeen(c, "a chapter far ahead", cp.levelTrack, ns.Journey:TrackLevels(f, far).levels)
+  local m = cp.levelTrack.marks
+  if inGame() and m[2].label:IsShown() then
+    c:That(m[1].label:GetRight() < m[2].label:GetLeft(), "a chapter far ahead: floor and cap do not overlap")
+  end
+  cp.sel = nil
+  ns.Window:ShowPage("heroes")
+  local hp = ns.Window.pageFrames.heroes
+  if hp.levelTrack:IsShown() then
+    trackSeen(c, "Adventurers page", hp.levelTrack, tr.levels)
+  else
+    c:That(true, "Adventurers page: no room left for the track")
   end
 end)
 
@@ -558,6 +753,11 @@ step("group photo: everyone together on the whole screen", function(c)
   local named = 0
   for _, x in ipairs(PH.cast) do if x.label:IsShown() then named = named + 1 end end
   c:That(true, ("%d names placed under the feet"):format(named))
+  -- U16: the names at 20 with the class icon in front.
+  local mine = PH.NameText(cur(), ns.Me())
+  if inGame() then c:Has(mine, "|T", "your name in the photo: your class icon in front") end
+  c:Has(mine, ns.Short(ns.Me()), "and your name")
+  c:Eq(PH.NAME_SIZE, 20, "names at 20")
   PH:StepPose(1)
   c:That(PH.frame.pose.value:GetText():find(L.PHOTO_EVERYONE, 1, true) ~= nil, "a pose for everyone")
   -- Over the world: the game's camera in first person, and Look around gives the mouse to the game.
@@ -611,6 +811,44 @@ step("group photo: Salute starts again (part 2)", function(c)
   end
   PH:Close()
   c:That(not PH:IsOpen(), "closed")
+end)
+
+-- Members near you in 3D (31 Oct 2026, UI/Models.lua): a Companion's real model also loads when they are not grouped,
+-- from a friendly nameplate, your target, focus or the one under the mouse. What this client offers for it; needs no
+-- fellowship ("/jtf check models" runs only this). Four probes the same day showed that nothing else can draw another
+-- player (docs/ARCHITECTURE.md §5).
+step("models: what the game offers for Adventurers near you", function(c)
+  c:That(UnitExists ~= nil and UnitIsPlayer ~= nil and UnitName ~= nil, "UnitExists, UnitIsPlayer and UnitName exist")
+  -- Friendly players' nameplates: Midnight's name first, the older one after (the check of 31 Oct 2026 found no
+  -- nameplateShowFriends on retail 12.1.5). The game's own list says which nameplate settings this client has.
+  local cv = C_CVar and C_CVar.GetCVar
+  local plates, which
+  for _, k in ipairs(ns.Models.PLATE_CVARS) do
+    local v = cv and cv(k)
+    if v ~= nil then plates, which = v, k break end
+  end
+  c:That(true, ("friendly player nameplates (%s): %s (on, members near you show in 3D without being targeted)"):format(
+    tostring(which), plates == "1" and "on" or (plates and "off" or "unknown")))
+  local all = ConsoleGetAllCommands or (C_Console and C_Console.GetAllCommands)
+  local ok, list = pcall(all or error)
+  if ok and type(list) == "table" then
+    local names = {}
+    for _, e in ipairs(list) do
+      local n = type(e) == "table" and e.command
+      if type(n) == "string" and n:lower():find("^nameplateshow") then names[#names + 1] = n end
+    end
+    table.sort(names)
+    c:That(true, "this client's nameplate settings: " .. (#names > 0 and table.concat(names, ", ") or "none"))
+  end
+  local unit = UnitExists("target") and UnitIsPlayer("target") and "target" or nil
+  if unit then
+    local n = UnitName(unit)
+    c:That(true, ("your target's name can be read: %s"):format((issecretvalue and issecretvalue(n)) and "no (secret here)" or "yes"))
+  else
+    c:That(true, "target a player to see whether their name can be read here")
+  end
+  local mine = ns.Models:DrawableUnit(ns.Self())
+  c:Eq(mine, "player", "you are always drawn")
 end)
 
 step("quests: tabs and attunements", function(c)
@@ -675,6 +913,9 @@ step("heroes and inspect", function(c)
   pf.sel = full("Brannic")
   ns.Window:Refresh()
   c:That(pf.whisper:IsShown(), "Whisper button")
+  -- The item-level box: a dash (not "1") until gear is shared, and a tooltip either way (check of 1 Nov 2026).
+  c:That(pf.ilvlBox.tip ~= nil and pf.ilvlBox.tip ~= "", "the item level box says what it is: " .. tostring(pf.ilvlBox.tip))
+  if pf.ilvlBox.tip == L.ILVL_NONE_TIP:format(ns.Short(full("Brannic"))) then c:Eq(pf.iIlvl:GetText(), "–", "no gear shared: a dash") end
   c:That(pf.inviteBtn:IsShown(), "Invite button")
   c:That(pf.stageCrest:IsShown(), "Inspect a pretend Adventurer: the crest and why")
   pf.sel = ns.Me()
@@ -886,6 +1127,97 @@ step("away: the leader marks a Hero, and I'm away / I'm back", function(c)
   c:Eq(ns.Journey:Away(f, ns.Me()), nil, "back")
 end)
 
+-- A Friend of the fellowship (SPEC §1.1, the owner, 1 Nov 2026): invited as one, in the fellowship and the runs, never
+-- counted for the floor, the votes, the firsts, the tournament or the challenges; in the tallies. Tamsin, a pretend
+-- one, joins as a Friend for this step and is removed at its end.
+step("friend of the fellowship: invited as one, never counted, tallies only", function(c)
+  local f, F, J, W = cur(), ns.Fellowship, ns.Journey, ns.Window
+  local t, me = full("Tamsin"), ns.Me()
+  local counted = #J:Counted(f)
+  -- The invite box offers it; the open invite says so.
+  W:ShowPage("heroes")
+  local pf = W.pageFrames.heroes
+  pf.sel = nil; W:Refresh()
+  c:That(pf.asFriend:IsShown(), "the invite box offers: As a Friend of the fellowship")
+  F:Do({ k = "invite", name = t, friend = true })
+  c:That(f.inviteFriend[t] == true, "invited as a Friend")
+  W:Refresh()
+  local row
+  for _, r in ipairs(pf.invRows.items) do if r:IsShown() and r.who == t then row = r end end
+  c:That(row ~= nil, "the open invite is listed")
+  if row then c:Has(row.name:GetText(), L.INV_AS_FRIEND, "as a Friend") end
+  dev("hero Tamsin accept")
+  c:That(F:IsFriend(f, t), "Tamsin joined as a Friend of the fellowship")
+  c:That(f.inviteFriend[t] == nil, "the invite is gone")
+  local joined = false
+  for _, e in ipairs(f.chronicle) do if e.text == L.CHR_JOINED_FRIEND:format(ns.Short(t)) then joined = true end end
+  c:That(joined, "the Chronicle: " .. L.CHR_JOINED_FRIEND:format(ns.Short(t)))
+  -- Never counted, never away, never behind.
+  c:Eq(#J:Counted(f), counted, "not counted for the floor")
+  c:Eq(J:Away(f, t), nil, "not away either")
+  c:Eq(ns.Hero:Status(f, t), L.STATUS_FRIEND, "the card says: " .. L.STATUS_FRIEND)
+  W:Refresh()
+  local card
+  for _, x in ipairs(pf.cards.items) do if x:IsShown() and x.who == t then card = x end end
+  c:That(card ~= nil and card.standing:GetText() == L.STATUS_FRIEND, "Tamsin's card, in the fellowship's colours of calm")
+  -- Counted apart (check of 1 Nov 2026, 11:30): not in the Adventurers tile or the roles; "1 Friend" beside them.
+  local nFr = F:Friends(f)
+  c:Eq(pf.stats[1].v:GetText(), tostring(F:Adventurers(f)), "the Adventurers tile leaves the Friends out")
+  c:That(pf.compFriend:IsShown() and pf.compFriend.n:GetText() == tostring(nFr), "the Friends counted apart beside the roles: " .. nFr)
+  local _, sub = ns.Pages:Titles("heroes", F:Context())
+  c:Has(sub, nFr == 1 and L.SUB_AND_FRIEND:format("") or L.SUB_AND_FRIENDS:format("", nFr), "the page says so: " .. sub)
+  c:That(F:Successor(f) ~= t, "never the next Leader before an Adventurer")
+  -- Votes, the tournament, the challenges: not a Friend's.
+  c:Eq(F:Apply(f, { k = "vote", a = "ballot", id = "none", yes = true }, t, time()), false, "no vote")
+  c:Eq(F:Apply(f, { k = "tourney", a = "sign", on = true }, t, time()), false, "no tournament sign-up")
+  local keep = { f.challenges, f.challengesOff, f.falls }
+  f.challenges, f.challengesOff = { hardcore = true }, nil
+  c:Eq(ns.Challenges:ApplyFall(f, t, { n = 1, lvl = 10 }, time()), false, "a death costs a Friend nothing")
+  c:Eq(ns.Challenges:Fallen(f, t), nil, "never Fallen")
+  f.challenges, f.challengesOff, f.falls = keep[1], keep[2], keep[3]
+  -- Firsts: not a Friend's; tallies: yes.
+  local open = ns.Firsts:Open(f)
+  f.heroes[t] = f.heroes[t] or {}
+  local hk = { f.heroes[t].deeds, f.heroes[t].tally }
+  if open[1] then
+    f.heroes[t].deeds = { [open[1]] = time() }
+    local got = false
+    for _, x in ipairs(ns.Firsts:List(f)) do if x.name == t then got = true end end
+    c:That(not got, "no first for a Friend (" .. open[1] .. " stays open)")
+  end
+  f.heroes[t].tally = { quests = 999 }
+  local q
+  for _, x in ipairs(ns.Firsts:Tallies(f)) do if x.kind == "quests" then q = x end end
+  c:That(q and q.top[1] and q.top[1].name == t, "but the tallies count: Tamsin did the most quests")
+  f.heroes[t].deeds, f.heroes[t].tally = hk[1], hk[2]
+  -- Switching: yourself only. Back to Adventurer only at or below the chapter's cap; the Leader always counts.
+  dev("hero Tamsin friend off")
+  c:That(not F:IsFriend(f, t) and #J:Counted(f) == counted + 1, "Tamsin plays on as an Adventurer: counted again")
+  dev("hero Tamsin friend")
+  c:That(F:IsFriend(f, t), "and a Friend again")
+  c:Eq(F:FriendBlock(f, true), "leader", "the Leader cannot become a Friend")
+  local ch = J:Current(f)
+  local lead, mine = f.leader, f.members[me]
+  local hm = ns.Hero:Get(f, me)
+  local lvl = hm and hm.level
+  if ch and hm then
+    f.leader, mine.friend = t, true
+    hm.level = ch.cap + f.rules.capTol + 1
+    c:Eq(F:FriendBlock(f, false), "cap", "back as an Adventurer: not over the chapter's cap")
+    hm.level = ch.cap
+    c:Eq(F:FriendBlock(f, false), nil, "at the cap: yes")
+    f.leader, mine.friend, hm.level = lead, nil, lvl
+  end
+  -- Your own page: the Friend section (as the Leader: why not).
+  pf.sel = me; W:Refresh()
+  c:That(pf.friendHead:IsShown(), "your own page: Friend of the fellowship")
+  c:Eq(pf.friendText:GetText(), L.FRIEND_NOT_LEADER, "the Leader always counts")
+  pf.sel = nil; W:Refresh()
+  -- Removed again (the steps after this one count three pretend Adventurers).
+  F:Remove(t)
+  c:That(f.members[t] == nil, "Tamsin removed again")
+end)
+
 step("rename and banner", function(c)
   local f = cur()
   ns.Fellowship:Rename("Selftest Renamed")
@@ -954,6 +1286,26 @@ step("Journey Admin: the journey editor works on the draft", function(c)
   c:That(not pf.publish:IsVisible(), "nothing to publish after Discard")
   c:Eq(#f.journey.chapters, n, "Discard: the published journey as it was")
   c:Eq(JE.PlacedIn(f.journey, "dm", n), nil, "without The Deadmines in the last chapter")
+end)
+
+-- U11: the chosen chapter enlarged on the ruler where the parts are too narrow for its number.
+step("Journey Admin: the chosen narrow chapter is enlarged on the ruler", function(c)
+  local f, A, W = cur(), ns.AdminDraft, ns.Window
+  W:ShowPage("admin")
+  local ed = W.pageFrames.admin.editor
+  local n = #f.journey.chapters
+  A.sel = n; W:Refresh(); ed:Refresh()
+  local seg = ed.segs[n]
+  if (seg:GetWidth() or 99) < 34 then
+    c:That(ed.lens:IsShown(), "the last chapter, narrow: enlarged")
+    c:Eq(ed.lens.n:GetText(), ns.Journey.Roman(n), "with its number")
+    c:Eq(seg.n:GetText() or "", "", "its own part under the lens has no second number")
+  else
+    c:That(not ed.lens:IsShown(), "the last chapter is wide enough here: no lens needed")
+  end
+  A.sel = 2; W:Refresh(); ed:Refresh()
+  c:That(not ed.lens:IsShown() or (ed.segs[2]:GetWidth() or 99) < 34, "a wide chapter: its own number, no lens")
+  A:Discard()
 end)
 
 step("clears: a cell in the table, and Undo clear", function(c)
@@ -1072,6 +1424,493 @@ step("Chronicle filters and totals", function(c)
   ns.Window:ShowPage("chronicle")
 end)
 
+-- F1 (SPEC §8): the fellowship's firsts from what the Adventurers share; only deeds after joining count.
+step("Chronicle: the fellowship's firsts and tallies", function(c)
+  local f, FS = cur(), ns.Firsts
+  local t = GetServerTime and GetServerTime() or time()
+  local b, e = f.heroes[full("Brannic")], f.heroes[full("Elyra")]
+  c:That(b ~= nil and e ~= nil, "pretend Adventurers to share deeds")
+  if not (b and e) then return end
+  local keep = { b.deeds, b.tally, e.deeds, e.tally }
+  b.deeds, b.tally = { lvl10 = t - 120, fall = t - 60 }, { falls = 2, quests = 4 }
+  e.deeds, e.tally = { lvl10 = t - 240, mount = t - 30 }, { falls = 0, quests = 9 }
+  -- A deed from long before Elyra joined does not count.
+  e.deeds.rare = (f.members[full("Elyra")].joined or t) - 86400
+  local byKey = {}
+  for _, x in ipairs(FS:List(f)) do byKey[x.key] = x.name end
+  c:Eq(byKey.lvl10, full("Elyra"), "first to level 10: Elyra, 2 minutes before Brannic")
+  c:Eq(byKey.fall, full("Brannic"), "first to fall: Brannic")
+  c:Eq(byKey.rare, nil, "a deed from before joining is no first")
+  local talliesOf = {}
+  for _, x in ipairs(FS:Tallies(f)) do talliesOf[x.kind] = x end
+  c:That(talliesOf.falls and talliesOf.falls.name == full("Brannic") and talliesOf.falls.n == 2, "has fallen most: Brannic (2)")
+  -- A toast for a recent first, once.
+  ns.char.firstsSeen = nil
+  local before = #report().toasts
+  FS:Check(f)
+  local firsts = 0
+  for i = before + 1, #report().toasts do if report().toasts[i].kind == "first" then firsts = firsts + 1 end end
+  c:That(firsts >= 3, firsts .. " toasts for the recent firsts")
+  c:Eq(FS:Check(f), 0, "no second toast for the same first")
+  ns.Window:ShowPage("chronicle")
+  local pf = ns.Window.pageFrames.chronicle
+  pf.filter = "first"; ns.Window:Refresh()
+  -- The Firsts filter is a cabinet of medals (check of 1 Nov 2026): the earned ones, then the ones still open, greyed.
+  local medals, open, named = 0, 0, 0
+  for _, m in ipairs(pf.medals.items) do
+    if m:IsShown() then
+      medals = medals + 1
+      if m.open then open = open + 1 end
+      if m.title:GetText() ~= m.key then named = named + 1 end
+    end
+  end
+  c:Eq(medals, #FS.KEYS, "a medal for every first, earned or not")
+  c:Eq(medals - open, #FS:List(f), "earned: " .. #FS:List(f))
+  c:Eq(open, #FS:Open(f), "still open, for someone to race for: " .. #FS:Open(f))
+  c:Eq(named, medals, "every medal has its name")
+  c:That(pf.earnedHead:IsShown() and pf.openHead:IsShown(), "Earned, then Still open")
+  -- Who is closest to an open level first (check of 1 Nov 2026, 11:30): named under it instead of "Nobody yet".
+  local near
+  for _, m in ipairs(pf.medals.items) do if not near and m:IsShown() and m.open and m.key:find("^lvl") then near = m end end
+  if near then
+    local who, lvl = FS:Closest(f, near.key)
+    c:Eq(near.closest, who, near.key .. ": " .. (who and (ns.Short(who) .. " " .. L.FIRST_CLOSEST:format(lvl)) or "nobody below it"))
+    if who then c:Eq(near.when:GetText(), L.FIRST_CLOSEST:format(lvl), "said under the medal") end
+  end
+  -- First to fall: gold without a challenge (violet and silver under one: the challenges' step).
+  for _, m in ipairs(pf.medals.items) do
+    if m:IsShown() and m.key == "fall" and not m.open then
+      c:Eq(m.solemn, ns.Challenges:Ever(f) or nil, "First to fall: " .. (m.solemn and "violet and silver" or "gold"))
+    end
+  end
+  local rows = 0
+  for _, r in ipairs(pf.rows.items) do if r:IsShown() then rows = rows + 1 end end
+  c:Eq(rows, 0, "no Chronicle lines under the medals")
+  c:That(pf.tHead:IsShown(), "the tallies on the right page")
+  -- The podium: the top three of each tally (Elyra did 9 quests, Brannic 4).
+  local q = talliesOf.quests
+  local qi = {}
+  for i, x in ipairs(q and q.all or {}) do qi[x.name] = i end
+  c:That(qi[full("Elyra")] and qi[full("Brannic")] and qi[full("Elyra")] < qi[full("Brannic")], "most quests: Elyra above Brannic")
+  local podium
+  for _, r in ipairs(pf.tRows.items) do if r:IsShown() and r.what:GetText() == L.TALLY_QUESTS then podium = r end end
+  c:That(podium ~= nil and podium.places[1]:IsShown(), "the quests tally as a podium")
+  if podium and q then c:Has(podium.places[1].name:GetText(), ns.Short(q.top[1].name), "first place: " .. ns.Short(q.top[1].name)) end
+  ns.Moments:Check(f)
+  c:That(ns.Moments:Find(f, "first:fall") ~= nil, "a Moments card for the first to fall")
+  local news = 0
+  for _, n in ipairs(ns.Board:News(f)) do if n.kind == "first" then news = news + 1 end end
+  c:That(news >= 3, news .. " firsts in the Discord outbox")
+  pf.filter = "all"
+  b.deeds, b.tally, e.deeds, e.tally = keep[1], keep[2], keep[3], keep[4]
+end)
+
+-- X2 (SPEC §9): survival, on the Selftest fellowship with Hardcore and two shared lives for a while (put back by the
+-- last of these steps). Brannic falls: Fallen, honoured (the Chronicle's memorial line, a toast, his card), no longer
+-- counted, a shared life gone; Corwin's fall takes the last one, and the journey goes on.
+local function withChallenges(f, ch)
+  if not ST.chalKeep then ST.chalKeep = { f.challenges, f.challengesOff, f.falls, f.broken, f.ring, f.race } end
+  f.challenges, f.challengesOff, f.falls, f.broken, f.ring, f.race = ch, nil, nil, nil, nil, nil
+end
+local function putChallengesBack(f)
+  local k = ST.chalKeep
+  if not k then return end
+  f.challenges, f.challengesOff, f.falls, f.broken, f.ring, f.race = k[1], k[2], k[3], k[4], k[5], k[6]
+  ST.chalKeep = nil
+end
+local function kindSeen(kind, since)
+  for i = since + 1, #report().toasts do if report().toasts[i].kind == kind then return true end end
+  return false
+end
+
+step("challenges: Hardcore and shared lives, the Fallen honoured", function(c)
+  local f, Ch, J = cur(), ns.Challenges, ns.Journey
+  withChallenges(f, { hardcore = true, shared = 2 })
+  local b, co = full("Brannic"), full("Corwin")
+  -- Candles that live (check of 1 Nov 2026, 11:30): the lit ones flicker, unless Reduce effects is on.
+  ns.Window:ShowPage("overview")
+  local still = ns.Settings:Get("reduce") and true or false
+  local lit1 = ns.Window.pageFrames.overview.lives.candles.items[1]
+  c:That(lit1 ~= nil and lit1.flickering == not still, still and "Reduce effects: the candles stay still" or "the lit candles flicker")
+  local counted, before = #J:Counted(f), #report().toasts
+  ns.lastSound = nil
+  dev("hero Brannic fall")
+  local e = Ch:Fallen(f, b)
+  c:That(e ~= nil, "a death under Hardcore: Brannic has fallen")
+  if not e then return end
+  -- A heavier toast for a Fallen (check of 1 Nov 2026): darker, slower, and a bell.
+  local fallToast
+  for i = before + 1, #report().toasts do if report().toasts[i].kind == "challenge" then fallToast = fallToast or report().toasts[i] end end
+  c:That(fallToast ~= nil and fallToast.solemn == true, "the toast is a solemn one")
+  local T = ns.Toasts
+  if T.frame and T.frame:IsShown() and T.current and T.current.solemn then
+    c:That(T.frame.solemn and T.frame.solemnBg:IsShown(), "its banner: night violet")
+    if inGame() then c:That(T.frame.hold:GetDuration() >= 5, "and it stays longer: " .. T.frame.hold:GetDuration() .. " seconds") end
+    if ns.Settings:Get("sounds") ~= false then c:Eq(ns.lastSound, "bell", "a bell tolls") end
+  end
+  c:Eq(e.foe, L.DEV_FOE, "who he was fighting is kept with it")
+  c:Eq(e.lvl, ns.Hero:Level(f, b), "and his level")
+  c:Eq(#J:Counted(f), counted - 1, "the Fallen no longer hold the fellowship back")
+  c:Eq(Ch:SharedLeft(f), 1, "a shared life is gone: 1 of 2 left")
+  c:That(kindSeen("challenge", before), "a toast for everyone")
+  dev("hero Brannic fall")
+  c:Eq(Ch:FallsOf(f, b), 1, "a Fallen's next death costs nothing more")
+  dev("hero Corwin fall")
+  c:That(Ch:LivesOut(f) ~= nil and Ch:LivesOut(f).who == co, "Corwin's fall took the last shared life")
+  c:Eq(Ch:SharedLeft(f), 0, "none left; the journey goes on")
+  -- The shared lives as candles on the Overview (check of 1 Nov 2026): two, both out; the tooltip names who.
+  ns.Window:ShowPage("overview")
+  local ov = ns.Window.pageFrames.overview
+  c:That(ov.lives:IsShown() and ov.lives.candles.total == 2 and ov.lives.candles:Lit() == 0, "the Overview's candles: 2, none lit")
+  c:Eq(ov.lives.text:GetText(), Ch:LivesView(f).title, "and what they mean")
+  c:Eq(#(ov.lives.candles.tipLines or {}), 2, "the tooltip names each life lost")
+  -- Each candle is the flame beside "Shared lives" (the game's candles read as white pearls; check of 1 Nov, 11:30).
+  c:Eq(ns.UI.icons[ov.lives.candles.items[1].icon], ns.ICONS.chal_shared, "each candle: the shared lives' flame")
+  -- Lives lost since the row was last seen: each candle goes out with a snuff and smoke (none with Reduce effects).
+  ns.char.livesSeen = ns.char.livesSeen or {}
+  ns.char.livesSeen[f.id] = 2
+  ns.Window:Refresh()
+  c:Eq(#(ov.lives.candles.snuffed or {}), still and 0 or 2, still and "Reduce effects: no snuff" or "both candles go out as you look")
+  c:Eq(ns.char.livesSeen[f.id], 0, "and only once")
+  -- Never counted (check of 1 Nov 2026, 11:30): not in the counts, never away, not online to group with, and never the
+  -- next Leader while someone plays on.
+  local inCounts, plays = 0, 0
+  for _, x in ipairs(J:Counts(f, J:CurrentIndex(f))) do inCounts = inCounts + x[2] end
+  for name, m in pairs(f.members) do if not m.friend and not Ch:Fallen(f, name) then plays = plays + 1 end end
+  c:Eq(inCounts, plays, "the counts leave the Fallen out")
+  local bm = f.members[b]
+  local wasAway = bm.away
+  bm.away = "forced"
+  c:Eq(J:Away(f, b), nil, "a Fallen is never away")
+  bm.away = wasAway
+  local offered = false
+  for _, n in ipairs(ns.Together:Online(f)) do if Ch:Fallen(f, n) then offered = true end end
+  c:That(not offered, "no Fallen among those online to group with")
+  local heir = ns.Fellowship:Successor(f)
+  c:That(heir ~= nil and not Ch:Fallen(f, heir), "the next Leader plays on: " .. (heir and ns.Short(heir) or "nobody"))
+  local first = ns.Progress:LongestServing(f)
+  c:That(not (first and Ch:Fallen(f, first)), "no Fallen takes over")
+  -- The Chronicle (All): the memorial line, with the level, the place and the day.
+  ns.Window:ShowPage("chronicle")
+  local pf = ns.Window.pageFrames.chronicle
+  pf.filter = "all"; ns.Window:Refresh()
+  local want, found = Ch:FallText(f, e), false
+  for _, r in ipairs(pf.rows.items) do if r:IsShown() and r.text:GetText() == want then found = true end end
+  c:That(found, "the Chronicle's memorial line: " .. want)
+  c:Has(want, Ch.Day(e.t), "with the day")
+  -- His card on the Adventurers page: Fallen, and when and where.
+  ns.Window:ShowPage("heroes")
+  local hp, card = ns.Window.pageFrames.heroes, nil
+  hp.sel = nil; ns.Window:Refresh()
+  local fallenSeen, livingAfter = false, false
+  for _, x in ipairs(hp.cards.items) do
+    if x:IsShown() then
+      if x.who == b then card = x end
+      local isF = Ch:Fallen(f, x.who) ~= nil
+      if isF then fallenSeen = true elseif fallenSeen then livingAfter = true end
+    end
+  end
+  c:That(card ~= nil, "Brannic still has his card")
+  c:That(fallenSeen and not livingAfter, "the Fallen come after those who play on")
+  -- Counted apart: "1 Fallen" beside the roles, and the roles only of those who play on (check of 1 Nov 2026).
+  local fallenN, roles = 0, 0
+  for name in pairs(f.members) do if Ch:Fallen(f, name) then fallenN = fallenN + 1 end end
+  for _, x in ipairs(hp.comp) do roles = roles + (tonumber(x.n:GetText()) or 0) end
+  c:That(hp.compFallen:IsShown() and hp.compFallen.n:GetText() == tostring(fallenN), "the Fallen counted apart: " .. fallenN)
+  c:Eq(roles, ns.Fellowship:Adventurers(f) - fallenN, "the roles count only the Adventurers who play on")
+  if card then
+    -- A memorial: a skull on the greyed crest, no Online, no Old addon, the card in violet.
+    c:That(card.fallenMark:IsShown(), "a skull on his crest's corner")
+    -- Clear of the line beside it (it covered the L of "Level 22"; check of 1 Nov 2026, 11:30).
+    if inGame() and card.fallenMark:GetRight() and card.xp:GetLeft() then
+      c:That(card.fallenMark:GetRight() <= card.xp:GetLeft(), "the skull stays clear of the memorial line")
+    end
+    c:That(card.crest:IsShown() and card.crest.icon:IsDesaturated(), "his class crest greyed")
+    c:That(not card.presence:IsShown() and not card.status:IsShown() and not card.old:IsShown(), "no Online, Offline or Old addon")
+    c:Eq(card.standing:GetText(), L.STATUS_FALLEN, "Fallen on his card")
+    c:Eq(card.xp:GetText(), Ch:FallenLine(e), "place, day and foe on his card")
+    -- The line stops before "Fallen" (they ran into each other in the check of 1 Nov 2026, 01:20), and holds the foe
+    -- whole (it was cut after the level was on it too; the check after 1133f90).
+    if inGame() and card.xp:GetRight() and card.standing:GetLeft() then
+      c:That(card.xp:GetRight() <= card.standing:GetLeft(), "the memorial line stops before Fallen")
+      c:That(card.xp:GetStringWidth() <= card.xp:GetWidth() + 1, "the whole line fits, the foe included")
+    end
+  end
+  -- His memorial page (check of 1 Nov 2026, 11:30): his crest and the fall in place of the gear, his journey on the
+  -- right in place of the chapter.
+  hp.sel = b; ns.Window:Refresh()
+  c:That(hp.memorial:IsShown() and not hp.modelBox:IsShown() and not hp.ilvlBox:IsShown(), "inspecting him: a memorial, not his gear")
+  c:Eq(hp.memorial.title:GetText(), L.MEMORIAL_TITLE:format(ns.Short(b)), "the memorial's title")
+  c:Eq(hp.memorial.line:GetText(), Ch:Memorial(f, b).line, "where, when and fighting whom")
+  c:That(hp.memHead:IsShown() and not hp.chHead:IsShown(), "his journey in place of this chapter")
+  c:Eq(hp.facts[2].k:GetText(), L.FACT_DAYS, "the days he was in the fellowship")
+  c:That(not hp.inviteBtn:IsShown() and not hp.iBar:IsShown(), "no Invite to group, no XP")
+  hp.sel = nil
+  -- First to fall, under a challenge: violet and silver, not gold.
+  local hb = f.heroes[b]
+  local keepDeeds = hb and hb.deeds
+  if hb then hb.deeds = { fall = e.t } end
+  ns.Window:ShowPage("chronicle")
+  pf.filter = "first"; ns.Window:Refresh()
+  local fm
+  for _, m in ipairs(pf.medals.items) do if m:IsShown() and m.key == "fall" and not m.open then fm = m end end
+  c:That(fm ~= nil and fm.solemn and fm.edge:IsShown(), "First to fall under a challenge: violet and silver, not gold")
+  pf.filter = "all"
+  if hb then hb.deeds = keepDeeds end
+  -- The Discord board keeps the Fallen, last, as memorial rows.
+  local rows = ns.Board:Build(f).heroes or {}
+  local lastRow = rows[#rows]
+  c:That(lastRow ~= nil and lastRow.group == "fallen", "the Discord board: the Fallen last, as memorial rows")
+  local fe = lastRow and Ch:Fallen(f, lastRow.name)
+  if fe then c:Has(lastRow.text or "", Ch.Day(fe.t), "with the day they fell") end
+end)
+
+step("challenges: the rulebook, Turn off in Manage, shared lives alone", function(c)
+  local f, Ch, W = cur(), ns.Challenges, ns.Window
+  -- The rulebook: an article after the rules.
+  W:ShowPage("rules")
+  local rp = W.pageFrames.rules
+  c:That(rp.chal.head:IsShown(), "the rulebook has the Challenges article")
+  c:Has(rp.chal.text:GetText(), L.CHAL_HARDCORE, "it names Hardcore")
+  c:Has(rp.chal.text:GetText(), ns.Short(full("Brannic")), "and the Fallen")
+  c:That(rp.chal.lives:IsShown() and rp.chal.lives.total == 2, "the rulebook's candles too")
+  -- Manage → Rules: Turn off asks first, then it is gone for good and the Chronicle says so.
+  W:ShowPage("rulesadmin")
+  local ap = W.pageFrames.rulesadmin
+  local row
+  for _, r in ipairs(ap.chalRows.items) do if r:IsShown() and r.key == "hardcore" then row = r end end
+  c:That(row ~= nil and row.off:IsShown(), "Hardcore with Turn off")
+  if row then
+    click(row.off)
+    c:That(W.confirm and W.confirm:IsShown(), "it asks first")
+    local ok = W.confirm and W.confirm.ok:GetScript("OnClick")
+    if ok then ok(W.confirm.ok) end
+  end
+  c:That(not Ch:Has(f, "hardcore") and f.challengesOff and f.challengesOff.hardcore ~= nil, "Hardcore is off")
+  c:That(Ch:Fallen(f, full("Brannic")) ~= nil, "the Fallen stay Fallen")
+  local off = false
+  for _, e in ipairs(Ch:Entries(f)) do if e.icon == "challenge" then off = true end end
+  c:That(off, "the Chronicle says it was turned off")
+  -- Shared lives alone: a fall costs one of the fellowship's lives, and nobody falls for good.
+  withChallenges(f, { shared = 3 })
+  dev("hero Elyra fall")
+  c:Eq(Ch:SharedLeft(f), 2, "Shared lives alone: Elyra's fall leaves 2 of 3")
+  c:Eq(Ch:Fallen(f, full("Elyra")), nil, "and she plays on")
+  c:Eq(ns.Hero:Status(f, full("Elyra")) == L.STATUS_FALLEN, false, "her card does not say Fallen")
+end)
+
+-- My own death: the same path as the game's (Firsts notices it; the fall waits a moment for the Death Recap).
+step("challenges: your own fall, recorded after a moment", function(c)
+  local f, Ch = cur(), ns.Challenges
+  withChallenges(f, { hardcore = "pvp" })
+  ST.myFalls = Ch:FallsOf(f, ns.Me())
+  ST.myFoe = Ch:Foe() -- (a best guess: the enemy you have targeted, when the game shares the name)
+  Ch:Fell()
+  c:That(true, "your fall, as the game's PLAYER_DEAD would bring it (foe now: " .. tostring(ST.myFoe) .. ")")
+end, 1.6) -- (longer than the moment the fall waits for the Death Recap, Challenges.RECAP_WAIT)
+
+step("challenges: your own fall (checked)", function(c)
+  local f, Ch = cur(), ns.Challenges
+  c:Eq(Ch:FallsOf(f, ns.Me()), (ST.myFalls or 0) + 1, "your fall is recorded in the fellowship")
+  local e = Ch:Fallen(f, ns.Me())
+  c:That(e ~= nil, "Hardcore PvP Fellowship: any death ends the journey")
+  c:That(e and e.zone ~= nil, "where: " .. tostring(e and e.zone))
+  local recap = Ch.Recap()
+  c:That(true, "the game's Death Recap gives an addon: " .. tostring(recap) .. " (nil: nothing, or hidden)")
+  putChallengesBack(f)
+  c:Eq(Ch:Fallen(f, ns.Me()), nil, "the Selftest fellowship's challenges put back")
+end)
+
+-- X3-X5 (the owner, 1 Nov 2026): a broken rule is marked, not stopped: the Chronicle's line, a toast, "Broke ..." on
+-- the card, "Broken by" in the rulebook. Only the first break of each challenge is kept.
+local function chronicleHas(text)
+  ns.Window:ShowPage("chronicle")
+  local pf = ns.Window.pageFrames.chronicle
+  pf.filter = "all"; ns.Window:Refresh()
+  for _, r in ipairs(pf.rows.items) do if r:IsShown() and r.text:GetText() == text then return true end end
+  return false
+end
+local function cardLine(name)
+  ns.Window:ShowPage("heroes")
+  local hp = ns.Window.pageFrames.heroes
+  hp.sel = nil; ns.Window:Refresh()
+  for _, x in ipairs(hp.cards.items) do if x:IsShown() and x.who == name then return x.line:GetText() end end
+  return nil
+end
+step("challenges: a broken rule, marked in the Chronicle, the card and the rulebook", function(c)
+  local f, Ch = cur(), ns.Challenges
+  withChallenges(f, { walk = true, white = true, fellowfound = true })
+  local b, before = full("Brannic"), #report().toasts
+  dev("hero Brannic break taxi")
+  local e = Ch:Broke(f, b, "walk")
+  c:That(e ~= nil, "Brannic took a flight path: Walk everywhere broken")
+  if not e then return end
+  c:That(kindSeen("challenge", before), "a toast for everyone")
+  dev("hero Brannic break hearth")
+  c:Eq(#Ch:BrokenBy(f, "walk"), 1, "the hearthstone after it adds nothing: only the first break is kept")
+  c:That(chronicleHas(Ch:BreakText(e)), "the Chronicle: " .. Ch:BreakText(e))
+  c:Has(cardLine(b) or "", L.CARD_BROKE:format(L.CHAL_WALK), "his card: Broke Walk everywhere")
+  dev("hero Brannic break trade")
+  c:Has(cardLine(b) or "", L.CARD_BROKE_N:format(2), "two broken: Broke 2 challenges")
+  c:Has(Ch:BreakText(Ch:Broke(f, b, "fellowfound")), L.DEV_BREAK_X, "the trade names who it was with")
+  ns.Window:ShowPage("rules")
+  c:Has(ns.Window.pageFrames.rules.chal.text:GetText(), L.CHAL_BOOK_BROKEN:format(ns.Short(b)), "the rulebook: Broken by Brannic")
+  -- Your own, as Fellowship/ChallengeWatch.lua records it.
+  dev("break gear")
+  local mine = Ch:Broke(f, ns.Me(), "white")
+  c:That(mine ~= nil and mine.x == L.DEV_BREAK_GEAR, "your own: " .. (mine and Ch:BreakText(mine) or "nothing"))
+  -- A Friend of the fellowship is never in the challenges.
+  local el = full("Elyra")
+  local m = f.members[el]
+  local was = m and m.friend
+  if m then
+    m.friend = true
+    dev("hero Elyra break taxi")
+    c:Eq(Ch:Broke(f, el, "walk"), nil, "a Friend breaks nothing")
+    m.friend = was
+  end
+end)
+
+-- Lord of the Rings: the first ring found is the Ring; only its bearer ends the quest.
+step("challenges: Lord of the Rings, found, carried, lost", function(c)
+  local f, Ch = cur(), ns.Challenges
+  withChallenges(f, { ring = true, race = true })
+  ns.Window:ShowPage("rules")
+  c:Has(ns.Window.pageFrames.rules.chal.text:GetText(), L.CHAL_BOOK_RING_NONE, "the rulebook: nobody has found it yet")
+  local b, before = full("Brannic"), #report().toasts
+  dev("hero Brannic ring")
+  c:That(f.ring ~= nil and f.ring.who == b, "Brannic found the Ring")
+  if not f.ring then return end
+  c:That(kindSeen("challenge", before), "a toast for everyone")
+  c:Has(cardLine(b) or "", L.CARD_RING_BEARER, "his card: Ring-bearer")
+  dev("hero Corwin ring")
+  c:Eq(f.ring.who, b, "a later find is no Ring")
+  dev("hero Corwin ring lost")
+  c:Eq(f.ring.state, nil, "only the bearer ends it")
+  dev("hero Brannic ring lost")
+  c:Eq(f.ring.state, "lost", "it left his bags outside Blackrock Mountain: the quest fails")
+  c:That(chronicleHas(Ch:RingText(f)), "the Chronicle: " .. Ch:RingText(f))
+  -- Carried into Blackrock Mountain and destroyed there: the quest is done.
+  f.ring = nil
+  dev("hero Corwin ring")
+  dev("hero Corwin ring done")
+  c:Eq(f.ring and f.ring.state, "done", "Corwin destroyed it inside Blackrock Mountain: done")
+  c:That(f.ring ~= nil and chronicleHas(Ch:RingText(f)), "the Chronicle: " .. (f.ring and Ch:RingText(f) or "nothing"))
+  -- Its bearer falls under Hardcore: the Ring is lost with them.
+  f.ring, f.challenges.hardcore = nil, true
+  dev("hero Elyra ring")
+  dev("hero Elyra fall")
+  c:That(f.ring ~= nil and f.ring.state == "lost" and f.ring.why == "fell", "Elyra fell carrying it: lost")
+  c:That(f.ring ~= nil and chronicleHas(Ch:RingText(f)), "the Chronicle: " .. (f.ring and Ch:RingText(f) or "nothing"))
+  local rings = 0
+  for _ in pairs(ns.ChallengeWatch.Rings()) do rings = rings + 1 end
+  c:That(true, ("your bags and fingers hold %d ring(s); inside Blackrock Mountain now: %s"):format(rings,
+    tostring(ns.ChallengeWatch.InBlackrock())))
+end)
+
+-- Race to 60: the clock in the rulebook; done, the Chronicle keeps the time and the account the best (put back after).
+step("challenges: Race to 60, the clock and the account's best", function(c)
+  local f, Ch = cur(), ns.Challenges
+  ns.Window:ShowPage("rules")
+  c:Has(ns.Window.pageFrames.rules.chal.text:GetText(), L.CHAL_BOOK_RACE:match("^(.-)%%s"), "the rulebook's clock")
+  local keep = ns.db.raceRecord
+  ns.Fellowship:Do({ k = "raced" })
+  c:That(f.race ~= nil, "everyone at 60: the race is done")
+  if f.race then
+    c:Eq(f.race.secs, f.race.t - Ch:RaceStart(f), "the time since the founding")
+    c:That(chronicleHas(L.CH_RACE:format(Ch.Span(f.race.secs))), "the Chronicle keeps it: " .. Ch.Span(f.race.secs))
+    c:That(ns.db.raceRecord ~= nil, "the account's best")
+  end
+  ns.db.raceRecord = keep
+end)
+
+-- Ironman Fellowship holds Hardcore Fellowship and White gear only: Manage → Rules has no Turn off for them.
+step("challenges: Ironman Fellowship holds the two it takes with it", function(c)
+  local f, Ch, W = cur(), ns.Challenges, ns.Window
+  withChallenges(f, { ironman = true, hardcore = true, white = true })
+  W:ShowPage("rulesadmin")
+  local rows = {}
+  for _, r in ipairs(W.pageFrames.rulesadmin.chalRows.items) do if r:IsShown() then rows[r.key] = r end end
+  local hc, iron = rows.hardcore, rows.ironman
+  c:That(hc ~= nil and hc.held:IsShown() and not hc.off:IsShown(), "Hardcore: Held by Ironman Fellowship, no Turn off")
+  c:That(rows.white ~= nil and rows.white.held:IsShown(), "White gear only: held too")
+  c:That(iron ~= nil and iron.off:IsShown() and not iron.held:IsShown(), "Ironman Fellowship itself can be turned off")
+  ns.Fellowship:Do({ k = "chaloff", key = "hardcore" })
+  c:That(Ch:Has(f, "hardcore"), "and a Turn off for Hardcore is refused")
+end)
+
+-- The watch (Fellowship/ChallengeWatch.lua) on this client: the game functions it listens to are here, and a pass
+-- over your own character runs. What it finds is written down, then put back with the challenges.
+step("challenges: the watch reads this client", function(c)
+  local f, Ch, CW = cur(), ns.Challenges, ns.ChallengeWatch
+  if inGame() then
+    local missing = {}
+    for _, name in ipairs({ "TakeInboxItem", "TakeInboxMoney", "SendMail", "UseAction", "GetInventoryItemQuality",
+      "GetMoney", "UnitOnTaxi", "GetProfessions" }) do
+      if type(_G[name]) ~= "function" then missing[#missing + 1] = name end
+    end
+    local AH = C_AuctionHouse
+    if not (AH and AH.PostItem) and type(_G.PostAuction) ~= "function" then missing[#missing + 1] = "the auction house" end
+    if not (C_Container and C_Container.UseContainerItem) then missing[#missing + 1] = "C_Container.UseContainerItem" end
+    c:Eq(table.concat(missing, ", "), "", "every game function the watch listens to is here")
+  end
+  withChallenges(f, { ironman = true, hardcore = true, white = true, walk = true, pauper = Ch.PAUPER_MAX })
+  CW:CheckAll()
+  local me, seen = ns.Me(), {}
+  for _, key in ipairs({ "white", "pauper", "walk", "ironman" }) do
+    local e = Ch:Broke(f, me, key)
+    if e then seen[#seen + 1] = Ch:BreakText(e) end
+  end
+  c:That(true, "a pass over you: " .. (#seen > 0 and table.concat(seen, " ") or "nothing broken"))
+  c:That(type(CW.TalentsSpent()) == "boolean", "talents read (points spent: " .. tostring(CW.TalentsSpent()) .. ")")
+end)
+
+-- One class only and No healers are held at the door, not marked.
+step("challenges: One class only and No healers, held at the door", function(c)
+  local f, Ch = cur(), ns.Challenges
+  local mine = ns.Fellowship:MyInfo().class
+  withChallenges(f, { oneclass = mine, nohealers = true })
+  local other = mine == "MAGE" and "WARRIOR" or "MAGE"
+  local ok, why = Ch:Allows(f, other, "DPS")
+  c:That(not ok, "a " .. Ch.ClassName(other) .. " can't join")
+  c:Eq(why, L.CHAL_ONECLASS_NO:format(Ch.ClassName(mine)), "and is told why")
+  local b = full("Brannic")
+  local role = f.members[b] and f.members[b].role
+  dev("hero Brannic role Healer")
+  c:That(f.members[b] and f.members[b].role ~= "Healer", "Brannic can't take the Healer role (still " .. tostring(f.members[b] and f.members[b].role) .. ")")
+  c:Eq(f.members[b] and f.members[b].role, role, "his role is unchanged")
+  -- A Friend of another class plays along, but can't play on as an Adventurer or be the next Leader.
+  local fr
+  for n, m in pairs(f.members) do if n ~= ns.Me() and m.class and m.class ~= mine then fr = n end end
+  local m = fr and f.members[fr]
+  if m then
+    local was = m.friend
+    m.friend = true
+    c:That(not ns.Fellowship:CanLead(f, fr), "a " .. Ch.ClassName(m.class) .. " Friend can't be the next Leader")
+    dev("hero " .. ns.Short(fr) .. " friend off")
+    c:That(m.friend == true, "nor play on as an Adventurer")
+    m.friend = was
+  end
+  putChallengesBack(f)
+  c:Eq(ST.chalKeep, nil, "the Selftest fellowship's challenges put back")
+end)
+
+-- U15: chapters unlocked in a row (three or more) read as one line that opens to show them.
+step("Chronicle: chapters unlocked in a row are one line", function(c)
+  local now = time()
+  local list = { { type = "run", time = now }, { type = "chapter", ch = 5, time = now }, { type = "chapter", ch = 4, time = now },
+    { type = "chapter", ch = 3, time = now }, { type = "run", time = now } }
+  local g = ns.ChronicleGroups(list, {})
+  c:Eq(#g, 3, "a run, one line for chapters III to V, a run")
+  c:That(g[2].group and g[2].lo == 3 and g[2].hi == 5, "the group: III to V")
+  c:Eq(#ns.ChronicleGroups(list, { [g[2].key] = true }), 6, "opened: the group line and its three chapters")
+  ns.Window:ShowPage("chronicle")
+  local pf = ns.Window.pageFrames.chronicle
+  local grouped
+  for _, e in ipairs(pf.rows.items) do if e:IsShown() and e.groupKey then grouped = e end end
+  c:That(true, grouped and "this fellowship's Chronicle groups its chapter lines" or "no three chapters in a row here")
+end)
+
 -- M25: a session with Brannic in the group (a pretend one: it started 15 minutes ago and he left 3 minutes ago).
 step("session recap: the toast, and the Chronicle at Sessions", function(c)
   local S, f = ns.Session, cur()
@@ -1169,6 +2008,32 @@ step("toasts: a long text wraps and the banner grows", function(c)
   ns.Toasts:Push("clear", "A long toast", ("The whole text must be readable, however long it is. "):rep(3))
   local t = ns.Toasts.frame
   if inGame() then c:That(t:GetHeight() > 86, ("taller than one line (%d)"):format(t:GetHeight())) end
+end, 1)
+
+-- U7: in the game the clear message finds the place's own picture (the same file as the Chapter page's rows).
+step("toasts: a clear shows the place's picture and who was there", function(c)
+  local key = ns.Dungeon("dm") and "dm" or ns.DUNGEONS[1][1]
+  c:Eq(ns.Clears:ClearedToast(cur(), key, { ns.Me(), full("Brannic") }), "shown", "the clear message")
+  local t = ns.Toasts.frame
+  if inGame() then c:That(t.place:IsShown(), ("%s: its picture shows"):format(key)) end
+  c:That(t.who:IsShown() and (t.who:GetText() or ""):find("Brannic", 1, true) ~= nil, "who was there")
+end, 1)
+
+-- U8: a Gathering's reminder and a newly open attunement show their place's picture, as a clear does.
+step("toasts: a Gathering and an attunement show their place's picture", function(c)
+  local QL = ns.QuestLists
+  local mc, dmKey
+  for _, a in ipairs(ns.ATTUNEMENTS) do
+    if a.key == "mc" and a.kind == "raid" and not a.raid then mc = a end
+    if a.item == 18249 then dmKey = a end
+  end
+  if mc then c:Eq(QL.PlaceOf(mc), "mc", "Molten Core's attunement: the raid's picture") end
+  if dmKey then c:Eq(QL.PlaceOf(dmKey), "dme", "the Dire Maul key: Dire Maul's picture, not the Deadmines'") end
+  local key = ns.Dungeon("dm") and "dm" or ns.DUNGEONS[1][1]
+  ns.Toasts:Push("gathering", ns.L.G_SOON, ns.L.G_SOON_TEXT:format("The Deadmines", "20:00"), "gatherings", { dungeon = key })
+  if inGame() then c:That(ns.Toasts.frame.place:IsShown(), ("a Gathering at %s: its picture"):format(key)) end
+  ns.Toasts:Push("gathering", ns.L.G_SOON, ns.L.G_SOON_TEXT:format(ns.L.G_SOMETHING_ELSE, "20:00"), "gatherings", {})
+  c:That(not ns.Toasts.frame.place:IsShown(), "a Gathering without a dungeon: the icon as before")
 end, 1)
 
 step("attunements: start levels and the toast when one opens", function(c)
@@ -1342,6 +2207,16 @@ step("the tracker on the screen", function(c)
   c:That(TK.frame and TK.frame:IsShown(), "shown")
   local content = TK:Content(cur())
   c:Has(content.title, cur().journey.chapters[ns.Journey:CurrentIndex(cur())].name, "the chapter")
+  -- U13: an icon on each line, and the little bar under "you".
+  local icons, shownLines = 0, 0
+  for _, b in ipairs(TK.frame.lines) do
+    if b:IsShown() then shownLines = shownLines + 1; if b.icon:IsShown() then icons = icons + 1 end end
+  end
+  if inGame() then c:Eq(icons, shownLines, "every line has its icon") end
+  c:That(content.bar ~= nil and content.bar.value >= 0 and content.bar.value <= 1, "the bar under you: a share of the way")
+  if ns.Settings:TrackerLineOn("you") and not ns.char.trackerFolded then
+    c:That(TK.frame.floorBar:IsShown(), "the bar shows under you")
+  end
   c:That(content.next ~= nil, "a next step: " .. tostring(content.next))
   TK:SetFolded(true)
   -- The game scales sizes to screen pixels: 30 comes back as 29.999996.
@@ -1465,6 +2340,34 @@ end
 
 step("tournament: bracket to a champion", function(c) playRounds(c, "bracket") ns.Window:ShowPage("tourney") end)
 
+-- U17: the bracket's cards are larger, with each Adventurer's class icon and level.
+step("tournament: the bracket's cards carry class icons and levels", function(c)
+  ns.Window:ShowPage("tourney")
+  local pf = ns.Window.pageFrames.tourney
+  local card
+  for _, x in ipairs(pf.cards.items) do if x:IsShown() then card = card or x end end
+  c:That(card ~= nil, "a card on the page")
+  if card then
+    c:That(math.abs(card:GetHeight() - 60) < 0.5, ("cards 60 high (%.1f)"):format(card:GetHeight()))
+    c:That((card.l1.level:GetText() or "") ~= "", "a level on the first line")
+    if inGame() then c:Has(card.l1.name:GetText() or "", "|T", "a class icon before the name") end
+    -- Every name whole, also yours with its You tag (check of 1 Nov 2026: "Edstr..." was cut).
+    if inGame() then
+      local cut
+      for _, x in ipairs(pf.cards.items) do
+        if x:IsShown() then
+          for _, l in ipairs({ x.l1, x.l2 }) do
+            local fs = l.name
+            local whole = fs.GetUnboundedStringWidth and fs:GetUnboundedStringWidth() or fs:GetStringWidth()
+            if whole > fs:GetWidth() + 1 then cut = fs:GetText() end
+          end
+        end
+      end
+      c:That(cut == nil, cut and ("a name is cut: " .. cut) or "every name on the cards is whole")
+    end
+  end
+end)
+
 shot("tournament, champion")
 
 step("tournament: walkovers when nobody duels", function(c)
@@ -1493,6 +2396,46 @@ step("history: the fellowship's own story", function(c)
   c:That(pf.rows.items[1] and pf.rows.items[1]:IsShown(), "its lines")
   c:Has(pf.founded:GetText(), "Founded", "when it was founded")
   c:That(pf.leads.items[1] and pf.leads.items[1]:IsShown(), "its Leaders")
+end)
+
+-- U9: the chapters so far, each with the day it began; the current one says "now".
+step("history: the chapters so far", function(c)
+  local f = cur()
+  ns.Window:ShowPage("history")
+  local pf = ns.Window.pageFrames.history
+  local chs = ns.HistoryChapters(f, nil)
+  c:Eq(#chs, math.min(ns.Journey:CurrentIndex(f), #f.journey.chapters), "one line per chapter reached")
+  local shown = 0
+  for _, d in ipairs(pf.chRows.items) do if d:IsShown() then shown = shown + 1 end end
+  c:Eq(shown, #chs, "the timeline on the page")
+  local last = pf.chRows.items[#chs]
+  c:Has(last and last.day:GetText() or "", "now", "the current chapter: now")
+end)
+
+-- U6: the number tiles (a gold number over its label and icon) on every page that has them.
+step("number tiles: the Adventurers page, Inspect, History and the Chronicle", function(c)
+  local function tiles(where, list)
+    local ok, icons = 0, 0
+    for _, t in ipairs(list or {}) do
+      if t:IsShown() and (t.v:GetText() or "") ~= "" and (t.k:GetText() or "") ~= "" then ok = ok + 1 end
+      if t.icon:IsShown() then icons = icons + 1 end
+    end
+    c:Eq(ok, #(list or {}), where .. ": every tile has its number and label")
+    if inGame() then c:That(true, ("%s: %d of %d with their icon"):format(where, icons, #(list or {}))) end
+  end
+  ns.Window:ShowPage("heroes")
+  local hp = ns.Window.pageFrames.heroes
+  hp.sel = nil
+  ns.Window:Refresh()
+  tiles("Adventurers page", hp.stats)
+  hp.sel = full("Brannic")
+  ns.Window:Refresh()
+  tiles("Inspect", hp.facts)
+  hp.sel = nil
+  ns.Window:ShowPage("history")
+  tiles("History", ns.Window.pageFrames.history.stats)
+  ns.Window:ShowPage("chronicle")
+  tiles("Chronicle", ns.Window.pageFrames.chronicle.stats)
 end)
 
 shot("fellowship history")
@@ -1600,6 +2543,10 @@ step("watch: follow another character's fellowship", function(c)
   c:That(ns.Characters:Summary(key) and ns.Characters:Summary(key).canWatch, "Your characters offers Follow")
   c:Eq(ns.Window.page, "overview", "it opens on the Overview")
   c:That(ns.Window.watchBar and ns.Window.watchBar:IsShown(), "the bar says whose fellowship it is, with Back")
+  -- A clearer sign (check of 1 Nov 2026): the header under a cool tint, a spyglass on the bar.
+  local h = ns.Window.frame.header
+  c:That(h.watchVeil and h.watchVeil:IsShown(), "the header tinted while following")
+  c:That(ns.Window.watchBar and ns.Window.watchBar.icon:IsShown(), "a spyglass on the bar")
 end, 2)
 
 step("watch: live and read-only", function(c)
@@ -1628,9 +2575,15 @@ end, 2)
 step("watch: news arrives, Back returns to your own", function(c)
   local W, D = ns.Watch, ns.Dev
   local f = ns.Fellowship:Get(D.WATCH_ID)
+  -- The pretend answer waits in the send queue behind the check's other messages: wait for it, up to 6 seconds (2
+  -- were not enough once the challenge steps came before it; check of 1 Nov 2026, 01:20).
+  local t0, n = GetTime(), 0
+  while f and ns.Hero:Level(f, full("Brannic")) ~= 18 and GetTime() - t0 < 6 and n < 600 do c:Yield(); n = n + 1 end
   c:Eq(f and ns.Hero:Level(f, full("Brannic")), 18, "Brannic levelled")
   W:Close()
   c:That(not W.active, "Back to your own")
+  local h = ns.Window.frame.header
+  c:That(not (h.watchVeil and h.watchVeil:IsShown()), "the tint goes with the bar")
   c:Eq(cur() and cur().name, "Selftest", "your own fellowship again")
   dev("watch off")
   c:That(ns.db.fellowships[D.WATCH_ID] == nil and ns.db.characters[full(D.WATCH_ALT)] == nil, "the pretend alt is gone")
@@ -1690,6 +2643,23 @@ step("settings and themes", function(c)
   S:Set("theme", was)
   ns.Window:OpenSettings()
   c:That(ns.Window.current == "settings" and ns.Window:IsFlat(), "settings open, on the flat sheet")
+  -- U10: folding sections; the toasts and the tracker take turns, and a folded heading says what is set.
+  local pf = ns.Window.pageFrames.settings
+  pf:Fold("tracker", true)
+  c:That(pf.sections.tracker.body:IsShown() and not pf.sections.toasts.body:IsShown(), "the tracker opens, the toasts fold")
+  c:That((pf.sections.toasts.head.sum:GetText() or "") ~= "", "the folded toasts say how many are on")
+  pf:Fold("toasts", true)
+  c:That(pf.sections.toasts.body:IsShown() and not pf.sections.tracker.body:IsShown(), "and back")
+  pf:Fold("book", false)
+  c:That(not pf.sections.book.body:IsShown() and (pf.sections.book.head.sum:GetText() or "") ~= "", "The book folds, its theme on the heading")
+  pf:Fold("book", true)
+  if inGame() then
+    for _, side in ipairs({ "left", "right" }) do
+      local last = side == "left" and pf.sections.help or pf.sections.toasts
+      local bottom = last.body:GetBottom()
+      c:That(bottom and pf[side]:GetBottom() and bottom >= pf[side]:GetBottom() - 1, side .. " page: everything fits")
+    end
+  end
 end)
 
 shot("settings")
@@ -2037,7 +3007,8 @@ function ST:Finish(keep)
   if done then C_Timer.After(1, done) end
 end
 
--- opts.onDone: runs after the self-test has cleaned up (/jtf check goes on with the tour).
+-- opts.onDone: runs after the self-test has cleaned up (/jtf check goes on with the tour). opts.only (a set of area
+-- keys that stand alone, Dev/Areas.lua): only their steps.
 function ST:Run(arg, opts)
   if self.running then return end
   if ns.Combat:InCombat() then ns:Print(L.SELFTEST_COMBAT, true) return end
@@ -2045,18 +3016,21 @@ function ST:Run(arg, opts)
   local keep = arg == "keep"
   self.running = true
   self.onDone = opts and opts.onDone
+  local only = opts and opts.only
   -- Not seen, so founding shows the setup guide (checked in "found"); as it was afterwards.
   self.savedSetup = ns.char.setupDone
   ns.char.setupDone = nil
-  ns.db.selftest = { started = time(), passed = 0, failed = 0, steps = {}, shots = {}, toasts = {} }
+  ns.db.selftest = { started = time(), passed = 0, failed = 0, steps = {}, shots = {}, toasts = {}, env = ST.Env() }
   -- Every toast during the run is noted (kind, title, text, the page a click opens), so the report shows which ones
-  -- fired. (The page is passed on: without it, a click on a toast opened nothing during the self-test.)
+  -- fired. (The page is passed on: without it, a click on a toast opened nothing during the self-test; so is a clear's
+  -- picture and who was there.)
   self.push = ns.Toasts.Push
-  ns.Toasts.Push = function(t, kind, title, text, page)
+  ns.Toasts.Push = function(t, kind, title, text, page, more)
     local list = report().toasts
     -- (A page that is a function, such as the share window's, is noted by name: saved data holds no functions.)
-    list[#list + 1] = { kind = kind, title = title, text = text, page = type(page) == "function" and "(opens a window)" or page, t = time() }
-    return ST.push(t, kind, title, text, page)
+    list[#list + 1] = { kind = kind, title = title, text = text, page = type(page) == "function" and "(opens a window)" or page, t = time(),
+      solemn = more and more.solemn or nil }
+    return ST.push(t, kind, title, text, page, more)
   end
   ns:Print(L.SELFTEST_START:format(#steps), true)
   local i = 0
@@ -2089,6 +3063,7 @@ function ST:Run(arg, opts)
     i = i + 1
     local s = steps[i]
     if not s then return ST:Finish(keep) end
+    if only and not only[ns.CheckAreas:ForStep(s.name)[1] or ""] then return nextStep() end
     run(s)
   end
   ns.Window:WhenBuilt(nextStep)

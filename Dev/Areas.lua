@@ -4,6 +4,8 @@
 -- and every id listed here exists. A new feature gets its area here, a step and a shot; then
 -- "/jtf check <area>" checks it and takes only its pictures, and tools/check-report.lua shows them together.
 -- noShots / noChecks: areas that have nothing to show or nothing to test on their own (with the reason).
+-- alone: its checks and shots need nothing set up before them (no fellowship, no pretend Heroes): "/jtf check <area>"
+-- with only such areas runs just their checks and shots, in seconds instead of minutes.
 local _, ns = ...
 local A = {}
 ns.CheckAreas = A
@@ -13,7 +15,7 @@ A.LIST = {
     checks = { "game APIs", "textures", "boss data", "crests:", "the book in combat" },
     noShots = "checks only: game functions and our files" },
   { key = "controls", title = "Buttons and choices (the game's art)", checks = { "controls:" }, shots = { "controls-gallery" } },
-  { key = "welcome", title = "Welcome and Your characters", shots = { "welcome", "characters-panel" },
+  { key = "welcome", title = "Welcome and Your characters", shots = { "welcome", "characters-panel", "characters-panel-all" },
     checks = { "play another character" } },
   { key = "found", title = "Create a Fellowship (size, style, journey, your own)",
     checks = { "create:", "found the Selftest fellowship", "rename and banner" },
@@ -43,21 +45,30 @@ A.LIST = {
       "chapter-later", "find-group", "chapter-partial", "undo-reopen-confirm", "chapter-catching" } },
   { key = "milestones", title = "Milestones", checks = { "milestones" },
     shots = { "chapter-milestones", "admin-milestone-form", "admin-one-level" } },
-  { key = "chronicle", title = "Chronicle and the cap", checks = { "Chronicle filters", "the cap:" },
-    shots = { "leader-chronicle-empty", "chronicle", "chronicle-runs" } },
+  { key = "chronicle", title = "Chronicle and the cap", checks = { "Chronicle filters", "Chronicle: chapters", "Chronicle: the fellowship's firsts", "the cap:" },
+    shots = { "leader-chronicle-empty", "chronicle", "chronicle-runs", "chronicle-firsts" } },
+  { key = "challenges", title = "Challenges: chosen at founding; survival, broken rules, the Ring, the race, held at the door (X1-X5)",
+    checks = { "challenges:" },
+    shots = { "create-challenges", "create-challenges-tip", "create-challenges-many", "heroes-fallen", "inspect-fallen",
+      "chronicle-fallen", "chronicle-firsts-fallen", "overview-lives", "rules-challenges", "manage-rules-challenges",
+      "heroes-broken", "chronicle-broken", "rules-challenges-more", "manage-rules-ironman", "toast-fallen", "toast-broken" } },
   { key = "moments", title = "Moments: the journey's big moments and your pictures", checks = { "moments:" },
     shots = { "leader-moments-empty", "moments" } },
   { key = "history", title = "History: the fellowship's own story", checks = { "history:" },
     shots = { "leader-history-alone", "history" } },
   { key = "photo", title = "Group photo: everyone together on the whole screen", checks = { "group photo:" },
     shots = { "group-photo", "group-photo-studio", "group-photo-twelve", "group-photo-look" } },
+  { key = "models", title = "Adventurers in 3D: what the game offers for those near you", checks = { "models:" },
+    noShots = "checks only: game functions and settings (the models show in the Adventurers shots)", alone = true },
   { key = "quests", title = "Shared quests and chains",
     checks = { "quests tab", "quests: Show all", "quests: Together", "other addons" },
     shots = { "leader-quests-empty", "quests", "quests-join", "quests-showall", "quests-chains" } },
   { key = "attune", title = "Attunements", checks = { "quests: tabs and attunements", "attunements:" },
     shots = { "quests-attune-none", "quests-attune", "quests-attune-ony", "toast-attune" } },
-  { key = "companions", title = "Companions and inspect", checks = { "heroes and inspect", "roles, addon versions" },
+  { key = "companions", title = "Companions and inspect", checks = { "heroes and inspect", "roles, addon versions", "number tiles" },
     shots = { "leader-heroes-alone", "heroes", "heroes-presence", "heroes-old-yours", "inspect", "inspect-me", "inspect-me-bottom" } },
+  { key = "friend", title = "Friend of the fellowship: plays along, never counted (SPEC §1.1)",
+    checks = { "friend of the fellowship" }, shots = { "heroes-friend", "inspect-friend" } },
   { key = "manage", title = "Manage: ranks, away, takeover, the fellowship, the rules",
     checks = { "needs attention", "remove a Hero", "ranks:", "away:", "leaving as the leader", "away by the rule" },
     shots = { "leader-manage-alone", "manage", "manage-fellowship", "manage-rules", "leave-confirm" } },
@@ -71,8 +82,8 @@ A.LIST = {
   { key = "tourney", title = "Guild Master tournament", checks = { "tournament" },
     shots = { "tourney-signup", "tourney-bracket", "tourney-champion", "tourney-double", "tourney-groups", "tourney-rr", "tourney-20" } },
   { key = "toasts", title = "Toasts, big moments, picture moment", checks = { "picture moment", "progress toasts", "toasts:" },
-    shots = { "chapter-unlocked", "picture-moment", "toast-move", "toast-clear", "toast-hero-floor", "toast-chapter", "toast-journey",
-      "toast-long" } },
+    shots = { "chapter-unlocked", "picture-moment", "toast-move", "toast-clear", "toast-clear-raid", "toast-hero-floor", "toast-chapter",
+      "toast-journey", "toast-long", "toast-first" } },
   { key = "tracker", title = "Tracker and minimap button", checks = { "the tracker", "minimap button" },
     shots = { "tracker", "tracker-all", "tracker-hidden", "minimap-tooltip" } },
   { key = "sync", title = "Sync with Adventurers who play at other times (pretend copies)", checks = { "sync:" },
@@ -95,6 +106,13 @@ for _, a in ipairs(A.LIST) do
 end
 
 function A:Get(key) return byKey[key] end
+
+-- Do these areas (a set of keys) all stand alone? Then a check runs only their steps and shots.
+function A:Alone(set)
+  if not set or next(set) == nil then return false end
+  for key in pairs(set) do if not (byKey[key] and byKey[key].alone) then return false end end
+  return true
+end
 
 -- The area of a tour shot, or nil.
 function A:ForShot(id) return byShot[id] end

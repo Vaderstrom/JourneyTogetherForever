@@ -141,12 +141,16 @@ function G:Tick()
     local going = mine == "yes" or mine == "maybe"
     if going and not reminded[g.id] and now >= g.at - self.REMIND and now < g.at then
       reminded[g.id] = true
-      ns:Toast("gathering", L.G_SOON, L.G_SOON_TEXT:format(G.What(g), G.When(g.at)), "gatherings")
+      -- With the dungeon's picture when it is one (U8, 31 Oct 2026); "something else" keeps the icon.
+      ns:Toast("gathering", L.G_SOON, L.G_SOON_TEXT:format(G.What(g), G.When(g.at)), "gatherings", { dungeon = g.key })
     end
     if now >= g.at and now < g.at + 30 * 60 and not started[g.id] then
       started[g.id] = true
       local host = self:Host(f, g)
-      if going then ns:Toast("gathering", L.G_START, L.G_START_TEXT:format(G.What(g), host and ns.Short(host) or "-"), "gatherings") end
+      if going then
+        ns:Toast("gathering", L.G_START, L.G_START_TEXT:format(G.What(g), host and ns.Short(host) or "-"), "gatherings",
+          { dungeon = g.key })
+      end
       if host == me then
         local names = {}
         for name, a in pairs(g.answers) do

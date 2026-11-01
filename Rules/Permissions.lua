@@ -13,7 +13,8 @@ function P.Rank(f, name)
 end
 
 -- action: invite, uninvite, answer, remove, lead, rename, banner, rules, disband, leave, journey, clears,
--- roles (yourself, or the leader for anyone), away (yourself, or the leader for anyone), swap (yourself).
+-- roles (yourself, or the leader for anyone), away (yourself, or the leader for anyone), swap (yourself),
+-- friend (yourself, never the Leader, never one of the Fallen: a Friend of the fellowship, SPEC §1.1).
 -- The Leader may do everything. An Adventurer invites (and takes the answer to their own invite), cancels their own
 -- invites, and changes only what concerns themselves (votes and Gatherings: their own files).
 function P.Can(f, who, action, target)
@@ -22,6 +23,7 @@ function P.Can(f, who, action, target)
   local leader = rank == "leader"
   if action == "roles" or action == "away" then return P.Rank(f, target) ~= nil and (target == who or leader) end
   if action == "swap" then return true end
+  if action == "friend" then return target == who and not leader and not (f.falls and ns.Challenges:Fallen(f, who)) end
   if action == "leave" then return not leader end
   if action == "remove" then return leader and P.Rank(f, target) == "member" end
   if action == "lead" then return leader and target ~= who and P.Rank(f, target) ~= nil end

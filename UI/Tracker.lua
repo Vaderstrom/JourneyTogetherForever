@@ -9,6 +9,10 @@ local UI, Theme, Combat, Settings = ns.UI, ns.Theme, ns.Combat, ns.Settings
 -- 280 wide and a short title ("II · The Wailing and the Wolf"): "Chapter 2: The Wailing and th..." was cut off.
 local TK = { WIDTH = 280, EVERY = 30, SOON = 24 * 3600 }
 ns.Tracker = TK
+-- Each line's icon (U13): the book's own painted icons for what the line is about.
+TK.ICON = 14
+TK.LINE_ICONS = { status = "chapter", you = "heroes", next = "overview", clears = "toast_clear", run = "raids",
+  quests = "quests", online = "characters", gather = "gatherings", duel = "tourney", inbox = "inbox" }
 
 local function place(f)
   f:ClearAllPoints()
@@ -65,8 +69,14 @@ function TK:Build()
     { "duel", 11, "goldText", "tourney" }, { "inbox", 11, "goldText", "inbox" } }) do
     local b = CreateFrame("Button", nil, f)
     b:SetWidth(self.WIDTH - 20)
-    b.text = UI.WrapText(b, spec[2], spec[3], self.WIDTH - 20, "body")
-    b.text:SetPoint("TOPLEFT")
+    -- Each line's small round icon in front (U13, 31 Oct 2026: the tracker read as a block of small text).
+    b.icon = UI.Round(b, "ARTWORK", TK.ICON)
+    b.icon:SetPoint("TOPLEFT", 0, -1)
+    b.hasIcon = UI.SetIcon(b.icon, ns.ICONS[TK.LINE_ICONS[spec[1]] or "toast_default"])
+    b.icon:SetShown(b.hasIcon)
+    local indent = b.hasIcon and TK.ICON + 6 or 0
+    b.text = UI.WrapText(b, spec[2], spec[3], self.WIDTH - 20 - indent, "body")
+    b.text:SetPoint("TOPLEFT", indent, 0)
     b.key, b.page = spec[1], spec[4]
     local hl = b:CreateTexture(nil, "HIGHLIGHT")
     hl:SetAllPoints(); hl:SetColorTexture(1, 0.85, 0.45, 0.08)
@@ -75,6 +85,9 @@ function TK:Build()
     end)
     f.lines[i] = b
   end
+  -- Under "you": a little bar to the floor (below it, red) or from the floor to the cap (U13).
+  f.floorBar = UI.Bar(f, 6)
+  f.floorBar:Hide()
   -- Hidden mode (Settings): a light check of whether the mouse is over the tracker's place, a few times a second
   -- (its lines take the mouse too, so OnEnter/OnLeave of the frame alone flicker; and an invisible tracker takes no
   -- clicks, so the mouse falls through to the world).
@@ -150,13 +163,27 @@ function TK:Content(f)
   end
   local waiting = ns.Inbox and ns.Inbox:Count() or 0
   local pct = ns.Hero:XP(f, me)
+  -- The little bar under "you" (U13): below the floor, the way from the chapter before's floor to this one; else
+  -- from the floor to the cap. Your XP into the level counts.
+  local bar
+  if ch then
+    local lvl = ns.Hero:Level(f, me) + (pct or 0)
+    local fl = J:FloorLevel(f, ch)
+    if lvl < fl then
+      local prev = cur > 1 and f.journey.chapters[cur - 1] and J:FloorLevel(f, f.journey.chapters[cur - 1]) or 1
+      bar = { value = (lvl - prev) / math.max(1, fl - prev), color = "B0321E" }
+    else
+      bar = { value = (lvl - fl) / math.max(1, ch.cap - fl), color = lvl >= ch.cap and "D8B060" or "3E9A52" }
+    end
+    bar.value = ns.Clamp(bar.value, 0, 1)
+  end
   return {
     title = ch and L.TRACKER_TITLE:format(ns.Journey.Roman(cur), ch.name) or L.BN_JOURNEY_DONE,
     status = status, statusColor = banner.color,
     you = you.head, next = nextText, clears = clears, run = run, quests = quests,
     online = #online > 0 and L.TRACK_ONLINE:format(#online, table.concat(online, ", ")) or L.TRACK_NOBODY,
     gather = gather, duel = duel, inbox = waiting > 0 and (waiting == 1 and L.TRACK_INBOX_1 or L.TRACK_INBOX_N:format(waiting)) or nil,
-    xp = pct, color = f.color, emblem = f.emblem,
+    xp = pct, color = f.color, emblem = f.emblem, bar = bar,
   }
 end
 
@@ -203,16 +230,26 @@ function TK:Refresh()
   fr.xp:SetShown(showBar)
   if showBar then fr.xp:SetValue(c.xp) end
   local y = showBar and 38 or 34
+  fr.floorBar:Hide()
   for _, b in ipairs(fr.lines) do
     local text = not folded and Settings:TrackerLineOn(b.key) and c[b.key] or nil
     b:SetShown(text ~= nil)
     if text then
       b.text:SetText(text)
       if b.key == "status" then b.text:SetTextColor(ns.Hex(c.statusColor or "D8B060")) end
-      local h = b.text:GetStringHeight()
+      local h = math.max(b.text:GetStringHeight(), b.hasIcon and self.ICON or 0)
       b:SetHeight(h)
       b:ClearAllPoints(); b:SetPoint("TOPLEFT", fr, "TOPLEFT", 10, -y)
       y = y + h + 5
+      if b.key == "you" and c.bar then
+        local indent = b.hasIcon and self.ICON + 6 or 0
+        local bw = self.WIDTH - 20 - indent
+        fr.floorBar:ClearAllPoints(); fr.floorBar:SetPoint("TOPLEFT", fr, "TOPLEFT", 10 + indent, -(y - 2))
+        fr.floorBar:SetColor(c.bar.color)
+        fr.floorBar:Set(bw, c.bar.value)
+        fr.floorBar:Show()
+        y = y + 8
+      end
     end
   end
   fr:SetHeight((folded or y <= 38) and (showBar and 34 or 30) or y + 4)

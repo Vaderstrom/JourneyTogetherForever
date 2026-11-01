@@ -19,12 +19,16 @@ function C:Reset()
   self.fine = false -- step 2: the full rules form instead of the styles
   -- "Your own journey" (28 Oct 2026): shaped here, in a Chapters step after the journey (the journey editor).
   self.own, self.journey, self.sel = false, nil, 1
+  -- Challenges (SPEC §9, 31 Oct 2026): none by default; they combine. lives: the shared lives chosen (nil: what the
+  -- size suggests); gold: Pauper's limit (nil: 10).
+  self.challenges, self.lives, self.pvp, self.gold = {}, nil, nil, nil
 end
 
 -- The steps, by key (C.step is a number into this list). Your own journey adds Chapters.
-C.STEPS = { "fellowship", "style", "journey", "review" }
-C.STEPS_OWN = { "fellowship", "style", "journey", "chapters", "review" }
-C.STEP_LABELS = { fellowship = "STEP_FELLOWSHIP", style = "STEP_STYLE", journey = "STEP_JOURNEY", chapters = "STEP_CHAPTERS", review = "STEP_REVIEW" }
+C.STEPS = { "fellowship", "style", "journey", "challenges", "review" }
+C.STEPS_OWN = { "fellowship", "style", "journey", "chapters", "challenges", "review" }
+C.STEP_LABELS = { fellowship = "STEP_FELLOWSHIP", style = "STEP_STYLE", journey = "STEP_JOURNEY", chapters = "STEP_CHAPTERS",
+  challenges = "STEP_CHALLENGES", review = "STEP_REVIEW" }
 function C:Steps() return self.own and self.STEPS_OWN or self.STEPS end
 function C:StepKey() local s = self:Steps(); return s[ns.Clamp(self.step, 1, #s)] end
 function C:Goto(key)
@@ -55,6 +59,159 @@ function C:ChooseOwn()
 end
 
 function C:ChoosePreset(key) self.own, self.preset = false, key end
+
+-- Challenges: each on or off; Shared lives' number starts at what the size suggests, and the Leader may change it.
+-- One Ironman Fellowship takes on (Hardcore Fellowship, White gear only) stays ticked with it; No healers is not for a
+-- Leader who heals.
+function C:Included(key) return self.challenges.ironman and ns.Challenges:IncludedBy({ challenges = { ironman = true } }, key) ~= nil end
+function C:Blocked(key) return key == "nohealers" and self.role == "Healer" end
+function C:ToggleChallenge(key)
+  if self:Included(key) or self:Blocked(key) then return end
+  self.challenges[key] = not self.challenges[key] or nil
+end
+function C:Chosen(key) return self.challenges[key] == true or self:Included(key) end
+-- Pauper's gold: 10 suggested, in steps that grow with the gold.
+C.GOLD_STEPS = { 1, 2, 3, 4, 5, 10, 15, 20, 25, 50, 75, 100, 150, 200, 250, 500, 750, 1000 }
+function C:Gold() return self.gold or ns.Challenges.PAUPER_SUGGEST end
+function C:StepGold(d)
+  local cur, steps = self:Gold(), self.GOLD_STEPS
+  if d > 0 then for _, g in ipairs(steps) do if g > cur then self.gold = g return end end
+  else for i = #steps, 1, -1 do if steps[i] < cur then self.gold = steps[i] return end end end
+end
+function C:Lives() return self.lives or ns.Challenges.SHARED_SUGGEST[self.size] or ns.Challenges.SHARED_SUGGEST.party end
+function C:StepLives(d)
+  local Ch = ns.Challenges
+  self.lives = ns.Clamp(self:Lives() + d, Ch.SHARED_MIN, Ch.SHARED_MAX)
+end
+-- What the fellowship is founded with: { hardcore = true | "pvp", shared = 10, pauper = 10, oneclass = "WARRIOR",
+-- ... }, or nil for none. (pvp: on a PvP realm, which the Leader says: Hardcore PvP Fellowship. One class only: the
+-- Leader's.)
+function C:Challenges()
+  local out = {}
+  for k in pairs(self.challenges) do if not self:Blocked(k) then out[k] = true end end
+  if out.ironman then out.hardcore, out.white = true, true end
+  if out.hardcore and self.pvp then out.hardcore = "pvp" end
+  if out.shared then out.shared = self:Lives() end
+  if out.pauper then out.pauper = self:Gold() end
+  if out.oneclass then out.oneclass = ns.Fellowship:MyInfo().class end
+  return ns.Challenges.Clean(out)
+end
+
+-- The challenge banners (the owner, 1 Nov 2026: three vertical banners, every challenge in sight at once). Each hangs
+-- from its group's picture: dark cloth with a gold edge and a pointed tail, drawn here. Its rows are placed by Refresh,
+-- each as tall as its words and what it asks.
+local BANNER_HEAD, BANNER_TAIL, BANNER_PAD, ROW_MIN = 36, 18, 6, 22
+local CLOTH_TOP, CLOTH_BOTTOM = { 0.17, 0.11, 0.06, 0.97 }, { 0.09, 0.06, 0.035, 0.97 }
+-- Each banner's picture (the dungeons' loading screens): Stratholme's dead for Survival, Blackrock Depths (where the
+-- Ring ends) for Story and Travel, the Deadmines' gold for Gear, Gold & More.
+C.GROUP_ART = { survival = "strat", story = "brd", more = "dm" }
+
+local function chalBanner(parent, w, group)
+  local b = CreateFrame("Frame", nil, parent)
+  b:SetWidth(w)
+  b.group, b.tail, b.rows = group, BANNER_TAIL, {}
+  b.head = CreateFrame("Frame", nil, b)
+  b.head:SetPoint("TOPLEFT"); b.head:SetPoint("TOPRIGHT"); b.head:SetHeight(BANNER_HEAD)
+  b.pic = b.head:CreateTexture(nil, "ARTWORK")
+  local fade = b.head:CreateTexture(nil, "ARTWORK", nil, 2)
+  UI.FramePicture(b.head, b.pic, fade)
+  ns.SetDungeonArt(b.pic, C.GROUP_ART[group], w - 4, BANNER_HEAD - 4)
+  UI.SetGradient(fade, "VERTICAL", { 0.05, 0.03, 0.01, 0.85 }, { 0.05, 0.03, 0.01, 0.3 })
+  b.title = UI.Text(b.head, 16, "goldText", "fancy", "CENTER", "OVERLAY")
+  b.title:SetPoint("CENTER", 0, -1); b.title:SetWidth(w - 12)
+  b.title:SetShadowOffset(1, -1); b.title:SetShadowColor(0, 0, 0, 1)
+  b.title:SetText(L["CHAL_GROUP_" .. group:upper()])
+  local cloth = b:CreateTexture(nil, "BACKGROUND")
+  cloth:SetPoint("TOPLEFT", 0, -BANNER_HEAD); cloth:SetPoint("BOTTOMRIGHT", 0, BANNER_TAIL)
+  UI.SetGradient(cloth, "VERTICAL", CLOTH_BOTTOM, CLOTH_TOP)
+  -- The tail: one-pixel strips, each a little narrower, down to the point.
+  for i = 1, BANNER_TAIL do
+    local s = b:CreateTexture(nil, "BACKGROUND")
+    s:SetColorTexture(CLOTH_BOTTOM[1], CLOTH_BOTTOM[2], CLOTH_BOTTOM[3], CLOTH_BOTTOM[4])
+    s:SetSize(math.max(1, w * (BANNER_TAIL - i + 0.5) / BANNER_TAIL), 1)
+    s:SetPoint("TOP", b, "BOTTOM", 0, BANNER_TAIL - i + 1)
+  end
+  for _, side in ipairs({ "LEFT", "RIGHT" }) do
+    local e = b:CreateTexture(nil, "BORDER")
+    e:SetColorTexture(Theme:RGBA("gold", 0.85)); e:SetWidth(2)
+    e:SetPoint("TOP" .. side, b.head, "BOTTOM" .. side)
+    e:SetPoint("BOTTOM" .. side, b, "BOTTOM" .. side, 0, BANNER_TAIL)
+  end
+  for _, side in ipairs({ "BOTTOMLEFT", "BOTTOMRIGHT" }) do
+    local l = b:CreateLine(nil, "BORDER")
+    l:SetThickness(2); l:SetColorTexture(Theme:RGBA("gold", 0.85))
+    l:SetStartPoint(side, b, side == "BOTTOMLEFT" and 1 or -1, BANNER_TAIL)
+    l:SetEndPoint("BOTTOM", b, 0, 0)
+  end
+  return b
+end
+
+-- A box to tick (the game's check box) with words beside it; the whole row is the button. Hovering it shows .tipTitle
+-- and .tipText (set by Refresh).
+local function chalTickBox(r, size)
+  r.box = r:CreateTexture(nil, "ARTWORK")
+  r.box:SetSize(size, size)
+  r.box:SetTexture("Interface\\Buttons\\UI-CheckBox-Up")
+  r.check = UI.Check(r, size)
+  r.check:SetPoint("CENTER", r.box)
+  local hi = r:CreateTexture(nil, "HIGHLIGHT")
+  hi:SetAllPoints(); hi:SetColorTexture(1, 0.9, 0.6, 0.08)
+end
+local function chalRow(parent, w, key, onClick)
+  local r = CreateFrame("Button", nil, parent)
+  r:SetSize(w, ROW_MIN)
+  r.key = key
+  r.tint = r:CreateTexture(nil, "BACKGROUND")
+  r.tint:SetAllPoints(); r.tint:SetColorTexture(1, 0.85, 0.45, 0.13); r.tint:Hide()
+  chalTickBox(r, 20)
+  r.box:SetPoint("TOPLEFT", 0, -1)
+  r.name = UI.WrapText(r, 13, "chipText", w - 26, "body")
+  r.name:SetPoint("TOPLEFT", 24, -4)
+  r.sub = UI.WrapText(r, 11, nil, w - 26, "book")
+  r.sub:SetPoint("TOPLEFT", r.name, "BOTTOMLEFT", 0, -2)
+  Theme:TextColor(r.sub, "chipText", 0.8)
+  r:SetScript("OnClick", function() ns.Sound("choose"); onClick() end)
+  r:SetScript("OnEnter", function(self)
+    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+    GameTooltip:SetText(self.tipTitle or "", 1, 0.82, 0)
+    if self.tipText then GameTooltip:AddLine(self.tipText, 1, 1, 1, true) end
+    if self.tipNote then GameTooltip:AddLine(self.tipNote, 1, 0.45, 0.35, true) end
+    GameTooltip:Show()
+  end)
+  r:SetScript("OnLeave", function() GameTooltip:Hide() end)
+  return r
+end
+-- Under a chosen row, what it asks: a smaller tick (Hardcore's PvP realm), or a number with what is suggested.
+local function chalTick(parent, w, label, getValue, setValue)
+  local t = CreateFrame("Button", nil, parent)
+  t:SetWidth(w)
+  chalTickBox(t, 18)
+  t.box:SetPoint("TOPLEFT", 0, -1)
+  t.label = UI.WrapText(t, 12, "chipText", w - 22, "body")
+  t.label:SetPoint("TOPLEFT", 22, -4); t.label:SetText(label)
+  t:SetScript("OnClick", function() ns.Sound("choose"); setValue(not getValue()) end)
+  function t:Refresh()
+    self.check:SetShown(getValue() and true or false)
+    self:SetHeight(math.max(20, self.label:GetStringHeight() + 8))
+  end
+  return t
+end
+local function chalNumber(parent, w, onDown, onUp, getText, getNote)
+  local f = CreateFrame("Frame", nil, parent)
+  f:SetSize(w, 36)
+  f:EnableMouse(true) -- a click between the arrows is not a click on the row
+  local s = UI.Stepper(f, onDown, onUp, getText)
+  s.down:SetSize(22, 22); s.up:SetSize(22, 22); s.value:SetWidth(60)
+  s:SetSize(22 + 4 + 60 + 4 + 22, 22)
+  s:SetPoint("TOPLEFT")
+  Theme:TextColor(s.value, "chipText")
+  f.stepper, f.up, f.down = s, s.up, s.down
+  f.note = UI.Text(f, 11, nil, "book")
+  f.note:SetPoint("TOPLEFT", s, "BOTTOMLEFT", 0, -2); f.note:SetWidth(w)
+  Theme:TextColor(f.note, "chipText", 0.8)
+  function f:Refresh() s:Refresh(); self.note:SetText(getNote()) end
+  return f
+end
 
 local STYLE_ART = { relaxed = 3, together = 1, strict = 13 }   -- chapter pictures on the style tiles
 local PRESET_ART = { classic = 1, short = 5, long = 9, scratch = 12 }
@@ -108,12 +265,13 @@ function C:Review()
     style = L.REVIEW_SIZE_STYLE:format(sizeName(R.SizeOf(r)), styleName(R.StyleOf(r))),
     rules = rows,
     journey = self:JourneyTitle(),
+    challenges = ns.Challenges:Line(self:Challenges()) or L.REVIEW_CHAL_NONE,
   }
 end
 
 function C:Create()
   local f = ns.Fellowship:Create({ name = self.name, color = self.color, emblem = self.emblem, role = self.role, preset = self.preset,
-    journey = self.own and self.journey or nil, rules = self.rules })
+    journey = self.own and self.journey or nil, rules = self.rules, challenges = self:Challenges() })
   return f
 end
 
@@ -478,6 +636,59 @@ local function build(pf)
   pf.reviewRoad.change = UI.TextButton(pf.reviewRoad, L.CHANGE, function() go(C.own and "chapters" or "journey") end, "link", 12)
   pf.reviewRoad.change:SetPoint("BOTTOMRIGHT", pf.reviewRoad.head, "BOTTOMRIGHT", 0, 6)
 
+  -- Challenges (SPEC §9), left: three banners side by side (Survival, Story and Travel, Gear, Gold & More; the owner,
+  -- 1 Nov 2026), so every challenge is in sight at once. Each lists its challenges to tick (they combine; none is
+  -- fine); hovering one tells its rule. Under a chosen row, what it asks: Hardcore Fellowship whether it's a PvP realm
+  -- (the game doesn't tell an addon the kind of realm, so the Leader says it), Shared lives how many, Pauper how much
+  -- gold. Right: what the fellowship takes on, in plain sentences.
+  local s5 = pf.body.challenges
+  local cp = UI.Text(s5, 15, "ink", "title")
+  cp:SetPoint("TOPLEFT"); cp:SetText(L.CHAL_PICK)
+  local cIntro = UI.WrapText(s5, 13, "ink2", width, "book")
+  cIntro:SetPoint("TOPLEFT", 0, -24); cIntro:SetText(L.CHAL_INTRO)
+  local cy = 24 + math.max(cIntro:GetStringHeight(), 32) + 10
+  local Ch = ns.Challenges
+  local gap = 12
+  local bw = math.floor((width - 2 * gap) / 3)
+  local rowW = bw - 2 * BANNER_PAD
+  pf.banners, pf.chalRows = {}, {}
+  for i, g in ipairs(Ch.GROUPS) do
+    local b = chalBanner(s5, bw, g.key)
+    b:SetPoint("TOPLEFT", (i - 1) * (bw + gap), -cy)
+    b:SetPoint("BOTTOMLEFT", (i - 1) * (bw + gap), 0)
+    for _, key in ipairs(g.list) do
+      local r = chalRow(b, rowW, key, function() C:ToggleChallenge(key); W:Refresh() end)
+      b.rows[#b.rows + 1] = r
+      pf.chalRows[key] = r
+    end
+    pf.banners[i] = b
+  end
+  local extraW = rowW - 24
+  pf.pvp = chalTick(pf.chalRows.hardcore, extraW, L.CHAL_PVP_REALM, function() return C.pvp end,
+    function(on) C.pvp = on or nil; W:Refresh() end)
+  pf.lives = chalNumber(pf.chalRows.shared, extraW, function() C:StepLives(-1); W:Refresh() end,
+    function() C:StepLives(1); W:Refresh() end, function() return tostring(C:Lives()) end,
+    function() return L.CHAL_LIVES_SUGGEST:format(ns.Rules.SizeWord(C.size), Ch.SHARED_SUGGEST[C.size] or Ch.SHARED_SUGGEST.party) end)
+  pf.gold = chalNumber(pf.chalRows.pauper, extraW, function() C:StepGold(-1); W:Refresh() end,
+    function() C:StepGold(1); W:Refresh() end, function() return L.CHAL_GOLD_N:format(C:Gold()) end,
+    function() return L.CHAL_GOLD_SUGGEST:format(Ch.PAUPER_SUGGEST) end)
+  pf.chalRows.hardcore.extra, pf.chalRows.shared.extra, pf.chalRows.pauper.extra = pf.pvp, pf.lives, pf.gold
+  local r5 = pf.side.challenges
+  local chh = UI.SectionHeader(r5, width)
+  chh:SetText(L.CHAL_HEAD); chh:SetPoint("TOPLEFT", 0, -8)
+  pf.chalName = UI.WrapText(r5, 18, "ink", width, "title")
+  pf.chalName:SetPoint("TOPLEFT", 0, -48)
+  pf.chalText = UI.WrapText(r5, 14, "ink", width, "book")
+  pf.chalText:SetPoint("TOPLEFT", pf.chalName, "BOTTOMLEFT", 0, -12)
+  -- Shared lives chosen: the lives as candles under the words, all lit (UI.Lives; placed by Refresh).
+  pf.chalLives = UI.Lives(r5, width)
+  pf.chalNote = UI.WrapText(r5, 12, "ink2", width, "book")
+  pf.chalNote:SetPoint("TOPLEFT", pf.chalText, "BOTTOMLEFT", 0, -16)
+  pf.chalNote:SetText(L.CHAL_NOTE)
+  pf.chalLater = UI.WrapText(r5, 12, "ink2", width, "book")
+  pf.chalLater:SetPoint("TOPLEFT", pf.chalNote, "BOTTOMLEFT", 0, -10)
+  pf.chalLater:SetText(L.CHAL_LATER)
+
   -- Step 4, left: the fellowship (banner, name, who leads it) and the rules as rows, each part with Change.
   local s4 = pf.body.review
   local function section(text, step, yy)
@@ -505,6 +716,10 @@ local function build(pf)
     v:SetPoint("TOPLEFT", 170, -(170 + (i - 1) * 22)); v:SetWidth(width - 170)
     pf.reviewRows[i] = { k = k, v = v }
   end
+  -- The challenges (or None), under the rules' seven rows.
+  pf.changeChal = select(2, section(L.REVIEW_CHALLENGES, "challenges", 330))
+  pf.reviewChal = UI.WrapText(s4, 13, "ink", width, "book")
+  pf.reviewChal:SetPoint("TOPLEFT", 0, -366)
 
   -- Footer: Back on the left page, Next / Create the fellowship on the right.
   pf.prev = UI.TextButton(left, L.BACK, function() C.step = math.max(1, C.step - 1); C.fine = false; W:Refresh() end, "plain", 14)
@@ -526,12 +741,27 @@ local function refresh(pf)
   C.step = ns.Clamp(C.step, 1, #steps)
   local step, key = C.step, C:StepKey()
   local width = ns.Window.PAGE_W_WIDE
-  pf.head:Set(L.FOUND, #steps == 5 and L.CREATE_SUB_5 or L.CREATE_SUB)
+  pf.head:Set(L.FOUND, #steps == 6 and L.CREATE_SUB_6 or L.CREATE_SUB)
+  -- Six steps (Your own journey): each label as wide as it is, with the room left shared out (an even sixth cut
+  -- "Challenges" into the next disc). Up to five: even slots.
+  local even, widths, total = #steps <= 5, {}, 0
+  if not even then
+    for i, s in ipairs(pf.steps) do
+      if steps[i] then
+        s.label:SetText(L[C.STEP_LABELS[steps[i]]])
+        widths[i] = 28 + s.label:GetStringWidth()
+        total = total + widths[i]
+      end
+    end
+  end
+  local gap, x = even and 0 or math.max(0, (width - total) / #steps), 0
   for i, s in ipairs(pf.steps) do
     s:SetShown(steps[i] ~= nil)
     if steps[i] then
-      s:SetWidth(width / #steps)
-      s:ClearAllPoints(); s:SetPoint("TOPLEFT", pf.left, "TOPLEFT", (i - 1) * width / #steps, -pf.stepY)
+      local w = even and width / #steps or widths[i] + gap
+      s:SetWidth(w)
+      s:ClearAllPoints(); s:SetPoint("TOPLEFT", pf.left, "TOPLEFT", x, -pf.stepY)
+      x = x + w
       s.label:SetText(L[C.STEP_LABELS[steps[i]]])
       s.disc:SetColorTexture(Theme:RGBA(i <= step and "accent" or "line"))
       s.label:SetTextColor(Theme:RGBA(i == step and "ink" or "ink2"))
@@ -589,6 +819,68 @@ local function refresh(pf)
   if key == "journey" then pf.road:Set(C:Journey(), L.ROAD_HEAD:format(C:JourneyTitle())) end
   if key == "chapters" then pf.editor:Refresh() end
 
+  -- Challenges: every banner's rows ticked or not, under a chosen row what it asks (the PvP realm, Shared lives'
+  -- number: what the size suggests until changed, Pauper's gold), and on the right what the fellowship takes on.
+  if key == "challenges" then
+    local Ch = ns.Challenges
+    local chosen = C:Challenges()
+    for _, b in ipairs(pf.banners) do
+      local y = BANNER_HEAD + BANNER_PAD
+      for _, r in ipairs(b.rows) do
+        local k = r.key
+        local included, blocked = C:Included(k), C:Blocked(k)
+        local on = C:Chosen(k) and not blocked
+        r.chosen = on
+        r.check:SetShown(on)
+        r.check:SetDesaturated(included); r.check:SetAlpha(included and 0.6 or 1)
+        r.tint:SetShown(on)
+        r:SetAlpha(blocked and 0.55 or 1)
+        local name = k == "hardcore" and Ch:Name("hardcore", C.pvp and "pvp") or L["CHAL_" .. k:upper()]
+        r.name:SetText(name)
+        r.name:SetTextColor(Theme:RGBA(on and "goldText" or "chipText"))
+        local sub = (included and L.CHAL_WITH_IRONMAN) or (blocked and L.CHAL_HEALER_YOU)
+          or (k == "oneclass" and on and chosen and L.CHAL_CLASS_YOURS:format(Ch.ClassName(chosen.oneclass))) or nil
+        r.sub:SetText(sub or ""); r.sub:SetShown(sub ~= nil)
+        -- The tooltip: the rule as it would be now (the lives, the gold, your class).
+        local v = (k == "hardcore" and C.pvp and "pvp") or (k == "shared" and C:Lives()) or (k == "pauper" and C:Gold())
+          or (k == "oneclass" and ns.Fellowship:MyInfo().class) or true
+        r.tipTitle, r.tipText = Ch:Name(k, v), Ch:Rule(k, v)
+        r.tipNote = (included and L.CHAL_INCLUDED) or (blocked and L.CHAL_HEALER_LEADER) or nil
+        local h = math.max(ROW_MIN, 4 + r.name:GetStringHeight() + (sub and 2 + r.sub:GetStringHeight() or 0) + 4)
+        if r.extra then
+          r.extra:SetShown(on)
+          if on then
+            r.extra:ClearAllPoints(); r.extra:SetPoint("TOPLEFT", 24, -h)
+            r.extra:Refresh()
+            h = h + r.extra:GetHeight() + 4
+          end
+        end
+        r:SetHeight(h)
+        r:ClearAllPoints(); r:SetPoint("TOPLEFT", b, "TOPLEFT", BANNER_PAD, -y)
+        y = y + h + 2
+      end
+    end
+    local shared = C:Chosen("shared")
+    pf.chalName:SetText(Ch:Line(chosen) or L.CHAL_NONE)
+    local lines = {}
+    for _, k in ipairs(Ch.LIST) do if chosen and chosen[k] then lines[#lines + 1] = Ch:Rule(k, chosen[k]) end end
+    -- (Many chosen: one line between them, so the page holds them all.)
+    pf.chalText:SetText(#lines > 0 and table.concat(lines, #lines > 3 and "\n" or "\n\n") or L.CHAL_NONE_TEXT)
+    local held = chosen and (chosen.oneclass or chosen.nohealers)
+    pf.chalNote:SetText(held and (L.CHAL_NOTE .. " " .. L.CHAL_NOTE_HELD) or L.CHAL_NOTE)
+    pf.chalNote:SetShown(chosen ~= nil)
+    pf.chalLives:SetShown(shared)
+    pf.chalNote:ClearAllPoints()
+    if shared then
+      pf.chalLives:ClearAllPoints(); pf.chalLives:SetPoint("TOPLEFT", pf.chalText, "BOTTOMLEFT", 0, -14)
+      pf.chalLives:Set(C:Lives(), C:Lives())
+      pf.chalLives:SetTip(L.LIVES_LEFT:format(C:Lives(), C:Lives()))
+      pf.chalNote:SetPoint("TOPLEFT", pf.chalLives, "BOTTOMLEFT", 0, -16)
+    else
+      pf.chalNote:SetPoint("TOPLEFT", pf.chalText, "BOTTOMLEFT", 0, -16)
+    end
+  end
+
   -- Review.
   if key == "review" then
     local rv = C:Review()
@@ -601,6 +893,7 @@ local function refresh(pf)
       row.k:SetShown(item ~= nil); row.v:SetShown(item ~= nil)
       if item then row.k:SetText(item[1]); row.v:SetText(item[2]) end
     end
+    pf.reviewChal:SetText(rv.challenges)
     pf.reviewRoad:Set(C:Journey(), L.REVIEW_JOURNEY_V:format(rv.journey))
   end
 

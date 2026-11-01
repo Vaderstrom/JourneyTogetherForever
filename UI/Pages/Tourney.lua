@@ -7,7 +7,9 @@ local UI, Theme = ns.UI, ns.Theme
 local T, Tn, Hr, R = ns.Tournament, ns.Tourney, ns.Hero, ns.Rules
 
 local COL_W = 196
-local CARD_W, CARD_H, GAP = COL_W - 18, 44, 4 -- 18 px between columns for the bracket lines
+-- 18 px between columns for the bracket lines. Cards 60 high with a class icon and level on each line (U17, 31 Oct
+-- 2026: the small cards left most of the page empty).
+local CARD_W, CARD_H, GAP = COL_W - 18, 60, 10
 
 local function who(x)
   if x == false then return L.T_BYE end
@@ -79,12 +81,14 @@ local function build(pf)
     local c = UI.Card(Rc)
     c:SetSize(CARD_W, CARD_H)
     local function line(y)
-      local l = {}
+      local l = { y = y }
       -- The winner's line has a light gold band behind it (29 Oct 2026: who won was hard to see).
       l.band = UI.Solid(c, "ARTWORK", "gold", 0.18)
-      l.band:SetPoint("TOPLEFT", 3, y + 3); l.band:SetPoint("TOPRIGHT", -3, y + 3); l.band:SetHeight(17)
-      l.name = UI.Text(c, 12, "ink", "title")
-      l.name:SetPoint("TOPLEFT", 8, y); l.name:SetWidth(CARD_W - 52)
+      l.band:SetPoint("TOPLEFT", 3, y + 4); l.band:SetPoint("TOPRIGHT", -3, y + 4); l.band:SetHeight(22)
+      l.name = UI.Text(c, 14, "ink", "title")
+      l.name:SetPoint("TOPLEFT", 8, y); l.name:SetWidth(CARD_W - 74)
+      l.level = UI.Text(c, 12, "ink2", "body", "RIGHT")
+      l.level:SetPoint("TOPRIGHT", -46, y)
       -- "You" on your own line, as a small tag after the name.
       l.you = UI.Box(c, 1, "dark", 0.85, "gold", 0.8)
       l.you.text = UI.Text(l.you, 10, "goldText", "title", "CENTER")
@@ -98,7 +102,7 @@ local function build(pf)
       l.mark:SetPoint("TOPRIGHT", -8, y + 1)
       return l
     end
-    c.l1, c.l2 = line(-7), line(-24)
+    c.l1, c.l2 = line(-9), line(-35)
     return c
   end)
   -- After the final (or the standings): who won, in a gold-edged box.
@@ -235,6 +239,9 @@ local function refresh(pf, ctx)
   if (phase == "signup" or phase == "cancelled") and #signed < (t and t.min or r.tMin) then
     lines[#lines + 1] = { L.T_FEW:format(t and t.min or r.tMin), "B0321E" }
   end
+  -- A Friend of the fellowship watches (SPEC §1.1).
+  local friend = ns.Fellowship:IsFriend(f, me)
+  if friend and phase == "signup" then lines[#lines + 1] = { L.T_FRIEND, ns.Hero.FRIEND } end
   if r.tStart == "auto" and phase ~= "signup" and phase ~= "running" then
     local nextAt = (f.tourneyLast or now) + Tn.AUTO_EVERY
     lines[#lines + 1] = { L.T_AUTO_NEXT:format(nextAt <= now and L.TIME_JUST_NOW or L.TIME_IN:format(ns.TimeLeft(nextAt - now))), "ink2" }
@@ -249,7 +256,7 @@ local function refresh(pf, ctx)
   end
   pf.lines:HideFrom(#lines + 1)
   local isSigned = t ~= nil and t.signed and t.signed[me] ~= nil
-  local canSign = phase == "signup"
+  local canSign = phase == "signup" and not friend
   pf.signUp:SetShown(canSign and not isSigned); pf.withdraw:SetShown(canSign and isSigned)
   pf.start:SetShown(not sample and Tn:CanStart(f, me))
   local bx = 12
@@ -360,16 +367,24 @@ local function refresh(pf, ctx)
       local l, n = side[1], side[2]
       local known = type(n) == "string"
       local won, lost = decided and m.w == n, decided and known and m.w ~= n
-      l.name:SetFont(Theme.FONT_TITLE, won and 13 or 12, "")
-      l.name:SetText(who(n))
+      -- The winner as large as the others: the gold band, green and the tick mark them (a larger name was cut
+      -- beside its icon and You; check of 1 Nov 2026).
+      l.name:SetFont(Theme.FONT_TITLE, 14, "")
+      local icon = known and ns.ClassIconMarkup(select(2, Hr:ClassName(f, n)), 14) or ""
+      l.name:SetText((icon ~= "" and (icon .. " ") or "") .. who(n))
+      l.level:SetText(known and level(n) or "")
+      l.level:SetAlpha(lost and 0.45 or 1)
       l.name:SetTextColor(Theme:RGBA(not known and "ink2" or (won and "3E7A3A" or "ink")))
       l.name:SetAlpha(lost and 0.45 or 1)
       l.score:SetAlpha(lost and 0.45 or 1)
       l.band:SetShown(won)
       l.mark:SetShown(won)
       l.score:SetText(view.bo > 1 and known and (wins[n] or 0) or "")
+      -- Without a score (one duel a round) the level moves into its place and the name gets the room.
+      local scored = view.bo > 1
+      l.level:ClearAllPoints(); l.level:SetPoint("TOPRIGHT", scored and -46 or -26, l.y)
       local mine = known and n == me
-      local nameW = w - 52 - (mine and (l.you:GetWidth() + 6) or 0)
+      local nameW = w - (scored and 74 or 54) - (mine and (l.you:GetWidth() + 6) or 0)
       l.name:SetWidth(nameW)
       l.you:SetShown(mine)
       if mine then

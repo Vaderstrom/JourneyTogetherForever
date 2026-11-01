@@ -134,12 +134,14 @@ end
 
 -- Icon in a texture: shows the middle of a game icon (without its frame).
 -- Every icon of our set is remembered and drawn again when the theme changes (the Horde set is red).
+-- Returns false when the game does not have the file (SetTexture says so for game icons).
 UI.icons = setmetatable({}, { __mode = "k" })
 function UI.SetIcon(tex, path)
   local file, l, r, t, b = ns.IconArt(path)
-  tex:SetTexture(file)
+  local found = tex:SetTexture(file)
   tex:SetTexCoord(l, r, t, b)
   UI.icons[tex] = path
+  return found ~= false
 end
 Theme:Register(function() for tex, path in pairs(UI.icons) do local file, l, r, t, b = ns.IconArt(path); tex:SetTexture(file); tex:SetTexCoord(l, r, t, b) end end)
 
@@ -172,7 +174,8 @@ end
 -- bottom with a gold title and a line of text, a gold border that glows on hover, and a "chosen" state (thicker gold
 -- border and a gold glow) for choices. art(tex, w, h) puts the picture on the texture. :Set(title, text),
 -- :SetChosen(on).
-function UI.PictureTile(parent, w, h, art, onClick)
+-- small: a card of a row of four (Create's challenges): the title smaller and on up to two lines, the text smaller.
+function UI.PictureTile(parent, w, h, art, onClick, small)
   local t = CreateFrame("Button", nil, parent)
   t:SetSize(w, h)
   t.bg = t:CreateTexture(nil, "BACKGROUND")
@@ -183,12 +186,12 @@ function UI.PictureTile(parent, w, h, art, onClick)
   local fade = t:CreateTexture(nil, "ARTWORK", nil, 2)
   fade:SetPoint("BOTTOMLEFT", 2, 2); fade:SetPoint("BOTTOMRIGHT", -2, 2); fade:SetHeight(math.floor(h * 0.7))
   UI.SetGradient(fade, "VERTICAL", { 0.05, 0.03, 0.01, 0.94 }, { 0.05, 0.03, 0.01, 0 })
-  t.title = UI.Text(t, 22, "goldText", "fancy")
+  t.title = small and UI.WrapText(t, 15, "goldText", w - 20, "fancy") or UI.Text(t, 22, "goldText", "fancy")
   t.title:SetShadowOffset(1, -1); t.title:SetShadowColor(0, 0, 0, 1)
-  t.text = UI.WrapText(t, 13, "chipText", w - 28, "book")
+  t.text = UI.WrapText(t, small and 11 or 13, "chipText", w - (small and 20 or 28), "book")
   t.text:SetShadowOffset(1, -1); t.text:SetShadowColor(0, 0, 0, 1)
-  t.text:SetPoint("BOTTOMLEFT", 14, 12)
-  t.title:SetPoint("BOTTOMLEFT", t.text, "TOPLEFT", 0, 4)
+  t.text:SetPoint("BOTTOMLEFT", small and 10 or 14, small and 9 or 12)
+  t.title:SetPoint("BOTTOMLEFT", t.text, "TOPLEFT", 0, small and 3 or 4)
   t.border = UI.Box(t, 2, nil, nil, "gold", 0.85)
   t.border:SetAllPoints()
   t.glow = t:CreateTexture(nil, "OVERLAY")
@@ -224,6 +227,204 @@ function UI.FramePicture(f, ...)
   f.edge = UI.Box(f, p, nil, nil, "gold", 0.85)
   f.edge:SetAllPoints()
   return f.edge
+end
+
+-- A number tile (U6, 31 Oct 2026; SPEC §4), like the game's achievement summary: the number large in the game's
+-- gold and the title font, over a small round icon and its label. A dark ground with the picture tiles' gold edge,
+-- the same in every theme, so the gold reads on parchment and at night alike. The Adventurers page, Inspect,
+-- History and the Chronicle use it. :Set(value): a number or a short word; one too wide is drawn smaller, and only
+-- cut when even 12 is too wide. :SetIcon(path): an icon of ns.ICONS; a file the game does not have leaves the label
+-- alone, centred. .v is the number, .k the label, .icon the icon.
+UI.TILE_GOLD = "FFD100" -- the game's own gold (its normal font colour)
+local TILE_PAD, TILE_GAP = 6, 5
+function UI.NumberTile(parent, w, h, label, icon)
+  local t = CreateFrame("Frame", nil, parent)
+  t:SetSize(w, h)
+  t.bg = t:CreateTexture(nil, "BACKGROUND")
+  t.bg:SetAllPoints(); t.bg:SetColorTexture(0.1, 0.07, 0.04, 1)
+  -- A warm light from the top, as on the game's achievement rows.
+  t.sheen = t:CreateTexture(nil, "BORDER")
+  t.sheen:SetPoint("TOPLEFT", UI.PIC_INSET, -UI.PIC_INSET); t.sheen:SetPoint("BOTTOMRIGHT", -UI.PIC_INSET, UI.PIC_INSET)
+  UI.SetGradient(t.sheen, "VERTICAL", { 0.85, 0.69, 0.38, 0 }, { 0.85, 0.69, 0.38, 0.16 })
+  t.edge = UI.Box(t, UI.PIC_INSET, nil, nil, "gold", 0.85)
+  t.edge:SetAllPoints()
+  local big = h >= 58
+  t.size = big and 22 or 20
+  local ring = big and 22 or 20
+  t.v = UI.Text(t, t.size, UI.TILE_GOLD, "title", "CENTER")
+  t.v:SetShadowOffset(1, -1); t.v:SetShadowColor(0, 0, 0, 1)
+  t.v:SetPoint("TOP", 0, -TILE_PAD)
+  t.k = UI.Text(t, 12, "muted", "body", "LEFT")
+  t.ring = UI.Round(t, "ARTWORK", ring)
+  Theme:Fill(t.ring, "gold", 0.9)
+  t.icon = UI.Round(t, "OVERLAY", ring - 4)
+  t.icon:SetPoint("CENTER", t.ring)
+  local room = w - 2 * TILE_PAD
+
+  -- The label and its icon side by side in the middle of the bottom row.
+  function t:Place()
+    local withIcon = self.ring:IsShown()
+    local shift = withIcon and (ring + TILE_GAP) or 0
+    self.k:SetWidth(0)
+    if self.k:GetStringWidth() > room - shift then self.k:SetWidth(room - shift) end
+    self.k:ClearAllPoints(); self.k:SetPoint("CENTER", self, "BOTTOM", shift / 2, TILE_PAD + ring / 2 - 1)
+    self.ring:ClearAllPoints(); self.ring:SetPoint("RIGHT", self.k, "LEFT", -TILE_GAP, 0)
+  end
+  function t:SetLabel(text) self.k:SetText(text or ""); self:Place() end
+  function t:SetIcon(path)
+    local found = path ~= nil and UI.SetIcon(self.icon, path)
+    self.ring:SetShown(found); self.icon:SetShown(found)
+    self:Place()
+  end
+  function t:Set(value)
+    local size = self.size
+    self.v:SetWidth(0)
+    self.v:SetFont(Theme.FONT_TITLE, size, "")
+    self.v:SetText(value ~= nil and tostring(value) or "-")
+    while self.v:GetStringWidth() > room and size > 12 do
+      size = size - 1
+      self.v:SetFont(Theme.FONT_TITLE, size, "")
+    end
+    if self.v:GetStringWidth() > room then self.v:SetWidth(room) end
+  end
+  t.k:SetText(label or "")
+  t:SetIcon(icon)
+  return t
+end
+
+-- Shared lives as a row of candles (SPEC §9; the Overview, the rulebook, Create): the lives left lit in the gold ring,
+-- the spent ones snuffed (grey and faint). More rows when they do not fit. :Set(total, left) returns the height;
+-- :SetTip(title, lines) is what the tooltip says. The candle is the first one the game has (ns.CANDLES). Bigger, with
+-- a thinner ring, since the check of 1 Nov 2026, 11:30 (at 22 they read as small white dots).
+-- Candles that live (the check of 1 Nov 2026, 11:30): a warm halo round each lit one that flickers softly, and a
+-- candle that went out since you last looked goes dark with a curl of smoke (:Snuff). Reduce effects keeps the halo
+-- still and the smoke away. The halo is the game's soft glow; without it, a faint disc.
+UI.LIFE = 26
+local LIFE_GAP = 5
+UI.SOFT_GLOW = { "Interface\\GLUES\\Models\\UI_Draenei\\GenericGlow64" }
+local function soft(tex)
+  for _, path in ipairs(UI.SOFT_GLOW) do if tex:SetTexture(path) ~= false then return true end end
+  tex:SetTexture(ns.CIRCLE_MASK)
+  return false
+end
+UI.HALO = 0.45 -- a lit candle's halo, at rest
+local function alphaTo(region, from, to, duration, delay)
+  local a = region.anim:CreateAnimation("Alpha")
+  a:SetFromAlpha(from); a:SetToAlpha(to); a:SetDuration(duration)
+  if delay then a:SetStartDelay(delay) end
+  if a.SetSmoothing then a:SetSmoothing("IN_OUT") end
+  return a
+end
+local function animated(region, looping)
+  region.anim = region:CreateAnimationGroup()
+  if looping then region.anim:SetLooping(looping) end
+  return region.anim
+end
+function UI.Lives(parent, width)
+  local w = CreateFrame("Frame", nil, parent)
+  w:SetSize(width, UI.LIFE)
+  w.items = {}
+  local function candle(i)
+    if w.items[i] then return w.items[i] end
+    local c = CreateFrame("Frame", nil, w)
+    c:SetSize(UI.LIFE, UI.LIFE)
+    c.halo = c:CreateTexture(nil, "BACKGROUND")
+    c.halo:SetSize(UI.LIFE + 18, UI.LIFE + 18)
+    c.halo:SetPoint("CENTER", 0, 2)
+    soft(c.halo)
+    c.halo:SetBlendMode("ADD")
+    c.halo:SetVertexColor(1, 0.72, 0.32)
+    c.halo:SetAlpha(0)
+    -- Each candle at its own pace, so the row never pulses as one.
+    c.flicker = animated(c.halo, "BOUNCE")
+    alphaTo(c.halo, 0.6, 0.25, 1.05 + ((i * 7) % 5) * 0.14)
+    c.ring = UI.Round(c, "ARTWORK", UI.LIFE)
+    c.ring:SetPoint("CENTER")
+    Theme:Register(function() c.ring:SetColorTexture(Theme:RGBA(c.lit == false and "line" or "gold", c.lit == false and 0.5 or 1)) end)
+    c.icon = UI.Round(c, "OVERLAY", UI.LIFE - 2)
+    c.icon:SetPoint("CENTER")
+    for _, path in ipairs(ns.CANDLES) do if UI.SetIcon(c.icon, path) then break end end
+    -- Going out: the flame dims and greys, then a wisp of smoke rises from it, grows and fades.
+    c.out = animated(c.icon)
+    alphaTo(c.icon, 1, 0.35, 0.7)
+    c.out:SetScript("OnFinished", function() c.icon:SetDesaturated(true) end)
+    c.dim = animated(c.halo)
+    alphaTo(c.halo, 0.8, 0, 0.6)
+    c.smoke = c:CreateTexture(nil, "OVERLAY", nil, 7)
+    c.smoke:SetSize(16, 16)
+    c.smoke:SetPoint("BOTTOM", c, "TOP", 0, -12)
+    soft(c.smoke)
+    c.smoke:SetVertexColor(0.78, 0.76, 0.74)
+    c.smoke:SetAlpha(0)
+    c.smoking = animated(c.smoke)
+    local up = c.smoking:CreateAnimation("Translation")
+    up:SetOffset(4, 20); up:SetDuration(1.7); up:SetStartDelay(0.3)
+    local grow = c.smoking:CreateAnimation("Scale")
+    if grow.SetScaleTo then grow:SetScaleFrom(0.8, 0.8); grow:SetScaleTo(1.9, 2.2) else grow:SetScale(2, 2.4) end
+    grow:SetDuration(1.7); grow:SetStartDelay(0.3)
+    alphaTo(c.smoke, 0, 0.7, 0.3, 0.3)
+    alphaTo(c.smoke, 0.7, 0, 1.4, 0.6)
+    w.items[i] = c
+    return c
+  end
+  function w:Set(total, left)
+    total, left = total or 0, left or 0
+    local per = math.max(1, math.floor((width + LIFE_GAP) / (UI.LIFE + LIFE_GAP)))
+    for i = 1, total do
+      local c = candle(i)
+      c.lit = i <= left
+      c:ClearAllPoints()
+      c:SetPoint("TOPLEFT", ((i - 1) % per) * (UI.LIFE + LIFE_GAP), -math.floor((i - 1) / per) * (UI.LIFE + LIFE_GAP))
+      c.ring:SetColorTexture(Theme:RGBA(c.lit and "gold" or "line", c.lit and 1 or 0.5))
+      c.icon:SetDesaturated(not c.lit)
+      c.icon:SetAlpha(c.lit and 1 or 0.35)
+      -- The halo: still with Reduce effects, else flickering.
+      c.halo:SetAlpha(c.lit and UI.HALO or 0)
+      c.flickering = c.lit and not ns.Settings:Get("reduce")
+      if c.flickering then
+        if not c.flicker:IsPlaying() then c.flicker:Play() end
+      else c.flicker:Stop() end
+      c:Show()
+    end
+    for i = total + 1, #self.items do self.items[i]:Hide() end
+    self.total, self.left = total, math.min(left, total)
+    local rows = math.max(1, math.ceil(total / per))
+    local h = rows * UI.LIFE + (rows - 1) * LIFE_GAP
+    self:SetHeight(h)
+    return h
+  end
+  function w:Lit()
+    local n = 0
+    for i = 1, self.total or 0 do if self.items[i].lit then n = n + 1 end end
+    return n
+  end
+  -- The candles that went out since this row was last seen (from lit, to lit now): each goes out with a short snuff
+  -- and a curl of smoke. Call after :Set. Nothing with Reduce effects. w.snuffed: which ones, for the tests.
+  function w:Snuff(from, to)
+    self.snuffed = {}
+    if ns.Settings:Get("reduce") then return end
+    for i = to + 1, math.min(from, self.total or 0) do
+      local c = self.items[i]
+      self.snuffed[#self.snuffed + 1] = i
+      c.icon:SetDesaturated(false)
+      c.out:Stop(); c.out:Play()
+      c.dim:Stop(); c.dim:Play()
+      c.smoking:Stop(); c.smoking:Play()
+    end
+  end
+  function w:SetTip(title, lines) self.tipTitle, self.tipLines = title, lines end
+  -- The tooltip needs the mouse; a click goes on to w.onClick (the Overview's row opens the rulebook).
+  w:EnableMouse(true)
+  w:SetScript("OnMouseUp", function() if w.onClick then w.onClick() end end)
+  w:SetScript("OnEnter", function()
+    if not w.tipTitle then return end
+    GameTooltip:SetOwner(w, "ANCHOR_TOP")
+    GameTooltip:SetText(w.tipTitle, 1, 1, 1)
+    for _, line in ipairs(w.tipLines or {}) do GameTooltip:AddLine(line, 0.85, 0.8, 0.7, true) end
+    GameTooltip:Show()
+  end)
+  w:SetScript("OnLeave", function() GameTooltip:Hide() end)
+  return w
 end
 
 -- A one-line tooltip on hover (icon buttons say what they do).
@@ -732,6 +933,32 @@ function UI.Checkbox(parent, getValue, setValue)
   function cb:Refresh() self:SetChecked(getValue() and true or false) end
   cb:Refresh()
   return cb
+end
+
+-- A checkbox with its words beside it, and a tooltip (tip, wrapped) on both. Height 24; :Refresh().
+function UI.LabeledCheck(parent, width, label, tip, getValue, setValue)
+  local f = CreateFrame("Frame", nil, parent)
+  f:SetSize(width, 24)
+  f.box = UI.Checkbox(f, getValue, setValue)
+  f.box:SetPoint("LEFT", -3, 0)
+  f.label = UI.Text(f, 13, "ink")
+  f.label:SetPoint("LEFT", f.box, "RIGHT", 2, 0)
+  f.label:SetText(label)
+  local function show(owner)
+    if not tip then return end
+    GameTooltip:SetOwner(owner, "ANCHOR_TOP")
+    GameTooltip:SetText(label, 1, 1, 1)
+    GameTooltip:AddLine(tip, 0.85, 0.8, 0.7, true)
+    GameTooltip:Show()
+  end
+  f:EnableMouse(true)
+  f:SetScript("OnEnter", show)
+  f:SetScript("OnLeave", function() GameTooltip:Hide() end)
+  f:SetScript("OnMouseUp", function() f.box:Click() end)
+  f.box:HookScript("OnEnter", show)
+  f.box:HookScript("OnLeave", function() GameTooltip:Hide() end)
+  function f:Refresh() self.box:Refresh() end
+  return f
 end
 
 -- A slider from min to max in steps; the value is shown on the right (format(value) gives the text).
@@ -1744,6 +1971,160 @@ function UI.HelpIcon(parent)
   end)
   b:SetScript("OnLeave", function() GameTooltip:Hide() end)
   return b
+end
+
+-- The level track (GLOSSARY.md; Chapter and Adventurers pages): the chapter's line from its floor to its cap with
+-- every counted Adventurer on it, a notch per level. Adventurers at one level share one marker with their number,
+-- and a line under the track names them ("22: Brannic, Elyra"): the Overview's old track, a name per dot, was
+-- cluttered when many shared a level (the owner, 31 Oct 2026). :Set(f, n, maxLines) returns its height.
+local LT_LINE_Y, LT_TEXT_Y, LT_PAD = 24, 54, 14
+function UI.LevelTrack(parent, width)
+  local t = CreateFrame("Frame", nil, parent)
+  t:SetWidth(width)
+  t.band = UI.Solid(t, "BORDER", "3E7A3A", 0.22)
+  t.band:SetHeight(10)
+  t.line = UI.Solid(t, "ARTWORK", "line", 1)
+  t.line:SetHeight(2)
+  t.line:SetPoint("TOPLEFT", LT_PAD, -LT_LINE_Y); t.line:SetPoint("TOPRIGHT", -LT_PAD, -LT_LINE_Y)
+  t.notches = UI.Pool(function()
+    local n = UI.Solid(t, "ARTWORK", "line", 0.9)
+    n:SetSize(1, 6)
+    return n
+  end)
+  t.marks = {}
+  for i = 1, 2 do
+    local m = UI.Solid(t, "ARTWORK", "ink2", 1)
+    m:SetSize(2, 16)
+    m.label = UI.Text(t, 11, "ink2", "body", "CENTER")
+    t.marks[i] = m
+  end
+  t.markers = UI.Pool(function()
+    local d = CreateFrame("Frame", nil, t)
+    d:SetSize(20, 20)
+    d:SetFrameLevel(t:GetFrameLevel() + 2)
+    d.ring = UI.Round(d, "ARTWORK", 14)
+    d.ring:SetPoint("CENTER")
+    d.dot = UI.Round(d, "OVERLAY", 10)
+    d.dot:SetPoint("CENTER")
+    d.n = UI.Text(d, 11, "white", "title", "CENTER")
+    d.n:SetPoint("CENTER", 0, 0)
+    d.n:SetShadowOffset(1, -1); d.n:SetShadowColor(0, 0, 0, 1)
+    -- On the marker, so it goes with it: on the track it stayed behind when fewer levels were left (check, 31 Oct).
+    d.lv = UI.Text(d, 11, "ink", "title", "CENTER")
+    d:EnableMouse(true)
+    d:SetScript("OnEnter", function(self)
+      GameTooltip:SetOwner(self, "ANCHOR_TOP")
+      GameTooltip:SetText(self.tip or "", 1, 1, 1, 1, true)
+      GameTooltip:Show()
+    end)
+    d:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    return d
+  end)
+  t.lines = UI.Pool(function() return UI.WrapText(t, 12, "ink", width, "book") end)
+  t.more = UI.Text(t, 11, "ink2")
+
+  function t:Set(f, n, maxLines)
+    local J, Hr, L = ns.Journey, ns.Hero, ns.L
+    local tr = J:TrackLevels(f, n)
+    if not tr then self:Hide(); return 0 end
+    local light = Theme:Current().light
+    local span = math.max(1, tr.hi - tr.lo)
+    local function x(v) return LT_PAD + (v - tr.lo) / span * (width - 2 * LT_PAD) end
+    self.band:ClearAllPoints()
+    self.band:SetPoint("LEFT", self, "TOPLEFT", x(tr.floor), -LT_LINE_Y - 1)
+    self.band:SetWidth(math.max(1, x(tr.cap) - x(tr.floor)))
+    -- A notch per level; every fifth when the track spans more than 40 levels (a level-2 newcomer in chapter XV).
+    local step = span > 40 and 5 or 1
+    local k = 0
+    for v = tr.lo, tr.hi, step do
+      k = k + 1
+      local notch = self.notches:Get(k)
+      if notch then
+        notch:ClearAllPoints(); notch:SetPoint("TOP", self, "TOPLEFT", x(v), -LT_LINE_Y + 2); notch:Show()
+      end
+    end
+    self.notches:HideFrom(k + 1)
+    for i, v in ipairs({ tr.floor, tr.cap }) do
+      local m = self.marks[i]
+      m:ClearAllPoints(); m:SetPoint("CENTER", self, "TOPLEFT", x(v), -LT_LINE_Y - 1)
+      m.label:SetText((i == 1 and L.TRACK_FLOOR or L.TRACK_CAP):format(v))
+      m.label:ClearAllPoints(); m.label:SetPoint("TOP", m, "BOTTOM", 0, -2)
+      m.label:Show()
+    end
+    -- Floor and cap close together (a chapter far ahead, the track stretched to reach it): one label between them
+    -- ("floor 54 and cap 56" overlapped in the check of 31 Oct 2026).
+    local fl, cp = self.marks[1].label, self.marks[2].label
+    if x(tr.cap) - x(tr.floor) < (fl:GetStringWidth() + cp:GetStringWidth()) / 2 + 8 then
+      fl:SetText(L.TRACK_BOTH:format(tr.floor, tr.cap))
+      fl:ClearAllPoints(); fl:SetPoint("TOP", self, "TOPLEFT", (x(tr.floor) + x(tr.cap)) / 2, -LT_LINE_Y - 12)
+      local half = fl:GetStringWidth() / 2
+      local cx = ns.Clamp((x(tr.floor) + x(tr.cap)) / 2, half, math.max(half, width - half))
+      fl:ClearAllPoints(); fl:SetPoint("TOP", self, "TOPLEFT", cx, -LT_LINE_Y - 12)
+      cp:Hide()
+    end
+    -- One marker per level, lowest first, so a level number that would touch the one before it is left out (the
+    -- lines under the track give every level anyway).
+    local lastX = -100
+    for i = #tr.levels, 1, -1 do
+      local e = tr.levels[i]
+      local d = self.markers:Get(#tr.levels - i + 1)
+      if not d then break end
+      local many = #e.names > 1
+      local below = e.level < tr.floor
+      d.ring:SetSize(many and 20 or 14, many and 20 or 14)
+      d.dot:SetSize(many and 16 or 10, many and 16 or 10)
+      d.ring:SetColorTexture(Theme:RGBA(below and "B0321E" or "card"))
+      if many then
+        d.dot:SetColorTexture(Theme:RGBA(below and "B0321E" or "ink"))
+      else
+        local _, token = Hr:ClassName(f, e.names[1])
+        d.dot:SetColorTexture(ns.Hex(ns.ClassHex(token, light) or "7A6A55"))
+      end
+      d.n:SetText(many and #e.names or "")
+      local cx = x(e.level)
+      d:ClearAllPoints(); d:SetPoint("CENTER", self, "TOPLEFT", cx, -LT_LINE_Y - 1); d:Show()
+      d.lv:SetText(e.level)
+      d.lv:ClearAllPoints(); d.lv:SetPoint("BOTTOM", d, "TOP", 0, 0)
+      d.lv:SetShown(cx - lastX >= 18)
+      if d.lv:IsShown() then lastX = cx end
+      local short = {}
+      for j, name in ipairs(e.names) do short[j] = ns.Short(name) end
+      d.tip = L.TRACK_LINE:format(e.level, table.concat(short, ", "))
+    end
+    self.markers:HideFrom(#tr.levels + 1)
+    -- The lines: one per level, highest first, each name in dark ink after its class icon (class colours were faint
+    -- on parchment, the warrior's brown above all; U12, 31 Oct 2026).
+    local y = LT_TEXT_Y
+    local shown = math.min(#tr.levels, maxLines or 8)
+    if shown < #tr.levels then shown = shown - 1 end
+    for i = 1, shown do
+      local e = tr.levels[i]
+      local names = {}
+      for j, name in ipairs(e.names) do
+        local _, token = Hr:ClassName(f, name)
+        local icon = ns.ClassIconMarkup(token, 13)
+        names[j] = (icon ~= "" and (icon .. " ") or "") .. ns.Short(name)
+      end
+      local fs = self.lines:Get(i)
+      if not fs then break end
+      fs:SetText(L.TRACK_LINE:format(e.level, table.concat(names, ", ")))
+      fs:ClearAllPoints(); fs:SetPoint("TOPLEFT", 0, -y); fs:Show()
+      y = y + fs:GetStringHeight() + 3
+    end
+    self.lines:HideFrom(shown + 1)
+    local rest = 0
+    for i = shown + 1, #tr.levels do rest = rest + #tr.levels[i].names end
+    self.more:SetShown(rest > 0)
+    if rest > 0 then
+      self.more:SetText(L.TRACK_MORE_LOWER:format(rest))
+      self.more:ClearAllPoints(); self.more:SetPoint("TOPLEFT", 0, -y)
+      y = y + 16
+    end
+    self:SetHeight(y)
+    self:Show()
+    return y
+  end
+  return t
 end
 
 -- Where the Companions stand (Chapter and Overview pages): a section per group (below the floor, ready, at the cap,

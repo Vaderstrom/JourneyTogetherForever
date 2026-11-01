@@ -71,11 +71,12 @@ function T:FindGroup(f, key)
   return picked
 end
 
--- Other Heroes online now, highest level first.
+-- Other Heroes online now, highest level first. Not the Fallen: their journey ended, and their card shows no presence
+-- (the Overview offered a Fallen to group with; seen in the check of 1 Nov 2026, 11:30).
 function T:Online(f)
   local me, list = ns.Me(), {}
   for name in pairs(f.members) do
-    if name ~= me and Hr:Online(f, name) then list[#list + 1] = name end
+    if name ~= me and Hr:Online(f, name) and not (f.falls and ns.Challenges:Fallen(f, name)) then list[#list + 1] = name end
   end
   table.sort(list, function(a, b)
     local la, lb = Hr:Level(f, a), Hr:Level(f, b)
@@ -318,6 +319,13 @@ function T:You(f)
   local r = f.rules
   local fl = J:FloorLevel(f, ch)
   local below = J:Below(f, ch.n)
+  -- A Friend of the fellowship (SPEC §1.1): nothing to reach, nobody waiting.
+  if F:IsFriend(f, me) then
+    out.head, out.state = L.YOU_HEAD:format(lvl, L.YOU_FRIEND), L.YOU_FRIEND
+    add("friend", L.YOU_FRIEND_TEXT)
+    out.friend = true
+    return out
+  end
   if J:Away(f, me) then
     out.head, out.state = L.YOU_HEAD:format(lvl, L.YOU_AWAY), L.YOU_AWAY
     add("away", L.YOU_AWAY_TEXT)
@@ -337,7 +345,8 @@ function T:You(f)
     if alone then add("waiting", L.YOU_ALONE)
     -- New and catching up: the chapter goes on without waiting (Rules/Journey.lua, J:CatchingUp).
     elseif J:CatchingUp(f, me) then add("waiting", L.YOU_CATCHING)
-    else add("waiting", #below == 1 and L.YOU_LAST or L.YOU_BELOW_TOO:format(#below - 1)) end
+    elseif #below == 1 then add("waiting", L.YOU_LAST)
+    else add("waiting", #below == 2 and L.YOU_BELOW_TOO_1 or L.YOU_BELOW_TOO:format(#below - 1)) end
     add("level", howFar(f, me, fl, true))
     -- Where to catch up (M25): the journey's dungeons good for your level, the ones you have not cleared first.
     -- (Third, before rested XP: the Overview shows three lines.)

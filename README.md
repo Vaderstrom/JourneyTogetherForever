@@ -14,7 +14,8 @@ Built for **WoW Forever**. Until Forever is out, it is developed and tested on t
 - [How it works](#how-it-works)
 - [Features](#features): [creating a fellowship](#create-a-fellowship), [the journey](#shape-the-journey),
   [where you stand](#where-you-stand), [chapters and dungeons](#chapters-and-dungeons),
-  [nobody left behind](#nobody-left-behind), [Adventurers](#the-adventurers), [quests](#quests-and-attunements),
+  [nobody left behind](#nobody-left-behind), [challenges](#challenge-modes), [Adventurers](#the-adventurers),
+  [quests](#quests-and-attunements),
   [rules and votes](#the-rulebook-and-votes), [Gatherings](#gatherings), [Chronicle and Moments](#chronicle-moments-and-history),
   [group photo](#group-photo), [toasts and tracker](#toasts-the-tracker-and-the-picture-moment),
   [raids](#the-endgame-and-raids), [tournament](#guild-master-tournament), [Discord](#discord), [look and settings](#look-and-settings)
@@ -39,13 +40,14 @@ Built for **WoW Forever**. Until Forever is out, it is developed and tested on t
 ## Features
 
 ### Create a fellowship
-Four steps, and you can change everything later:
+Five steps, and you can change everything later except the challenges:
 1. **Fellowship**: the name, your role, how many you will be (Duo, Trio, Party, Large or any size; it picks the
    rules that fit) and the banner: a colour and an emblem from picture crests and 16 heraldic emblems.
 2. **Play style**: Relaxed, Together or Strict, each shown as a strip of levels: below the floor, slack, floor to
    cap, fellowship runs only, over the cap. Or fine-tune every rule yourself.
-3. **Journey**: Classic, Short chapters, Long chapters, or **your own journey** (a fifth step: the journey editor).
-4. **Review**: everything as rows, each with Change, then Create the fellowship.
+3. **Journey**: Classic, Short chapters, Long chapters, or **your own journey** (one more step: the journey editor).
+4. **Challenges**: none, or any of [the challenge modes](#challenge-modes), on three banners side by side.
+5. **Review**: everything as rows, each with Change, then Create the fellowship.
 
 ![Step 2: choose how you play together](.github/screenshots/play-style.jpg)
 
@@ -79,10 +81,12 @@ The **Overview** answers "what now?" at a glance:
 ### Chapters and dungeons
 - A **stage track** for the chapter: Everyone at the floor, Run the dungeons, Milestones, Complete. While someone is
   below the floor, a waiting box says who, how far, and about how long at their pace.
+- The **level track**: the chapter's floor and cap with every Adventurer on one line, also on the Adventurers page.
 - Every dungeon as a row with its picture, role, levels and state ("4 of 7 bosses", "2 still need it"), with
   **Find group**, which invites the Adventurers online who still need it (a tank and a healer first).
-- **Clears are picked up from boss kills** (no clicking needed). A toast tells everyone the moment the last needed
-  boss dies; Adventurers outside the group hear it when the group leaves the instance.
+- **Clears are picked up from boss kills** (no clicking needed). A message with the dungeon's picture and who was in
+  the group tells everyone the moment the last needed boss dies; Adventurers outside the group hear it when the group
+  leaves the instance.
 - A **clears table** (Adventurer by dungeon). The Leader can mark a clear or undo one; undoing a clear an earlier
   chapter needs reopens that chapter, and the question says so first.
 - Shortcuts to other addons when you have them: the **Dungeon Journal** addon (loot, quests, where to pick them up)
@@ -100,17 +104,36 @@ The **Overview** answers "what now?" at a glance:
 - **Away**: anyone can mark themselves away for a break, and an Adventurer not seen for 14 days (a rule) counts as
   away, so nobody waits for them.
 - **If the Leader is away** for the rule's number of days, the Adventurer who joined first takes over.
+- **Friend of the fellowship**: someone who plays along now and then. A Friend fills a slot in a dungeon run but never
+  counts for the floor, the votes, the firsts, the tournament or the challenges. Invite them as one, or become one
+  yourself; back to Adventurer at or below the chapter's cap.
+
+### Challenge modes
+When creating the fellowship, the Leader can take on challenges. They combine, and can't be added later, so a run is
+honest from level 1.
+- **Survival**: **Hardcore Fellowship** (one life each; **Hardcore PvP Fellowship** on a PvP realm) and **Shared
+  lives** (the fellowship's lives together, shown as candles).
+- **Story and Travel**: **Lord of the Rings** (the first ring anyone finds is the Ring: carry it to Blackrock Mountain
+  and destroy it there), **Walk everywhere**, **Questless** and **Race to 60** (your account keeps the best time).
+- **Gear, Gold & More**: **Fellowship-found**, **White gear only**, **Pauper** (you set the gold), **Ironman
+  Fellowship**, **One class only**, **No healers** and **Dungeons only**.
+- The addon can't stop anyone, but it notices: a broken rule is written in the Chronicle and shown on that
+  Adventurer's card, and they play on. One class only and No healers are held at the door.
+- **The Fallen**: an Adventurer whose last life is spent stays in the fellowship, honoured with a memorial page, and
+  may bring a new character who starts at level 1.
+- The rulebook has an article for the challenges, and the Leader can turn one off in Manage, for good.
 
 ### The Adventurers
 - Every Adventurer with role, class, level, XP and rested XP, and a **presence mark** like the game's friends list:
   Online, AFK, Offline ("Seen 3 hours ago") or Away. A ring shows someone the game says is online whose addon does
   not answer.
-- **3D heads**: yours always; another Adventurer's once you have been grouped and near (the game only draws players
-  it has seen). Before that, their class crest.
+- **3D heads**: yours always; another Adventurer's once they have been near you: in your group, your target or focus,
+  under your mouse, or with their nameplate showing (the game only draws players it has seen). Before that, their
+  class crest and when they were last near you.
 - **Inspect**: their gear around the character in 3D, item level, XP, this chapter's dungeons, roles, Whisper and
   Invite to group.
 - **Invite Adventurers**: everyone can invite; the name box suggests friends, Battle.net friends and guild members.
-  A friend without the addon? **Share it** gives you the addon's page to whisper them.
+  Someone without the addon? **Share it** gives you the addon's page to whisper them.
 - **Roles** and a secondary role, **I'm away**, and the fellowship's make-up (tanks, healers, damage).
 - **Old addon**: everyone sees who runs an older version, and you get one reminder per session when it is you.
 - **Your characters**: every character on your account with its fellowship, "as of" when you last played it.
@@ -154,8 +177,11 @@ tracker show the next one.
 - **Chronicle**: the journey's story. Every run, whether it counted and why not ("3 Adventurers, 4 needed"), leader
   changes, going over the cap, and **session recaps**: after playing together, how long, with whom, the levels, the
   dungeons, the bosses and the quests.
+- **Firsts**: the first Adventurer to reach level 10, 20 ... 60, to fall, to wear a rare or an epic item, to ride a
+  mount, to hold 100 gold, to bring a profession to 150, 225 or 300, and to win a PvP kill, as a cabinet of medals.
+  Light-hearted tallies too: who has fallen most, run most dungeons and turned in most quests.
 - **Moments**: the big moments, kept as they happened: a chapter begins, a dungeon is cleared for the first time, a
-  milestone, someone reaches 60, a champion is crowned. Each with its picture, **who was there** with their levels
+  milestone, a first, someone reaches 60, a champion is crowned. Each with its picture, **who was there** with their levels
   then, and how many screenshots you took.
 - **History**: the fellowship's own story: founded, who joined and left, Leaders, rules and votes, Gatherings and the
   tournament.
@@ -167,8 +193,7 @@ The interface hides and the whole fellowship stands together in 3D on the whole 
 size, up to six in a row and as many rows as needed. Choose a **pose** for everyone or one person (Cheer, Salute,
 Bow, Dance and more), a **backdrop** (the world, a studio, the chapter's picture, the dungeon), names and a caption
 with the crest. Over the world, **Look around** lets you walk and turn to find the place. **Take the photo** saves a
-screenshot without the controls. The game can only draw Adventurers who are in your group and near you; the others
-are left out with a line that says so.
+screenshot without the controls. The game can only draw Adventurers who are near you; the others are left out.
 
 ![The group photo over the world (the screenshot tour's pretend Adventurers wear your looks)](.github/screenshots/group-photo.jpg)
 
@@ -177,8 +202,9 @@ are left out with a line that says so.
   reaches the floor or the cap or goes over it, new rules, a Gathering soon, an attunement opens, and more. Big
   moments get a big banner. Each can be turned off, and you can drag them where you like. Click one to open the page
   it is about.
-- **The tracker** on the screen: the chapter, where you stand, the next step, dungeons cleared, who is online, the
-  next Gathering, shared quests, your next duel and your inbox; it can hide until you point at it.
+- **The tracker** on the screen: the chapter, where you stand (with a little bar to the floor or the cap), the next
+  step, dungeons cleared, who is online, the next Gathering, shared quests, your next duel and your inbox, each line
+  with its icon; it can hide until you point at it.
 - **Picture after a final boss**: Take a picture (with or without the interface) or open the group photo, right
   there in the dungeon.
 - The **inbox** in the header: invitations, votes, Gatherings, asks to group up, the tournament.
@@ -208,7 +234,7 @@ Post the fellowship's progress to your Discord channel through the separate app
 [its releases](https://github.com/Vaderstrom/WoW-Addon-Webhooks-for-Discord/releases/latest); this addon's plugin is in
 `Webhooks/`). It keeps a **board picture** of the fellowship up to date (the chapter, its
 steps, every Adventurer, the dungeons, who you are waiting for, the latest news) and can post when a chapter is
-complete, when a dungeon is cleared, and the pictures you took after a final boss. The addon writes its news when you
+complete, when a dungeon is cleared, the fellowship's firsts, and the pictures you took after a final boss. The addon writes its news when you
 log out; the app reads it from your saved data and posts nothing you have not chosen.
 
 ![The board picture the app posts (sample data)](.github/screenshots/discord-board.jpg)

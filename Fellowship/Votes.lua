@@ -15,11 +15,12 @@ local function all(f)
 end
 
 -- Yes and No among current members, the Yes votes needed (more than half of the counted Heroes), and who may still
--- vote (counted Heroes who have not).
+-- vote (counted Heroes who have not). A Friend of the fellowship's ballot (cast before they became one) is left out.
 function V:Counts(f, v)
   local yes, no = 0, 0
   for name, b in pairs(v.ballots) do
-    if f.members[name] then if b then yes = yes + 1 else no = no + 1 end end
+    local m = f.members[name]
+    if m and not m.friend then if b then yes = yes + 1 else no = no + 1 end end
   end
   local counted = J:Counted(f)
   local left = 0

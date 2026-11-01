@@ -3,7 +3,8 @@ local _, ns = ...
 local S = {}
 ns.Settings = S
 
-S.TOAST_EVENTS = { "chapter", "floor", "clear", "heroFloor", "heroCap", "overCap", "ahead", "session", "gathering", "attune", "version" }
+S.TOAST_EVENTS = { "chapter", "floor", "clear", "heroFloor", "heroCap", "overCap", "ahead", "session", "gathering", "attune", "version", "first",
+  "challenge" }
 
 S.DEFAULTS = {
   theme = "journal", size = 1, fullscreen = false, chat = "all", warnCap = true, warnPct = 75, reduce = false, minimap = true, lang = "en",

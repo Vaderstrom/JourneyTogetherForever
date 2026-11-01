@@ -90,7 +90,8 @@ function S:SendInvite(f, name)
   local s = { at = GetTime() }
   self.sent[name] = s
   Comm:Send(name, "INV", { fid = f.id, name = f.name, leader = f.leader, color = f.color, emblem = f.emblem,
-    heroes = F:Count(f), faction = f.faction }, true)
+    heroes = F:Count(f), faction = f.faction, friend = f.inviteFriend and f.inviteFriend[name] or nil,
+    oneclass = f.challenges and f.challenges.oneclass, nohealers = f.challenges and f.challenges.nohealers }, true)
   -- Only this invite: a newer one to the same player has its own wait.
   C_Timer.After(self.RECEIPT_WAIT, function()
     local cur = F:Current()
@@ -159,7 +160,8 @@ function S:Digest(f)
   -- (seen: which changes the copy has, so two copies with different changes at the same version are noticed too.)
   local core = { f.name, f.color, f.emblem, f.leader, f.officers, f.rules, f.journey, f.disbanded or false, f.seen or {} }
   local members = {}
-  for name, m in pairs(f.members) do members[name] = { m.role, m.second or "", m.away or "" } end
+  -- (A Friend of the fellowship adds a mark only then, so copies without any Friends agree with older versions.)
+  for name, m in pairs(f.members) do members[name] = { m.role, m.second or "", m.away or "", m.friend and 1 or nil } end
   core[#core + 1] = members
   local s, h = ns.Serialize.Encode(core), 5381
   for i = 1, #s do h = (h * 33 + s:byte(i)) % 4294967296 end
@@ -177,7 +179,9 @@ Comm:On("INV", function(sender, d)
   local cur = F:Current()
   if cur and cur.id == d.fid then return end
   ns.char.invites[d.fid] = { from = sender, name = d.name, leader = d.leader, color = d.color, emblem = d.emblem,
-    heroes = tonumber(d.heroes) or 1, time = time() }
+    heroes = tonumber(d.heroes) or 1, time = time(), friend = d.friend == true or nil,
+    oneclass = type(d.oneclass) == "string" and d.oneclass:match("^%u+$") and #d.oneclass <= 16 and d.oneclass or nil,
+    nohealers = d.nohealers == true or nil }
   F:Changed()
 end)
 
@@ -219,6 +223,12 @@ Comm:On("ACC", function(sender, d)
     Comm:Send(sender, "ACCX", { fid = d.fid }, true)
     return
   end
+  -- One class only, No healers (an older addon on their side did not check): they are told why.
+  local ok, _, no = ns.Challenges:Allows(f, d.class, d.role, nil, f.inviteFriend and f.inviteFriend[sender])
+  if not ok then
+    Comm:Send(sender, "ACCX", { fid = d.fid, no = no, class = f.challenges.oneclass }, true)
+    return
+  end
   if F:Do({ k = "join", name = sender, role = d.role, class = d.class, level = d.level, guild = d.guild, gm = d.gm }) then
     Comm:Send(sender, "ACCOK", { fid = f.id }, true)
     S:SendSnap(sender, f)
@@ -235,7 +245,10 @@ Comm:On("ACCX", function(sender, d)
   local p = type(d) == "table" and F.pendingJoin[d.fid]
   if p and p.from == sender then
     F.pendingJoin[d.fid] = nil
-    ns:Toast(nil, L.ACCEPT_FAILED, L.ACCEPT_CLOSED:format(ns.Short(sender)))
+    local text = L.ACCEPT_CLOSED:format(ns.Short(sender))
+    if d.no == "nohealers" then text = L.CHAL_NOHEALERS_NO
+    elseif d.no == "oneclass" and type(d.class) == "string" then text = L.CHAL_ONECLASS_NO:format(ns.Challenges.ClassName(d.class)) end
+    ns:Toast(nil, L.ACCEPT_FAILED, text)
   end
 end)
 

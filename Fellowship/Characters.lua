@@ -1,4 +1,5 @@
--- "Your characters" (SPEC §4.1): every character on this account and its fellowship, as last seen.
+-- "Your characters" (SPEC §4.1): every character on this account and its fellowship, as last seen; the ones
+-- without a fellowship behind a button (C:Shown).
 -- Another character's data is only as fresh as its last login, and the rows say so ("as of 2 days ago").
 local _, ns = ...
 local L = ns.L
@@ -30,6 +31,31 @@ local function fellowshipOf(c)
   local f = c and ns.Fellowship:Get(c.fellowshipId)
   if f and not f.disbanded then return f end
   return nil
+end
+
+-- The list as it shows (31 Oct 2026): characters in a fellowship on top, in List's order; the ones without a
+-- fellowship only after "Show N characters without a fellowship", there to show the addon knows them too. Not
+-- saved: hidden again after a /reload. Returns the keys to show and how many characters have no fellowship.
+C.showAll = false
+function C:Shown()
+  local shown, rest = {}, {}
+  for _, key in ipairs(self:List()) do
+    local t = fellowshipOf(ns.db.characters[key]) and shown or rest
+    t[#t + 1] = key
+  end
+  local none = #shown == 0
+  if self.showAll then
+    for _, key in ipairs(rest) do shown[#shown + 1] = key end
+  end
+  return shown, #rest, none
+end
+
+-- The button under the list: its label, or nil when every character has a fellowship.
+function C:ToggleLabel()
+  local _, n = self:Shown()
+  if n == 0 then return nil end
+  if self.showAll then return L.CHARS_HIDE_REST end
+  return n == 1 and L.CHARS_SHOW_REST_1 or L.CHARS_SHOW_REST_N:format(n)
 end
 
 -- One row of the list (see the mockup's myChars).

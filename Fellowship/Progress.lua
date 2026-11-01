@@ -13,13 +13,13 @@ local DAY = 86400
 ---------------------------------------------------------------------------
 -- Leader takeover
 ---------------------------------------------------------------------------
--- The Adventurer who has been in the fellowship the longest and is not away (ties: by name). (It was the longest-
--- serving Steward until the two ranks of 27 Oct 2026.)
+-- The Adventurer who has been in the fellowship the longest and is not away, nor a Friend of the fellowship, nor one
+-- of the Fallen (ties: by name). (It was the longest-serving Steward until the two ranks of 27 Oct 2026.)
 function P:LongestServing(f)
   local best, since
   for name, m in pairs(f.members) do
     local t = tonumber(m.joined) or 0
-    if name ~= f.leader and not ns.Journey:Away(f, name) and (not best or t < since or (t == since and name < best)) then
+    if name ~= f.leader and not J:Uncounted(f, name) and not J:Away(f, name) and (not best or t < since or (t == since and name < best)) then
       best, since = name, t
     end
   end

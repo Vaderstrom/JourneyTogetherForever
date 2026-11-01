@@ -15,19 +15,32 @@ function J.Roman(n) return ROMAN[n] or tostring(n) end
 local function level(f, name) return ns.Hero:Level(f, name) end
 
 -- Why a Hero is away: "self", "forced" (by the leader), "auto" (not seen for the rule's number of days), or nil.
+-- Never counted: a Friend of the fellowship (SPEC §1.1), or one of the Fallen of a survival challenge (§9.2). Never away
+-- either, not in the counts, and never the next Leader before someone who plays on.
+function J:Uncounted(f, name)
+  local m = f.members[name]
+  if not m then return false end
+  return m.friend == true or (f.falls ~= nil and ns.Challenges:Fallen(f, name) ~= nil)
+end
+
 function J:Away(f, name)
   local m = f.members[name]
-  if not m then return nil end
+  -- (A Fallen went "away" after the rule's days and was counted as away; seen in the check of 1 Nov 2026, 11:30.)
+  if not m or self:Uncounted(f, name) then return nil end
   if m.away then return m.away end
   local r = f.rules
   if not r.awayNever and name ~= ns.Me() and time() - ns.Hero:LastSeen(f, name) > (r.awayDays or 14) * 86400 then return "auto" end
   return nil
 end
 
--- Heroes not away, highest level first.
+-- Heroes not away, highest level first. The Fallen of a survival challenge are not counted either: their journey
+-- ended, so they no longer hold the fellowship back (SPEC §9, Fellowship/Challenges.lua). Nor are Friends of the
+-- fellowship (SPEC §1.1).
 function J:Counted(f)
   local list = {}
-  for name in pairs(f.members) do if not self:Away(f, name) then list[#list + 1] = name end end
+  for name in pairs(f.members) do
+    if not self:Uncounted(f, name) and not self:Away(f, name) then list[#list + 1] = name end
+  end
   table.sort(list, function(a, b)
     local la, lb = level(f, a), level(f, b)
     if la ~= lb then return la > lb end
@@ -319,11 +332,15 @@ function J:Counts(f, n)
   if not ch then return {} end
   local fl, top, over = self:FloorLevel(f, ch), readyBelow(ch), ch.cap + f.rules.capTol
   local below, ready, cap, above, away = 0, 0, 0, 0, 0
+  -- (A Friend of the fellowship and the Fallen are not in the counts: they never hold anyone back. The Fallen were,
+  -- "4 Below the floor" beside 3 on the right page; seen in the check of 1 Nov 2026, 11:30.)
   for name in pairs(f.members) do
-    if self:Away(f, name) then away = away + 1
-    else
-      local lv = level(f, name)
-      if lv < fl then below = below + 1 elseif lv < top then ready = ready + 1 elseif lv <= over then cap = cap + 1 else above = above + 1 end
+    if not self:Uncounted(f, name) then
+      if self:Away(f, name) then away = away + 1
+      else
+        local lv = level(f, name)
+        if lv < fl then below = below + 1 elseif lv < top then ready = ready + 1 elseif lv <= over then cap = cap + 1 else above = above + 1 end
+      end
     end
   end
   return { { L.CNT_BELOW, below, "B0321E" }, { L.CNT_READY, ready, "2E7A3E" }, { L.CNT_CAP, cap, "B8742A" },
@@ -370,6 +387,28 @@ function J:Groups(f, n)
       or (why == "auto" and L.NOTE_AWAY_AUTO:format(math.floor((time() - ns.Hero:LastSeen(f, name)) / 86400)) or L.NOTE_AWAY) })
   end
   return g
+end
+
+-- The level track of chapter n (GLOSSARY.md): its floor and cap, the levels it spans (lo..hi: one below the floor
+-- to one past the cap, wider when someone is further out), and the counted Heroes by level, highest first
+-- ({ level, names }). Heroes at one level share one entry: one marker with a number on the track.
+function J:TrackLevels(f, n)
+  local ch = f.journey.chapters[n]
+  if not ch then return nil end
+  local t = { floor = self:FloorLevel(f, ch), cap = ch.cap, levels = {} }
+  local at = {}
+  for _, name in ipairs(self:Counted(f)) do -- highest level first, then by name
+    local l = level(f, name)
+    if not at[l] then
+      at[l] = { level = l, names = {} }
+      t.levels[#t.levels + 1] = at[l]
+    end
+    table.insert(at[l].names, name)
+  end
+  local top, bottom = t.levels[1], t.levels[#t.levels]
+  t.lo = math.min(t.floor - 1, bottom and bottom.level or t.floor)
+  t.hi = math.max(t.cap + 1, top and top.level or t.cap)
+  return t
 end
 
 -- Heroes over the cap (+ allowance) in the current chapter.

@@ -54,16 +54,23 @@ end
 local function prep(fn, wait) shots[#shots + 1] = { fn = fn, wait = wait, prep = true } end
 
 -- Phase A: no fellowship.
-shot("welcome", "Welcome", "No fellowship: logo, features, Found / Join, Your characters", function()
+shot("welcome", "Welcome", "No fellowship: logo, features, Found / Join, Your characters (without a fellowship: hidden)", function()
+  ns.Characters.showAll = false
   W().startView = "welcome"; W():Open(); W():Refresh()
 end)
 shot("controls-gallery", "The game's button art (gallery)", "Every candidate template and texture for WoW-style buttons; missing ones say so", function()
   ns.Gallery:Show()
 end)
 prep(function() ns.Gallery:Hide() end)
-shot("characters-panel", "Your characters panel", "The header's characters button: every character with its fellowship", function()
+shot("characters-panel", "Your characters panel", "The header's characters button: characters in a fellowship, the others behind Show", function()
+  ns.Characters.showAll = false
   W():OpenPanel("characters")
 end)
+shot("characters-panel-all", "Your characters panel (all shown)", "After Show: the characters without a fellowship under the others, and Hide", function()
+  local p = W().panels.characters
+  if p and p.list and p.list.toggle:IsShown() and not ns.Characters.showAll then p.list.toggle:Click() end
+end)
+prep(function() ns.Characters.showAll = false end)
 shot("create-1", "Create: step 1 (empty)", "Name, role and four size cards; on the right your banner, its colour and every emblem", function()
   W():HidePanels(); ns.CreateState:Reset(); W().startView = "create"; W():Refresh()
 end)
@@ -99,7 +106,25 @@ end)
 shot("create-chapters-journey", "Create: Chapters (Whole journey)", "The Whole journey tab: Start over from a preset, Import", function()
   pf("create").editor:ShowTab("journey")
 end)
-shot("create-4", "Create: review", "The fellowship and the rules as rows (Change), the journey's chapters, Create the fellowship", function()
+-- X1 (SPEC §9): the challenges, chosen only here; Hardcore Fellowship on a PvP realm and Shared lives together (the
+-- review shows them next).
+shot("create-challenges", "Create: Challenges", "Three banners side by side, every challenge in sight: Hardcore PvP Fellowship (the PvP realm tick under it renames it) and Shared lives chosen (they combine), how many lives (the size suggests it); what you take on, on the right", function()
+  local C = ns.CreateState
+  C.challenges, C.pvp = { hardcore = true, shared = true }, true
+  C:Goto("challenges"); W():Refresh()
+end)
+-- X3-X5 (the owner, 1 Nov 2026): a challenge's tooltip, then many across the three banners.
+shot("create-challenges-tip", "Create: Challenges (a tooltip)", "Hovering Lord of the Rings in the Story and Travel banner: its name and its whole rule", function()
+  local r = W().pageFrames.create.chalRows.ring
+  r:GetScript("OnEnter")(r)
+end)
+shot("create-challenges-many", "Create: Challenges (many at once)", "Lord of the Rings and Walk everywhere; Ironman Fellowship (White gear only greyed, with it), Pauper with its gold, One class only (your class): every row stays on its banner's cloth, and the right page holds them all above Next", function()
+  if GameTooltip then GameTooltip:Hide() end
+  local C = ns.CreateState
+  C.challenges.ring, C.challenges.walk, C.challenges.ironman, C.challenges.pauper, C.challenges.oneclass = true, true, true, true, true
+  W():Refresh()
+end)
+shot("create-4", "Create: review", "The fellowship, the rules as rows and the challenges (Change), the journey's chapters, Create the fellowship", function()
   ns.CreateState:Goto("review"); W():Refresh()
 end)
 shot("join-empty", "Join (no invitations)", "How to join", function() W().startView = "join"; W():Refresh() end)
@@ -150,7 +175,7 @@ shot("leader-quests-empty", "Quests (alone)", "No shared quests", function() pag
 local function chronicle(filter) page("chronicle"); pf("chronicle").filter = filter; W():Refresh() end
 shot("leader-chronicle-empty", "Chronicle (empty)", "Nothing yet, totals at zero; the Chronicle and Moments tabs", function() chronicle("all") end)
 shot("leader-moments-empty", "Moments (empty)", "No moments yet: what the tab keeps", function() page("moments") end)
-shot("leader-history-alone", "History (new fellowship)", "The fellowship's own story: founded, the numbers, its Leader", function()
+shot("leader-history-alone", "History (new fellowship)", "The fellowship's own story: founded, the number tiles, its Leader", function()
   page("history"); pf("history").filter = "all"; W():Refresh()
 end)
 shot("leader-heroes-alone", "Heroes (alone)", "One Hero", function() page("heroes") end)
@@ -197,7 +222,7 @@ shot("since", "Since you were last here", "What changed, who levelled, where the
   ns.Since:Mark(); dev("hero Elyra level 19"); dev("hero Brannic level 20")
   ns.Since.current = ns.Since:Digest(cur()); page("since")
 end)
-shot("chapter", "Chapter", "The stage track, the banner, every dungeon as a row without scrolling, where the Adventurers stand", function()
+shot("chapter", "Chapter", "The stage track, the banner, every dungeon as a row without scrolling; the level track, then where the Adventurers stand", function()
   dev("hero Corwin level 17"); page("chapter"); top(pf("chapter").lscroll)
 end)
 -- M25: everyone at the floor and online: Play now names the dungeon two of you need.
@@ -234,9 +259,24 @@ end, 0.5)
 shot("chapter-partial", "Chapter (a dungeon partly done)", "The Deadmines' row after two kills: how many bosses (the clears table shows only whole clears)", function()
   page("chapter"); top(pf("chapter").lscroll)
 end)
-shot("chronicle", "Chronicle (all)", "Runs with counted / not counted, the journey's dungeons so far", function() chronicle("all") end)
+shot("chronicle", "Chronicle (all)", "Runs with counted / not counted; chapters unlocked in a row as one line (U15); the number tiles, the journey's dungeons so far", function() chronicle("all") end)
 shot("chronicle-runs", "Chronicle (runs filter)", "Only runs", function()
   local p = pf("chronicle"); p.filter = "run"; W():Refresh()
+end)
+-- F1 (SPEC §8): the pretend Adventurers' deeds a little while ago, shared as their state would carry them.
+prep(function()
+  local f, t = cur(), (GetServerTime and GetServerTime() or time())
+  local deeds = { Brannic = { lvl10 = t - 290, fall = t - 250, rare = t - 200, mount = t - 40 },
+    Elyra = { lvl10 = t - 280, lvl20 = t - 150, gold100 = t - 100 }, Corwin = { fall = t - 240, epic = t - 20 } }
+  local tally = { Brannic = { falls = 3, quests = 12 }, Elyra = { falls = 1, quests = 20 }, Corwin = { falls = 1, quests = 7 } }
+  for n, d in pairs(deeds) do
+    local h = f.heroes and f.heroes[full(n)]
+    if h then h.deeds, h.tally = d, tally[n] end
+  end
+  ns.Firsts:Check(f); ns.Moments:Check(f)
+end)
+shot("chronicle-firsts", "Chronicle (Firsts)", "The firsts as medals: Earned (who, when), then Still open, greyed (an open level names who is closest); the tallies on the right as podiums, the top three in gold, silver, bronze", function()
+  chronicle("first")
 end)
 -- M25: a session recap kept for this character (a pretend one with Brannic and Elyra), as the toast's click opens it.
 shot("chronicle-sessions", "Chronicle (Sessions)", "Your session recaps: how long, with whom, levels, dungeons, bosses, quests", function()
@@ -275,7 +315,7 @@ shot("moments", "Moments", "The journey's moments as picture tiles; the chosen o
 end)
 -- The group photo (UI/Photo.lua): you standing in for the pretend Adventurers, over the world, then in the studio
 -- with poses and one chosen.
-shot("group-photo", "Group photo (the world)", "The interface hidden; everyone side by side at true size, names under their feet, the crest and name top left, the controls at the bottom", function()
+shot("group-photo", "Group photo (the world)", "The interface hidden; everyone side by side at true size, names under their feet (20, with class icons: U16), the crest and name top left, the controls at the bottom", function()
   hideOverlays()
   -- The photo keeps the backdrop it last had (the self-test's was the studio; seen in the check of 30 Oct 2026).
   ns.Photo.backdrop = "world"
@@ -297,7 +337,7 @@ shot("group-photo-twelve", "Group photo (twelve)", "Two rows of six, the back ro
   PH:Close()
   PH.backdrop = "studio"
   PH:Open({ standIns = true, extra = ns.Dev:Crowd(cur(), 12) })
-end, { wait = 0.8 })
+end, { wait = 1.5 }) -- six new models load for the back row (at 0.8 s only their names stood there, 31 Oct 2026)
 shot("group-photo-look", "Group photo (look around)", "Over the world in first person, the controls gone; the hint and Back to the photo at the bottom", function()
   local PH = ns.Photo
   PH:SetBackdrop("world")
@@ -350,7 +390,7 @@ end)
 shot("quests-attune-ony", "Quests (Onyxia's steps)", "A long attunement chain", function()
   pf("quests").attSel = attRow("ony"); W():Refresh()
 end)
-shot("heroes", "Adventurers", "Banner, stats, every Adventurer with a 3D head (yours) or class crest, status and XP", function()
+shot("heroes", "Adventurers", "Banner, number tiles (a gold number over an icon), the level track (Adventurers at one level: one marker with a number), every Adventurer with a 3D head (yours) or class crest, status and XP", function()
   ns.QuestLists.viewLevel = nil
   local p = pf("quests"); p.attSel = nil; p.tabs.buttons[2]:Click(); page("heroes")
 end)
@@ -373,7 +413,7 @@ prep(function()
   for _, name in ipairs(PRETEND) do dev("hero " .. name .. " online") end
   W():Refresh()
 end)
-shot("inspect", "Inspect an Adventurer", "Gear at the edges like the character sheet, the class crest (pretend Adventurers cannot be drawn), XP, facts, Whisper / Invite", function()
+shot("inspect", "Inspect an Adventurer", "Gear at the edges like the character sheet, the class crest (pretend Adventurers cannot be drawn), XP, the number tiles, Whisper / Invite", function()
   -- Brannic shares gear (your items as a stand-in), so the slots and their tooltips (Shift compares) show.
   dev("hero Brannic gear")
   local p = pf("heroes"); p.sel = full("Brannic"); W():Refresh()
@@ -381,7 +421,16 @@ end)
 shot("inspect-me", "Inspect yourself", "You in 3D between your gear; role, secondary role, I'm away, how to play another character", function()
   local p = pf("heroes"); p.sel = ns.Me(); W():Refresh()
 end)
-shot("inspect-me-bottom", "Inspect yourself (scrolled)", "How to play another character here (from that character)", function() return bottom(pf("heroes").iscroll) end)
+shot("inspect-me-bottom", "Inspect yourself (scrolled)", "Friend of the fellowship (the Leader always counts), how to play another character here", function() return bottom(pf("heroes").iscroll) end)
+-- A Friend of the fellowship (SPEC §1.1): Elyra becomes one for these two shots.
+prep(function() dev("hero Elyra friend") end)
+shot("heroes-friend", "Adventurers (a Friend of the fellowship)", "Elyra after those who count, Friend of the fellowship in teal; the Adventurers tile one fewer, \"1 Friend\" beside the roles, \"... and 1 Friend\" under the title; the invite box with As a Friend of the fellowship", function()
+  local p = pf("heroes"); p.sel = nil; page("heroes"); top(p.scroll)
+end)
+shot("inspect-friend", "Inspect a Friend of the fellowship", "Friend of the fellowship by her name, in teal", function()
+  local p = pf("heroes"); p.sel = full("Elyra"); W():Refresh()
+end)
+prep(function() dev("hero Elyra friend off"); pf("heroes").sel = nil end)
 shot("manage", "Manage: Adventurers", "Needs attention, every Adventurer with a menu, invites", function()
   pf("heroes").sel = nil; dev("hero Corwin level 18"); page("manage")
 end)
@@ -390,6 +439,64 @@ shot("manage-fellowship", "Manage: The fellowship", "Name, banner colour, every 
 end)
 shot("manage-rules", "Manage: Rules", "The rules as a draft: size, play style, every rule; Publish", function()
   page("rulesadmin")
+end)
+-- X2 (SPEC §9): the Tour fellowship with Hardcore and ten shared lives for these shots; Brannic falls (where you are,
+-- fighting a Defias Pillager). Put back after them.
+prep(function()
+  local f = cur()
+  TR.chalKeep = { f.challenges, f.challengesOff, f.falls }
+  f.challenges, f.challengesOff, f.falls = { hardcore = true, shared = 10 }, nil, nil
+  dev("hero Brannic fall")
+end)
+shot("heroes-fallen", "Adventurers (a Fallen Adventurer)", "Hardcore: Brannic's card a memorial (greyed crest with a skull, violet, no Online), last; Fallen, with the place, day and foe on the line (his level is the card's number); 1 Fallen beside the roles", function()
+  pf("heroes").sel = nil; page("heroes"); top(pf("heroes").scroll)
+end)
+shot("inspect-fallen", "Inspect a Fallen Adventurer (his memorial)", "In memory of Brannic: his greyed crest with a skull on the dimmed stage, where, when and fighting whom, honoured in the Chronicle; no gear. Right: Days together, Fallen, his journey (joined, fell, dungeons, firsts), no XP or Invite", function()
+  local p = pf("heroes"); p.sel = full("Brannic"); W():Refresh()
+end)
+prep(function() pf("heroes").sel = nil end)
+shot("chronicle-fallen", "Chronicle (a memorial)", "In memory of Brannic: level, place, day and foe; a shared life lost, 9 of 10 left", function() chronicle("all") end)
+shot("chronicle-firsts-fallen", "Chronicle (Firsts, under a challenge)", "First to fall in violet with a silver ring, not gold; an open level medal names who is closest (\"is closest (22)\")", function()
+  chronicle("first")
+end)
+-- The candles as the Overview opens after Brannic's fall: his goes out now (the lives seen were 10), so the shot catches
+-- the snuff: dark, with a curl of smoke above it (none with Reduce effects); the lit ones with a warm halo.
+shot("overview-lives", "Overview (shared lives)", "The shared lives as a row of candles: 9 of 10 lit with a warm halo, Brannic's going dark with a curl of smoke; Challenges › opens the rulebook", function()
+  ns.char.livesSeen = ns.char.livesSeen or {}
+  ns.char.livesSeen[cur().id] = 10
+  page("overview"); top(pf("overview").lscroll)
+end)
+shot("rules-challenges", "Rules (the challenges)", "The rulebook's last article: Hardcore and Shared lives, the lives left, the Fallen, starting anew", function()
+  page("rules"); bottom(pf("rules").lscroll)
+end)
+shot("manage-rules-challenges", "Manage: Rules (challenges)", "Each challenge with Turn off (for good; it asks first), above the size and the play style", function()
+  page("rulesadmin"); top(pf("rulesadmin").lscroll)
+end)
+-- X3-X5: Ironman Fellowship, Walk everywhere, Lord of the Rings and Race to 60; Brannic takes a flight path and trades
+-- outside, and finds the Ring.
+prep(function()
+  local f = cur()
+  f.challenges, f.falls, f.broken, f.ring, f.race = { ironman = true, hardcore = true, white = true, walk = true, ring = true, race = true }, nil, nil, nil, nil
+  dev("hero Brannic break taxi")
+  dev("hero Brannic break potion")
+  dev("hero Brannic ring")
+end)
+shot("heroes-broken", "Adventurers (broken challenges, the Ring)", "Brannic's card: Ring-bearer · Broke 2 challenges after his roles", function()
+  pf("heroes").sel = nil; page("heroes"); top(pf("heroes").scroll)
+end)
+shot("chronicle-broken", "Chronicle (broken rules, the Ring)", "Brannic took a flight path, breaking Walk everywhere; used a potion, breaking Ironman Fellowship; found the Ring", function() chronicle("all") end)
+shot("rules-challenges-more", "Rules (the challenges, X3-X5)", "The article: each rule, Broken by Brannic, who carries the Ring, Race to 60's clock", function()
+  page("rules"); bottom(pf("rules").lscroll)
+end)
+shot("manage-rules-ironman", "Manage: Rules (Ironman Fellowship)", "Hardcore Fellowship and White gear only: Held by Ironman Fellowship instead of Turn off", function()
+  page("rulesadmin"); top(pf("rulesadmin").lscroll)
+end)
+prep(function()
+  local f, k = cur(), TR.chalKeep
+  if k then f.challenges, f.challengesOff, f.falls = k[1], k[2], k[3] end
+  f.broken, f.ring, f.race = nil, nil, nil
+  TR.chalKeep = nil
+  top(pf("rules").lscroll)
 end)
 shot("leave-confirm", "Leave as the leader (asks first)", "Who leads after you", function()
   W():Confirm(ns.Fellowship:LeaveQuestion(cur()), L.LEAVE_SHORT, function() end)
@@ -439,7 +546,7 @@ end)
 shot("admin-shelf", "Journey Admin (Every dungeon)", "The Every dungeon tab: every dungeon by level, the ones that fit chapter 2 in gold, to drag onto a chapter", function()
   hideOverlays(); pf("admin").editor:ScrollToShelf()
 end)
-shot("admin-add-again", "Journey Admin (a dungeon again)", "Chapter XV: Blackrock Depths clicked in from the shelf, its third placement (also in XIII, XIV)", function()
+shot("admin-add-again", "Journey Admin (a dungeon again)", "Chapter XV: Blackrock Depths clicked in from the shelf, its third placement (also in XIII, XIV); XV enlarged on the ruler (U11)", function()
   hideOverlays()
   local A = ns.AdminDraft
   A.sel = 15; W():Refresh()
@@ -516,7 +623,7 @@ shot("tourney-signup", "Tournament (sign-up)", "Sign-up open, entrants and seeds
   for _, n in ipairs(PRETEND) do dev("hero " .. n .. " signup") end
   page("tourney")
 end)
-shot("tourney-bracket", "Tournament (bracket running)", "Semifinals joined to the final by bracket lines, your next duel", function() dev("tourney next"); W():Refresh() end)
+shot("tourney-bracket", "Tournament (bracket running)", "Semifinals joined to the final by bracket lines, your next duel; cards 60 high with class icons and levels (U17)", function() dev("tourney next"); W():Refresh() end)
 shot("tourney-champion", "Tournament (over)", "The winner and the hand-over", function()
   local f = cur()
   for _ = 1, 4 do
@@ -526,7 +633,7 @@ shot("tourney-champion", "Tournament (over)", "The winner and the hand-over", fu
   end
   W():Refresh()
 end)
-shot("history", "History (the fellowship's story)", "Joined, rules, votes, Gatherings and the tournament; founded, numbers and Leaders", function()
+shot("history", "History (the fellowship's story)", "Joined, rules, votes, Gatherings and the tournament; founded, the number tiles, the chapters so far (U9) and Leaders", function()
   page("history"); pf("history").filter = "all"; W():Refresh()
 end)
 local function format(fmt)
@@ -549,25 +656,52 @@ shot("tourney-20", "Tournament (20 entrants)", "Round by round: round 1's winner
   dev("tourney big"); page("tourney")
 end)
 prep(function() dev("tourney big off") end)
-shot("settings", "Settings", "The whole page: the book, messages, help, toasts and the tracker", function()
-  ns.AdminDraft:Discard(); W():OpenSettings()
+shot("settings", "Settings", "Folding sections (U10): the book, messages and help on the left; the toasts open on the right, the tracker folded with what is set", function()
+  ns.AdminDraft:Discard(); W():OpenSettings(); pf("settings"):Fold("toasts", true)
 end)
-shot("settings-tracker-off", "Settings (tracker off)", "The tracker's lines fade while it is off", function()
-  W():OpenSettings(); ns.Settings:Set("tracker", false); W():Refresh()
+shot("settings-tracker-off", "Settings (tracker off)", "The tracker open (the toasts fold), its lines faded while it is off", function()
+  W():OpenSettings(); pf("settings"):Fold("tracker", true); ns.Settings:Set("tracker", false); W():Refresh()
 end)
 shot("toast-move", "Toast position (move mode)", "The sample banner to drag", function()
   ns.Settings:Set("tracker", true); W():OpenSettings(); ns.Toasts:StartMove()
 end)
 
 -- Toasts on their own (the book closed).
-local function toast(kind, title, text)
-  return function() ns.Toasts:StopMove(); W():Close(); ns.Toasts:Push(kind, title, text) end
+-- more.dungeon may be a function: the place is looked up when the shot is taken (each game has its own list).
+local function toast(kind, title, text, more)
+  return function()
+    ns.Toasts:StopMove(); W():Close()
+    local m = more and { dungeon = more.dungeon } or nil
+    if m and type(m.dungeon) == "function" then m.dungeon = m.dungeon() end
+    ns.Toasts:Push(kind, title, text, nil, m)
+  end
 end
-shot("toast-clear", "Toast: dungeon cleared", "A normal toast", toast("clear", L.TOAST_CLEARED, L.TOAST_CLEARED_TEXT:format("The Deadmines")), { toast = true })
+-- A clear message (U7): the place's picture on the left, its name, and who was there in their class colours.
+local function cleared(key)
+  return function()
+    ns.Toasts:StopMove(); W():Close()
+    local names = { ns.Me() }
+    for _, n in ipairs(PRETEND) do names[#names + 1] = full(n) end
+    local k = key()
+    if k then ns.Clears:ClearedToast(cur(), k, names) end
+  end
+end
+-- The Deadmines and Molten Core where this game has them, else its first dungeon and raid with a loading screen
+-- (WoW Forever: Onyxia's Lair). Asked when the shot runs: the lists are this game's only once the addon has loaded.
+local function first(list, want)
+  if ns.Dungeon(want) then return want end
+  for _, d in ipairs(list) do if ns.DungeonScreen(d[1]) then return d[1] end end
+  return list[1] and list[1][1]
+end
+shot("toast-clear", "Toast: dungeon cleared", "The dungeon's picture, its name and who was there",
+  cleared(function() return first(ns.DUNGEONS, "dm") end), { toast = true })
+shot("toast-clear-raid", "Toast: raid cleared", "The raid's picture, its name and who was there",
+  cleared(function() return first(ns.RAIDS, "mc") end), { toast = true })
 shot("toast-hero-floor", "Toast: a Hero reaches the floor", "A normal toast", toast("heroFloor", L.T_HERO_FLOOR:format("Brannic"), L.T_HERO_FLOOR_TEXT:format(21, "Corwin")), { toast = true })
 shot("toast-chapter", "Toast: chapter unlocked (big)", "The big banner", toast("chapter", L.T_CHAPTER:format("IV"), L.T_CHAPTER_TEXT:format("Chains and Tides", 25, 29)), { toast = true })
 shot("toast-journey", "Toast: journey complete (big)", "The biggest moment", toast("journey", L.T_JOURNEY, L.T_JOURNEY_TEXT:format("Tour")), { toast = true })
-shot("toast-gathering", "Toast: a Gathering soon", "The reminder", toast("gathering", L.G_SOON, L.G_SOON_TEXT:format("The Deadmines", "20:00")), { toast = true })
+shot("toast-gathering", "Toast: a Gathering soon", "The reminder, with the dungeon's picture (U8)", toast("gathering", L.G_SOON,
+  L.G_SOON_TEXT:format("The Deadmines", "20:00"), { dungeon = function() return first(ns.DUNGEONS, "dm") end }), { toast = true })
 shot("toast-ahead", "Toast: you pull ahead", "Two or more levels above an Adventurer", toast("ahead", L.T_AHEAD:format(3, "Corwin"),
   L.T_AHEAD_TEXT:format("Corwin")), { toast = true })
 shot("toast-session", "Toast: session recap (big)", "After playing together: how long, with whom, what you did", function()
@@ -577,12 +711,23 @@ shot("toast-session", "Toast: session recap (big)", "After playing together: how
     quests = 9, chapters = { 3 } })
 end, { toast = true })
 shot("toast-long", "Toast: a long text", "Wraps to more lines; the banner grows", toast("clear", L.TOAST_CLEARED,
-  L.TOAST_CLEARED_FOR:format("The Deadmines", "Brannic, Elyra, Corwin and you") .. " " .. L.TOAST_ENDGAME_TEXT), { toast = true })
-shot("toast-attune", "Toast: an attunement opens", "At the level where it can be started", toast("attune",
-  L.TOAST_ATTUNE_TITLE:format("Molten Core"), L.TOAST_ATTUNE_RAID), { toast = true })
+  L.TOAST_CLEAR_FOR:format("Brannic, Elyra, Corwin and you") .. " " .. L.TOAST_ENDGAME_TEXT), { toast = true })
+shot("toast-attune", "Toast: an attunement opens", "At the level where it can be started, with the raid's picture (U8)",
+  toast("attune", L.TOAST_ATTUNE_TITLE:format("Molten Core"), L.TOAST_ATTUNE_RAID, { dungeon = function() return first(ns.RAIDS, "mc") end }), { toast = true })
+shot("toast-first", "Toast: a fellowship first", "\"Brannic is the first to ride a mount.\"", toast("first", L.T_FIRST:format("Brannic"), L.FIRST_MOUNT:format("Brannic")), { toast = true })
+shot("toast-fallen", "Toast: an Adventurer has fallen", "Hardcore: Brannic has fallen, his level, the place and the foe; honoured in the Chronicle", function()
+  ns.Toasts:StopMove(); W():Close()
+  local e = { who = full("Brannic"), t = time(), lvl = ns.Hero:Level(cur(), full("Brannic")) or 22, zone = GetZoneText and GetZoneText() or nil, foe = L.DEV_FOE, fatal = true, left = 0 }
+  ns.Toasts:Push("challenge", ns.Challenges:FallToast(cur(), e))
+end, { toast = true })
+shot("toast-broken", "Toast: a challenge is broken", "Brannic took a flight path, breaking Walk everywhere", function()
+  ns.Toasts:StopMove(); W():Close()
+  local e = { who = full("Brannic"), t = time(), what = "taxi", key = "walk" }
+  ns.Toasts:Push("challenge", L.T_BROKE, ns.Challenges:BreakText(e), "chronicle")
+end, { toast = true })
 shot("toast-endgame", "Toast: the Endgame is open (big)", "After the journey: the raids", toast("journey", L.TOAST_ENDGAME,
   L.TOAST_ENDGAME_TEXT), { toast = true })
-shot("tracker", "The tracker on the screen", "Chapter, status, XP bar, you, the next step, dungeons cleared, who is online, a Gathering soon", function()
+shot("tracker", "The tracker on the screen", "Chapter, status, XP bar, you with the little bar to the floor or cap, the next step, dungeons cleared, who is online, a Gathering soon; an icon on each line (U13)", function()
   ns.Toasts.frame:Hide(); W():Close(); ns.Tracker:SetFolded(false); ns.Tracker:Refresh()
 end)
 shot("tracker-all", "The tracker, every line on", "Also shared quests, your next duel and the inbox (Settings)", function()
@@ -651,8 +796,9 @@ end)
 shot("watch-inspect", "Following: inspect an Adventurer", "No Whisper or Invite: they are not in your group", function()
   page("heroes"); pf("heroes").sel = full("Brannic"); W():Refresh()
 end)
-shot("watch-characters", "Your characters: Follow this fellowship", "Another character's fellowship, followed live, with the Follow button", function()
+shot("watch-characters", "Your characters: Follow this fellowship", "Another character's fellowship on top, followed live, with the Follow button; the others hidden", function()
   pf("heroes").sel = nil
+  ns.Characters.showAll = false
   ns.Watch:Close()
   W():OpenPanel("characters")
   local p = W().panels.characters
@@ -793,6 +939,7 @@ end
 
 -- opts: { areas = { key = true } or nil for all, ids = { [shot id] = its entry of TR.BRAND } (only these),
 -- brand = a look (TR.BRAND_LOOK: the founded fellowship and the theme; the game's interface hidden),
+-- only = { key = true } (areas that stand alone, Dev/Areas.lua): only their shots, nothing else set up,
 -- onDone = function }.
 function TR:Run(arg, opts)
   if self.running then return end
@@ -835,6 +982,7 @@ function TR:Run(arg, opts)
     i = i + 1
     local s = shots[i]
     if not s or i > last then return TR:Finish(keep) end
+    if opts.only and (s.prep or not wanted(s, areas, ids)) then return nextShot() end
     local res
     local ok, err = xpcall(function() res = s.fn() end, trace)
     if not ok then

@@ -35,27 +35,41 @@ local function heroes(f, n)
   for i, g in ipairs(J:Groups(f, n)) do
     for _, r in ipairs(g.rows) do note[r.name], standing[r.name] = r.note, STANDING[i] end
   end
-  local counted, catching, away = {}, {}, {}
+  local counted, catching, friends, away, fallen = {}, {}, {}, {}, {}
   for _, name in ipairs(J:Counted(f)) do
     if J:CatchingUp(f, name) then catching[#catching + 1] = name else counted[#counted + 1] = name end
   end
-  for name in pairs(f.members) do if J:Away(f, name) then away[#away + 1] = name end end
-  table.sort(away, function(a, b)
+  -- The Fallen (SPEC §9) stay on the board, last, as a memorial: the level they fell at, where and when.
+  local falls = {}
+  for name, m in pairs(f.members) do
+    local e = f.falls and ns.Challenges:Fallen(f, name)
+    if m.friend then friends[#friends + 1] = name; note[name] = L.STATUS_FRIEND
+    elseif e then
+      fallen[#fallen + 1] = name; falls[name] = e
+      local day = ns.Challenges.Day(e.t)
+      note[name] = e.zone and L.BOARD_FALLEN_IN:format(e.zone, day) or L.BOARD_FALLEN:format(day)
+    elseif J:Away(f, name) then away[#away + 1] = name end
+  end
+  local function byLevel(a, b)
     local la, lb = ns.Hero:Level(f, a), ns.Hero:Level(f, b)
     if la ~= lb then return la > lb end
     return a < b
-  end)
+  end
+  table.sort(friends, byLevel)
+  table.sort(away, byLevel)
+  table.sort(fallen, function(a, b) if falls[a].t ~= falls[b].t then return falls[a].t < falls[b].t end return a < b end)
   local list = {}
   local function add(names, group)
     for _, name in ipairs(names) do
-      local h, m = f.heroes[name], f.members[name]
+      local h, m, e = f.heroes[name], f.members[name], falls[name]
       local xp = h and tonumber(h.xp) and tonumber(h.xpMax) and h.xpMax > 0 and ns.Clamp(h.xp / h.xpMax, 0, 1) or 0
-      list[#list + 1] = { name = name, short = ns.Short(name), class = (h and h.class) or m.class, level = ns.Hero:Level(f, name),
-        xp = xp, group = group, standing = n and standing[name] or nil, text = n and note[name] or nil,
+      list[#list + 1] = { name = name, short = ns.Short(name), class = (h and h.class) or m.class,
+        level = e and e.lvl or ns.Hero:Level(f, name), xp = e and 0 or xp, group = group,
+        standing = not e and n and standing[name] or nil, text = (e or n) and note[name] or nil,
         seen = ns.Hero:LastSeen(f, name) }
     end
   end
-  add(counted, "counted"); add(catching, "catching"); add(away, "away")
+  add(counted, "counted"); add(catching, "catching"); add(friends, "friend"); add(away, "away"); add(fallen, "fallen")
   return list
 end
 
@@ -119,6 +133,11 @@ function B:News(f)
       name = d and d[2] or nil, text = d and (p.photo and L.BOARD_EV_PHOTO or L.BOARD_EV_PICTURE):format(d[2], names)
         or (p.photo and L.BOARD_EV_PHOTO_0 or L.BOARD_EV_PICTURE_0):format(names),
       fields = { dungeon = d and d[2] or nil, who = shorts(who) } }
+  end
+  -- The fellowship's firsts (SPEC §8): posted only where the player draws "Firsts" to (default off).
+  for _, x in ipairs(ns.Firsts:List(f)) do
+    list[#list + 1] = { id = ("first:%s:%s"):format(x.key, x.name), kind = "first", time = x.time,
+      name = ns.Short(x.name), text = L.BOARD_EV_FIRST:format(ns.Firsts.Text(x)), fields = { who = shorts({ x.name }) } }
   end
   table.sort(list, function(a, b) return a.time > b.time end)
   while #list > self.NEWS do table.remove(list) end

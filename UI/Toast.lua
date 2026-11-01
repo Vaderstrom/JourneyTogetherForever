@@ -6,23 +6,28 @@ local UI, Theme, Combat, Settings = ns.UI, ns.Theme, ns.Combat, ns.Settings
 local T = { shownCount = 0, exampleN = 0, moving = false }
 ns.Toasts = T
 
--- Settings → "Show an example toast" goes through these in turn (from the mockup).
+-- Settings → "Show an example toast" goes through these in turn (from the mockup; the clear with its picture, U7).
 T.EXAMPLES = {
   { "chapter", L.EX_CHAPTER_TITLE, L.EX_CHAPTER_TEXT }, { "floor", L.EX_FLOOR_TITLE, L.EX_FLOOR_TEXT },
-  { "clear", L.EX_CLEAR_TITLE, L.EX_CLEAR_TEXT }, { "heroFloor", L.EX_HEROFLOOR_TITLE, L.EX_HEROFLOOR_TEXT },
+  { "clear", L.EX_CLEAR_TITLE, L.EX_CLEAR_TEXT, { dungeon = "stocks", kicker = L.TOAST_CLEARED, who = L.EX_CLEAR_WHO } },
+  { "heroFloor", L.EX_HEROFLOOR_TITLE, L.EX_HEROFLOOR_TEXT },
   { "heroCap", L.EX_HEROCAP_TITLE, L.EX_HEROCAP_TEXT }, { "overCap", L.EX_OVERCAP_TITLE, L.EX_OVERCAP_TEXT },
 }
 
--- Small caps line above the title: the event's name, or the addon's name.
-function T:Kicker(kind)
-  local label = kind and L["TOAST_" .. kind:upper()]
+-- Small caps line above the title: the toast's own (own), else the event's name, or the addon's name.
+function T:Kicker(kind, own)
+  local label = own or (kind and L["TOAST_" .. kind:upper()])
   return (label or L.ADDON_NAME):upper()
 end
 
 -- Returns "off" (Reduce effects or this event turned off) or "shown". page (optional): the book's page a click opens.
-function T:Push(kind, title, text, page)
+-- more (optional): { dungeon = key (its picture on the left), kicker = text, who = a line under the text,
+-- solemn = true (a Fallen, the last shared life: darker, slower, with a bell; SPEC §9) }.
+function T:Push(kind, title, text, page, more)
   if Settings:Get("reduce") or (kind and not Settings:ToastOn(kind)) then return "off" end
-  local t = { kind = kind, title = title, text = text, page = page }
+  more = more or {}
+  local t = { kind = kind, title = title, text = text, page = page, dungeon = more.dungeon, kicker = more.kicker, who = more.who,
+    solemn = more.solemn }
   -- The banner is made at login. Only after a /reload during combat can it be missing: then it shows after combat.
   if not self.frame and Combat:InCombat() then
     Combat:AfterCombat(function() T:Show(t) end)
@@ -32,12 +37,12 @@ function T:Push(kind, title, text, page)
   return "shown"
 end
 
-function ns:Toast(kind, title, text, page) return T:Push(kind, title, text, page) end
+function ns:Toast(kind, title, text, page, more) return T:Push(kind, title, text, page, more) end
 
 function T:Example()
   local e = self.EXAMPLES[self.exampleN % #self.EXAMPLES + 1]
   self.exampleN = self.exampleN + 1
-  return self:Push(e[1], e[2], e[3])
+  return self:Push(e[1], e[2], e[3], nil, e[4])
 end
 
 ---------------------------------------------------------------------------
@@ -75,6 +80,19 @@ end
 ---------------------------------------------------------------------------
 -- The banner
 ---------------------------------------------------------------------------
+-- Clear messages (U7, 31 Oct 2026): the dungeon's or raid's picture on the left, the same art as the Chapter page's
+-- dungeon rows and the Raids page (ns.SetDungeonArt), at 2:1 so it still reads at a glance on a 4K screen. A place
+-- with no picture of its own (the game's default tile, or nothing: some of WoW Forever's own dungeons) shows the
+-- message as usual, with the icon.
+T.PIC_W, T.PIC_H, T.PIC_PAD = 176, 88, 10
+
+-- The place's picture on tex. true when it has one of its own.
+function T:SetPlace(tex, key)
+  local inset = 2 * UI.PIC_INSET
+  local ok, default = ns.SetDungeonArt(tex, key, self.PIC_W - inset, self.PIC_H - inset)
+  return ok == true and not default
+end
+
 function T:Build()
   if self.frame then return self.frame end
   local f = UI.Box(UIParent, 2, nil, nil, "gold", 1)
@@ -84,6 +102,11 @@ function T:Build()
   f:SetMovable(true)
   local bg = UI.GradientTex(f, "BACKGROUND", "VERTICAL", { "dark", 0.97 }, { "toastTop", 0.97 })
   bg:SetPoint("TOPLEFT", 2, -2); bg:SetPoint("BOTTOMRIGHT", -2, 2)
+  -- A solemn one (SPEC §9): night violet over the banner, darker at the foot.
+  f.solemnBg = f:CreateTexture(nil, "BACKGROUND", nil, 1)
+  f.solemnBg:SetPoint("TOPLEFT", 2, -2); f.solemnBg:SetPoint("BOTTOMRIGHT", -2, 2)
+  UI.SetGradient(f.solemnBg, "VERTICAL", { 0.05, 0.03, 0.07, 0.98 }, { 0.2, 0.15, 0.27, 0.96 })
+  f.solemnBg:Hide()
   -- Big moments show the chapter's picture behind the text, darker on the left where the text is.
   f.pic = f:CreateTexture(nil, "BACKGROUND", nil, 2)
   f.pic:SetPoint("TOPLEFT", 2, -2); f.pic:SetPoint("BOTTOMRIGHT", -2, 2)
@@ -105,6 +128,13 @@ function T:Build()
   f.crest:SetPoint("CENTER", disc)
   f.crest:SetFrameLevel(f:GetFrameLevel() + 3)
   f.crest:Hide()
+  -- A clear's picture (U7) takes the icon's place: the dungeon's or raid's, in the book's gold picture frame.
+  f.place = CreateFrame("Frame", nil, f)
+  f.place:SetSize(T.PIC_W, T.PIC_H)
+  f.place:SetPoint("LEFT", T.PIC_PAD, 0)
+  f.place.tex = f.place:CreateTexture(nil, "ARTWORK")
+  UI.FramePicture(f.place, f.place.tex)
+  f.place:Hide()
   f.kicker = UI.Text(f, 11, "gold", "body")
   f.kicker:SetPoint("TOPLEFT", 86, -14)
   f.title = UI.Text(f, 20, "goldText", "title")
@@ -116,12 +146,22 @@ function T:Build()
   f.text:SetWordWrap(true)
   if f.text.SetMaxLines then f.text:SetMaxLines(3) end
   f.text:SetJustifyV("TOP")
+  -- Who was there, under the text of a clear (U7): the names in their class colours.
+  f.who = UI.Text(f, 13, "toastText", "body")
+  f.who:SetPoint("TOPLEFT", f.text, "BOTTOMLEFT", 0, -4)
+  f.who:SetWordWrap(true)
+  if f.who.SetMaxLines then f.who:SetMaxLines(2) end
+  f.who:SetJustifyV("TOP")
+  f.who:Hide()
   -- Fades in, stays, fades out: 4.2 seconds in all (as in the mockup).
   local ag = f:CreateAnimationGroup()
+  -- (A solemn one fades in and out slowly and stays longer: Fill sets the times.)
   local a1 = ag:CreateAnimation("Alpha"); a1:SetFromAlpha(0); a1:SetToAlpha(1); a1:SetDuration(0.35); a1:SetOrder(1)
+  f.fadeIn = a1
   local a2 = ag:CreateAnimation("Alpha"); a2:SetFromAlpha(1); a2:SetToAlpha(1); a2:SetDuration(3.05); a2:SetOrder(2)
   f.hold = a2
   local a3 = ag:CreateAnimation("Alpha"); a3:SetFromAlpha(1); a3:SetToAlpha(0); a3:SetDuration(0.8); a3:SetOrder(3)
+  f.fadeOut = a3
   ag:SetScript("OnFinished", function() if not T.moving then f:Hide() end end)
   f.anim = ag
   f:EnableMouse(true)
@@ -145,6 +185,9 @@ end
 T.BIG = { chapter = true, journey = true, session = true }
 T.BIG_SOUND = 888 -- the game's level-up fanfare
 T.SOUND = { chapter = true, journey = true }
+-- A solemn banner (a Fallen, the last shared life; SPEC §9): violet and silver instead of gold, a slower fade, longer
+-- on screen, and the bell (ns.Sound).
+T.SOLEMN = { hold = 5.5, fadeIn = 1, fadeOut = 2.2, edge = "8C7AA6", kicker = "B9AECB", title = "E8E2F0" }
 
 -- The big moments' gold and leather frame (our art, Media\MomentFrame, A9): one picture about 3.2 wide to 1 high,
 -- stored stretched in a 1024 x 512 file. Drawn in five pieces across, so the corners and the gem keep their shape
@@ -194,23 +237,45 @@ function T:Fill(t)
   local f = self.frame
   f:SetScale(ns.Window:BaseScale())
   local big = t.kind ~= nil and self.BIG[t.kind] == true
-  local w = big and 680 or 560
+  local pictured = not big and t.dungeon ~= nil and self:SetPlace(f.place.tex, t.dungeon)
+  f.place:SetShown(pictured)
+  local w = big and 680 or (pictured and 640 or 560)
+  local left = pictured and (self.PIC_PAD + self.PIC_W + 16) or 86
   f.title:SetFont(Theme.FONT_TITLE, big and 28 or 20, "")
   f.text:SetFont(Theme.FONT_BODY, big and 15 or 13, "")
   -- More room on the right of a big one: its frame is thicker (the text ran into it; seen in the seventh check).
-  f.text:SetWidth(w - 86 - (big and 52 or 22))
+  f.text:SetWidth(w - left - (big and 52 or 22))
   f.text:SetText(t.text or "")
-  -- Taller when the text takes more than one line.
+  f.who:SetWidth(w - left - 22)
+  f.who:SetText(t.who or "")
+  f.who:SetShown(t.who ~= nil)
+  -- Taller when the text takes more than one line, and for the line of who was there.
   local extra = math.max(0, math.ceil((f.text:GetStringHeight() or 0) - (big and 17 or 15)))
+  if t.who then extra = extra + math.ceil(f.who:GetStringHeight() or 0) + 4 end
   local h = (big and 112 or 86) + extra
+  -- With a picture the banner is as tall as it with its margins, and the words sit in the middle beside it.
+  local top = 14
+  if pictured and h < self.PIC_H + 2 * self.PIC_PAD then
+    top = top + math.floor((self.PIC_H + 2 * self.PIC_PAD - h) / 2)
+    h = self.PIC_H + 2 * self.PIC_PAD
+  end
+  f.kicker:ClearAllPoints(); f.kicker:SetPoint("TOPLEFT", left, -top)
   f:SetSize(w, h)
-  f.hold:SetDuration(big and 6 or 3.05)
-  f.big = big
+  local solemn = t.solemn == true and not big
+  f.hold:SetDuration(big and 6 or (solemn and T.SOLEMN.hold or 3.05))
+  f.fadeIn:SetDuration(solemn and T.SOLEMN.fadeIn or 0.35)
+  f.fadeOut:SetDuration(solemn and T.SOLEMN.fadeOut or 0.8)
+  f.big, f.solemn = big, solemn
   -- The frame takes the place of the thin gold border on big moments only (decided 27 Oct 2026: the frame marks
   -- them as special; normal toasts keep the plain banner).
   local framed = self:LayoutFrame(f, big, h)
   f.glow:SetShown(not framed)
-  f:SetBackdropBorderColor(Theme:RGBA("gold", framed and 0 or 1))
+  local edge = solemn and T.SOLEMN.edge or "gold"
+  f:SetBackdropBorderColor(Theme:RGBA(edge, framed and 0 or 1))
+  f.glow:SetBackdropBorderColor(Theme:RGBA(edge, 0.35))
+  f.solemnBg:SetShown(solemn)
+  f.kicker:SetTextColor(Theme:RGBA(solemn and T.SOLEMN.kicker or "gold"))
+  f.title:SetTextColor(Theme:RGBA(solemn and T.SOLEMN.title or "goldText"))
   f.pic:SetShown(big); f.picFade:SetShown(big)
   if big then
     local fs = ns.Fellowship:Current()
@@ -219,9 +284,10 @@ function T:Fill(t)
   UI.SetIcon(f.icon, ns.ICONS["toast_" .. (t.kind or "default")] or ns.ICONS.toast_default)
   local fs = big and ns.Fellowship:Current()
   f.crest:SetShown(fs ~= nil and fs ~= false)
-  f.icon:SetShown(not f.crest:IsShown()); f.disc:SetShown(not f.crest:IsShown())
+  local badge = not f.crest:IsShown() and not pictured
+  f.icon:SetShown(badge); f.disc:SetShown(badge)
   if f.crest:IsShown() then f.crest:Set(fs.color, fs.emblem) end
-  f.kicker:SetText(self:Kicker(t.kind))
+  f.kicker:SetText(self:Kicker(t.kind, t.kicker))
   f.title:SetText(t.title or "")
   f.text:SetText(t.text or "")
 end
@@ -246,6 +312,8 @@ function T:Show(t)
   f.anim:Stop()
   f.anim:Play()
   if f.big and T.SOUND[t.kind] and PlaySound then PlaySound(T.BIG_SOUND, "Master") end
+  -- A solemn one tolls the bell once (Settings → Sounds turns it off).
+  if f.solemn then ns.Sound("bell") end
 end
 
 ns:On("LOGIN", function() Combat:AfterCombat(function() T:Build() end) end)

@@ -105,6 +105,14 @@
 .hero.small .lvbar { height: 5px; }
 .hero.small .note { font-size: 11.5px; max-width: 235px; }
 .hero.first-small { margin-top: 8px; border-top: 1px solid var(--line); }
+/* The Fallen (a survival challenge): greyed, a skull for the dot, no bar, the note in the memorial's violet. */
+.hero.fallen { opacity: 0.85; }
+.hero.fallen .dot { background: none; box-shadow: none; width: 15px; height: auto; margin: 0 -1.5px; font-size: 16px; line-height: 1;
+  text-align: center; color: #6E5A82; }
+.hero.fallen .nm { color: var(--ink2) !important; filter: grayscale(1); }
+.hero.fallen .lv { color: var(--ink2); }
+.hero.fallen .lvbar { visibility: hidden; }
+.hero.fallen .note { color: #8C7AA3; font-style: italic; }
 .more { padding-top: 5px; font-size: 12.5px; font-style: italic; color: var(--ink2); }
 
 /* Dungeons. */

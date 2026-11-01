@@ -119,8 +119,10 @@
   function heroRow(h, ch, small) {
     const cc = CLASS[h.class] || ['#B8A57C', '#3B2410'];
     const standing = h.group === 'counted' ? h.standing : 'muted';
-    const r = el('div', 'hero s-' + (standing || 'none') + (small ? ' small' : ''));
-    const dot = el('span', 'dot'); dot.style.background = cc[0];
+    // The Fallen (a survival challenge): a memorial row, greyed, with a skull for the class dot and no bar.
+    const fallen = h.group === 'fallen';
+    const r = el('div', 'hero s-' + (standing || 'none') + (small ? ' small' : '') + (fallen ? ' fallen' : ''));
+    const dot = el('span', 'dot', fallen ? '☠' : null); if (!fallen) dot.style.background = cc[0];
     const nm = el('span', 'nm clip', h.short || h.name); nm.style.color = cc[1];
     const bar = el('span', 'lvbar'); const f = el('i');
     f.style.width = (fill(h, ch) * 100).toFixed(1) + '%';
@@ -138,7 +140,7 @@
     const shown = list.length > MAX ? list.slice(0, MAX) : list;
     let firstSmall = true;
     shown.forEach((h) => {
-      const small = h.group === 'catching' || h.group === 'away';
+      const small = h.group === 'catching' || h.group === 'friend' || h.group === 'away' || h.group === 'fallen';
       const r = heroRow(h, b.chapter, small);
       if (small && firstSmall) { r.classList.add('first-small'); firstSmall = false; }
       add(s, r);

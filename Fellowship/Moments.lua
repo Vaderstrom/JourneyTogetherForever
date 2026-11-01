@@ -115,6 +115,10 @@ function M:Check(f)
     a.lv[name] = lvl
   end
   for name in pairs(a.lv) do if not f.members[name] then a.lv[name] = nil end end
+  -- The fellowship's firsts (Fellowship/Firsts.lua, SPEC §8).
+  for _, x in ipairs(ns.Firsts and ns.Firsts:List(f) or {}) do
+    self:Add(f, { id = "first:" .. x.key, k = "first", time = x.time, names = { x.name }, first = x.key })
+  end
   -- The Guild Master tournament's champion (the chronicle's line).
   for _, e in ipairs(f.chronicle) do
     if e.k == "champion" and e.who then self:Add(f, { id = "champion:" .. e.time, k = "champion", time = e.time, names = { e.who } }) end
@@ -187,7 +191,8 @@ function M:Title(m)
   elseif m.k == "clear" then return L.MO_CLEAR:format(dname(m.key))
   elseif m.k == "milestone" then return L.MO_MILESTONE:format(m.name or "")
   elseif m.k == "level" then return L.MO_LEVEL:format(who, m.level or 60)
-  elseif m.k == "champion" then return L.MO_CHAMPION:format(who) end
+  elseif m.k == "champion" then return L.MO_CHAMPION:format(who)
+  elseif m.k == "first" then return L.MO_FIRST:format(who) end
   return ""
 end
 
@@ -203,7 +208,8 @@ function M:Text(f, m)
   elseif m.k == "clear" then return ch and L.MO_CLEAR_TEXT:format(dname(m.key), J.Roman(m.ch), ch.name) or L.MO_CLEAR_TEXT_0:format(dname(m.key))
   elseif m.k == "milestone" then return L.MO_MILESTONE_TEXT:format(J.Roman(m.ch), ch and ch.name or "", m.name or "")
   elseif m.k == "level" then return L.MO_LEVEL_TEXT:format(ns.Short(m.names[1]), m.level or 60)
-  elseif m.k == "champion" then return L.MO_CHAMPION_TEXT:format(ns.Short(m.names[1])) end
+  elseif m.k == "champion" then return L.MO_CHAMPION_TEXT:format(ns.Short(m.names[1]))
+  elseif m.k == "first" and m.first then return ns.Firsts.Text({ key = m.first, name = m.names[1] }) end
   return ""
 end
 
