@@ -126,6 +126,7 @@ local function whoColor(fs, f, name, alpha)
   else fs:SetTextColor(Theme:RGBA("ink", alpha)) end
 end
 
+-- near: { who, level } of the closest to this open level (only the next one gets it), or nil.
 local function fillMedal(m, f, key, x, near)
   m.key, m.open = key, x == nil
   m.solemn = x ~= nil and key == "fall" and ns.Challenges:Ever(f) or nil
@@ -144,7 +145,7 @@ local function fillMedal(m, f, key, x, near)
   end
   m.tip = { L["FIRSTN_" .. key:upper()] or key, L.FIRST_OPEN_TIP }
   local who, lvl
-  if near then who, lvl = ns.Firsts:Closest(f, key) end
+  if near then who, lvl = near[1], near[2] end
   if who then
     m.closest = who
     m.who:SetText(ns.Short(who))
@@ -167,15 +168,20 @@ local function placeMedals(pf, f, s)
   for _, key in ipairs(FS.KEYS) do if byKey[key] then earned[#earned + 1] = key end end
   local open = FS:Open(f)
   -- (The next open level: the lowest someone counted is still below; one everyone passed before joining is not.)
-  local nextLevel
-  for _, key in ipairs(open) do if key:match("^lvl") and FS:Closest(f, key) then nextLevel = key; break end end
+  local nextLevel, near
+  for _, key in ipairs(open) do
+    if key:match("^lvl") then
+      local who, lvl = FS:Closest(f, key)
+      if who then nextLevel, near = key, { who, lvl }; break end
+    end
+  end
   local function grid(keys)
     local y0 = s.y
     for i, key in ipairs(keys) do
       local m = pf.medals:Get(n + 1)
       if not m then return end
       n = n + 1
-      fillMedal(m, f, key, byKey[key], key == nextLevel)
+      fillMedal(m, f, key, byKey[key], key == nextLevel and near or nil)
       m:ClearAllPoints()
       m:SetPoint("TOPLEFT", pf.lscroll.child, "TOPLEFT", ((i - 1) % MEDAL_COLS) * (pf.medalW + MEDAL_GAP),
         -(y0 + math.floor((i - 1) / MEDAL_COLS) * (MEDAL_H + MEDAL_GAP)))

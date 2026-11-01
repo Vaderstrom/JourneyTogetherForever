@@ -461,7 +461,8 @@ function C:FallToast(f, e)
   elseif e.life then text = text .. " " .. L.CH_SHARED_LEFT:format(e.pool or 0, self:SharedLives(f) or 0) end
   -- Above the title, the challenge the fall is about (it said the Settings line "A challenge: a fall, a broken rule,
   -- the Ring"; check of 1 Nov 2026, 15:23); the skull stays.
-  local kicker = (e.out or not e.fatal) and self:Name("shared") or self:Name("hardcore", f.challenges and f.challenges.hardcore)
+  -- A fall for good names Hardcore, even when it spent the last shared life: Hardcore ended that journey.
+  local kicker = e.fatal and self:Name("hardcore", f.challenges and f.challenges.hardcore) or self:Name("shared")
   return title, text, "chronicle", { solemn = (e.fatal or e.out) and true or nil, kicker = kicker }
 end
 

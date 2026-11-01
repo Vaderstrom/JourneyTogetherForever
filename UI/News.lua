@@ -102,10 +102,14 @@ function N:Show()
   return true
 end
 
--- /jtf news: opens the book and shows it, seen or not.
+-- /jtf news: opens the book and shows it, seen or not. In combat it waits until combat ends, as the toasts do
+-- (only if the book is still open then).
 function N:Open()
   local W = ns.Window
-  W:WhenBuilt(function() W:Open(); N:Show() end)
+  W:WhenBuilt(function()
+    W:Open()
+    ns.Combat:AfterCombat(function() if W:IsOpen() then N:Show() end end)
+  end)
 end
 
 -- When it is due: the book opened, or a fellowship was founded.

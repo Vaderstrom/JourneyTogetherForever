@@ -668,6 +668,21 @@ step("what's new: once after an update, our own art", function(c)
   ns.db.newsSeen = keep
 end)
 
+-- /jtf news typed in combat (the 0.12.0 review): the book opens, What's New waits until combat ends.
+step("what's new: /jtf news in combat shows it after combat", function(c)
+  local N, W, Co = ns.News, ns.Window, ns.Combat
+  local keep, wasSimulated = ns.db.newsSeen, Co.simulated
+  Co:SetSimulated(true)
+  N:Open()
+  local o = W.overlays and W.overlays.news
+  c:That(not (o and o:IsShown()), "not during combat")
+  Co:SetSimulated(wasSimulated)
+  o = W.overlays and W.overlays.news
+  c:That(Co:InCombat() or (o ~= nil and o:IsShown()), "it shows once combat ends")
+  if o and o:IsShown() then click(o.ok) end
+  ns.db.newsSeen = keep
+end)
+
 step("since you were last here", function(c)
   ns.Since:Mark()
   dev("hero Elyra level 17")
@@ -1602,6 +1617,9 @@ step("challenges: Hardcore and shared lives, the Fallen honoured", function(c)
   c:That(fallToast ~= nil and fallToast.solemn == true, "the toast is a solemn one")
   -- (Its kicker said the Settings line "A challenge: a fall, a broken rule, the Ring"; check of 1 Nov 2026, 15:23.)
   c:Eq(fallToast and fallToast.kicker, Ch:Name("hardcore", f.challenges.hardcore), "the challenge's name above the title")
+  -- A fall for good that also spends the last shared life: Hardcore still (the 0.12.0 review).
+  local _, _, _, last = Ch:FallToast(f, setmetatable({ out = true, life = true, pool = 0 }, { __index = e }))
+  c:Eq(last and last.kicker, Ch:Name("hardcore", f.challenges.hardcore), "also when it spends the last shared life")
   local T = ns.Toasts
   if T.frame and T.frame:IsShown() and T.current and T.current.solemn then
     c:That(T.frame.solemn and T.frame.solemnBg:IsShown(), "its banner: night violet")

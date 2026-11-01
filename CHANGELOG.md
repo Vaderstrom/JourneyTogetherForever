@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.12.1 beta (1 November 2026)
+- `/jtf news` typed during combat opens the book and shows What's New once combat ends (it showed nothing).
+- With Hardcore Fellowship and Shared lives both on, a fall that ends a journey and spends the last shared life now
+  says Hardcore Fellowship above the title, not Shared lives.
+
 ## 0.12.0 beta (1 November 2026)
 - What's New: once after an update (or when you found your first fellowship), a page over the book with this
   update's news: the big one in a round picture inside a gold ring, two picture cards beside it. `/jtf news` shows it
