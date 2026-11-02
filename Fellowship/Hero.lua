@@ -2,13 +2,16 @@
 --   HELLO / HI   at login: my state and the fellowship version; HI is the answer (no further answer)
 --   STATE        my level, XP, rested XP, zone, guild (on change, and as a heartbeat every 5 minutes)
 --   GEAR         what I wear (on change, and with HELLO / HI)
---   RELAY / RELAYG  another Adventurer's state / gear, passed on (below)
+--   RELAY / RELAYG / RELAYQ  another Adventurer's state / gear / quests, passed on (below)
 -- A Hero counts as online while their messages keep coming (heartbeat), and as offline as soon as a whisper to them
 -- fails ("No player named ..."). Everything stored for another Hero carries the time it was heard ("Seen ...").
 -- Passed on (27 Oct 2026): each Adventurer counts their own states (seq) and gear (gseq). HELLO and HI carry the
 -- counts this addon has of everyone; the other side sends back the states and gear it has newer, so Lea's level
 -- reaches Noa through Pata even when Lea and Noa never play at the same time. Only the owner raises a count, so
--- the highest count is always the newest; no clock is compared.
+-- the highest count is always the newest; no clock is compared. Quests go the same way by the time their owner sent
+-- them (only the owner's clock: 2 Nov 2026), and a state passed on carries the firsts and tallies too.
+-- Every state also carries the fellowship's fingerprints, so copies that differ are found while both are online
+-- (Sync:CompareSoon, Clears:CompareSoon), not only at the next login.
 local _, ns = ...
 local L = ns.L
 local F, Comm = ns.Fellowship, ns.Comm
@@ -74,7 +77,9 @@ function Hr:MyState()
     gm = guild ~= nil and rankIndex == 0 or nil, run = f and ns.Progress:InRun(f) or nil,
     pace = ns.Pace and ns.Pace:PerHour() or nil, ver = ns.VERSION, t = time(), alts = self:MyAlts(),
     -- My deeds and tallies, for the fellowship's firsts (Fellowship/Firsts.lua).
-    deeds = ns.Firsts and (ns.Firsts:State()) or nil, tally = ns.Firsts and select(2, ns.Firsts:State()) or nil }
+    deeds = ns.Firsts and (ns.Firsts:State()) or nil, tally = ns.Firsts and select(2, ns.Firsts:State()) or nil,
+    -- My online minutes in this tournament round, for the referee's walkovers (Fellowship/Tourney.lua).
+    ton = f and f.heroes and f.heroes[ns.Me()] and f.heroes[ns.Me()].ton or nil }
 end
 
 -- The other characters on this account the addon has seen: they may watch this fellowship while you play them.
@@ -145,7 +150,8 @@ function Hr:Store(f, name, s, heardAt, relayed)
     for k in pairs(ns.Firsts.KNOWN) do d[k] = num(s.deeds[k]) end
     h.deeds = d
   end
-  if type(s.tally) == "table" then h.tally = { falls = num(s.tally.falls), quests = num(s.tally.quests) } end
+  if type(s.tally) == "table" then h.tally = { falls = num(s.tally.falls), quests = num(s.tally.quests), runs = num(s.tally.runs) } end
+  if ns.Tourney then ns.Tourney:StoreMinutes(f, name, s.ton) end
   h.t = num(s.t) or time()
   -- (Passed on: when they were last heard by whoever passed it on; a failed whisper to them still stands.)
   if relayed then h.heard = heardAt or h.heard else h.heard, h.offline = heardAt or time(), nil end
@@ -325,13 +331,13 @@ local function nextCount(key, have)
   return ns.char[key]
 end
 
--- The counts this addon has of everyone's state and gear (sent with HELLO and HI).
+-- The counts this addon has of everyone's state and gear, and the time of their quests (sent with HELLO and HI).
 function Hr:Counts(f)
-  local sq, gq = {}, {}
+  local sq, gq, qq = {}, {}, {}
   for name, h in pairs(f.heroes or {}) do
-    if f.members[name] then sq[name], gq[name] = h.seq, h.gseq end
+    if f.members[name] then sq[name], gq[name], qq[name] = h.seq, h.gseq, h.questsTime end
   end
-  return sq, gq
+  return sq, gq, qq
 end
 
 function Hr:SendState(tag, to)
@@ -341,12 +347,10 @@ function Hr:SendState(tag, to)
   local mine = self:Get(f, ns.Me())
   s.seq = nextCount("seq", mine and mine.seq)
   self:Store(f, ns.Me(), s)
-  local data = { fid = f.id, v = f.v, s = s }
-  if tag == "HELLO" or tag == "HI" then
-    -- What every copy must agree on, the counts of everyone's state and gear, and the kills (Fellowship/Clears.lua).
-    data.h, data.k = ns.Sync:Digest(f), ns.Clears:Digest(f)
-    data.sq, data.gq = self:Counts(f)
-  end
+  -- What every copy must agree on and the kills (Fellowship/Clears.lua), with every state; the leadership as this
+  -- copy has it (Sync:Beats). At login also the counts of everyone's state, gear and quests.
+  local data = { fid = f.id, v = f.v, s = s, h = ns.Sync:Digest(f), k = ns.Clears:Digest(f), lv = f.lv or 0, ld = f.leader }
+  if tag == "HELLO" or tag == "HI" then data.sq, data.gq, data.qq = self:Counts(f) end
   -- Only the newest one waits: held in a dungeon, a state every minute piled up and held back everything behind it
   -- (code review, 30 Oct 2026).
   for _, name in ipairs(to and { to } or others(f)) do Comm:Send(name, tag or "STATE", data, false, true) end
@@ -367,27 +371,32 @@ function Hr:SendGear(to)
   for _, name in ipairs(to and { to } or others(f)) do Comm:Send(name, "GEAR", { fid = f.id, g = g, t = gt, n = n }, false, true) end
 end
 
--- Sends `to` the states and gear of others that this addon has newer than they do (their counts sq, gq).
-function Hr:Relay(f, to, sq, gq)
+-- Sends `to` the states, gear and quests of others that this addon has newer than they do (their counts sq, gq, qq).
+function Hr:Relay(f, to, sq, gq, qq)
   if type(sq) ~= "table" then return end -- an older addon: nothing to compare
   gq = type(gq) == "table" and gq or {}
   local me = ns.Me()
   -- Never count below what another addon has of me.
   ns.char.seq = math.max(ns.char.seq or 0, tonumber(sq[me]) or 0)
   ns.char.gseq = math.max(ns.char.gseq or 0, tonumber(gq[me]) or 0)
-  local states, gears = {}, {}
+  local states, gears, quests = {}, {}, {}
   for name, h in pairs(f.heroes or {}) do
     if f.members[name] and name ~= to and name ~= me then
       if (h.seq or 0) > (tonumber(sq[name]) or 0) then
         states[name] = { level = h.level, xp = h.xp, xpMax = h.xpMax, rested = h.rested, zone = h.zone, class = h.class,
           className = h.className, race = h.race, guild = h.guild, gm = h.gm, pace = h.pace, ver = h.ver, t = h.t,
-          alts = h.alts, seq = h.seq, heard = h.heard }
+          alts = h.alts, seq = h.seq, heard = h.heard, deeds = h.deeds, tally = h.tally, ton = h.ton }
       end
       if h.gear and (h.gseq or 0) > (tonumber(gq[name]) or 0) then gears[name] = { g = h.gear, t = h.gearTime, n = h.gseq } end
+      -- (An older addon sends no quest times: nothing is passed on to it.)
+      if type(qq) == "table" and h.quests and (h.questsTime or 0) > (tonumber(qq[name]) or 0) then
+        quests[name] = ns.Quests:Stored(h)
+      end
     end
   end
   if next(states) then Comm:Send(to, "RELAY", { fid = f.id, h = states }) end
   if next(gears) then Comm:Send(to, "RELAYG", { fid = f.id, g = gears }) end
+  if next(quests) then Comm:Send(to, "RELAYQ", { fid = f.id, q = quests }) end
 end
 
 -- At login: say hello (with my state and version) and show what I wear.
@@ -419,18 +428,12 @@ local function hello(sender, d, answer)
   local f = fellowshipFor(sender, d)
   if not f then ns.Sync:NotMember(sender, d) return end
   Hr:Store(f, sender, d.s)
-  -- Others' state and gear we have newer, and kills that differ (players who are not online at the same time).
-  Hr:Relay(f, sender, d.sq, d.gq)
+  -- Others' state, gear and quests we have newer, and kills that differ (players who are not online at the same time).
+  Hr:Relay(f, sender, d.sq, d.gq, d.qq)
   ns.Clears:Compare(f, sender, d.k)
-  local v = tonumber(d.v) or 0
-  if v > f.v then ns.Sync:AskSnap(sender, f) elseif v < f.v then ns.Sync:SendSnap(sender, f)
-  elseif d.h and d.h ~= ns.Sync:Digest(f) then
-    -- Same version, different content (changes made apart): the leader's copy wins, else the one whose name sorts
-    -- first. The other side takes it and makes its own missing changes again on top (Sync:Replay).
-    local me = ns.Me()
-    local winner = (me == f.leader or sender == f.leader) and f.leader or (me < sender and me or sender)
-    if winner == me then ns.Sync:SendSnap(sender, f) else ns.Sync:AskSnap(sender, f) end
-  end
+  -- The fellowship itself: the one behind gets the other copy; at the same version with other content (changes made
+  -- apart), both sides pick the same copy (Sync:Beats), and the other side makes its own changes again on top of it.
+  ns.Sync:Compare(sender, f, d)
   if answer then
     Hr:SendState("HI", sender)
     Hr:SendGear(sender)
@@ -445,8 +448,9 @@ Comm:On("STATE", function(sender, d)
   local f = fellowshipFor(sender, d)
   if not f then return end
   Hr:Store(f, sender, d.s)
-  -- Their copy is newer: we missed a change (Sync:AskSoon).
-  if (tonumber(d.v) or 0) > f.v then ns.Sync:AskSoon(sender, f) end
+  -- A copy that differs (a change lost on the way, two at once), and kills that differ: found while both are online.
+  ns.Sync:CompareSoon(sender, f, d)
+  ns.Clears:CompareSoon(f, sender, d.k)
   ns:Fire("HEROES")
 end)
 Comm:On("GEAR", function(sender, d)
@@ -462,6 +466,21 @@ Comm:On("RELAY", function(sender, d)
     if type(name) == "string" and name ~= me and name ~= sender and type(s) == "table" then
       local heard = tonumber(s.heard)
       if Hr:Store(f, name, s, heard and math.min(heard, time()) or nil, true) then any = true end
+    end
+  end
+  if any then ns:Fire("HEROES") end
+end)
+-- Quests passed on: taken only when their owner sent them later than the ones we have.
+Comm:On("RELAYQ", function(sender, d)
+  local f = fellowshipFor(sender, d)
+  if not f or type(d.q) ~= "table" then return end
+  local me, any = ns.Me(), false
+  for name, x in pairs(d.q) do
+    local h = f.heroes and f.heroes[name]
+    local t = type(x) == "table" and tonumber(x.t)
+    if type(name) == "string" and name ~= me and name ~= sender and t and t > ((h and h.questsTime) or 0) then
+      ns.Quests:Store(f, name, x, t)
+      any = true
     end
   end
   if any then ns:Fire("HEROES") end

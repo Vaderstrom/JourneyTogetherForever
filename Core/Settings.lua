@@ -15,6 +15,8 @@ S.DEFAULTS = {
   trackerPeek = true, -- hidden mode: it shows for a few seconds when something in it changes
   trackerHideCombat = false, -- not shown in combat
   trackerHideInstance = false, -- not shown in dungeons, raids, battlegrounds and arenas
+  trackerDock = true, -- under the game's quest tracker, as one more section of it (off: its own panel; on from the
+  -- start, the owner, 2 Nov 2026)
   trackerLines = { status = true, you = true, bar = true, next = true, clears = true, run = true, quests = false,
     online = true, gather = true, duel = true, inbox = true },
   toasts = { chapter = true, floor = true, clear = true, heroFloor = true, heroCap = true, overCap = true, gathering = true,

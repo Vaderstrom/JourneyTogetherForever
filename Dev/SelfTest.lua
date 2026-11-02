@@ -2325,8 +2325,9 @@ step("the tracker on the screen", function(c)
   local TK = ns.Tracker
   -- Your own tracker settings are put back afterwards (with the tracker off, this step failed; 27 Oct 2026).
   local S0 = ns.Settings
-  local was = { tracker = S0:Get("tracker"), trackerHover = S0:Get("trackerHover") }
-  S0:Set("tracker", true); S0:Set("trackerHover", false)
+  -- Its own panel: docked under the game's tracker (on by default since 2 Nov 2026) has its own step below.
+  local was = { tracker = S0:Get("tracker"), trackerHover = S0:Get("trackerHover"), trackerDock = S0:Get("trackerDock") }
+  S0:Set("tracker", true); S0:Set("trackerHover", false); S0:Set("trackerDock", false)
   c:Eq(ns.Settings:Get("tracker"), true, "Settings: tracker on")
   c:That(TK.frame ~= nil, "built")
   c:That(cur() ~= nil, "in a fellowship")
@@ -2363,6 +2364,49 @@ step("the tracker on the screen", function(c)
   ns.Settings:Set("tracker", false)
   c:That(not TK.frame:IsShown(), "off in Settings")
   for k, v in pairs(was) do S0:Set(k, v) end
+end)
+
+-- Under the game's quest tracker (Settings; the owner, 2 Nov 2026). Only looked at, never changed: folding the game's
+-- tracker from here would taint it (its quest item buttons would fail until a /reload).
+step("the tracker under the game's quest tracker", function(c)
+  local TK, S = ns.Tracker, ns.Settings
+  local was = { tracker = S:Get("tracker"), trackerHover = S:Get("trackerHover"), trackerDock = S:Get("trackerDock") }
+  local wasFolded = ns.char.trackerFolded
+  S:Set("tracker", true); S:Set("trackerHover", false); TK:SetFolded(false)
+  S:Set("trackerDock", true)
+  local fr, ot = TK.frame, TK:GameTracker()
+  if not ot or not fr.dock then
+    c:That(not TK:Docked() and fr:IsShown() and fr.bar:IsShown(), "no game tracker to sit under here: the panel stays")
+  else
+    c:That(TK:Docked(), "docked under the game's quest tracker")
+    local _, to = fr:GetPoint()
+    c:That(to == ot or to == ot.NineSlice or to == ot.Header, "anchored to the game's tracker")
+    if ot:IsCollapsed() then
+      c:That(not fr:IsShown(), "the game's tracker is folded: ours folds away with it")
+    else
+      c:That(fr:IsShown() and fr.dock:IsShown() and not fr.bar:IsShown(), "the game's section header, not our title bar")
+      c:Has(fr.dock.Text:GetText(), cur().journey.chapters[ns.Journey:CurrentIndex(cur())].name, "the chapter in the header")
+      fr.dock.MinimizeButton:Click()
+      c:That(ns.char.trackerFolded == true, "folds with the game's fold button")
+      local tex = fr.dock.MinimizeButton:GetNormalTexture()
+      if tex and tex.GetAtlas then
+        -- Atlas names are not case-sensitive; the game gives this one back in capitals.
+        c:Eq((tex:GetAtlas() or ""):lower(), "ui-questtrackerbutton-secondary-expand", "the game's fold button shows it folded")
+      end
+      fr.dock.MinimizeButton:Click()
+      c:That(not ns.char.trackerFolded, "and opens again")
+      -- The book repaints its colours when its page changes; the docked look must come back (a dark box with a gold
+      -- edge was seen after a click on a line, 2 Nov 2026).
+      ns.Theme:Apply()
+      local _, _, _, bg = fr:GetBackdropColor()
+      c:That(math.abs((bg or 0) - TK.DOCK_SHADE * (ot.NineSlice:GetAlpha() or 0)) < 0.01,
+        ("after a repaint: no dark box (background %.2f)"):format(bg or -1))
+    end
+  end
+  S:Set("trackerDock", false)
+  c:That(not TK:Docked() and fr.bar:IsShown(), "off: its own panel again")
+  for k, v in pairs(was) do S:Set(k, v) end
+  TK:SetFolded(wasFolded)
 end)
 
 step("minimap button and toast position", function(c)
@@ -2969,7 +3013,7 @@ end, 0.8)
 step("sync: a change lost while online arrives with the next state", function(c)
   local f = cur()
   c:Eq(f.leader, ns.Me(), "you lead again")
-  ns.Sync.askedAt[f.id] = nil
+  ns.Sync.comparedAt[full("Brannic")], ns.Sync.fixed[full("Brannic")] = nil, nil
   PE():Change("Brannic", { k = "away", name = full("Brannic"), on = true }, true)
   c:Eq(ns.Journey:Away(f, full("Brannic")), nil, "lost: not here")
   PE():State("Brannic")
@@ -2979,6 +3023,93 @@ step("sync: a change lost while online arrives with the next state (checked)", f
   c:Eq(ns.Journey:Away(cur(), full("Brannic")), "self", "the copy was asked for: Brannic is away")
   PE():Change("Brannic", { k = "away", name = full("Brannic"), on = false })
 end, 0.8)
+
+-- One truth (2 Nov 2026): both online, a change each lost on the way, at the same version: the next state finds it.
+step("sync: a change each lost while both online: the next state makes them one", function(c)
+  local b = full("Brannic")
+  PE():SetOnline("Brannic", false)
+  ns.Fellowship:SetRoles(ns.Me(), "Healer")
+  PE():SetOnline("Brannic", true)
+  PE():Change("Brannic", { k = "role", name = b, role = "Tank", second = "" }, true)
+  c:Eq(PE():Get("Brannic").copy.v, cur().v, "the same version, different changes")
+  ns.Sync.comparedAt[b], ns.Sync.fixed[b] = nil, nil
+  PE():State("Brannic")
+end, ns.Sync.GRACE + 1.5)
+
+step("sync: a change each lost while both online: the next state makes them one (checked)", function(c)
+  local f, p = cur(), PE():Get("Brannic")
+  c:Eq(f.members[ns.Me()].role, "Healer", "your change")
+  c:Eq(f.members[full("Brannic")].role, "Tank", "and Brannic's")
+  c:Eq(ns.Sync:Digest(p.copy), ns.Sync:Digest(f), "the same fellowship on both")
+end, 0.8)
+
+-- Brannic took over in his own copy while you led elsewhere (you renamed): his copy wins on both sides, and your
+-- rename, made while you still led, is kept (rights at the time).
+step("sync: a takeover while you led elsewhere: one leader, your change kept", function(c)
+  local b, p = full("Brannic"), PE():Get("Brannic")
+  PE():SetOnline("Brannic", false)
+  ns.Fellowship:Rename("Selftest Led")
+  -- As Brannic's addon saw it: you not seen for 30 days, the Adventurers who joined before him away.
+  local aw = {}
+  for name in pairs(p.copy.members) do if name ~= b and name ~= ns.Me() then aw[name] = true end end
+  p.copy.rules.takeoverNever = false
+  c:That(PE():Change("Brannic", { k = "takeover", seen = time() - 30 * 86400, aw = aw }), "Brannic takes over in his copy")
+  c:Eq(p.copy.leader, b, "his copy: he leads")
+  PE():SetOnline("Brannic", true)
+  PE():Hello("Brannic")
+end, 1)
+
+step("sync: a takeover while you led elsewhere: one leader, your change kept (checked)", function(c)
+  local f, p = cur(), PE():Get("Brannic")
+  c:Eq(f.leader, full("Brannic"), "Brannic leads in your copy too")
+  c:Eq(f.name, "Selftest Led", "your rename, made while you led, is kept")
+  c:Eq(p.copy.name, "Selftest Led", "and Brannic has it")
+  c:Eq(ns.Sync:Digest(p.copy), ns.Sync:Digest(f), "the same fellowship on both")
+  PE():Change("Brannic", { k = "lead", name = ns.Me() })
+end, 0.8)
+
+step("sync: the leadership back; the name again", function(c)
+  c:Eq(cur().leader, ns.Me(), "you lead again")
+  ns.Fellowship:Rename("Selftest")
+end, 0.8)
+
+-- Passed on (RELAY, RELAYQ): another Adventurer's firsts, tallies and quests reach those who never meet them.
+step("sync: firsts, tallies, quests and tournament minutes are passed on", function(c)
+  local f, e = cur(), full("Elyra")
+  local h = f.heroes[e] or {}
+  f.heroes[e] = h
+  local keep = { h.deeds, h.tally, h.quests, h.questsTime, h.seq, h.ton }
+  h.deeds, h.tally, h.seq = { mount = time() - 60 }, { falls = 2, quests = 30, runs = 7 }, (h.seq or 0) + 1
+  h.ton = { id = 5, slot = 1, min = 12 }
+  h.quests, h.questsTime = { [783] = { t = "A Threat Within", z = "Elwynn Forest", l = 1, h = 1, g = 1 } }, time()
+  local sent, send = {}, ns.Comm.Send
+  ns.Comm.Send = function(_, _, tag, data) sent[tag] = data end
+  ns.Hero:Relay(f, full("Brannic"), {}, {}, {})
+  ns.Comm.Send = send
+  local st, q = sent.RELAY and sent.RELAY.h[e], sent.RELAYQ and sent.RELAYQ.q[e]
+  c:That(st and st.deeds and st.deeds.mount, "Elyra's first mount goes with her state")
+  c:Eq(st and st.tally and st.tally.falls, 2, "and her tallies")
+  c:Eq(st and st.tally and st.tally.runs, 7, "her own count of dungeon runs")
+  c:Eq(st and st.ton and st.ton.min, 12, "her tournament minutes")
+  c:That(q and q.q and q.q[783], "her quests go too")
+  -- Her runs count is her own, whatever this copy's History holds.
+  local runs
+  for _, x in ipairs(ns.Firsts:Tallies(f)) do
+    if x.kind == "runs" then for _, y in ipairs(x.all) do if y.name == e then runs = y.n end end end
+  end
+  c:Eq(runs, 7, "the runs tally shows her count")
+  h.deeds, h.tally, h.quests, h.questsTime, h.seq, h.ton = keep[1], keep[2], keep[3], keep[4], keep[5], keep[6]
+end)
+
+step("sync: one run seen apart is one History line with everyone in it", function(c)
+  local mine = { type = "run", key = "x", time = 1000, last = 1100, names = { full("Elyra") }, cleared = {}, killed = { a = true } }
+  ns.Clears:JoinRun(mine, { type = "run", key = "x", time = 900, last = 1500, names = { full("Brannic") }, cleared = {},
+    killed = { b = true }, ok = true })
+  c:Eq(#mine.names, 2, "both names")
+  c:That(mine.killed.a and mine.killed.b, "both kills")
+  c:Eq(mine.time, 900, "from the first kill"); c:Eq(mine.last, 1500, "to the last")
+  c:That(mine.ok, "counted when either copy counted it")
+end)
 
 step("sync: kills compared at login", function(c)
   local f, J = cur(), ns.Journey

@@ -6,13 +6,14 @@
 -- Invites work while both players are online: an invite that is not received at once (offline, no addon, busy in a
 -- fight) is removed and the inviter is told; an Accept the inviter's addon does not take is reported to the player.
 -- A change is applied when its version is exactly one more than ours. On a gap we ask the sender for the whole
--- fellowship; on a clash (two changes at once) we ask the leader, whose copy wins. At login, HELLO (Fellowship/Hero.lua)
--- compares versions with every Hero.
+-- fellowship; on a clash (two changes at once) the leader puts it on top and sends everyone its copy, and two
+-- Adventurers swap copies. At login (HELLO) and with every state after it (STATE, Fellowship/Hero.lua), versions and
+-- a fingerprint (Sync:Digest) are compared; when two copies differ, both pick the same one to go on from (Sync:Beats).
 -- Nothing is lost when players are not online at the same time (27 Oct 2026): every change carries who made it (a,
 -- the character whose addon made it) and that character's own count (n); a copy knows the highest count it has of
 -- everyone (f.seen). Each addon keeps the changes it applied lately (ns.db.oplog, not sent). When it takes another
 -- copy, the changes that copy has not seen are made again on top and passed on (Sync:Replay), checked against the
--- rights of whoever made them. Versions decide the order; no clock is compared.
+-- rights whoever made them had then (r: "leader" when they led; Fellowship:Apply). Versions decide the order.
 local _, ns = ...
 local L = ns.L
 local F, P, Comm = ns.Fellowship, ns.Permissions, ns.Comm
@@ -29,9 +30,9 @@ S.sent = {}
 S.LOG_MAX = 150 -- changes each addon keeps per fellowship, to make again on top of another copy
 
 -- a: the character whose addon made the change (left out when it is this one); n: its count; by: whose rights it
--- uses when that is not a (another character taking a place, Fellowship:TakePlace).
-function S:SendOp(f, recipients, op, t, a, n, by)
-  local msg = { fid = f.id, v = f.v, op = op, t = t, n = n, a = a ~= ns.Self() and a or nil, by = by ~= a and by or nil }
+-- uses when that is not a (another character taking a place, Fellowship:TakePlace); r: "leader" when by led then.
+function S:SendOp(f, recipients, op, t, a, n, by, r)
+  local msg = { fid = f.id, v = f.v, op = op, t = t, n = n, a = a ~= ns.Self() and a or nil, by = by ~= a and by or nil, r = r }
   for _, name in ipairs(recipients) do Comm:Send(name, "OP", msg) end
 end
 
@@ -42,7 +43,7 @@ local function oplog(fid)
 end
 
 -- Records a change this copy now has. n nil: a new change made here by a (its next count). Returns n.
-function S:Note(f, a, n, by, op, t)
+function S:Note(f, a, n, by, op, t, r)
   f.seen = f.seen or {}
   if not n then
     ns.db.opn = ns.db.opn or {}
@@ -51,7 +52,7 @@ function S:Note(f, a, n, by, op, t)
   end
   f.seen[a] = math.max(f.seen[a] or 0, n)
   local l = oplog(f.id)
-  l[#l + 1] = { a = a, n = n, by = by, op = op, t = t }
+  l[#l + 1] = { a = a, n = n, by = by, op = op, t = t, r = r }
   while #l > self.LOG_MAX do table.remove(l, 1) end
   return n
 end
@@ -70,12 +71,12 @@ function S:Replay(f, list)
   local me, lost = ns.Self(), false
   for _, e in ipairs(list) do
     if (f.seen[e.a] or 0) < e.n then
-      if F:Apply(f, e.op, e.by or e.a, e.t) then
+      if F:Apply(f, e.op, e.by or e.a, e.t, e.r) then
         f.v = f.v + 1
         f.seen[e.a] = e.n
         local others = {}
         for name in pairs(f.members) do if name ~= me then others[#others + 1] = name end end
-        self:SendOp(f, others, e.op, e.t, e.a, e.n, e.by or e.a)
+        self:SendOp(f, others, e.op, e.t, e.a, e.n, e.by or e.a, e.r)
       elseif e.a == me then
         lost = true
       end
@@ -152,6 +153,59 @@ function S:SendSnap(name, f)
   Comm:Send(name, "SNAP", { f = self:Copy(f) }, false, true)
 end
 function S:AskSnap(name, f) Comm:Send(name, "SNAPQ", { fid = f.id, v = f.v }, false, true) end
+
+-- Which of two copies the fellowship goes on from: the same answer on both sides, whoever asks (2 Nov 2026).
+-- A key is { v, lv, leader, holder }: the newer version; then the newer leadership (a takeover or a handover the other
+-- copy has not seen: its count, f.lv); then the leader whose name sorts first (two leadership changes at once); then
+-- the copy the leader holds; then the holder whose name sorts first. Each side compares its own copy with the other's.
+function S:Key(f, holder) return { v = f.v, lv = f.lv or 0, leader = f.leader, holder = holder } end
+function S:Beats(a, b)
+  if a.v ~= b.v then return a.v > b.v end
+  if a.lv ~= b.lv then return a.lv > b.lv end
+  if a.leader ~= b.leader then return a.leader < b.leader end
+  local al, bl = a.holder == a.leader, b.holder == b.leader
+  if al ~= bl then return al end
+  return a.holder < b.holder
+end
+-- The other copy's key from what its addon sent (v, lv, ld); an older addon sends no lv or ld: ours stand in.
+function S:TheirKey(f, sender, d)
+  return { v = tonumber(d.v) or 0, lv = tonumber(d.lv) or f.lv or 0, leader = type(d.ld) == "string" and d.ld or f.leader, holder = sender }
+end
+
+-- Compares our copy with another Adventurer's (HELLO, HI and STATE carry v, lv, ld and the fingerprint h): the
+-- one behind gets the other copy; at the same version with other content, both sides pick the same copy (Beats),
+-- and the other one takes it and makes its own missing changes again on top (Replay).
+function S:Compare(sender, f, d)
+  local v = tonumber(d.v) or 0
+  if v > f.v then self:AskSnap(sender, f)
+  elseif v < f.v then self:SendSnap(sender, f)
+  elseif d.h and d.h ~= self:Digest(f) then
+    if self:Beats(self:TheirKey(f, sender, d), self:Key(f, ns.Me())) then self:AskSnap(sender, f) else self:SendSnap(sender, f) end
+  end
+end
+
+-- The same with every state while both are online (a change lost on the way, two at once): at most once a minute
+-- for each Adventurer, and the same difference only once in half an hour (a copy that cannot be made the same must
+-- not send itself every minute). Behind them: ask for their copy. Ahead: nothing (their addon asks when it hears our
+-- state; pushing ours sent whole copies for a change still on its way). The same version with other content: GRACE
+-- seconds later, if it still differs (two changes crossing settle themselves).
+S.comparedAt, S.fixed, S.GRACE = {}, {}, 5
+S.swappedAt, S.SWAP_EVERY = {}, 30
+function S:CompareSoon(sender, f, d)
+  local now = GetTime()
+  if self.comparedAt[sender] and now - self.comparedAt[sender] < 60 then return end
+  local v, mine = tonumber(d.v) or 0, self:Digest(f)
+  if v < f.v or (v == f.v and (not d.h or d.h == mine)) then return end
+  local key = f.v .. ":" .. v .. ":" .. tostring(d.h) .. ":" .. mine
+  local last = self.fixed[sender]
+  if last and last.key == key and now - last.at < 1800 then return end
+  self.comparedAt[sender], self.fixed[sender] = now, { key = key, at = now }
+  if v > f.v then self:AskSnap(sender, f) return end
+  C_Timer.After(self.GRACE, function()
+    local g = F:Get(f.id)
+    if g and g.members[sender] and g.v == v and d.h ~= self:Digest(g) then self:Compare(sender, g, d) end
+  end)
+end
 
 -- A short fingerprint of what every copy must agree on (not Hero states, runs or History, which each client adds
 -- itself). HELLO carries it: two copies with the same version but different content (two changes at once while the
@@ -263,9 +317,10 @@ Comm:On("OP", function(sender, d)
   local f = F:Get(d.fid)
   if not f then S:Unknown(sender, d.fid) return end
   local op = d.op
-  -- a made it (the sender, or a Companion whose change is passed on); by: whose rights it uses.
+  -- a made it (the sender, or a Companion whose change is passed on); by: whose rights it uses; r: their rank then.
   local a = type(d.a) == "string" and d.a or sender
   local by = type(d.by) == "string" and d.by or a
+  local r = d.r == "leader" and "leader" or nil
   local n = tonumber(d.n)
   -- Another character on a Companion's account takes that Companion's place (Fellowship:TakePlace): made as that
   -- Companion, by a character their addon listed as theirs.
@@ -277,23 +332,34 @@ Comm:On("OP", function(sender, d)
   if n and f.seen and (f.seen[a] or 0) >= n then return end
   local v = tonumber(d.v) or 0
   if v == f.v + 1 then
-    if F:Apply(f, op, by, d.t) then
+    if F:Apply(f, op, by, d.t, r) then
       f.v = v
-      if n then S:Note(f, a, n, by, op, d.t) end
+      if n then S:Note(f, a, n, by, op, d.t, r) end
       F:AfterChange(f)
     end
   elseif v > f.v + 1 then
     S:AskSnap(sender, f)
   elseif ns.Me() == f.leader then
     -- A clash: two changes at once. The leader applies it if allowed and sends everyone its copy.
-    if F:Apply(f, op, by, d.t) then
+    if F:Apply(f, op, by, d.t, r) then
       f.v = f.v + 1
-      if n then S:Note(f, a, n, by, op, d.t) end
+      if n then S:Note(f, a, n, by, op, d.t, r) end
       for name in pairs(f.members) do if name ~= f.leader then S:SendSnap(name, f) end end
       F:AfterChange(f)
     end
-  elseif f.leader ~= sender then
+  elseif f.leader ~= sender and ns.Hero:Online(f, f.leader) then
+    -- A clash with the leader online: the leader's copy, with both changes, comes to everyone.
     S:AskSnap(f.leader, f)
+  else
+    -- A clash with the leader offline (or from the leader, on another copy): the two swap copies at once, and the
+    -- one that Beats is taken by the other (2 Nov 2026: they waited for the leader, who might not come for days).
+    -- Once in SWAP_EVERY seconds with each Adventurer: a burst of changes passed on would each send the whole copy
+    -- (code review, 2 Nov 2026); a clash left over is found with the next state (CompareSoon).
+    local now = GetTime()
+    if S.swappedAt[sender] and now - S.swappedAt[sender] < S.SWAP_EVERY then return end
+    S.swappedAt[sender] = now
+    S:SendSnap(sender, f)
+    S:AskSnap(sender, f)
   end
 end)
 Comm:On("SNAPQ", function(sender, d)
@@ -318,9 +384,8 @@ Comm:On("SNAP", function(sender, d)
     return
   end
   local joining = F.pendingJoin[snap.id] ~= nil and snap.members[me] ~= nil
-  -- At the same version with other content (Digest) the leader's copy wins, else the one whose name sorts first.
-  local newer = mine and (mine.members[sender] or mine.leader == sender)
-    and (snap.v > mine.v or (snap.v == mine.v and (sender == mine.leader or (me ~= mine.leader and sender < me))))
+  -- Taken when it wins over ours (Beats: the same answer on both sides).
+  local newer = mine and (mine.members[sender] or mine.leader == sender) and S:Beats(S:Key(snap, sender), S:Key(mine, me))
   if not joining and not newer then return end
   S:KeepLocal(snap, mine)
   -- Our changes the copy has not seen are made again on top of it (nothing made while apart is lost). Not when the
@@ -358,18 +423,6 @@ function S:KeepLocal(snap, mine)
     snap.reached = math.max(snap.reached or 1, mine.reached or 1)
     snap.reopenV = mine.reopenV
   end
-end
-
----------------------------------------------------------------------------
--- Changes missed while online (a message lost during a boss fight): a STATE with a newer version asks for the copy,
--- at most once a minute per fellowship.
----------------------------------------------------------------------------
-S.askedAt = {}
-function S:AskSoon(sender, f)
-  local last = self.askedAt[f.id]
-  if last and GetTime() - last < 60 then return end
-  self.askedAt[f.id] = GetTime()
-  self:AskSnap(sender, f)
 end
 
 -- Removed (or the fellowship disbanded) while away: the HELLO of someone no longer in our copy, from an older copy,

@@ -23,11 +23,13 @@ function J:Uncounted(f, name)
   return m.friend == true or (f.falls ~= nil and ns.Challenges:Fallen(f, name) ~= nil)
 end
 
-function J:Away(f, name)
+-- aw: who is away by the rule as a change's maker saw it ({ name = true }, F.Claim), instead of this addon's own view.
+function J:Away(f, name, aw)
   local m = f.members[name]
   -- (A Fallen went "away" after the rule's days and was counted as away; seen in the check of 1 Nov 2026, 11:30.)
   if not m or self:Uncounted(f, name) then return nil end
   if m.away then return m.away end
+  if aw then return aw[name] and "auto" or nil end
   local r = f.rules
   if not r.awayNever and name ~= ns.Me() and time() - ns.Hero:LastSeen(f, name) > (r.awayDays or 14) * 86400 then return "auto" end
   return nil
@@ -36,10 +38,17 @@ end
 -- Heroes not away, highest level first. The Fallen of a survival challenge are not counted either: their journey
 -- ended, so they no longer hold the fellowship back (SPEC §9, Fellowship/Challenges.lua). Nor are Friends of the
 -- fellowship (SPEC §1.1).
-function J:Counted(f)
+-- Who is away by the rule as this addon sees it (not seen for the rule's days): { name = true }, for a change to carry.
+function J:AutoAway(f)
+  local out = {}
+  for name in pairs(f.members) do if self:Away(f, name) == "auto" then out[name] = true end end
+  return out
+end
+
+function J:Counted(f, aw)
   local list = {}
   for name in pairs(f.members) do
-    if not self:Uncounted(f, name) and not self:Away(f, name) then list[#list + 1] = name end
+    if not self:Uncounted(f, name) and not self:Away(f, name, aw) then list[#list + 1] = name end
   end
   table.sort(list, function(a, b)
     local la, lb = level(f, a), level(f, b)
@@ -202,10 +211,15 @@ end
 -- Marks a newcomer catching up when they arrive below the current chapter's floor while the fellowship is past its
 -- first chapter (after the Prologue) (Fellowship:Apply, join and swap). Friends joining at the start hold the first
 -- chapter as usual.
-function J:MarkNewcomer(f, name, lvl)
+-- Does someone at level lvl joining now catch up (below the floor of a chapter past the first)? The change that lets
+-- them in carries the answer, so every copy marks them the same (Fellowship:Apply).
+function J:Newcomer(f, lvl)
   local ch = self:Current(f)
   local first = (f.journey.chapters[1] and f.journey.chapters[1].art == "prologue") and 2 or 1
-  if ch and ch.n > first and f.members[name] and (tonumber(lvl) or 0) < self:FloorLevel(f, ch) then f.members[name].catching = true end
+  return ch ~= nil and ch.n > first and (tonumber(lvl) or 0) < self:FloorLevel(f, ch)
+end
+function J:MarkNewcomer(f, name, lvl)
+  if f.members[name] and self:Newcomer(f, lvl) then f.members[name].catching = true end
 end
 
 -- Their level reached the current floor: from now on they count like everyone (Hero:Store). Returns true when it changed.

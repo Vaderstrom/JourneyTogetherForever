@@ -105,7 +105,7 @@ function Tn:Apply(f, op, by, now)
     if not on(f) or active(t) then return false end
     if f.rules.tStart == "auto" then
       if f.tourneyLast and now < f.tourneyLast + self.AUTO_EVERY then return false end
-    elseif by ~= f.leader then
+    elseif ns.Permissions.Rank(f, by) ~= "leader" then
       return false
     end
     f.tourney = startNew(f, now)
@@ -114,7 +114,8 @@ function Tn:Apply(f, op, by, now)
   end
   if not active(t) then return false end
   if a == "sign" then
-    if t.phase ~= "signup" or now >= t.signupEnd or ns.Journey:Away(f, by) then return false end
+    -- (Away as every copy knows it: signing up shows they are here, whatever another copy last heard.)
+    if t.phase ~= "signup" or now >= t.signupEnd or ns.Journey:Away(f, by, {}) then return false end
     t.signed[by] = op.on and now or nil
     return true
   elseif a == "duel" then
@@ -224,12 +225,24 @@ function Tn:Tick()
   end
 end
 
+-- Another Adventurer's online minutes, from TON or with their state (also passed on by others): a later round, or
+-- more minutes in the same one, replaces what is known. Returns true when stored.
+function Tn:StoreMinutes(f, name, x)
+  if type(x) ~= "table" or not f.members[name] or name == ns.Me() then return false end
+  local id, slot, min = tonumber(x.id), tonumber(x.slot), tonumber(x.min) or 0
+  if not id or not slot then return false end
+  f.heroes = f.heroes or {}
+  f.heroes[name] = f.heroes[name] or {}
+  local old = f.heroes[name].ton
+  if old and ((old.id or 0) > id or (old.id == id and ((old.slot or 0) > slot or (old.slot == slot and (old.min or 0) >= min)))) then return false end
+  f.heroes[name].ton = { id = id, slot = slot, min = min }
+  return true
+end
+
 Comm:On("TON", function(sender, d)
   local f = type(d) == "table" and F:Get(d.fid)
   if not f or not f.members[sender] then return end
-  f.heroes = f.heroes or {}
-  f.heroes[sender] = f.heroes[sender] or {}
-  f.heroes[sender].ton = { id = tonumber(d.id), slot = tonumber(d.slot), min = tonumber(d.min) or 0 }
+  if Tn:StoreMinutes(f, sender, d) then ns:Fire("HEROES") end
 end)
 
 ---------------------------------------------------------------------------

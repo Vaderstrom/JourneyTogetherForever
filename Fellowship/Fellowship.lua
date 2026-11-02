@@ -154,6 +154,12 @@ function F:Sanitize(f)
     for a, n in pairs(f.seen) do if type(a) == "string" and tonumber(n) then seen[a] = tonumber(n) end end
   end
   f.seen = seen
+  -- Who led until when, and how often the leader changed (Fellowship:Apply, Sync:Beats).
+  local led = {}
+  if type(f.led) == "table" then
+    for name, t in pairs(f.led) do if type(name) == "string" and tonumber(t) then led[name] = tonumber(t) end end
+  end
+  f.led, f.lv = led, tonumber(f.lv) or 0
   f.journey = ns.Journey.Clean(f.journey) or ns.BuildJourney("classic")
   ns.Journey.MigrateKeys(f)
   -- Challenges chosen at founding, turned off since, the falls, broken rules, the Ring and the race (Fellowship/Challenges.lua).
@@ -203,10 +209,49 @@ end
 
 ---------------------------------------------------------------------------
 -- Changes (ops). Apply checks that "by" may make the change, then makes it.
+-- One truth (2 Nov 2026): every copy must apply a change the same way, whenever it gets it. So a change is checked
+-- with its maker's rights when they made it (r), and what only the maker's addon can see (when the leader was last
+-- seen, who is away by the rule, the chapter a newcomer joins in) is written into the change by that addon
+-- (F.Claim), never worked out again by each copy from what it happens to know.
 ---------------------------------------------------------------------------
-function F:Apply(f, op, by, t)
-  if type(op) ~= "table" then return false end
+-- The maker's addon works the value out and writes it into the change (F.making); a change from an older addon
+-- without it is worked out here.
+local function claim(op, key, fn)
+  if op[key] ~= nil then return op[key] end
+  local v = fn()
+  if F.making then op[key] = v end
+  return v
+end
+F.Claim = claim
+
+-- Did name still lead at time t? f.led[name]: when they stopped leading.
+function F:LedAt(f, name, t)
+  local stop = f.led and f.led[name]
+  return stop ~= nil and t <= stop
+end
+
+-- r: "leader" when the maker led when they made the change.
+function F:Apply(f, op, by, t, r)
   t = tonumber(t) or time()
+  local was = r == "leader" and by ~= f.leader and self:LedAt(f, by, t)
+  if was then P.acting, P.actingIn = by, f end
+  -- (Lent for this one change only, also when it fails with an error.)
+  local fine, ok = pcall(self.ApplyChange, self, f, op, by, t)
+  P.acting, P.actingIn = nil, nil
+  if not fine then error(ok, 0) end
+  return ok
+end
+
+-- The leader changes: who led until when (rights at the time, above), and a count every copy compares (Sync:Beats).
+local function newLeader(f, name, t)
+  f.led = f.led or {}
+  if f.leader then f.led[f.leader] = t end
+  f.leader = name
+  f.lv = (f.lv or 0) + 1
+end
+
+function F:ApplyChange(f, op, by, t)
+  if type(op) ~= "table" then return false end
   local k, n = op.k, op.name
   f.inviteFriend = f.inviteFriend or {} -- (a copy from before Friends of the fellowship)
   if k == "invite" then
@@ -227,7 +272,7 @@ function F:Apply(f, op, by, t)
     f.invites[n], f.inviteFrom[n], f.inviteFriend[n] = nil, nil, nil
     f.members[n] = { role = op.role, joined = t, class = op.class, level = tonumber(op.level), guild = op.guild, gm = op.gm, friend = friend }
     -- (A Friend never counts, so never catches up either.)
-    if not friend then ns.Journey:MarkNewcomer(f, n, op.level) end
+    if not friend and claim(op, "c", function() return ns.Journey:Newcomer(f, op.level) end) then f.members[n].catching = true end
     -- "X was invited" is folded into "X joined the fellowship".
     local invited = L.CHR_INVITED:format(ns.Short(n))
     for i = #f.chronicle, 1, -1 do if f.chronicle[i].text == invited then table.remove(f.chronicle, i) end end
@@ -242,7 +287,7 @@ function F:Apply(f, op, by, t)
     self:Log(f, L.CHR_REMOVED:format(ns.Short(n)), t, "removed", n)
   elseif k == "lead" then
     if not P.Can(f, by, "lead", n) or not F:CanLead(f, n) then return false end
-    f.leader = n
+    newLeader(f, n, t)
     f.members[n].friend = nil -- the Leader always counts
     self:Log(f, L.CHR_LEADS:format(ns.Short(n)), t, "leads", n)
   elseif k == "rename" then
@@ -295,7 +340,9 @@ function F:Apply(f, op, by, t)
     f.members[n].friend = on
     -- Counting again starts from where they stand: a catch-up if they are below the floor.
     f.members[n].catching = nil
-    if not on then ns.Journey:MarkNewcomer(f, n, tonumber(op.level) or ns.Hero:Level(f, n)) end
+    if not on and claim(op, "c", function() return ns.Journey:Newcomer(f, tonumber(op.level) or ns.Hero:Level(f, n)) end) then
+      f.members[n].catching = true
+    end
     self:Log(f, (on and L.CHR_FRIEND_ON or L.CHR_FRIEND_OFF):format(ns.Short(n)), t, on and "friendon" or "friendoff", n)
   elseif k == "swap" then
     -- Play another character on the same account: it takes this Hero's place, rank and roles. Not a Fallen one's:
@@ -304,9 +351,9 @@ function F:Apply(f, op, by, t)
     local m = f.members[by]
     if not ns.Challenges:Allows(f, op.class, m.role, m.second, m.friend) then return false end
     f.members[n] = { role = m.role, second = m.second, joined = m.joined, class = op.class, level = tonumber(op.level), friend = m.friend }
-    ns.Journey:MarkNewcomer(f, n, op.level)
+    if claim(op, "c", function() return ns.Journey:Newcomer(f, op.level) end) then f.members[n].catching = true end
     f.members[by] = nil
-    if f.leader == by then f.leader = n end
+    if f.leader == by then newLeader(f, n, t) end
     if f.heroes then f.heroes[by] = nil end
     self:Log(f, L.CHR_SWAP:format(ns.Short(by), ns.Short(n)), t, f.leader == n and "swapleader" or "swap", n)
   elseif k == "tourney" then
@@ -322,9 +369,12 @@ function F:Apply(f, op, by, t)
     if not P.Rank(f, by) or self:IsFriend(f, by) or not ns.Votes:Apply(f, op, by, t) then return false end
   elseif k == "takeover" then
     -- The longest-serving Adventurer takes over when the leader has not been seen for the rule's days (Progress.lua).
-    if not ns.Progress:CanTakeOver(f, by) then return false end
+    -- As the Adventurer who took over saw it: when they last saw the leader, and who was away (2 Nov 2026).
+    local seen = tonumber(claim(op, "seen", function() return ns.Hero:LastSeen(f, f.leader) end))
+    local aw = claim(op, "aw", function() return ns.Journey:AutoAway(f) end)
+    if not seen or not ns.Progress:CanTakeOver(f, by, t, seen, type(aw) == "table" and aw or {}) then return false end
     local old = f.leader
-    f.leader = by
+    newLeader(f, by, t)
     f.members[by].friend = nil
     self:Log(f, L.CHR_TAKEOVER:format(ns.Short(by), ns.Short(old), f.rules.takeover), t, "takeover", by)
   elseif k == "tick" then
@@ -383,10 +433,16 @@ function F:Do(op)
   local me, t = ns.Me(), time()
   local others = {}
   for name in pairs(f.members) do if name ~= me then others[#others + 1] = name end end
-  if not self:Apply(f, op, me, t) then return false end
+  local r = P.Rank(f, me) == "leader" and "leader" or nil
+  -- (Claims are written only into this addon's own change, also when applying it fails with an error.)
+  self.making = true
+  local fine, ok = pcall(self.Apply, self, f, op, me, t, r)
+  self.making = nil
+  if not fine then error(ok, 0) end
+  if not ok then return false end
   f.v = f.v + 1
-  local n = ns.Sync:Note(f, me, nil, me, op, t)
-  ns.Sync:SendOp(f, others, op, t, me, n, me)
+  local n = ns.Sync:Note(f, me, nil, me, op, t, r)
+  ns.Sync:SendOp(f, others, op, t, me, n, me, r)
   self:AfterChange(f)
   return true
 end
@@ -603,10 +659,16 @@ function F:FinishTake(main, fid)
   local op = { k = "swap", name = me, from = main, class = class, level = UnitLevel("player") }
   local others = {}
   for name in pairs(f.members) do if name ~= main then others[#others + 1] = name end end
-  if not self:Apply(f, op, main, t) then return false end
+  local r = P.Rank(f, main) == "leader" and "leader" or nil
+  -- (Claims are written only into this addon's own change, also when applying it fails with an error.)
+  self.making = true
+  local fine, ok = pcall(self.Apply, self, f, op, main, t, r)
+  self.making = nil
+  if not fine then error(ok, 0) end
+  if not ok then return false end
   f.v = f.v + 1
-  local n = ns.Sync:Note(f, me, nil, main, op, t)
-  ns.Sync:SendOp(f, others, op, t, me, n, main)
+  local n = ns.Sync:Note(f, me, nil, main, op, t, r)
+  ns.Sync:SendOp(f, others, op, t, me, n, main, r)
   ns.char.fellowshipId = f.id
   local c = ns.db.characters[main]
   if c then c.fellowshipId = nil end

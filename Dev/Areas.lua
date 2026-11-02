@@ -86,7 +86,7 @@ A.LIST = {
     shots = { "chapter-unlocked", "picture-moment", "toast-move", "toast-clear", "toast-clear-raid", "toast-hero-floor", "toast-chapter",
       "toast-journey", "toast-long", "toast-first" } },
   { key = "tracker", title = "Tracker and minimap button", checks = { "the tracker", "minimap button" },
-    shots = { "tracker", "tracker-all", "tracker-hidden", "minimap-tooltip" } },
+    shots = { "tracker", "tracker-all", "tracker-docked", "tracker-hidden", "minimap-tooltip" } },
   { key = "sync", title = "Sync with Adventurers who play at other times (pretend copies)", checks = { "sync:" },
     shots = { "sync-restore" } },
   { key = "board", title = "The board for the Discord companion", checks = { "board:" },

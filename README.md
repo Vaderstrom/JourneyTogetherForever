@@ -273,16 +273,17 @@ log out; the app reads it from your saved data and posts nothing you have not ch
   reaches the floor or the cap or goes over it, new rules, a Gathering soon, an attunement opens, and more. Big
   moments get a big banner. Each can be turned off, and you can drag them where you like. Click one to open the page
   it is about.
-- **The tracker** on the screen: the chapter, where you stand (with a little bar to the floor or the cap), the next
-  step, dungeons cleared, who is online, the next Gathering, shared quests, your next duel and your inbox, each line
-  with its icon; it can hide until you point at it.
+- **The tracker**, under the game's quest tracker as one more section in the game's own look: the chapter, where you
+  stand (with a little bar to the floor or the cap), the next step, dungeons cleared, who is online, the next
+  Gathering, shared quests, your next duel and your inbox, each line with its icon. It moves and folds with the game's
+  list. Or make it a panel you drag anywhere, which can hide until you point at it.
 - **Picture after a final boss**: Take a picture (with or without the interface) or open the group photo, right
   there in the dungeon.
 - The **inbox** in the header: invitations, votes, Gatherings, asks to group up, the tournament.
 
 ![A big banner: Chapter IV unlocked](.github/screenshots/chapter-unlocked.jpg)
 
-![The tracker](.github/screenshots/tracker.jpg)
+![The tracker under the game's quest tracker](.github/screenshots/tracker.jpg)
 
 #### Look and settings
 - The book: a leather book with parchment pages and art for every page, in the game's own look (its fonts, buttons

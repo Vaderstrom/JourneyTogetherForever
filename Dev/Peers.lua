@@ -60,16 +60,18 @@ function Pe:Hello(name, tag)
   local p = self:Get(name)
   if not p or not p.online then return end
   local c = p.copy
-  local sq, gq = ns.Hero:Counts(c)
-  send(p, tag or "HELLO", { fid = c.id, v = c.v, s = state(p), h = ns.Sync:Digest(c), k = ns.Clears:Digest(c), sq = sq, gq = gq })
+  local sq, gq, qq = ns.Hero:Counts(c)
+  send(p, tag or "HELLO", { fid = c.id, v = c.v, s = state(p), h = ns.Sync:Digest(c), k = ns.Clears:Digest(c), sq = sq, gq = gq,
+    qq = qq, lv = c.lv or 0, ld = c.leader })
 end
 
--- The peer's level or XP changed: STATE (with its version, Sync:AskSoon).
+-- The peer's level or XP changed: STATE, with its version and fingerprints (Sync:CompareSoon).
 function Pe:State(name, level)
   local p = self:Get(name)
   if not p or not p.online then return end
   p.level = level or p.level
-  send(p, "STATE", { fid = p.copy.id, v = p.copy.v, s = state(p) })
+  local c = p.copy
+  send(p, "STATE", { fid = c.id, v = c.v, s = state(p), h = ns.Sync:Digest(c), k = ns.Clears:Digest(c), lv = c.lv or 0, ld = c.leader })
 end
 
 -- The peer makes a change in its own copy and sends it (online). lost: it never arrives (a message lost in a fight).
@@ -77,31 +79,36 @@ function Pe:Change(name, op, lost)
   local p = self:Get(name)
   if not p then return false end
   local c, t = p.copy, time()
-  if not quietly(function() return F:Apply(c, op, p.name, t) end) then return false end
+  -- (As Fellowship:Do: with the peer's rank, and what its addon saw written into the change.)
+  local r = ns.Permissions.Rank(c, p.name) == "leader" and "leader" or nil
+  F.making = true
+  local ok = quietly(function() return F:Apply(c, op, p.name, t, r) end)
+  F.making = nil
+  if not ok then return false end
   c.v = c.v + 1
   local n = (c.seen[p.name] or 0) + 1
   c.seen[p.name] = n
-  p.ops[#p.ops + 1] = { n = n, op = op, t = t }
-  if p.online and not lost then send(p, "OP", { fid = c.id, v = c.v, op = op, t = t, n = n }) end
+  p.ops[#p.ops + 1] = { n = n, op = op, t = t, r = r }
+  if p.online and not lost then send(p, "OP", { fid = c.id, v = c.v, op = op, t = t, n = n, r = r }) end
   return true
 end
 
--- A copy from this client: taken when it is not older (this client decided it wins), the peer's own changes it has
--- not seen made again on top and sent (as Sync:Replay). A copy without the peer: it was removed.
+-- A copy from this client: taken when it wins over the peer's (Sync:Beats, as the SNAP handler), the peer's own
+-- changes it has not seen made again on top and sent (as Sync:Replay). A copy without the peer: it was removed.
 function Pe:TakeCopy(p, f)
   local snap = F:Sanitize(wire(f))
   local c = p.copy
-  if not snap or snap.id ~= c.id or snap.v < c.v then return end
+  if not snap or snap.id ~= c.id or not ns.Sync:Beats(ns.Sync:Key(snap, ns.Me()), ns.Sync:Key(c, p.name)) then return end
   snap.heroes = c.heroes
   quietly(function() ns.Clears:Merge(snap, c) end)
   p.copy = snap
   p.took = (p.took or 0) + 1
   if snap.disbanded or not snap.members[p.name] then p.gone = true return end
   for _, e in ipairs(p.ops) do
-    if (snap.seen[p.name] or 0) < e.n and quietly(function() return F:Apply(snap, e.op, p.name, e.t) end) then
+    if (snap.seen[p.name] or 0) < e.n and quietly(function() return F:Apply(snap, e.op, p.name, e.t, e.r) end) then
       snap.v = snap.v + 1
       snap.seen[p.name] = e.n
-      send(p, "OP", { fid = snap.id, v = snap.v, op = e.op, t = e.t, n = e.n })
+      send(p, "OP", { fid = snap.id, v = snap.v, op = e.op, t = e.t, n = e.n, r = e.r })
     end
   end
 end
@@ -112,7 +119,7 @@ function Pe:Op(p, d)
   local a, n = d.a or ns.Me(), tonumber(d.n)
   if n and (c.seen[a] or 0) >= n then return end
   if v == c.v + 1 then
-    if quietly(function() return F:Apply(c, d.op, d.by or a, tonumber(d.t)) end) then
+    if quietly(function() return F:Apply(c, d.op, d.by or a, tonumber(d.t), d.r) end) then
       c.v = v
       if n then c.seen[a] = math.max(c.seen[a] or 0, n) end
       if c.disbanded or not c.members[p.name] then p.gone = true end
@@ -131,9 +138,9 @@ function Pe:Hello2(p, d, answer)
   if v > c.v then send(p, "SNAPQ", { fid = c.id, v = c.v })
   elseif v < c.v then send(p, "SNAP", { f = ns.Sync:Copy(c) })
   elseif d.h and d.h ~= ns.Sync:Digest(c) then
-    local me = ns.Me()
-    local winner = (p.name == c.leader or me == c.leader) and c.leader or (p.name < me and p.name or me)
-    if winner == p.name then send(p, "SNAP", { f = ns.Sync:Copy(c) }) else send(p, "SNAPQ", { fid = c.id, v = c.v }) end
+    -- (Sync:Beats: the same copy wins on both sides.)
+    local S = ns.Sync
+    if S:Beats(S:Key(c, p.name), S:TheirKey(c, ns.Me(), d)) then send(p, "SNAP", { f = S:Copy(c) }) else send(p, "SNAPQ", { fid = c.id, v = c.v }) end
   end
 end
 

@@ -738,6 +738,7 @@ end, { toast = true })
 shot("toast-endgame", "Toast: the Endgame is open (big)", "After the journey: the raids", toast("journey", L.TOAST_ENDGAME,
   L.TOAST_ENDGAME_TEXT), { toast = true })
 shot("tracker", "The tracker on the screen", "Chapter, status, XP bar, you with the little bar to the floor or cap, the next step, dungeons cleared, who is online, a Gathering soon; an icon on each line (U13)", function()
+  ns.Settings:Set("trackerDock", false) -- (its own panel here; docked in "tracker-docked")
   ns.Toasts.frame:Hide(); W():Close(); ns.Tracker:SetFolded(false); ns.Tracker:Refresh()
 end)
 shot("tracker-all", "The tracker, every line on", "Also shared quests, your next duel and the inbox (Settings)", function()
@@ -747,7 +748,12 @@ shot("tracker-all", "The tracker, every line on", "Also shared quests, your next
   dev("hero Brannic propose")
   ns.Tracker:Refresh()
 end)
+shot("tracker-docked", "The tracker under the game's quest tracker", "Settings: one more section under the game's quest list, with the game's section header, fold button and fonts; every line on (a client without the game's tracker keeps the panel)", function()
+  ns.Settings:Set("trackerDock", true)
+  ns.Tracker:Refresh()
+end)
 shot("tracker-hidden", "The tracker, hidden", "Nothing on the screen until pointed at; it shows for a moment when something changes", function()
+  ns.Settings:Set("trackerDock", false)
   for key, on in pairs(TR.savedLines or {}) do ns.Settings:SetTrackerLine(key, on) end
   ns.Settings:Set("trackerHover", true)
   -- The lines just changed, so the first refresh starts a peek; the second one, after it is cleared, hides it (the
@@ -962,7 +968,7 @@ function TR:Run(arg, opts)
   self.onDone = opts.onDone
   self.running = true
   self.saved = { theme = ns.Settings:Get("theme"), size = ns.Settings:Get("size"), chat = ns.Settings:Get("chat"),
-    trackerHover = ns.Settings:Get("trackerHover"), fullscreen = ns.Settings:Get("fullscreen") }
+    trackerHover = ns.Settings:Get("trackerHover"), trackerDock = ns.Settings:Get("trackerDock"), fullscreen = ns.Settings:Get("fullscreen") }
   -- The setup guide would take over after joining and founding: seen for the tour, as it was afterwards.
   self.savedSetup = ns.char.setupDone
   ns.char.setupDone = true

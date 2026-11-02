@@ -15,11 +15,11 @@ local DAY = 86400
 ---------------------------------------------------------------------------
 -- The Adventurer who has been in the fellowship the longest and is not away, nor a Friend of the fellowship, nor one
 -- of the Fallen (ties: by name). (It was the longest-serving Steward until the two ranks of 27 Oct 2026.)
-function P:LongestServing(f)
+function P:LongestServing(f, aw)
   local best, since
   for name, m in pairs(f.members) do
     local t = tonumber(m.joined) or 0
-    if name ~= f.leader and not J:Uncounted(f, name) and not J:Away(f, name) and (not best or t < since or (t == since and name < best)) then
+    if name ~= f.leader and not J:Uncounted(f, name) and not J:Away(f, name, aw) and (not best or t < since or (t == since and name < best)) then
       best, since = name, t
     end
   end
@@ -28,10 +28,11 @@ end
 
 -- May `by` take over as leader? The rule allows it, `by` is the longest-serving Adventurer, and the leader has not
 -- been seen for the rule's number of days (as far as this client knows).
-function P:CanTakeOver(f, by)
+-- t, seen, aw: the takeover as the Adventurer who made it saw it (Fellowship:Apply), so every copy judges it the same.
+function P:CanTakeOver(f, by, t, seen, aw)
   local r = f.rules
-  if r.takeoverNever or by == f.leader or self:LongestServing(f) ~= by then return false end
-  return time() - Hr:LastSeen(f, f.leader) > (r.takeover or 14) * DAY
+  if r.takeoverNever or by == f.leader or self:LongestServing(f, aw) ~= by then return false end
+  return (t or time()) - (seen or Hr:LastSeen(f, f.leader)) > (r.takeover or 14) * DAY
 end
 
 function P:CheckTakeover(f)
@@ -76,7 +77,8 @@ function P:OverCap(f, ch, n, name)
   local inRun = h and h.run
   if inRun and r.runXp and lvl <= ch.cap + r.capTol + r.runXpMax then return end
   f.capLogged[name] = lvl
-  ns.Clears:Log(f, { type = "cap", icon = "cap", ok = false,
+  -- (The same id on every copy that notices it: Clears:Merge keeps one.)
+  ns.Clears:Log(f, { type = "cap", icon = "cap", ok = false, id = "cap:" .. name .. ":" .. lvl .. ":" .. n,
     text = (inRun and L.H_OVER_CAP_RUN or L.H_OVER_CAP):format(ns.Short(name), lvl, ns.Journey.Roman(n), ch.cap) })
 end
 

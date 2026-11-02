@@ -319,6 +319,15 @@ function Q:Send(to, force)
   ns:Fire("HEROES")
 end
 
+-- A Hero's stored quests as QUESTS sends them, to pass on (Hero:Relay, RELAYQ).
+function Q:Stored(h)
+  local ids, keys = {}, {}
+  for id in pairs(h.questsDone or {}) do ids[#ids + 1] = id end
+  for id in pairs(h.keys or {}) do keys[#keys + 1] = id end
+  table.sort(ids); table.sort(keys)
+  return { q = h.quests, d = ids, k = keys, t = h.questsTime }
+end
+
 Comm:On("QUESTS", function(sender, d)
   if type(d) ~= "table" then return end
   local f = F:Get(d.fid)

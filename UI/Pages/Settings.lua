@@ -278,6 +278,7 @@ local function build(pf)
     pf.trackerParts[#pf.trackerParts + 1] = f
     return f.box
   end
+  pf.trackerDock = opt(L.TRACKER_DOCK, "trackerDock", L.TRACKER_DOCK_HINT)
   pf.trackerHover = opt(L.TRACKER_HOVER, "trackerHover", L.TRACKER_HOVER_HINT)
   pf.trackerPeek = opt(L.TRACKER_PEEK, "trackerPeek", L.TRACKER_PEEK_HINT, true)
   pf.trackerCombat = opt(L.TRACKER_HIDE_COMBAT, "trackerHideCombat")

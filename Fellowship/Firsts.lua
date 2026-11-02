@@ -59,10 +59,32 @@ function FS:Count(kind)
   share()
 end
 
+-- How many runs the History holds with this Adventurer in them (all there was to go by before each counted their own).
+function FS:HistoryRuns(f, name)
+  local n = 0
+  for _, e in ipairs(f.history or {}) do
+    if e.type == "run" and type(e.names) == "table" then
+      for _, x in ipairs(e.names) do if x == name then n = n + 1; break end end
+    end
+  end
+  return n
+end
+
+-- I was in a dungeon run new to this addon (Fellowship/Clears.lua). Counted here like falls and quests, so every copy
+-- shows the same count: the History keeps only its newest entries, and a copy passed on carries fewer. The first count
+-- starts from what my History holds.
+function FS:CountRun(f)
+  if f ~= F:Current() then return end
+  local t = ns.char.tally
+  if type(t) ~= "table" or t.fid ~= f.id then t = { fid = f.id }; ns.char.tally = t end
+  if t.runs == nil then t.runs = self:HistoryRuns(f, ns.Me()) end
+  self:Count("runs")
+end
+
 -- What goes with my state: my deeds, and my tallies in this fellowship.
 function FS:State()
   local f, t = F:Current(), ns.char and ns.char.tally
-  local tally = (f and type(t) == "table" and t.fid == f.id) and { falls = t.falls, quests = t.quests } or nil
+  local tally = (f and type(t) == "table" and t.fid == f.id) and { falls = t.falls, quests = t.quests, runs = t.runs } or nil
   local deeds = {}
   for k, v in pairs(self:Mine()) do if KNOWN[k] then deeds[k] = v end end -- (not the fellowship's id)
   return deeds, tally
@@ -122,19 +144,14 @@ end
 
 -- The tallies: for each kind the Adventurer with the most (more than none), { kind, name, n, top, all }: top the
 -- first three (the Chronicle's podium), all everyone with a count, most first (its tooltip). Ties go to the name first
--- in the alphabet. Dungeon runs come from the journey's History, the others from what each Adventurer shares.
+-- in the alphabet. Each Adventurer counts their own (dungeon runs from the History for an addon that sends none).
 function FS:Tallies(f)
   local counts = { falls = {}, runs = {}, quests = {} }
   for name in pairs(f.members) do
     local h = f.heroes and f.heroes[name]
     local t = h and type(h.tally) == "table" and h.tally or {}
     counts.falls[name], counts.quests[name] = tonumber(t.falls) or 0, tonumber(t.quests) or 0
-    counts.runs[name] = 0
-  end
-  for _, e in ipairs(f.history or {}) do
-    if e.type == "run" and type(e.names) == "table" then
-      for _, n in ipairs(e.names) do if counts.runs[n] then counts.runs[n] = counts.runs[n] + 1 end end
-    end
+    counts.runs[name] = tonumber(t.runs) or self:HistoryRuns(f, name)
   end
   local out = {}
   for _, kind in ipairs(self.TALLIES) do

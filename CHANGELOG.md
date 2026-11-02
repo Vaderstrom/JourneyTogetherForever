@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.13.0 beta (2 November 2026)
+- One truth for the whole fellowship: Adventurers who play alone or at other times now always come to the same
+  fellowship when they meet, and with several online every change shows on every screen at once.
+- After a takeover, the old Leader's copy and the new one no longer refuse each other: everyone gets one Leader, and a
+  change the old Leader made while still leading is kept (one made after it is refused, and they are told).
+- A takeover, a vote passing and a newcomer catching up are judged as the Adventurer who made them saw it, so every
+  copy decides the same way.
+- Online together, a change or a kill lost on the way is found with the next state (within minutes), not at the next
+  login; two Adventurers changing something at the same moment agree at once when the Leader is offline.
+- Firsts, tallies and quests reach Adventurers who never play at the same time, passed on by the others like levels
+  and gear.
+- A chapter unlocked or a Hero over the cap is one line in History, not one for each copy that noticed it.
+- The dungeon runs tally is each Adventurer's own count, like falls and quests, so every book shows the same number
+  (it was counted from each book's History, which keeps only the newest lines).
+- One dungeon run seen by two Adventurers who did not hear each other is one History line with everyone in it.
+- Tournament online minutes reach whoever closes the round, also through other Adventurers.
+- The tracker now sits under the game's quest tracker, as one more section under the game's quest list, with the
+  game's own header, fold button and fonts. It moves with the list, also in Edit Mode, and folds away when you fold
+  the game's tracker. The game's tracker itself is not changed, so its quest item buttons keep working in combat.
+  Settings → Tracker on the screen → **Under the game's quest tracker** turns it off for the panel you drag.
+- The tracker's text is easier to read over the world: the chapter's status in bright colours (no dark blue), and
+  white lines with a solid shadow under the game's quest tracker.
+
 ## 0.12.1 beta (1 November 2026)
 - `/jtf news` typed during combat opens the book and shows What's New once combat ends (it showed nothing).
 - With Hardcore Fellowship and Shared lives both on, a fall that ends a journey and spends the last shared life now

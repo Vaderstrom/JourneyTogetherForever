@@ -260,7 +260,11 @@ function C:CheckChapter(f)
   if last and cur > last then
     for n = last + 1, cur do
       local ch = f.journey.chapters[n]
-      if ch then self:Log(f, { type = "chapter", icon = "chapter", ch = n, text = L.H_CHAPTER:format(ns.Journey.Roman(n), ch.name) }) end
+      -- (Every copy notices it at its own moment: the same id on all, so a copy taken later keeps one line.)
+      if ch then
+        self:Log(f, { type = "chapter", icon = "chapter", ch = n, id = "chapter:" .. n .. ":" .. (f.reopenV or 0),
+          text = L.H_CHAPTER:format(ns.Journey.Roman(n), ch.name) })
+      end
     end
   end
   f.lastChapter = cur
@@ -321,7 +325,12 @@ function C:Record(f, key, t, names, tok)
       if h.type == "run" and h.key == key and t > h.time - self.SAME_RUN and t < (h.last or h.time) + self.SAME_RUN then e = h; break end
     end
     if not e then e = self:Log(f, { type = "run", icon = "run", key = key, time = t, names = {}, killed = {}, cleared = {}, of = F:Count(f) }) end
-    for _, n in ipairs(names) do if not has(e.names, n) then e.names[#e.names + 1] = n end end
+    for _, n in ipairs(names) do
+      if not has(e.names, n) then
+        if n == ns.Me() and ns.Firsts then ns.Firsts:CountRun(f) end -- (my dungeon-runs tally, before I am in it)
+        e.names[#e.names + 1] = n
+      end
+    end
     for _, n in ipairs(newly) do if not has(e.cleared, n) then e.cleared[#e.cleared + 1] = n end end
     table.sort(e.names); table.sort(e.cleared)
     e.killed[tok] = true
@@ -335,6 +344,21 @@ function C:Record(f, key, t, names, tok)
     elseif not e.ok then e.ok, e.reason = false, (not open) and "locked" or "few" end
   end
   return e, newly, not was and J:Cleared(f, key)
+end
+
+-- One run seen by two copies (each heard other kills of it): the same entry on both, with everything either saw.
+function C:JoinRun(h, e)
+  for _, field in ipairs({ "names", "cleared" }) do
+    h[field] = h[field] or {}
+    for _, n in ipairs(type(e[field]) == "table" and e[field] or {}) do if not has(h[field], n) then h[field][#h[field] + 1] = n end end
+    table.sort(h[field])
+  end
+  h.killed = h.killed or {}
+  for tok in pairs(type(e.killed) == "table" and e.killed or {}) do h.killed[tok] = true end
+  h.last = math.max(h.last or h.time, tonumber(e.last) or tonumber(e.time) or 0)
+  h.time = math.min(h.time, tonumber(e.time) or h.time)
+  h.bossesKilled = math.max(h.bossesKilled or 0, tonumber(e.bossesKilled) or 0)
+  if e.ok then h.ok, h.reason = true, nil end
 end
 
 -- A copy from another Hero replaces ours: keep the kills and runs we heard of that the copy does not have yet.
@@ -365,11 +389,11 @@ function C:Merge(into, from)
   end
   for _, e in ipairs(from.history or {}) do
     if e.type == "run" and ns.Endgame:Tracked(into, e.key) then
-      local found = false
+      local found
       for _, h in ipairs(into.history) do
-        if h.type == "run" and h.key == e.key and e.time < (h.last or h.time) + self.SAME_RUN and (e.last or e.time) > h.time - self.SAME_RUN then found = true; break end
+        if h.type == "run" and h.key == e.key and e.time < (h.last or h.time) + self.SAME_RUN and (e.last or e.time) > h.time - self.SAME_RUN then found = h; break end
       end
-      if not found then self:Log(into, e) end
+      if found then self:JoinRun(found, e) else self:Log(into, e) end
     end
   end
 end
@@ -398,6 +422,22 @@ function C:Digest(f) return hash(ns.Serialize.Encode(self:KeyDigests(f))) end
 function C:Compare(f, to, theirs)
   if not theirs or theirs == self:Digest(f) then return end
   Comm:Send(to, "KILLD", { fid = f.id, d = self:KeyDigests(f) })
+end
+
+-- The same with every state while both are online (a kill report lost on the way): at most once a minute for each
+-- Adventurer, and the same difference only once in half an hour.
+C.comparedAt, C.fixed = {}, {}
+function C:CompareSoon(f, to, theirs)
+  if not theirs then return end
+  local now = GetTime()
+  if self.comparedAt[to] and now - self.comparedAt[to] < 60 then return end
+  local mine = self:Digest(f)
+  if theirs == mine then return end
+  local key = tostring(theirs) .. ":" .. mine
+  local last = self.fixed[to]
+  if last and last.key == key and now - last.at < 1800 then return end
+  self.comparedAt[to], self.fixed[to] = now, { key = key, at = now }
+  self:Compare(f, to, theirs)
 end
 
 local function memberOf(sender, d)
@@ -543,7 +583,9 @@ function C:ApplyOp(f, op, by, t)
   local was = J:Cleared(f, key)
   local d, who = dname(key), ns.Short(by)
   -- The leader undoing a clear an earlier chapter needs takes the fellowship back to that chapter.
-  local back = by == f.leader and op.k ~= "clear" and not op.on and J:ReopensChapter(f, key)
+  -- (Whether it takes the fellowship back is the leader's addon's answer, carried in the change: F.Claim.)
+  local back = ns.Permissions.Rank(f, by) == "leader" and op.k ~= "clear" and not op.on
+    and F.Claim(op, "back", function() return J:ReopensChapter(f, key) or false end)
   f.undone[key] = f.undone[key] or {}
   if op.k == "clear" then
     local runs = f.runs[key] or {}
