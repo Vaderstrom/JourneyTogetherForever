@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.13.1 beta (3 November 2026)
+- Game data from WoW Forever 1.60.1.70753: City of Dalaran and Ruins of Lordaeron list their bosses in the
+  game's new order, so the picture moment comes after the real last boss (Shade of the Archmage, Rath'mael).
+
 ## 0.13.0 beta (2 November 2026)
 - One truth for the whole fellowship: Adventurers who play alone or at other times now always come to the same
   fellowship when they meet, and with several online every change shows on every screen at once.

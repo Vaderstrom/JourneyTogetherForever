@@ -7,7 +7,7 @@
 --     "d" or "r", best level from, to, a raid's players (0: not given), picture file, the bosses of a wing... }.
 local _, ns = ...
 ns.ENCOUNTERS = {
-  wowf = { build = "1.60.1.70685",
+  wowf = { build = "1.60.1.70753",
   finder = {
     [1] = "Wailing Caverns",
     [2] = "Scholomance",
@@ -72,12 +72,12 @@ ns.ENCOUNTERS = {
     [2784] = { "Demon Fall Canyon", { 3023, "Grimroot" }, { 3028, "Destructor's Wraith" }, { 3029, "Zilbagob" }, { 3030, "Pyranis" }, { 3024, "Diathorus the Seeker" }, { 3031, "Hellscream's Phantom" }, { 3080, "Azgaloth" } },
     [2875] = { "Karazhan Crypts", { 3141, "Harbinger of Sin" }, { 3146, "Creeping Malison" }, { 3144, "Three Little Wolves" }, { 3145, "Dark Rider" }, { 3143, "Kharon" }, { 3152, "Unk'omon" }, { 3168, "Hans and Greta" }, { 3169, "The Ugly Goblin" }, { 3170, "Kaigy Maryla" }, { 3171, "Sairuh Maryla" }, { 3172, "Barian Maryla" } },
     [2921] = { "Naxxramas", { 3296, "Spirit of Mograine" } },
-    [2959] = { "City of Dalaran", { 3298, "Arcane Anomaly" }, { 3299, "Fel Ancient" }, { 3300, "Mana Devourer" }, { 3301, "Mana Elemental" }, { 3302, "Unstable Sentinel" }, { 3303, "Shade of the Archmage" }, { 3310, "Lyn the Ignored" }, { 3311, "Atrexis the Grave Knight" }, { 3312, "Mana Wraith" } },
+    [2959] = { "City of Dalaran", { 3298, "Arcane Anomaly" }, { 3299, "Fel Ancient" }, { 3300, "Mana Devourer" }, { 3301, "Mana Elemental" }, { 3302, "Unstable Sentinel" }, { 3310, "Lyn the Ignored" }, { 3311, "Atrexis the Grave Knight" }, { 3312, "Mana Wraith" }, { 3303, "Shade of the Archmage" } },
     [2998] = { "Excavation Site: Wetlands", { 3480, "Saltspine" }, { 3481, "Shadetooth" }, { 3644, "Highland Horror" }, { 3482, "Relic Guardian" } },
-    [2999] = { "Ruins of Lordaeron", { 3353, "Witherfang" }, { 3357, "The Abandoned" }, { 3355, "The Butcher" }, { 3354, "Rath'mael" }, { 3408, "Lordaeron Captain" }, { 3411, "Viktor the Vile" }, { 3412, "Bjork" } },
+    [2999] = { "Ruins of Lordaeron", { 3353, "Witherfang" }, { 3357, "The Abandoned" }, { 3355, "The Butcher" }, { 3408, "Lordaeron Captain" }, { 3411, "Viktor the Vile" }, { 3412, "Bjork" }, { 3354, "Rath'mael" } },
     [3065] = { "The Hall of Thanes", { 3493, "Faldrim Anvilmar" }, { 3495, "Infurnus" }, { 3494, "Plunder" }, { 3496, "Durgen Dirgehammer" } },
   } },
-  wow = { build = "12.1.5.70575",
+  wow = { build = "12.1.5.70688",
   guide = {
     { 63, 36, "Deadmines", 0, "d", 7, 30, 0, 522352 },
     { 64, 33, "Shadowfang Keep", 0, "d", 8, 30, 0, 522358 },
