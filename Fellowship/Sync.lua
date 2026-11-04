@@ -26,6 +26,7 @@ ns.Sync = S
 S.RECEIPT_WAIT = 6  -- seconds to wait for the invited player's receipt
 S.ACCEPT_WAIT = 10  -- seconds to wait for each Adventurer's addon after Accept
 S.EXPIRE = 86400    -- an invite not answered within a day is removed
+S.DEC_WAIT = 15     -- a decline: how long each Adventurer after the first in turn waits before removing the invite
 S.DELIVER_EVERY = 300 -- seconds between the courier's tries to deliver an open invite
 S.WHO_MAX = 8       -- Adventurers an invite names to take the answer
 
@@ -407,7 +408,13 @@ Comm:On("ACCX", function(sender, d)
   if p and p.from == sender then
     -- Not open in their copy (cancelled, or they have not heard of it yet): the next Adventurer in turn, while there is
     -- one (F:AcceptNext tells the player when every one said so). A challenge's refusal is final.
-    if not d.no then p.closed = sender; F:AcceptNext(d.fid) return end
+    -- Only the inviter's word closes it: another Adventurer's copy may not have the invite yet, and when the rest are
+    -- offline the invite stays open to try later (code review of 1.0.0).
+    if not d.no then
+      if sender == p.list[1] then p.closed = sender end
+      F:AcceptNext(d.fid)
+      return
+    end
     F.pendingJoin[d.fid] = nil
     ns.char.invites[d.fid] = nil
     F:Changed()
@@ -421,8 +428,14 @@ end)
 Comm:On("DEC", function(sender, d)
   local f = F:Current()
   if type(d) ~= "table" or not f or f.id ~= d.fid or not f.invites[sender] then return end
-  -- (Any Adventurer who may take the answer removes it: the player said no.)
-  F:Do({ k = "uninvite", name = sender, declined = true })
+  -- (Any Adventurer who may take the answer removes it: the player said no. The first in turn at once, the next ones
+  -- after DEC_WAIT seconds each, if nobody before them has; an older addon sends no turn: at once.)
+  local function take()
+    local g = F:Current()
+    if g and g.id == d.fid and g.invites[sender] then F:Do({ k = "uninvite", name = sender, declined = true }) end
+  end
+  local i = math.floor(tonumber(d.i) or 1)
+  if i <= 1 then take() else C_Timer.After(math.min(i - 1, 5) * S.DEC_WAIT, take) end
 end)
 
 Comm:On("OP", function(sender, d)

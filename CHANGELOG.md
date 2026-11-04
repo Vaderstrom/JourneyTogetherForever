@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.0.1 (4 November 2026)
+- Lord of the Rings: a fellowship whose Ring-bearer left before 1.0 no longer shows "Something does not match" every
+  day. The Leader's addon passes the Ring to the next in line, as it now does when a bearer leaves.
+- Declining an invite while several Adventurers are online is taken once. Each of their addons used to remove it at
+  the same moment, which slowed syncing for everyone.
+- Accepting an invite: an Adventurer whose addon has not heard of it yet no longer makes it look closed. With nobody
+  else online, it stays open to try again later.
+- The "Something does not match" report names every Adventurer a problem is about, not only one.
+
 ## 1.0.0 (4 November 2026)
 - WoW Forever is here: version 1.0 is made for it. The addon no longer lists the retail client (Midnight) as a game it
   runs on.

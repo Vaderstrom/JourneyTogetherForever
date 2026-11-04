@@ -80,6 +80,8 @@ function Cf:SeqHash(f)
 end
 
 -- What every state carries (Fellowship/Hero.lua).
+-- (Made afresh for every state, once a minute: a kept one would hide a copy whose parts changed without a change,
+-- the very fault this looks for; code review of 1.0.0.)
 function Cf:Prints(f)
   return { ph = hash(self:Parts(f)), dp = self:DungeonHash(f), fs = self:FirstsHash(f), sh = self:SeqHash(f) }
 end
@@ -161,21 +163,43 @@ function Cf:Issues(f)
   for name, m in pairs(f.members) do
     if not F.ROLES[m.role] then out[#out + 1] = { part = "role", who = name } end
   end
-  -- (The Ring passes on when its bearer goes: Challenges:PassRing.)
+  -- (The Ring passes on when its bearer goes: Challenges:PassRing. One that never passed went with a bearer who left
+  -- before that existed: the Leader's addon passes it, Cf:Check.)
   local r = f.ring
-  if r and not r.state and not f.members[r.who] then out[#out + 1] = { part = "ring", who = r.who } end
+  if r and not r.state and not f.members[r.who] and r.passes then out[#out + 1] = { part = "ring", who = r.who } end
   table.sort(out, function(a, b) if a.part ~= b.part then return a.part < b.part end return a.who < b.who end)
   return out
 end
 
+-- A Ring left with a bearer who went before it could pass on (an addon before 1.0): whose it is, or nil.
+function Cf:LeftRing(f)
+  local r = f and f.ring
+  if r and not r.state and not r.passes and type(r.who) == "string" and not f.members[r.who] then return r.who end
+end
+
 function Cf:Check(f)
   if not f or f.disbanded or not f.members[ns.Me()] then return nil end
+  -- The Leader's addon passes such a Ring on (op "ringpass"), once this change is done.
+  if self:LeftRing(f) and f.leader == ns.Me() and not self.passing then
+    self.passing = true
+    C_Timer.After(1, function()
+      Cf.passing = nil
+      local g = F:Current()
+      local who = Cf:LeftRing(g)
+      if who and g.leader == ns.Me() then F:Do({ k = "ringpass", name = who }) end
+    end)
+  end
   local issues = self:Issues(f)
   if #issues == 0 then return nil end
   local parts, details = {}, {}
   for _, x in ipairs(issues) do
-    if not details[x.part] then parts[#parts + 1] = x.part end
-    details[x.part] = { who = x.who }
+    local d = details[x.part]
+    if not d then
+      parts[#parts + 1] = x.part
+      details[x.part] = { who = x.who, all = { x.who } }
+    else
+      d.all[#d.all + 1] = x.who
+    end
   end
   return self:Found(f, "impossible", nil, parts, details)
 end
@@ -202,6 +226,17 @@ function Cf:Found(f, kind, with, parts, details)
   return c
 end
 
+-- Who an issue names: "Ghost", or "Ghost, Bob" when it names several.
+function Cf.Who(d)
+  if type(d) ~= "table" then return "?" end
+  if type(d.all) == "table" and #d.all > 1 then
+    local names = {}
+    for i, who in ipairs(d.all) do names[i] = ns.Short(who) end
+    return table.concat(names, ", ")
+  end
+  return ns.Short(d.who or "?")
+end
+
 -- A part's name in a sentence ("the One Ring").
 function Cf.PartName(part) return L["CONFLICT_PART_" .. part:upper()] or part end
 
@@ -216,7 +251,7 @@ function Cf:Names(c)
   local out = {}
   for _, part in ipairs(c.parts) do
     local d = c.details[part]
-    local text = c.kind == "impossible" and (L["CONFLICT_ISSUE_" .. part:upper()] or part):format(ns.Short(d and d.who or "?"))
+    local text = c.kind == "impossible" and (L["CONFLICT_ISSUE_" .. part:upper()] or part):format(self.Who(d))
       or self.PartName(part)
     out[#out + 1] = { part = part, text = text }
   end
@@ -258,7 +293,7 @@ function Cf:Report(c)
   for _, part in ipairs(c.parts) do
     local d, line = c.details[part], "- " .. part
     if d and d.here then line = line .. (" (here: %s, theirs: %s)"):format(d.here, tostring(d.theirs))
-    elseif d and d.who then line = line .. (" (%s)"):format(ns.Short(d.who)) end
+    elseif d and d.who then line = line .. (" (%s)"):format(self.Who(d)) end
     lines[#lines + 1] = line
   end
   return table.concat(lines, "\n")

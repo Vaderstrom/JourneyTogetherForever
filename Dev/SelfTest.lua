@@ -3236,6 +3236,22 @@ step("sync: a copy that disagrees about the One Ring opens the report window", f
   if o then o:Hide() end
 end)
 
+-- The code review of 1.0.0 (4 Nov 2026): a Ring left with a bearer who went before it could pass on, an issue that
+-- names several Adventurers, a decline taken in turn.
+step("sync: the 1.0 review's fixes (a left Ring, every name, a decline in turn)", function(c)
+  local f, Cf = cur(), ns.Conflicts
+  local copy = ns.Serialize.Decode(ns.Serialize.Encode(f))
+  copy.ring = { who = "Ghost-Nowhere", t = time() }
+  c:Eq(Cf:LeftRing(copy), "Ghost-Nowhere", "a Ring that never passed, its bearer gone: the Leader passes it")
+  local found = false
+  for _, x in ipairs(Cf:Issues(copy)) do if x.part == "ring" then found = true end end
+  c:That(not found, "and it is not reported")
+  copy.ring.passes = { { from = ns.Me(), to = "Ghost-Nowhere", t = time() } }
+  c:Eq(Cf:LeftRing(copy), nil, "one that passed before is a fault")
+  c:Eq(Cf.Who({ who = "Ghost-Nowhere", all = { "Ghost-Nowhere", "Wisp-Nowhere" } }), "Ghost, Wisp", "an issue names everyone")
+  c:That((tonumber(ns.Sync.DEC_WAIT) or 0) > 0, "a decline: the next in turn waits before taking it")
+end)
+
 -- The code review of 0.13.0 (2 Nov 2026): what it left open.
 step("sync: a change carries the game's server time", function(c)
   local l, st = ns.db.oplog and ns.db.oplog[cur().id] or {}, nil

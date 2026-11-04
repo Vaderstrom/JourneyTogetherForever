@@ -371,6 +371,12 @@ function F:ApplyChange(f, op, by, t)
     if f.heroes then f.heroes[by] = nil end
     self:Log(f, L.CHR_SWAP:format(ns.Short(by), ns.Short(n)), t, f.leader == n and "swapleader" or "swap", n)
     ns.Challenges:PassRing(f, by, t, n)
+  elseif k == "ringpass" then
+    -- A Ring-bearer who left before the Ring could pass on (an addon before 1.0) still holds it: the Leader's addon
+    -- passes it now, as it would have then (Conflicts:Check; code review of 1.0.0).
+    local r = f.ring
+    if by ~= f.leader or type(n) ~= "string" or f.members[n] or not r or r.state or r.who ~= n then return false end
+    ns.Challenges:PassRing(f, n, t)
   elseif k == "tourney" then
     -- The Guild Master tournament: start, sign up, a duel won, sign-up or a round over (Fellowship/Tourney.lua).
     if not P.Rank(f, by) or self:IsFriend(f, by) or not ns.Tourney:Apply(f, op, by, t) then return false end
@@ -579,7 +585,9 @@ function F:DeclineInvite(fid)
   local inv = ns.char.invites[fid]
   if not inv then return end
   -- (To everyone who may take it: whoever is online removes it for all.)
-  for _, n in ipairs(self:InviteAnswerers(inv)) do ns.Comm:Send(n, "DEC", { fid = fid }) end
+  -- (i: their place in turn. The first removes it at once; the others wait and remove it only if it is still open, so
+  -- two Adventurers online do not make the same change at once; code review of 1.0.0.)
+  for i, n in ipairs(self:InviteAnswerers(inv)) do ns.Comm:Send(n, "DEC", { fid = fid, i = i }) end
   -- Remembered for a day: the courier may send it again before it hears the answer.
   ns.char.declined = type(ns.char.declined) == "table" and ns.char.declined or {}
   for id, t in pairs(ns.char.declined) do if time() - (tonumber(t) or 0) > ns.Sync.EXPIRE then ns.char.declined[id] = nil end end
