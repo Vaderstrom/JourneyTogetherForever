@@ -129,11 +129,14 @@ local function build(pf)
     r:SetSize(width, 32)
     r.name = UI.Text(r, 14, "ink")
     r.name:SetPoint("LEFT")
-    r.wait = UI.Text(r, 12, "ink2")
-    r.wait:SetPoint("LEFT", r.name, "RIGHT", 6, 0)
-    r.wait:SetText(L.WAITING_ANSWER)
     r.cancel = UI.TextButton(r, L.CANCEL, function() F:CancelInvite(r.who) end, "plain", 12)
     r.cancel:SetPoint("RIGHT")
+    -- Wraps before Cancel ("· 23 hours left" ran under it; the check of 4 Nov 2026, 20:33).
+    r.wait = UI.Text(r, 12, "ink2")
+    r.wait:SetPoint("LEFT", r.name, "RIGHT", 6, 0)
+    r.wait:SetPoint("RIGHT", r.cancel, "LEFT", -8, 0)
+    r.wait:SetWordWrap(true); r.wait:SetJustifyH("LEFT")
+    r.wait:SetText(L.WAITING_ANSWER)
     return r
   end)
   pf.noInvites = UI.Text(R1, 12, "ink2")
@@ -220,16 +223,19 @@ local function refresh(pf, ctx)
     n = i
     r.who = name
     r.name:SetText(ns.Short(name) .. (f.inviteFriend and f.inviteFriend[name] and L.INV_AS_FRIEND or ""))
-    -- What this client knows about the invite it sent: sending, or received by their addon. (Offline or no answer
-    -- removes the invite and says so.)
+    -- What this client knows about the invite it sent: sending, offline (it waits), or received by their addon. (No
+    -- answer from an addon that got it removes the invite and says so.)
     local st = ns.Sync:InviteStatus(name)
     local text, color = L.WAITING_ANSWER, "ink2"
     if st == "received" then text, color = L.INV_RECEIVED, "3E7A3A"
+    elseif st == "offline" then text = ns.Sync:OfflineText(f, name)
     elseif st == "sending" then text = L.INV_SENDING end
     r.wait:SetText(text)
     r.wait:SetTextColor(Theme:RGBA(color))
     r.cancel:SetShown(P.Can(f, me, "uninvite", name))
-    t:Place(r, 32, 2)
+    local h = math.max(32, math.ceil(r.wait:GetStringHeight() or 0) + 12)
+    r:SetHeight(h)
+    t:Place(r, h, 2)
   end
   pf.invites:HideFrom(n + 1)
   pf.noInvites:SetShown(#names == 0)

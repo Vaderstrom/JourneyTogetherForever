@@ -272,8 +272,9 @@ end
 --     levels, pictures and bosses, and its expansion (ns.EXPANSION: the journey editor's shelf groups by it).
 -- The lists above are the whole catalog, kept in ns.ALL_*; ns.KeepThisGame (when the addon loads) puts this game's in
 -- ns.DUNGEONS, ns.RAIDS, ns.DUNGEON_MAPS and ns.DUNGEON_SCREEN, so the pages, the editor's shelf, Gatherings, clear
--- detection and the Endgame follow. The presets plan with the catalog (ns.PLAN_DUNGEONS: its levels and chapters), so
--- they stay the Classic ones in both games, with every Classic dungeon the game offers: on retail also its own Scarlet
+-- detection and the Endgame follow. The presets plan with the catalog's levels and chapters (ns.PLAN_DUNGEONS), so
+-- they stay the Classic ones in both games, with every dungeon the game offers (in WoW Forever only what Blizzard has
+-- announced: the owner, 4 Nov 2026): on retail also its own Scarlet
 -- Halls, Scarlet Monastery and Stratholme Service Entrance (ns.GUIDE_PLAN). A journey keeps the placement of a dungeon
 -- this game lacks; ns.Dungeon knows it not, so the pages skip it until the game has it.
 ns.ALL_DUNGEONS, ns.ALL_RAIDS = ns.DUNGEONS, ns.RAIDS
@@ -309,6 +310,7 @@ end
 -- new dungeons), "World of Warcraft: Forever Raid Overview" ("Barrow Deeps, Hyjal Summit, and Onyxia's Lair unlock on
 -- December 9"; no hour, so midnight Pacific); the Classic dungeons, which the game's data has with their bosses, as
 -- the guides list them. The daily routine reads Blizzard's news for more (docs/GAME-UPDATES.md, tools/forever-news.txt).
+-- The same list, for people: docs/FOREVER-CONTENT.md (change both together; tests/test_games.lua compares them).
 local DEC_9 = 1796803200 -- 9 December 2026, 00:00 PST
 ns.FOREVER_SCHEDULE = {
   rfc = true, dm = true, wc = true, sfk = true, bfd = true, stocks = true, rfk = true, gnomer = true, smgy = true,
@@ -415,7 +417,7 @@ function ns.KeepThisGame()
       return out
     end
     ns.DUNGEONS, ns.RAIDS = keep(ns.ALL_DUNGEONS), keep(ns.ALL_RAIDS)
-    ns.DUNGEON_MAPS, ns.DUNGEON_SCREEN, ns.PLAN_DUNGEONS = ns.ALL_DUNGEON_MAPS, ns.ALL_DUNGEON_SCREEN, ns.ALL_DUNGEONS
+    ns.DUNGEON_MAPS, ns.DUNGEON_SCREEN, ns.PLAN_DUNGEONS = ns.ALL_DUNGEON_MAPS, ns.ALL_DUNGEON_SCREEN, ns.DUNGEONS
     ns.EXPANSION, ns.GUIDE_ART = {}, {}
   end
   local forever = ns.IsForever()

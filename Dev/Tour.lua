@@ -442,6 +442,17 @@ prep(function() dev("hero Elyra friend off"); pf("heroes").sel = nil end)
 shot("manage", "Manage: Adventurers", "Needs attention, every Adventurer with a menu, invites", function()
   pf("heroes").sel = nil; dev("hero Corwin level 18"); page("manage")
 end)
+-- U51: an invite to someone offline, sent an hour ago (written straight into this copy: no whisper goes out).
+shot("manage-invite-offline", "Manage: an invite waiting for someone offline", "Jtfnobodyhere: offline: it reaches them when they log in · 23 hours left", function()
+  local name = full("Jtfnobodyhere")
+  cur().invites[name] = time() - 3600
+  ns.Sync.sent[name] = { offline = true }
+  page("manage")
+end)
+prep(function()
+  local name = full("Jtfnobodyhere")
+  cur().invites[name] = nil; ns.Sync.sent[name] = nil
+end)
 shot("manage-fellowship", "Manage: The fellowship", "Name, banner colour, every emblem; your banner as the others see it; Leave (hands over)", function()
   page("managefellowship")
 end)
@@ -491,12 +502,22 @@ prep(function()
   dev("hero Brannic break potion")
   dev("hero Brannic ring")
 end)
-shot("heroes-broken", "Adventurers (broken challenges, the Ring)", "Brannic's card: Ring-bearer · Broke 2 challenges after his roles", function()
+shot("heroes-broken", "Adventurers (broken challenges, the Ring)", "Brannic's card: the Ring in a gold ring on his portrait's corner (U50); Broke 2 challenges after his roles, no Ring-bearer there", function()
   pf("heroes").sel = nil; page("heroes"); top(pf("heroes").scroll)
 end)
 shot("chronicle-broken", "Chronicle (broken rules, the Ring)", "Brannic took a flight path, breaking Walk everywhere; used a potion, breaking Ironman Fellowship; found the Ring", function() chronicle("all") end)
 shot("rules-challenges-more", "Rules (the challenges, X3-X5)", "The article: a block for each challenge with its icon; Broken by Brannic in red under Walk everywhere and Ironman Fellowship, who carries the Ring, Race to 60's clock, each on its own line. The tiles: Race clock, Ring-bearer Brannic, Rules broken 2", function()
   page("rules"); bottom(pf("rules").lscroll); bottom(pf("rules").rscroll)
+end)
+-- U49: the Ring went from Brannic to Corwin (written straight into this copy; the prep after puts it back).
+shot("rules-ring-road", "Rules (the Ring's road)", "Under Lord of the Rings: The Ring's road: Brannic, then Corwin; the rule ends with how the Ring passes on (U53)", function()
+  local r = cur().ring
+  if r then
+    r.first = { who = r.who, item = r.item }
+    r.passes = { { from = r.who, to = full("Corwin"), t = time() } }
+    r.who, r.guid = full("Corwin"), nil
+  end
+  page("rules"); bottom(pf("rules").lscroll)
 end)
 shot("manage-rules-ironman", "Manage: Rules (Ironman Fellowship)", "Hardcore Fellowship and White gear only: Held by Ironman Fellowship instead of Turn off", function()
   page("rulesadmin"); top(pf("rulesadmin").lscroll)
@@ -725,6 +746,11 @@ shot("toast-long", "Toast: a long text", "Wraps to more lines; the banner grows"
 shot("toast-attune", "Toast: an attunement opens", "At the level where it can be started, with the raid's picture (U8)",
   toast("attune", L.TOAST_ATTUNE_TITLE:format("Molten Core"), L.TOAST_ATTUNE_RAID, { dungeon = function() return first(ns.RAIDS, "mc") end }), { toast = true })
 shot("toast-first", "Toast: a fellowship first", "\"Brannic is the first to ride a mount.\"", toast("first", L.T_FIRST:format("Brannic"), L.FIRST_MOUNT:format("Brannic")), { toast = true })
+shot("toast-ring-passed", "Toast: the Ring passes on", "Brannic left: the Ring passes to Corwin, in the big moments' gold frame at the normal size, with a soft chime (U52)", function()
+  ns.Toasts:StopMove(); W():Close()
+  ns.Toasts:Push("challenge", L.T_RING_PASSED, L.CH_RING_PASSED:format("Brannic", "Corwin"), nil,
+    ns.Challenges:ToastOf("ring", { framed = true, sound = "ring" }))
+end, { toast = true })
 shot("toast-fallen", "Toast: an Adventurer has fallen", "Hardcore: Brannic has fallen, his level, the place and the foe; honoured in the Chronicle", function()
   ns.Toasts:StopMove(); W():Close()
   local e = { who = full("Brannic"), t = time(), lvl = ns.Hero:Level(cur(), full("Brannic")) or 22, zone = GetZoneText and GetZoneText() or nil, foe = L.DEV_FOE, fatal = true, left = 0 }
@@ -847,6 +873,14 @@ prep(function() ns.Dev.pretendTrial = false; W():Refresh() end)
 shot("sync-restore", "Restore a lost fellowship", "The question after the saved data was lost and an Adventurer still lists you", function()
   local f = cur()
   W():Confirm(L.RESTORE_Q:format("Brannic", f and f.name or TR.look.name), L.RESTORE_OK, function() end)
+end)
+prep(function() hideOverlays() end)
+-- Conflicts (3 Nov 2026): what was found, the report to copy and where to post it.
+shot("sync-conflict", "Something does not match", "Two copies named other Ring-bearers: the report window; what differs one line each with its icon (U54): the One Ring, the votes", function()
+  local f = cur()
+  ns.ConflictWindow:Open({ t = time(), kind = "disagree", with = full("Brannic"), parts = { "ring", "votes" },
+    details = { ring = { here = ns.Short(ns.Me()), theirs = "Brannic" } }, fid = f and f.id, name = f and f.name or TR.look.name,
+    v = f and f.v or 1, ver = ns.VERSION, game = ns.Game() })
 end)
 prep(function() hideOverlays() end)
 

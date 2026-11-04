@@ -300,6 +300,7 @@ end
 -- Returns the history entry (nil when the boss is not needed), the Heroes who cleared it now, and true when the
 -- dungeon became cleared for the fellowship.
 function C:Record(f, key, t, names, tok)
+  if ns.Firsts then ns.Firsts:RunsSeen(f) end -- (my dungeon-runs tally, before I am in this one)
   local was = J:Cleared(f, key)
   local needed = self:Needed(f, key)
   local open = J:Open(f, key)
@@ -325,12 +326,7 @@ function C:Record(f, key, t, names, tok)
       if h.type == "run" and h.key == key and t > h.time - self.SAME_RUN and t < (h.last or h.time) + self.SAME_RUN then e = h; break end
     end
     if not e then e = self:Log(f, { type = "run", icon = "run", key = key, time = t, names = {}, killed = {}, cleared = {}, of = F:Count(f) }) end
-    for _, n in ipairs(names) do
-      if not has(e.names, n) then
-        if n == ns.Me() and ns.Firsts then ns.Firsts:CountRun(f) end -- (my dungeon-runs tally, before I am in it)
-        e.names[#e.names + 1] = n
-      end
-    end
+    for _, n in ipairs(names) do if not has(e.names, n) then e.names[#e.names + 1] = n end end
     for _, n in ipairs(newly) do if not has(e.cleared, n) then e.cleared[#e.cleared + 1] = n end end
     table.sort(e.names); table.sort(e.cleared)
     e.killed[tok] = true
@@ -342,6 +338,7 @@ function C:Record(f, key, t, names, tok)
     e.bossesKilled, e.bossesOf = count, #needed
     if ok then e.ok, e.reason = true, nil
     elseif not e.ok then e.ok, e.reason = false, (not open) and "locked" or "few" end
+    if ns.Firsts then ns.Firsts:CountRuns(f) end
   end
   return e, newly, not was and J:Cleared(f, key)
 end
@@ -425,18 +422,12 @@ function C:Compare(f, to, theirs)
 end
 
 -- The same with every state while both are online (a kill report lost on the way): at most once a minute for each
--- Adventurer, and the same difference only once in half an hour.
-C.comparedAt, C.fixed = {}, {}
+-- Adventurer, and the same difference only once in half an hour (Sync.Limiter).
+C.compared = ns.Sync.Limiter()
 function C:CompareSoon(f, to, theirs)
-  if not theirs then return end
-  local now = GetTime()
-  if self.comparedAt[to] and now - self.comparedAt[to] < 60 then return end
+  if not theirs or not self.compared:Ready(to) then return end
   local mine = self:Digest(f)
-  if theirs == mine then return end
-  local key = tostring(theirs) .. ":" .. mine
-  local last = self.fixed[to]
-  if last and last.key == key and now - last.at < 1800 then return end
-  self.comparedAt[to], self.fixed[to] = now, { key = key, at = now }
+  if theirs == mine or not self.compared:Take(to, tostring(theirs) .. ":" .. mine) then return end
   self:Compare(f, to, theirs)
 end
 
@@ -487,7 +478,10 @@ Comm:On("KILLS", function(sender, d)
     if type(e) == "table" and e.type == "run" and type(e.key) == "string" and tonumber(e.time) and type(e.names) == "table"
       and type(e.killed) == "table" and type(e.cleared) == "table" then history[#history + 1] = e end
   end
+  -- (A run line with me in it, new here, counts for my runs tally: Firsts:CountRuns.)
+  ns.Firsts:RunsSeen(f)
   C:Merge(f, { kills = kills, history = history })
+  ns.Firsts:CountRuns(f)
   F:Changed()
 end)
 

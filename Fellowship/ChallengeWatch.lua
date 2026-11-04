@@ -279,6 +279,7 @@ end
 
 -- A ring that came into my bags since I last looked, not from a quest, the auction house or the bank: the Ring, if
 -- nobody found one before. As its bearer: the Ring gone from my bags is destroyed inside Blackrock Mountain, or lost.
+-- Passed to me (Challenges:PassRing): a ring I wear or carry becomes the Ring, or the next one I get.
 function CW:CheckRings()
   local now, known = self.Rings(), self.rings
   self.rings = now
@@ -294,6 +295,12 @@ function CW:CheckRings()
         if not known[guid] then return F:Do({ k = "ring", item = x.name, id = x.id, guid = guid }) end
       end
     end
+  elseif r and not r.state and r.who == me() and not r.guid and r.passes then
+    local ids = {}
+    for guid in pairs(now) do ids[#ids + 1] = guid end
+    table.sort(ids)
+    local guid = ids[1]
+    if guid then return F:Do({ k = "ringclaim", item = now[guid].name, id = now[guid].id, guid = guid }) end
   elseif r and not r.state and r.who == me() and r.guid and not now[r.guid] then
     -- (Moved between bags, or from bag to finger: looked at again in a moment.)
     C_Timer.After(self.RING_WAIT, function()
@@ -358,6 +365,15 @@ ns:On("LOGIN", function()
 end)
 ns:On("JOINED", function() C_Timer.After(3, function() CW:CheckAll() end) end)
 ns:On("HEROES", function() CW:CheckRace() end)
+-- The Ring passed to me: a ring I carry becomes it (CW:CheckRings).
+ns:On("CHALLENGES", function()
+  local f = F:Current()
+  local r = f and f.ring
+  if r and not r.state and r.passes and not r.guid and r.who == me() and not CW.claimSoon then
+    CW.claimSoon = true
+    C_Timer.After(1, function() CW.claimSoon = nil; CW:CheckRings() end)
+  end
+end)
 ns:RegisterEvent("TRADE_SHOW", function() CW:TradeShow() end)
 ns:RegisterEvent("UI_INFO_MESSAGE", function(_, _, text) if text == ERR_TRADE_COMPLETE then CW:TradeDone() end end)
 ns:RegisterEvent("PLAYER_EQUIPMENT_CHANGED", function() CW:CheckGear() end)

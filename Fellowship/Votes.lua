@@ -91,11 +91,23 @@ function V:Apply(f, op, by, t)
     if not v or v.result or t > v.ends then return false end
     v.ballots[by] = op.yes and true or false
   elseif op.a == "pass" then
-    -- The majority as the pass's maker counted it (who was away for them), so every copy passes it the same.
+    -- The majority as the pass's maker counted it (who was away for them, and the ballots they had), so every copy
+    -- passes it the same and keeps the same tally: a ballot that reached one copy before the pass and another after
+    -- it is in neither (code review of 0.13.0).
     local v = votes[op.id]
     if not v or v.result or f.rules[v.key] == v.value then return false end
-    local yes, _, need = self:Counts(f, v, awayFor(f, op))
+    local bl = F.Claim(op, "bl", function()
+      local copy = {}
+      for name, b in pairs(v.ballots) do copy[name] = b end
+      return copy
+    end)
+    local ballots = {}
+    for name, b in pairs(type(bl) == "table" and bl or v.ballots) do
+      if type(name) == "string" and type(b) == "boolean" then ballots[name] = b end
+    end
+    local yes, _, need = self:Counts(f, { ballots = ballots }, awayFor(f, op))
     if yes < need then return false end
+    v.ballots = ballots
     local r = {}
     for k, val in pairs(f.rules) do r[k] = val end
     r[v.key] = v.value

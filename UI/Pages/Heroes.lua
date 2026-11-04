@@ -193,6 +193,18 @@ local function buildList(pf, width)
     c.fallenMark.icon:SetPoint("CENTER")
     UI.SetIcon(c.fallenMark.icon, ns.ICONS.hist_fallen)
     c.fallenMark:Hide()
+    -- The Ring-bearer's mark: the Ring in a gold ring on the same corner (a bearer is never Fallen: the Ring is lost
+    -- with them). The check of 3 Nov 2026, 21:57: in place of "Ring-bearer" on the card's line.
+    c.ringMark = CreateFrame("Frame", nil, c)
+    c.ringMark:SetSize(24, 24)
+    c.ringMark:SetPoint("CENTER", c.portrait, "BOTTOMRIGHT", -8, 8)
+    c.ringMark:SetFrameLevel(c:GetFrameLevel() + 8)
+    local gold = UI.Round(c.ringMark, "ARTWORK", 24)
+    gold:SetPoint("CENTER"); Theme:Fill(gold, "gold", 1)
+    c.ringMark.icon = UI.Round(c.ringMark, "OVERLAY", 20)
+    c.ringMark.icon:SetPoint("CENTER")
+    UI.SetIcon(c.ringMark.icon, ns.Challenges:Icon("ring"))
+    c.ringMark:Hide()
     local hl = c:CreateTexture(nil, "HIGHLIGHT")
     hl:SetPoint("TOPLEFT", 4, -4); hl:SetPoint("BOTTOMRIGHT", -4, 4); hl:SetColorTexture(1, 0.9, 0.6, 0.12)
     c:SetScript("OnClick", function() pf.sel = c.who; ns.Window:Refresh() end)
@@ -243,10 +255,13 @@ local function buildList(pf, width)
     r:SetSize(width - 8, 28)
     r.name = UI.Text(r, 13, "ink")
     r.name:SetPoint("LEFT")
-    r.wait = UI.Text(r, 12, "ink2")
-    r.wait:SetPoint("LEFT", r.name, "RIGHT", 6, 0)
     r.cancel = UI.TextButton(r, L.CANCEL, function() F:CancelInvite(r.who) end, "plain", 12)
     r.cancel:SetPoint("RIGHT")
+    -- Wraps before Cancel (the time left of an offline invite ran under it; the check of 4 Nov 2026, 20:33).
+    r.wait = UI.Text(r, 12, "ink2")
+    r.wait:SetPoint("LEFT", r.name, "RIGHT", 6, 0)
+    r.wait:SetPoint("RIGHT", r.cancel, "LEFT", -8, 0)
+    r.wait:SetWordWrap(true); r.wait:SetJustifyH("LEFT")
     return r
   end)
 end
@@ -282,7 +297,7 @@ local function roleLine(f, name)
   local roleName = L["ROLE_" .. (m.role or "DPS"):upper()]
   if m.second then roleName = roleName .. " / " .. L["ROLE_" .. m.second:upper()] end
   -- The challenges (SPEC §9): "Ring-bearer", "Broke Walk everywhere".
-  local note = f.challenges ~= nil and ns.Challenges:CardNote(f, name)
+  local note = f.challenges ~= nil and ns.Challenges:CardNote(f, name, true)
   return Hr:ClassName(f, name) .. "  ·  " .. roleName .. (note and ("  ·  " .. note) or "")
 end
 
@@ -407,11 +422,14 @@ local function refreshList(pf, ctx, width)
       r.who = name
       r.name:SetText(ns.Short(name) .. (f.inviteFriend and f.inviteFriend[name] and L.INV_AS_FRIEND or ""))
       local st = ns.Sync:InviteStatus(name)
-      r.wait:SetText(st == "received" and L.INV_RECEIVED or (st == "sending" and L.INV_SENDING or L.WAITING_ANSWER))
+      r.wait:SetText(st == "received" and L.INV_RECEIVED or (st == "offline" and ns.Sync:OfflineText(f, name))
+        or (st == "sending" and L.INV_SENDING or L.WAITING_ANSWER))
       r.wait:SetTextColor(Theme:RGBA(st == "received" and "3E7A3A" or "ink2"))
       r.cancel:SetShown(P.Can(f, ctx.me, "uninvite", name))
       r:SetWidth(width - 8)
-      stack:Place(r, 28, 2)
+      local h = math.max(28, math.ceil(r.wait:GetStringHeight() or 0) + 10)
+      r:SetHeight(h)
+      stack:Place(r, h, 2)
     end
     stack:Skip(10)
   end
@@ -444,6 +462,8 @@ local function refreshList(pf, ctx, width)
     local ver, newestVer = Hr:OldVersion(f, name)
     c.old:SetShown(ver ~= nil and not fallen)
     if ver then c.tip[2] = { L.OLD_ADDON_TIP:format(ver, newestVer), 1, 0.6, 0.2 } end
+    local bearer = ns.Challenges:Bearer(f, name)
+    if bearer then c.tip[#c.tip + 1] = { L.CARD_RING_TIP:format(f.ring.item or L.RING_A_RING), 1, 0.82, 0 } end
     local st, color = Hr:Standing(f, name)
     c.standing:SetText(st or "")
     if st then c.standing:SetTextColor(Theme:RGBA(color)) end
@@ -454,6 +474,7 @@ local function refreshList(pf, ctx, width)
     if not drawn then c.crest:Set(select(2, Hr:ClassName(f, name))) end
     c.crest.icon:SetDesaturated(fallen ~= nil); c.crest.ring:SetDesaturated(fallen ~= nil)
     c.fallenMark:SetShown(fallen ~= nil)
+    c.ringMark:SetShown(bearer and not fallen)
     c.role:SetAlpha(fallen and 0.5 or 1)
     c.level:SetTextColor(Theme:RGBA(fallen and "ink2" or "ink"))
     c.bgRole, c.borderRole = fallen and FALLEN_BG or nil, fallen and Hr.FALLEN or "line"

@@ -280,7 +280,10 @@ function Q:Store(f, name, d, t)
   f.heroes = f.heroes or {}
   local h = f.heroes[name] or {}
   f.heroes[name] = h
-  h.quests, h.questsTime = clean(d.q), tonumber(t) or time()
+  -- (A log from an older addon has no time: none is made up from this clock, so a log its owner sent later, passed on
+  -- by someone else, still wins over it, and it is never passed on as newer than one that has a time; code review of
+  -- 0.13.0.)
+  h.quests, h.questsTime = clean(d.q), tonumber(t)
   h.questsDone = {}
   for _, id in ipairs(type(d.d) == "table" and d.d or {}) do if tonumber(id) then h.questsDone[tonumber(id)] = true end end
   -- Keys and attunement items this Hero carries (item IDs).

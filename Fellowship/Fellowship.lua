@@ -230,10 +230,20 @@ function F:LedAt(f, name, t)
   return stop ~= nil and t <= stop
 end
 
+-- When a change was made, by the game's server time (st), written in by its maker's addon: a PC clock that is wrong
+-- must not let an old Leader's change made after a takeover pass as made before it (code review of 0.13.0). A change
+-- from an older addon has only its own time (not this clock's now: a change that arrives late would pass as made
+-- after the takeover; code review of 1.0.0).
+local function serverTime(op, t)
+  if op.st == nil and not F.making then return t end
+  return tonumber(claim(op, "st", function() return GetServerTime and GetServerTime() or nil end)) or t
+end
+
 -- r: "leader" when the maker led when they made the change.
 function F:Apply(f, op, by, t, r)
   t = tonumber(t) or time()
-  local was = r == "leader" and by ~= f.leader and self:LedAt(f, by, t)
+  local st = type(op) == "table" and serverTime(op, t) or t
+  local was = r == "leader" and by ~= f.leader and self:LedAt(f, by, st)
   if was then P.acting, P.actingIn = by, f end
   -- (Lent for this one change only, also when it fails with an error.)
   local fine, ok = pcall(self.ApplyChange, self, f, op, by, t)
@@ -261,7 +271,8 @@ function F:ApplyChange(f, op, by, t)
     f.inviteFriend[n] = op.friend and true or nil
     self:Log(f, L.CHR_INVITED:format(ns.Short(n)), t, "invited", n)
   elseif k == "uninvite" then
-    if not P.Can(f, by, "uninvite", n) or not f.invites[n] then return false end
+    -- (declined: the player said no, to whichever Adventurer was online to take the answer.)
+    if not (P.Can(f, by, "uninvite", n) or (op.declined and P.Can(f, by, "answer"))) or not f.invites[n] then return false end
     f.invites[n], f.inviteFrom[n], f.inviteFriend[n] = nil, nil, nil
   elseif k == "join" then
     -- Made by the Hero who received the accept: that Hero must be allowed to invite, and the invite must exist.
@@ -281,13 +292,15 @@ function F:ApplyChange(f, op, by, t)
     if not P.Can(f, by, "leave") then return false end
     f.members[by] = nil
     self:Log(f, L.CHR_LEFT:format(ns.Short(by)), t, "left", by)
+    ns.Challenges:PassRing(f, by, t)
   elseif k == "remove" then
     if not P.Can(f, by, "remove", n) then return false end
     f.members[n] = nil
     self:Log(f, L.CHR_REMOVED:format(ns.Short(n)), t, "removed", n)
+    ns.Challenges:PassRing(f, n, t)
   elseif k == "lead" then
     if not P.Can(f, by, "lead", n) or not F:CanLead(f, n) then return false end
-    newLeader(f, n, t)
+    newLeader(f, n, tonumber(op.st) or t)
     f.members[n].friend = nil -- the Leader always counts
     self:Log(f, L.CHR_LEADS:format(ns.Short(n)), t, "leads", n)
   elseif k == "rename" then
@@ -344,6 +357,7 @@ function F:ApplyChange(f, op, by, t)
       f.members[n].catching = true
     end
     self:Log(f, (on and L.CHR_FRIEND_ON or L.CHR_FRIEND_OFF):format(ns.Short(n)), t, on and "friendon" or "friendoff", n)
+    if on then ns.Challenges:PassRing(f, n, t) end
   elseif k == "swap" then
     -- Play another character on the same account: it takes this Hero's place, rank and roles. Not a Fallen one's:
     -- they stay, honoured, and a new character joins by invitation (SPEC §9).
@@ -353,9 +367,10 @@ function F:ApplyChange(f, op, by, t)
     f.members[n] = { role = m.role, second = m.second, joined = m.joined, class = op.class, level = tonumber(op.level), friend = m.friend }
     if claim(op, "c", function() return ns.Journey:Newcomer(f, op.level) end) then f.members[n].catching = true end
     f.members[by] = nil
-    if f.leader == by then newLeader(f, n, t) end
+    if f.leader == by then newLeader(f, n, tonumber(op.st) or t) end
     if f.heroes then f.heroes[by] = nil end
     self:Log(f, L.CHR_SWAP:format(ns.Short(by), ns.Short(n)), t, f.leader == n and "swapleader" or "swap", n)
+    ns.Challenges:PassRing(f, by, t, n)
   elseif k == "tourney" then
     -- The Guild Master tournament: start, sign up, a duel won, sign-up or a round over (Fellowship/Tourney.lua).
     if not P.Rank(f, by) or self:IsFriend(f, by) or not ns.Tourney:Apply(f, op, by, t) then return false end
@@ -374,7 +389,7 @@ function F:ApplyChange(f, op, by, t)
     local aw = claim(op, "aw", function() return ns.Journey:AutoAway(f) end)
     if not seen or not ns.Progress:CanTakeOver(f, by, t, seen, type(aw) == "table" and aw or {}) then return false end
     local old = f.leader
-    newLeader(f, by, t)
+    newLeader(f, by, tonumber(op.st) or t)
     f.members[by].friend = nil
     self:Log(f, L.CHR_TAKEOVER:format(ns.Short(by), ns.Short(old), f.rules.takeover), t, "takeover", by)
   elseif k == "tick" then
@@ -393,10 +408,12 @@ function F:ApplyChange(f, op, by, t)
   elseif k == "broke" then
     -- An Adventurer broke one of the challenges' rules (Fellowship/ChallengeWatch.lua): only they record it.
     if not P.Rank(f, by) or not ns.Challenges:ApplyBreak(f, by, op, t) then return false end
-  elseif k == "ring" or k == "ringend" then
-    -- Lord of the Rings: the Ring found, destroyed or lost, by its finder (Fellowship/ChallengeWatch.lua).
+  elseif k == "ring" or k == "ringend" or k == "ringclaim" then
+    -- Lord of the Rings: the Ring found, destroyed or lost, by its finder; a ring of theirs is the Ring once it passed
+    -- to them (Fellowship/ChallengeWatch.lua).
     local C = ns.Challenges
-    if not P.Rank(f, by) or not (k == "ring" and C:ApplyRing(f, by, op, t) or k == "ringend" and C:ApplyRingEnd(f, by, op, t)) then return false end
+    if not P.Rank(f, by) or not (k == "ring" and C:ApplyRing(f, by, op, t) or k == "ringend" and C:ApplyRingEnd(f, by, op, t)
+      or k == "ringclaim" and C:ApplyRingClaim(f, by, op, t)) then return false end
   elseif k == "raced" then
     -- Race to 60: everyone reached the cap (any Adventurer's addon sees it first).
     if not P.Rank(f, by) or not ns.Challenges:ApplyRace(f, by, op, t) then return false end
@@ -421,6 +438,8 @@ function F:AfterChange(f)
     if ns.char.started then ns.char.started[f.id] = nil end
     if not self.leaving then ns:Toast(nil, L.GONE_T, (f.disbanded and L.GONE_DISBANDED or L.GONE_REMOVED):format(f.name)) end
   end
+  -- Something that cannot be in one copy is reported (Fellowship/Conflicts.lua).
+  if ns.Conflicts and f.id == ns.char.fellowshipId then ns.Conflicts:Check(f) end
   self:Changed()
 end
 
@@ -494,8 +513,9 @@ function F:MyInvites()
   return list
 end
 
--- Accept: the inviter's addon must take it now (ACCOK, then the fellowship comes as SNAP). If the inviter is offline,
--- does not answer, or the invite is no longer open, the player is told and asks for a new invite.
+-- Accept: an Adventurer's addon must take it now (ACCOK, then the fellowship comes as SNAP): the inviter first, then
+-- the others the invite names, in turn (F:AcceptNext). If none of them is online, the player is told and the invite
+-- stays open to try later; if it is no longer open (ACCX), the player is told to ask for a new one.
 function F:AcceptInvite(fid, role)
   local inv = ns.char.invites[fid]
   if not inv or self:Current() then return end
@@ -512,23 +532,58 @@ function F:AcceptInvite(fid, role)
     ns:Toast(nil, L.ACCEPT_FAILED, why)
     return false
   end
-  local p = { from = inv.from }
+  local p = { list = self:InviteAnswerers(inv), i = 0, name = inv.name,
+    msg = { fid = fid, role = F.ROLES[role] and role or "DPS", class = info.class, level = info.level, guild = info.guild, gm = info.gm } }
   self.pendingJoin[fid] = p
-  ns.Comm:Send(inv.from, "ACC", { fid = fid, role = F.ROLES[role] and role or "DPS", class = info.class, level = info.level, guild = info.guild, gm = info.gm }, true)
-  ns.char.invites[fid] = nil
-  C_Timer.After(ns.Sync.ACCEPT_WAIT, function()
-    if F.pendingJoin[fid] == p and not p.ok then
-      F.pendingJoin[fid] = nil
-      ns:Toast(nil, L.ACCEPT_FAILED, L.ACCEPT_NOANSWER:format(ns.Short(inv.from)))
-    end
-  end)
+  self:AcceptNext(fid)
   self:Changed()
+end
+
+-- Who an answer to inv goes to, in turn: the one who sent it, then the others it names.
+function F:InviteAnswerers(inv)
+  local list, seen = { inv.from }, { [inv.from] = true, [ns.Me()] = true }
+  for _, n in ipairs(type(inv.who) == "table" and inv.who or {}) do
+    if not seen[n] then seen[n] = true; list[#list + 1] = n end
+  end
+  return list
+end
+
+-- The Accept goes to the next Adventurer in turn (offline or no answer in ACCEPT_WAIT seconds: the one after). None
+-- left: the player is told, and the invite stays open.
+function F:AcceptNext(fid)
+  local p = self.pendingJoin[fid]
+  if not p then return end
+  p.i = p.i + 1
+  local to = p.list[p.i]
+  if not to then
+    self.pendingJoin[fid] = nil
+    -- An Adventurer said it is no longer open: it is gone. Else nobody was online: it stays open.
+    if p.closed then
+      ns.char.invites[fid] = nil
+      ns:Toast(nil, L.ACCEPT_FAILED, L.ACCEPT_CLOSED:format(ns.Short(p.list[1])))
+    else
+      ns:Toast(nil, L.ACCEPT_FAILED, L.ACCEPT_NOBODY:format(p.name or "?"))
+    end
+    self:Changed()
+    return
+  end
+  p.from = to
+  ns.Comm:Send(to, "ACC", p.msg, true)
+  local i = p.i
+  C_Timer.After(ns.Sync.ACCEPT_WAIT, function()
+    if F.pendingJoin[fid] == p and not p.ok and p.i == i then F:AcceptNext(fid) end
+  end)
 end
 
 function F:DeclineInvite(fid)
   local inv = ns.char.invites[fid]
   if not inv then return end
-  ns.Comm:Send(inv.from, "DEC", { fid = fid })
+  -- (To everyone who may take it: whoever is online removes it for all.)
+  for _, n in ipairs(self:InviteAnswerers(inv)) do ns.Comm:Send(n, "DEC", { fid = fid }) end
+  -- Remembered for a day: the courier may send it again before it hears the answer.
+  ns.char.declined = type(ns.char.declined) == "table" and ns.char.declined or {}
+  for id, t in pairs(ns.char.declined) do if time() - (tonumber(t) or 0) > ns.Sync.EXPIRE then ns.char.declined[id] = nil end end
+  ns.char.declined[fid] = time()
   ns.char.invites[fid] = nil
   self:Changed()
 end

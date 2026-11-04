@@ -1,4 +1,4 @@
-## Interface: 120105, 16001
+## Interface: 16001
 ## Title: |cffe2b857Journey Together|r Forever
 ## Notes: Level together with your fellowship, chapter by chapter.
 ## Author: Vaderstrom
@@ -53,6 +53,7 @@ Fellowship\Board.lua
 Fellowship\Watch.lua
 Fellowship\Sample.lua
 Fellowship\Friends.lua
+Fellowship\Conflicts.lua
 UI\Theme.lua
 UI\Sound.lua
 UI\Icons.lua
@@ -86,6 +87,7 @@ UI\Window.lua
 UI\GatherForm.lua
 UI\Toast.lua
 UI\Share.lua
+UI\Conflict.lua
 UI\News.lua
 UI\Picture.lua
 UI\Photo.lua

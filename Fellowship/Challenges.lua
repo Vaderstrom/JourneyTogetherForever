@@ -39,7 +39,7 @@ local _, ns = ...
 local L = ns.L
 local F = ns.Fellowship
 local C = { RECENT = 3600, RECAP_WAIT = 1, SHARED_MIN = 1, SHARED_MAX = 30, FALLS_MAX = 200, BROKEN_MAX = 300,
-  PAUPER_MIN = 1, PAUPER_MAX = 1000, PAUPER_SUGGEST = 10, RACE_LEVEL = 60 }
+  PAUPER_MIN = 1, PAUPER_MAX = 1000, PAUPER_SUGGEST = 10, RACE_LEVEL = 60, PASSES_MAX = 20 }
 ns.Challenges = C
 
 -- Create's tabs, in the order shown (the owner, 1 Nov 2026).
@@ -130,9 +130,17 @@ function C:Sanitize(f)
   f.broken = #broken > 0 and broken or nil
   local r = f.ring
   if type(r) == "table" and type(r.who) == "string" and tonumber(r.t) then
+    local passes = {}
+    for _, p in ipairs(type(r.passes) == "table" and r.passes or {}) do
+      if type(p) == "table" and type(p.from) == "string" and type(p.to) == "string" and tonumber(p.t) then
+        passes[#passes + 1] = { from = p.from, to = p.to, t = tonumber(p.t), item = str(p.item), tc = tonumber(p.tc) }
+      end
+    end
+    local first = type(r.first) == "table" and type(r.first.who) == "string" and { who = r.first.who, item = str(r.first.item) } or nil
     f.ring = { who = r.who, t = tonumber(r.t), item = str(r.item), id = tonumber(r.id), guid = str(r.guid),
       state = (r.state == "done" or r.state == "lost") and r.state or nil, tEnd = tonumber(r.tEnd),
-      why = (r.why == "fell" or r.why == "gone") and r.why or nil }
+      why = (r.why == "fell" or r.why == "gone" or r.why == "nobody") and r.why or nil,
+      first = first, passes = #passes > 0 and passes or nil }
   else
     f.ring = nil
   end
@@ -280,6 +288,63 @@ function C:ApplyRing(f, by, op, t)
   if r and (r.state or r.t <= t) then return false end
   f.ring = { who = by, t = t, item = str(op.item), id = tonumber(op.id), guid = type(op.guid) == "string" and #op.guid <= 64 and op.guid or nil }
   if fresh(f, t) then ns:Toast("challenge", L.T_RING, self:RingText(f), "chronicle", self:ToastOf("ring")) end
+  ns:Fire("CHALLENGES")
+  return true
+end
+
+-- Who carries the Ring after gone: the Adventurer who joined first (those who are away after them; ties by name), as
+-- who leads after a Leader leaves (Fellowship:Successor). nil when nobody can.
+function C:NextBearer(f, gone)
+  local best, bestKey
+  for name, m in pairs(f.members) do
+    if name ~= gone and self:Holds(f, name, "ring") then
+      local key = { m.away and 1 or 0, m.joined or 0, name }
+      if not best or key[1] < bestKey[1] or (key[1] == bestKey[1] and (key[2] < bestKey[2] or (key[2] == bestKey[2] and key[3] < bestKey[3]))) then
+        best, bestKey = name, key
+      end
+    end
+  end
+  return best
+end
+
+-- The Ring-bearer gone left, was removed, became a Friend of the fellowship or plays another character (the owner,
+-- 3 Nov 2026; Fellowship:ApplyChange, the same on every copy): the Ring is not lost, it passes on. To their new
+-- character (to) when it may carry it, else to the next in line (C:NextBearer). A ring the new bearer wears or carries
+-- becomes the Ring, or the next one they get (ChallengeWatch:CheckRings, op "ringclaim"). With nobody left to carry
+-- it, the quest has failed.
+function C:PassRing(f, gone, t, to)
+  local r = f.ring
+  if not r or r.state or r.who ~= gone then return end
+  if not (to and self:Holds(f, to, "ring")) then to = self:NextBearer(f, gone) end
+  if not to then
+    r.state, r.tEnd, r.why = "lost", t, "nobody"
+    if fresh(f, t) then ns:Toast("challenge", L.T_RING_LOST, self:RingText(f), "chronicle", self:ToastOf("ring", { solemn = true })) end
+  else
+    r.first = r.first or { who = r.who, item = r.item }
+    r.passes = r.passes or {}
+    table.insert(r.passes, { from = gone, to = to, t = t })
+    while #r.passes > self.PASSES_MAX do table.remove(r.passes, 1) end
+    r.who, r.item, r.id, r.guid = to, nil, nil, nil
+    if fresh(f, t) then
+      ns:Toast("challenge", L.T_RING_PASSED, L.CH_RING_PASSED:format(ns.Short(gone), ns.Short(to)), "chronicle",
+        self:ToastOf("ring", { framed = true, sound = "ring" }))
+    end
+  end
+  ns:Fire("CHALLENGES")
+end
+
+-- The Ring passed to by, and a ring of theirs is the Ring now (op "ringclaim": its name, item id and the game's id of
+-- that very item). Once, until it passes on again.
+function C:ApplyRingClaim(f, by, op, t)
+  local r = f.ring
+  local guid = type(op.guid) == "string" and #op.guid <= 64 and op.guid or nil
+  if not r or r.state or not r.passes or r.who ~= by or r.guid or not guid or not self:Holds(f, by, "ring") then return false end
+  r.item, r.id, r.guid = str(op.item), tonumber(op.id), guid
+  local p = r.passes[#r.passes]
+  if p.to == by then p.item, p.tc = r.item, t end
+  if fresh(f, t) then
+    ns:Toast("challenge", L.T_RING, L.CH_RING_CLAIMED:format(ns.Short(by), r.item or L.RING_A_RING), "chronicle", self:ToastOf("ring"))
+  end
   ns:Fire("CHALLENGES")
   return true
 end
@@ -490,7 +555,10 @@ function C:RingText(f)
   if not r then return nil end
   local who, item = ns.Short(r.who), r.item or L.RING_A_RING
   if r.state == "done" then return L.CH_RING_DONE:format(who, item) end
-  if r.state == "lost" then return (r.why == "fell" and L.CH_RING_FELL or L.CH_RING_GONE):format(who, item) end
+  if r.state == "lost" then
+    if r.why == "nobody" then return L.CH_RING_NOBODY:format(who) end
+    return (r.why == "fell" and L.CH_RING_FELL or L.CH_RING_GONE):format(who, item)
+  end
   return L.CH_RING:format(who, item)
 end
 
@@ -537,15 +605,31 @@ function C:Memorial(f, name)
 end
 
 -- What an Adventurer's card adds after their roles: "Ring-bearer", "Broke Walk everywhere" (or "Broke 3 challenges");
--- nil when nothing.
-function C:CardNote(f, name)
+-- nil when nothing. noRing: leave the Ring out (the Adventurers page marks the bearer's portrait instead).
+function C:CardNote(f, name, noRing)
   local parts = {}
   local r = f.ring
-  if r and not r.state and r.who == name then parts[#parts + 1] = L.CARD_RING_BEARER end
+  if r and not r.state and r.who == name and not noRing then parts[#parts + 1] = L.CARD_RING_BEARER end
   local broke = self:BrokenOf(f, name)
   if #broke == 1 then parts[#parts + 1] = L.CARD_BROKE:format(self:Name(broke[1]))
   elseif #broke > 1 then parts[#parts + 1] = L.CARD_BROKE_N:format(#broke) end
   return #parts > 0 and table.concat(parts, "  ·  ") or nil
+end
+
+-- Is name the Ring-bearer now (the quest open)?
+function C:Bearer(f, name)
+  local r = f.ring
+  return r ~= nil and not r.state and r.who == name
+end
+
+-- Who carried the Ring, in turn: "Brannic, then Corwin, then Elyra" (its finder first). hl(s) marks a name.
+function C:RingRoad(f, hl)
+  local r = f.ring
+  if not r then return nil end
+  hl = hl or function(s) return s end
+  local names = { hl(ns.Short((r.first or r).who)) }
+  for _, p in ipairs(r.passes or {}) do names[#names + 1] = hl(ns.Short(p.to)) end
+  return table.concat(names, L.RING_ROAD_THEN)
 end
 
 -- The Chronicle's entries (UI/Pages/Chronicle.lua, under All): the falls, the broken rules, the Ring, the race and
@@ -563,8 +647,17 @@ function C:Entries(f)
   end
   local r = f.ring
   if r then
-    add({ icon = "ring", time = r.t, text = L.CH_RING:format(ns.Short(r.who), r.item or L.RING_A_RING), chip = L.ST_RING,
-      chipColor = "A8862E", who = r.who })
+    local found = r.first or r
+    add({ icon = "ring", time = r.t, text = L.CH_RING:format(ns.Short(found.who), found.item or L.RING_A_RING), chip = L.ST_RING,
+      chipColor = "A8862E", who = found.who })
+    for _, p in ipairs(r.passes or {}) do
+      add({ icon = "ring", time = p.t, text = L.CH_RING_PASSED:format(ns.Short(p.from), ns.Short(p.to)), chip = L.ST_RING,
+        chipColor = "A8862E", who = p.to })
+      if p.tc then
+        add({ icon = "ring", time = p.tc, text = L.CH_RING_CLAIMED:format(ns.Short(p.to), p.item or L.RING_A_RING),
+          chip = L.ST_RING, chipColor = "A8862E", who = p.to })
+      end
+    end
     if r.state then
       add({ icon = "ring", time = r.tEnd or r.t, text = self:RingText(f), who = r.who,
         chip = r.state == "done" and L.ST_RING_DONE or L.ST_RING_LOST, chipColor = r.state == "done" and "3E7A3A" or "B0321E" })
@@ -600,6 +693,8 @@ function C:Book(f, hl)
     if self:Has(f, k) then
       local name = self:Name(k, f.challenges[k])
       local it = { key = k, title = name, name = hl(name), rule = self:Rule(k, f.challenges[k]), notes = {} }
+      -- (How the Ring passes on is told here only: Create keeps the rule short; the check of 3 Nov 2026, 21:57.)
+      if k == "ring" then it.rule = it.rule .. " " .. L.CHAL_RING_PASS_RULE end
       local by = self:BrokenBy(f, k)
       for i, who in ipairs(by) do by[i] = ns.Short(who) end
       if #by > 0 then it.broken = L.CHAL_BOOK_BROKEN:format(table.concat(by, ", ")) end
@@ -619,7 +714,9 @@ function C:Book(f, hl)
   local r = f.ring
   if r then
     if r.state then note("ring", self:RingText(f) .. " " .. L.CHAL_BOOK_ON:format(day(r.tEnd or r.t)))
+    elseif r.passes and not r.guid then note("ring", L.CHAL_BOOK_RING_WAIT:format(hl(ns.Short(r.who))))
     else note("ring", L.CHAL_BOOK_RING:format(hl(ns.Short(r.who)), r.item or L.RING_A_RING)) end
+    if r.passes then note("ring", L.CHAL_BOOK_RING_ROAD:format(self:RingRoad(f, hl))) end
   elseif self:Has(f, "ring") then
     note("ring", L.CHAL_BOOK_RING_NONE)
   end

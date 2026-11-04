@@ -147,6 +147,22 @@ step("boss data", function(c)
   c:That(not forever or built == client, ("boss data from build %s, this client %s%s"):format(tostring(built), client, note))
 end)
 
+-- The Classic preset plans only with this game's places: in WoW Forever what Blizzard has announced
+-- (ns.FOREVER_SCHEDULE), never a place that is only in the game's files (the owner, 4 Nov 2026).
+step("the Classic preset: only places this game offers", function(c)
+  local j = ns.BuildJourney("classic")
+  local stray, n = {}, 0
+  for key in pairs(j.place) do
+    n = n + 1
+    if not ns.InGame(key) then stray[#stray + 1] = key end
+  end
+  table.sort(stray)
+  c:That(#stray == 0, #stray == 0 and (n .. " places, all in this game") or ("not in this game: " .. table.concat(stray, ", ")))
+  local out = {}
+  for _, r in ipairs(ns.RAIDS) do if not ns.InGame(r[1]) then out[#out + 1] = r[1] end end
+  c:That(#out == 0, #out == 0 and (#ns.RAIDS .. " raids in the Endgame, all in this game") or ("raid not in this game: " .. table.concat(out, ", ")))
+end)
+
 step("crests: the medallion and the heraldic emblems", function(c)
   local E = ns.Emblems
   E.list = nil; E:Scan()
@@ -355,6 +371,7 @@ step("challenges: Story and Gear banners, Ironman takes two with it, Pauper's go
   click(row("ring")); click(row("walk"))
   c:That(row("ring").chosen and row("walk").chosen and row("hardcore").chosen, "they combine across the banners")
   c:Has(pf.chalText:GetText(), L.CHAL_RING_RULE, "the Ring's rule on the right page")
+  c:That(not (pf.chalText:GetText() or ""):find(L.CHAL_RING_PASS_RULE, 1, true), "without how it passes on (the rulebook says that)")
   c:Has(pf.chalName:GetText(), L.CHAL_WALK, "Walk everywhere in the line")
   click(row("ironman"))
   c:That(row("white").chosen, "Ironman Fellowship takes White gear only with it")
@@ -1144,9 +1161,39 @@ step("invite: a real name that is offline", function(c)
   c:Eq(ns.Fellowship:Invite(OFFLINE_NAME), "sent", "sent")
 end, 3)
 
-step("invite: offline is reported and the invite removed", function(c)
-  c:That(cur().invites[full(OFFLINE_NAME)] == nil, "the invite is gone")
+-- Invites wait up to a day (3 Nov 2026): an invite to someone offline stays open, and the courier sends it again.
+step("invite: offline is reported and the invite waits", function(c)
+  local name = full(OFFLINE_NAME)
+  c:That(cur().invites[name] ~= nil, "the invite stays open")
+  c:Eq(ns.Sync:InviteStatus(name), "offline", "the list says it waits until they are online")
+  -- The check of 3 Nov 2026, 21:57: and how long it still waits.
+  local left = ns.Sync:InviteLeft(cur(), name)
+  c:That(left ~= nil and left > ns.Sync.EXPIRE - 600 and left <= ns.Sync.EXPIRE, "it waits about a day")
+  c:Has(ns.Sync:OfflineText(cur(), name), L.INV_LEFT:format(ns.TimeLeft(left or 0)), "the list says how long")
+  -- The check of 4 Nov 2026, 20:33: "· 23 hours left" ran under Cancel. It wraps before it now.
+  ns.Window:ShowPage("manage")
+  local row
+  for _, r in ipairs(ns.Window.pageFrames.manage.invites.items) do if r:IsShown() and r.who == name then row = r end end
+  c:Has(row and row.wait:GetText(), L.INV_LEFT:format(ns.TimeLeft(left or 0)), "Manage shows how long")
+  local wr, cl = row and row.wait:GetRight(), row and row.cancel:GetLeft()
+  if wr and cl and inGame() then c:That(wr <= cl + 1, "the words end before Cancel") end
   c:That(toastSeen(nil, OFFLINE_NAME), "a toast says " .. OFFLINE_NAME .. " is offline")
+end)
+
+step("invite: the courier sends an open invite again, naming who may take the answer", function(c)
+  local f, name = cur(), full(OFFLINE_NAME)
+  c:Eq(ns.Sync:Courier(f), ns.Me(), "the Leader's addon delivers")
+  local sent, send = {}, ns.Comm.Send
+  ns.Comm.Send = function(_, to, tag, data) if tag == "INV" then sent[to] = data end end
+  ns.Sync.sent[name] = nil
+  local n = ns.Sync:Deliver()
+  ns.Comm.Send = send
+  c:Eq(n, 1, "one invite sent again")
+  local inv = sent[name]
+  c:Eq(inv and inv.who and inv.who[1], ns.Me(), "the Leader takes the answer first")
+  c:Eq(inv and inv.t, cur().invites[name], "it keeps the day it was made")
+  ns.Fellowship:CancelInvite(name)
+  c:That(cur().invites[name] == nil, "cancelled again")
 end)
 
 step("remove a Hero, a Hero leaves", function(c)
@@ -1186,7 +1233,7 @@ end)
 step("away: the leader marks a Hero, and I'm away / I'm back", function(c)
   local f = cur()
   ns.Fellowship:SetAway(full("Elyra"), true)
-  c:Eq(ns.Journey:Away(f, full("Elyra")), "forced", "Elyra away (set by the leader)")
+  c:Eq(ns.Journey:Away(f, full("Elyra")), "forced", "Elyra away (set by the Leader)")
   ns.Fellowship:SetAway(full("Elyra"), false)
   c:Eq(ns.Journey:Away(f, full("Elyra")), nil, "Elyra back")
   ns.Fellowship:SetAway(ns.Me(), true)
@@ -1842,12 +1889,16 @@ local function chronicleHas(text)
   for _, r in ipairs(pf.rows.items) do if r:IsShown() and r.text:GetText() == text then return true end end
   return false
 end
-local function cardLine(name)
+local function cardOf(name)
   ns.Window:ShowPage("heroes")
   local hp = ns.Window.pageFrames.heroes
   hp.sel = nil; ns.Window:Refresh()
-  for _, x in ipairs(hp.cards.items) do if x:IsShown() and x.who == name then return x.line:GetText() end end
+  for _, x in ipairs(hp.cards.items) do if x:IsShown() and x.who == name then return x end end
   return nil
+end
+local function cardLine(name)
+  local x = cardOf(name)
+  return x and x.line:GetText()
 end
 step("challenges: a broken rule, marked in the Chronicle, the card and the rulebook", function(c)
   local f, Ch = cur(), ns.Challenges
@@ -1906,7 +1957,14 @@ step("challenges: Lord of the Rings, found, carried, lost", function(c)
   c:That(f.ring ~= nil and f.ring.who == b, "Brannic found the Ring")
   if not f.ring then return end
   c:That(kindSeen("challenge", before), "a toast for everyone")
-  c:Has(cardLine(b) or "", L.CARD_RING_BEARER, "his card: Ring-bearer")
+  -- The check of 3 Nov 2026, 21:57: the Ring on his portrait's corner, not a word on the card's line.
+  local card = cardOf(b)
+  c:That(card ~= nil and card.ringMark:IsShown(), "his card: the Ring on his portrait")
+  c:That(not (cardLine(b) or ""):find(L.CARD_RING_BEARER, 1, true), "no Ring-bearer on the line")
+  local tipped = false
+  for _, l in ipairs(card and card.tip or {}) do if l[1] == L.CARD_RING_TIP:format(f.ring.item or L.RING_A_RING) then tipped = true end end
+  c:That(tipped, "the card's tooltip says he carries it")
+  c:That(not (cardOf(ns.Me()) and cardOf(ns.Me()).ringMark:IsShown()), "no Ring on your card")
   dev("hero Corwin ring")
   c:Eq(f.ring.who, b, "a later find is no Ring")
   dev("hero Corwin ring lost")
@@ -1930,6 +1988,48 @@ step("challenges: Lord of the Rings, found, carried, lost", function(c)
   for _ in pairs(ns.ChallengeWatch.Rings()) do rings = rings + 1 end
   c:That(true, ("your bags and fingers hold %d ring(s); inside Blackrock Mountain now: %s"):format(rings,
     tostring(ns.ChallengeWatch.InBlackrock())))
+end)
+
+-- Lord of the Rings: a bearer who goes (here: becomes a Friend of the fellowship) passes the Ring to the next in line,
+-- and a ring of theirs becomes it (the owner, 3 Nov 2026).
+step("challenges: Lord of the Rings, passed on when its bearer goes", function(c)
+  local f, Ch = cur(), ns.Challenges
+  withChallenges(f, { ring = true, race = true })
+  local b = full("Brannic")
+  local m = f.members[b]
+  c:That(m ~= nil, "Brannic is in the fellowship")
+  if not m then return end
+  local was, wasCatching = m.friend, m.catching
+  m.friend = nil
+  dev("hero Brannic ring")
+  local nxt = Ch:NextBearer(f, b)
+  local before = #report().toasts
+  ns.lastSound = nil
+  dev("hero Brannic friend")
+  c:That(f.ring ~= nil and f.ring.state == nil, "Brannic became a Friend: the Ring is not lost")
+  -- The check of 3 Nov 2026, 21:57: its toast in the big moments' gold frame, with a soft chime.
+  local passed
+  for i = before + 1, #report().toasts do if report().toasts[i].title == L.T_RING_PASSED then passed = report().toasts[i] end end
+  c:That(passed ~= nil and passed.framed == true, "the toast: in the gold frame")
+  c:Eq(passed and passed.sound, "ring", "and its own sound")
+  if ns.Settings:Get("sounds") ~= false and ns.Toasts.current and ns.Toasts.current.title == L.T_RING_PASSED then
+    c:Eq(ns.lastSound, "ring", "the chime plays")
+  end
+  c:Eq(f.ring and f.ring.who, nxt, "it passes to the next in line")
+  c:That(nxt ~= nil and chronicleHas(L.CH_RING_PASSED:format("Brannic", ns.Short(nxt))), "the Chronicle says so")
+  ns.Window:ShowPage("rules")
+  c:Has(ns.Window.pageFrames.rules.chal:Text(), L.CHAL_BOOK_RING_WAIT:match(": (.*)$"), "the rulebook: a ring of theirs becomes it")
+  c:Has(ns.Window.pageFrames.rules.chal:Text(), L.CHAL_BOOK_RING_ROAD:match("^(.-)%%s"), "the Ring's road")
+  c:Eq(Ch:RingRoad(f), "Brannic" .. L.RING_ROAD_THEN .. ns.Short(nxt or "?"), "Brannic, then " .. ns.Short(nxt or "?"))
+  c:Has(ns.Window.pageFrames.rules.chal:Text(), L.CHAL_RING_PASS_RULE, "the rule says how it passes on")
+  if nxt and nxt ~= ns.Me() then
+    dev("hero " .. ns.Short(nxt) .. " ring claim")
+    c:Eq(f.ring and f.ring.guid, "dev-ring-2", "a ring of theirs is the Ring now")
+  else
+    c:That(true, "it passed to you: a ring you wear or carry becomes it")
+  end
+  f.ring = nil
+  m.friend, m.catching = was, wasCatching
 end)
 
 -- Race to 60: the clock in the rulebook; done, the Chronicle keeps the time and the account the best (put back after).
@@ -3013,7 +3113,7 @@ end, 0.8)
 step("sync: a change lost while online arrives with the next state", function(c)
   local f = cur()
   c:Eq(f.leader, ns.Me(), "you lead again")
-  ns.Sync.comparedAt[full("Brannic")], ns.Sync.fixed[full("Brannic")] = nil, nil
+  ns.Sync.compared:Reset(full("Brannic"))
   PE():Change("Brannic", { k = "away", name = full("Brannic"), on = true }, true)
   c:Eq(ns.Journey:Away(f, full("Brannic")), nil, "lost: not here")
   PE():State("Brannic")
@@ -3032,7 +3132,7 @@ step("sync: a change each lost while both online: the next state makes them one"
   PE():SetOnline("Brannic", true)
   PE():Change("Brannic", { k = "role", name = b, role = "Tank", second = "" }, true)
   c:Eq(PE():Get("Brannic").copy.v, cur().v, "the same version, different changes")
-  ns.Sync.comparedAt[b], ns.Sync.fixed[b] = nil, nil
+  ns.Sync.compared:Reset(b)
   PE():State("Brannic")
 end, ns.Sync.GRACE + 1.5)
 
@@ -3109,6 +3209,102 @@ step("sync: one run seen apart is one History line with everyone in it", functio
   c:That(mine.killed.a and mine.killed.b, "both kills")
   c:Eq(mine.time, 900, "from the first kill"); c:Eq(mine.last, 1500, "to the last")
   c:That(mine.ok, "counted when either copy counted it")
+end)
+
+-- Conflicts (3 Nov 2026): a copy with the same changes but another Ring-bearer opens the report window, once a day.
+step("sync: a copy that disagrees about the One Ring opens the report window", function(c)
+  local f, Cf, b = cur(), ns.Conflicts, full("Brannic")
+  c:Eq(#Cf:Issues(f), 0, "nothing impossible in this copy")
+  local copy = ns.Serialize.Decode(ns.Serialize.Encode(f))
+  copy.ring = { who = b, t = time(), item = "The One Ring" }
+  if f.ring and f.ring.who == b then copy.ring.who = ns.Me() end
+  -- (The step can run again: this conflict's once-a-day mark is cleared first.)
+  ns.db.conflictSeen = ns.db.conflictSeen or {}
+  ns.db.conflictSeen["disagree:" .. f.id .. ":" .. b .. ":ring"] = nil
+  local x = Cf:Taking(f, copy, b)
+  c:Eq(x and x.parts[1], "ring", "the Ring is named")
+  local o = ns.Window.overlays and ns.Window.overlays.conflict
+  c:That(o and o:IsShown(), "the report window is open")
+  c:Eq(o and o.text:GetText(), Cf:Lead(x), "it says what was found")
+  -- The check of 3 Nov 2026, 21:57: a line for each part, with its icon.
+  local row = o and o.items[1]
+  c:That(row ~= nil and row:IsShown() and (row.text:GetText() or ""):lower() == L.CONFLICT_PART_RING:lower(), "the One Ring on its own line")
+  c:Eq(row and ns.UI.icons[row.icon], ns.ICONS.chal_ring, "with the Ring's icon")
+  c:Has(o and o.report:GetText(), "- ring (here:", "the report says what each copy holds")
+  c:Eq(Cf:Taking(f, copy, b), nil, "not again the same day")
+  if x and ns.db.conflicts[1] == x then table.remove(ns.db.conflicts, 1) end
+  if o then o:Hide() end
+end)
+
+-- The code review of 0.13.0 (2 Nov 2026): what it left open.
+step("sync: a change carries the game's server time", function(c)
+  local l, st = ns.db.oplog and ns.db.oplog[cur().id] or {}, nil
+  for i = #l, 1, -1 do if l[i].a == ns.Self() then st = l[i].op and l[i].op.st; break end end
+  c:That(tonumber(st) ~= nil, "your newest change says when, by the game's clock")
+  c:That(st and math.abs(st - GetServerTime()) < 3600, "within the hour")
+end)
+
+step("sync: a copy from an addon before 0.13 is never refused by both sides", function(c)
+  local S = ns.Sync
+  local old = { v = 5, leader = full("Brannic"), holder = full("Elyra") }
+  local new = { v = 5, lv = 2, leader = full("Brannic"), holder = ns.Me() }
+  c:That(S:Beats(old, new) and not S:Beats(new, old), "its copy wins: its addon takes only its leader's")
+  new.holder = full("Brannic")
+  c:That(S:Beats(new, old) and not S:Beats(old, new), "unless ours is held by its leader")
+end)
+
+step("sync: a vote's pass keeps the tally its maker had", function(c)
+  local E = ns.Serialize
+  local f = ns.Fellowship:Sanitize(E.Decode(E.Encode(ns.Sync:Copy(cur()))))
+  local yes, late = {}, nil
+  for name in pairs(f.members) do
+    f.members[name].friend, f.members[name].away = nil, nil
+    yes[name] = true
+    if name ~= ns.Me() then late = name end
+  end
+  local value = f.rules.minHeroes == 3 and 2 or 3
+  f.votes = { st = { id = "st", by = ns.Me(), key = "minHeroes", value = value, t = time(), ends = time() + 600,
+    ballots = { [ns.Me()] = true, [late or ns.Me()] = false } } }
+  local toast = ns.Toast
+  ns.Toast = function() end
+  local ok = ns.Votes:Apply(f, { k = "vote", a = "pass", id = "st", bl = yes, aw = {} }, ns.Me(), time())
+  ns.Toast = toast
+  c:That(ok, "it passes on the tally it carries")
+  c:Eq(E.Encode(f.votes.st.ballots), E.Encode(yes), "the copy keeps that tally, not the ballot that came later")
+end)
+
+step("sync: a quest log without a time is not given this PC's", function(c)
+  local f, name = { members = { [full("Elyra")] = {} }, heroes = {} }, full("Elyra")
+  ns.Quests:Store(f, name, { q = { [783] = { t = "A Threat Within", z = "Elwynn Forest", l = 1, h = 0, g = 1 } } })
+  c:Eq(f.heroes[name].questsTime, nil, "no time")
+  c:That(f.heroes[name].quests[783], "the log is kept")
+end)
+
+step("sync: a run line taken from another copy counts once in your runs tally", function(c)
+  local f, keep = cur(), ns.char.tally
+  ns.char.tally = { fid = f.id, runs = 5 }
+  ns.Firsts:RunsSeen(f) -- (the runs this History holds already are counted)
+  local e = { type = "run", key = "selftest", time = time() - 60, last = time() - 30, names = { ns.Me() }, cleared = {}, killed = {} }
+  table.insert(f.history, 1, e)
+  ns.Firsts:CountRuns(f)
+  local first = ns.char.tally.runs
+  ns.Firsts:CountRuns(f)
+  local again = ns.char.tally.runs
+  for i, h in ipairs(f.history) do if h == e then table.remove(f.history, i); break end end
+  ns.char.tally = keep
+  c:Eq(first, 6, "counted")
+  c:Eq(again, 6, "once")
+end)
+
+step("sync: one limit for both comparisons while online", function(c)
+  local lim = ns.Sync.Limiter()
+  c:Eq(getmetatable(ns.Clears.compared), getmetatable(ns.Sync.compared), "kills and copies use the same one")
+  c:That(lim:Ready("x") and lim:Take("x", "a"), "the first comparison")
+  c:That(not lim:Ready("x"), "not again within the minute")
+  lim.at.x = GetTime() - 61
+  c:That(lim:Ready("x") and not lim:Take("x", "a"), "the same difference waits half an hour")
+  lim:Reset("x")
+  c:That(lim:Take("x", "a"), "until it is reset")
 end)
 
 step("sync: kills compared at login", function(c)
@@ -3287,7 +3483,8 @@ function ST:Run(arg, opts)
     local list = report().toasts
     -- (A page that is a function, such as the share window's, is noted by name: saved data holds no functions.)
     list[#list + 1] = { kind = kind, title = title, text = text, page = type(page) == "function" and "(opens a window)" or page, t = time(),
-      solemn = more and more.solemn or nil, icon = more and more.icon or nil, kicker = more and more.kicker or nil }
+      solemn = more and more.solemn or nil, icon = more and more.icon or nil, kicker = more and more.kicker or nil,
+      framed = more and more.framed or nil, sound = more and more.sound or nil }
     return ST.push(t, kind, title, text, page, more)
   end
   ns:Print(L.SELFTEST_START:format(#steps), true)

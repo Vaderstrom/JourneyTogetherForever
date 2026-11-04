@@ -268,9 +268,11 @@ function D:HeroMore(f, full, what, arg)
     local w = breakWhat(arg)
     if w then op(f, full, { k = "broke", what = w, x = D.BreakX(w) }) end
   elseif what == "ring" then
-    -- Lord of the Rings: they find the Ring, or it ends: /jtf debug hero <Name> ring [done|lost]
+    -- Lord of the Rings: they find the Ring, it ends, or (passed to them) a ring of theirs becomes it:
+    -- /jtf debug hero <Name> ring [done|lost|claim]
     local a = (arg or ""):lower()
     if a == "done" or a == "lost" then op(f, full, { k = "ringend", state = a })
+    elseif a == "claim" then op(f, full, { k = "ringclaim", item = L.DEV_RING, guid = "dev-ring-2" })
     else op(f, full, { k = "ring", item = L.DEV_RING, guid = "dev-ring" }) end
   elseif what == "friend" then
     -- They become a Friend of the fellowship, or play on as an Adventurer: /jtf debug hero <Name> friend [off]

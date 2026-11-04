@@ -32,9 +32,11 @@ ns.PRESETS = {
 
 -- Chapters and dungeon places for a preset. Dungeons go to the chapter that matches their best level;
 -- outside the Classic preset bridges become mandatory. The presets plan with the catalog's levels and chapters
--- (ns.PLAN_DUNGEONS, Data/Dungeons.lua), so they are the same in every game: in Forever every catalog dungeon is
--- placed, also one the game does not list yet (its chapter finishes on level until it does); on retail the ones its
--- Adventure Guide has, and its own Classic versions (ns.GUIDE_PLAN).
+-- (ns.PLAN_DUNGEONS, Data/Dungeons.lua), so they are the same in every game: in Forever the dungeons Blizzard has
+-- announced (ns.FOREVER_SCHEDULE; "Build the classic preset only with the dungeons and raids blizzard has announced",
+-- the owner, 4 Nov 2026), so a place only in the game's files stays out; on retail the ones its Adventure Guide has,
+-- and its own Classic versions (ns.GUIDE_PLAN). A journey keeps a placement the game later drops (its chapter then
+-- finishes on level until the place is back).
 -- Every preset but Start from scratch begins with the Prologue (27 Oct 2026): levels 1-15, no dungeons, done when
 -- everyone reaches 15. Each chapter keeps its picture (art: the preset chapter's number, or "prologue"), so the
 -- pictures do not move when chapters are added in front.

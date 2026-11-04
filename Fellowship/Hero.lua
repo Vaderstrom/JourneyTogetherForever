@@ -350,6 +350,8 @@ function Hr:SendState(tag, to)
   -- What every copy must agree on and the kills (Fellowship/Clears.lua), with every state; the leadership as this
   -- copy has it (Sync:Beats). At login also the counts of everyone's state, gear and quests.
   local data = { fid = f.id, v = f.v, s = s, h = ns.Sync:Digest(f), k = ns.Clears:Digest(f), lv = f.lv or 0, ld = f.leader }
+  -- The fingerprints of the rest, to find copies that should agree and do not (Fellowship/Conflicts.lua).
+  for k, v in pairs(ns.Conflicts:Prints(f)) do data[k] = v end
   if tag == "HELLO" or tag == "HI" then data.sq, data.gq, data.qq = self:Counts(f) end
   -- Only the newest one waits: held in a dungeon, a state every minute piled up and held back everything behind it
   -- (code review, 30 Oct 2026).
@@ -434,6 +436,7 @@ local function hello(sender, d, answer)
   -- The fellowship itself: the one behind gets the other copy; at the same version with other content (changes made
   -- apart), both sides pick the same copy (Sync:Beats), and the other side makes its own changes again on top of it.
   ns.Sync:Compare(sender, f, d)
+  ns.Conflicts:Compare(sender, f, d)
   if answer then
     Hr:SendState("HI", sender)
     Hr:SendGear(sender)
@@ -451,6 +454,7 @@ Comm:On("STATE", function(sender, d)
   -- A copy that differs (a change lost on the way, two at once), and kills that differ: found while both are online.
   ns.Sync:CompareSoon(sender, f, d)
   ns.Clears:CompareSoon(f, sender, d.k)
+  ns.Conflicts:Compare(sender, f, d)
   ns:Fire("HEROES")
 end)
 Comm:On("GEAR", function(sender, d)

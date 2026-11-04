@@ -1,5 +1,43 @@
 # Changelog
 
+## 1.0.0 (4 November 2026)
+- WoW Forever is here: version 1.0 is made for it. The addon no longer lists the retail client (Midnight) as a game it
+  runs on.
+- Lord of the Rings: once the Ring has passed on, the rulebook shows its road ("The Ring's road: Brannic, then
+  Corwin."). The bearer's card shows the Ring on their portrait instead of the word "Ring-bearer", and its tooltip
+  says which ring it is. The Ring passing on is a framed moment with a soft chime. Create shows the Ring's rule
+  without the hand-over sentence, which stays in the rulebook.
+- An invite waiting for someone offline says how long it still waits ("23 hours left").
+- WoW Forever: the presets plan only with the dungeons Blizzard has announced. A place that is only in the game's
+  files stays out of a new journey.
+- The "Something does not match" window lists each thing that differs on its own line, with an icon.
+- The rank reads "Leader" with a capital L everywhere in the book (it said "the leader" in a few texts: Rules,
+  the Chronicle, Make Leader, away set by the Leader).
+- Lord of the Rings: a Ring-bearer who leaves, is removed or becomes a Friend of the fellowship no longer fails the
+  quest. The Ring passes to the next in line, and a ring they wear or carry becomes the Ring (or the next one they
+  get). A bearer who plays another character keeps it. With nobody left to carry it, the quest fails.
+- Something does not match: if your addon finds fellowship data that should be the same as another Adventurer's but is
+  not (two Ring-bearers, two Leaders, other votes, dungeon progress or firsts), or something that cannot be, a window
+  shows a report to copy and where to post it (GitHub or CurseForge). The fellowship goes on from one copy.
+- Invites wait up to a day: an invite to someone offline stays open and reaches them when they log in (whichever
+  Adventurer is online sends it). Accept and Decline reach any Adventurer who is online, not only the one who invited.
+- A change the old Leader made after a takeover is refused also when their PC clock is wrong: changes are timed by
+  the game's server clock.
+- A change from an Adventurer who has not updated keeps the time it was made, so one made before a takeover is no
+  longer refused because it arrived late.
+- After you decline an invite, a new one from an Adventurer who has not updated shows again (it was silently
+  refused for a day). A new invite after an earlier one was cancelled waits its own full day.
+- A vote passes with the same tally on every copy: a ballot that arrives while the pass is on its way no longer counts
+  on some copies and not on others.
+- A fellowship copy from an Adventurer who has not updated to 0.13 is no longer refused by both sides: the two agree.
+- A quest log from an Adventurer who has not updated no longer hides a newer one passed on by someone else.
+- A dungeon run your addon missed (a reload during the fight) counts in your runs tally once it reaches you from
+  another Adventurer's History, and only once.
+
+## 0.13.1 beta (3 November 2026)
+- Game data from WoW Forever 1.60.1.70753: City of Dalaran and Ruins of Lordaeron list their bosses in the
+  game's new order, so the picture moment comes after the real last boss (Shade of the Archmage, Rath'mael).
+
 ## 0.13.0 beta (2 November 2026)
 - One truth for the whole fellowship: Adventurers who play alone or at other times now always come to the same
   fellowship when they meet, and with several online every change shows on every screen at once.

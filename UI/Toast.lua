@@ -23,12 +23,13 @@ end
 -- Returns "off" (Reduce effects or this event turned off) or "shown". page (optional): the book's page a click opens.
 -- more (optional): { dungeon = key (its picture on the left), kicker = text, who = a line under the text,
 -- solemn = true (a Fallen, the last shared life: darker, slower, with a bell; SPEC §9), icon = a path of ns.ICONS (in
--- place of its kind's: a challenge's own) }.
+-- place of its kind's: a challenge's own), framed = true (the big moments' gold frame at the normal size: the Ring
+-- passing on), sound = a name for ns.Sound }.
 function T:Push(kind, title, text, page, more)
   if Settings:Get("reduce") or (kind and not Settings:ToastOn(kind)) then return "off" end
   more = more or {}
   local t = { kind = kind, title = title, text = text, page = page, dungeon = more.dungeon, kicker = more.kicker, who = more.who,
-    solemn = more.solemn, icon = more.icon }
+    solemn = more.solemn, icon = more.icon, framed = more.framed, sound = more.sound }
   -- The banner is made at login. Only after a /reload during combat can it be missing: then it shows after combat.
   if not self.frame and Combat:InCombat() then
     Combat:AfterCombat(function() T:Show(t) end)
@@ -238,6 +239,7 @@ function T:Fill(t)
   local f = self.frame
   f:SetScale(ns.Window:BaseScale())
   local big = t.kind ~= nil and self.BIG[t.kind] == true
+  local framed = big or (t.framed == true and t.solemn ~= true)
   local pictured = not big and t.dungeon ~= nil and self:SetPlace(f.place.tex, t.dungeon)
   f.place:SetShown(pictured)
   local w = big and 680 or (pictured and 640 or 560)
@@ -245,7 +247,7 @@ function T:Fill(t)
   f.title:SetFont(Theme.FONT_TITLE, big and 28 or 20, "")
   f.text:SetFont(Theme.FONT_BODY, big and 15 or 13, "")
   -- More room on the right of a big one: its frame is thicker (the text ran into it; seen in the seventh check).
-  f.text:SetWidth(w - left - (big and 52 or 22))
+  f.text:SetWidth(w - left - (framed and 52 or 22))
   f.text:SetText(t.text or "")
   f.who:SetWidth(w - left - 22)
   f.who:SetText(t.who or "")
@@ -267,9 +269,10 @@ function T:Fill(t)
   f.fadeIn:SetDuration(solemn and T.SOLEMN.fadeIn or 0.35)
   f.fadeOut:SetDuration(solemn and T.SOLEMN.fadeOut or 0.8)
   f.big, f.solemn = big, solemn
-  -- The frame takes the place of the thin gold border on big moments only (decided 27 Oct 2026: the frame marks
-  -- them as special; normal toasts keep the plain banner).
-  local framed = self:LayoutFrame(f, big, h)
+  -- The frame takes the place of the thin gold border on big moments (decided 27 Oct 2026: the frame marks them as
+  -- special; normal toasts keep the plain banner), and on a toast that asks for it (the Ring passing on; the check of
+  -- 3 Nov 2026, 21:57).
+  framed = self:LayoutFrame(f, framed, h)
   f.glow:SetShown(not framed)
   local edge = solemn and T.SOLEMN.edge or "gold"
   f:SetBackdropBorderColor(Theme:RGBA(edge, framed and 0 or 1))
@@ -318,6 +321,7 @@ function T:Show(t)
   if f.big and T.SOUND[t.kind] and PlaySound then PlaySound(T.BIG_SOUND, "Master") end
   -- A solemn one tolls the bell once (Settings → Sounds turns it off).
   if f.solemn then ns.Sound("bell") end
+  if t.sound then ns.Sound(t.sound) end
 end
 
 ns:On("LOGIN", function() Combat:AfterCombat(function() T:Build() end) end)

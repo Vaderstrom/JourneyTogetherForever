@@ -109,6 +109,9 @@ local function collect(root)
           if clip then cl, cb, cr, ct = box(clip) end
           -- Out of the list's view: not drawn, so nothing to check.
           if not cl or (r > cl and l < cr and t > cb and b < ct) then
+            -- Only the part in the list's view is drawn: a paragraph scrolled half out of view ran "over" the page's
+            -- title above the list (the check of 4 Nov 2026, 20:33, the rulebook scrolled to the Ring's road).
+            if cl then l, b, r, t = math.max(l, cl), math.max(b, cb), math.min(r, cr), math.min(t, ct) end
             out[#out + 1] = { fs = region, l = l, b = b, r = r, t = t, clip = clip, layer = ancestor(region, isCover) or root }
           end
         end

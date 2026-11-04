@@ -70,15 +70,56 @@ function FS:HistoryRuns(f, name)
   return n
 end
 
--- I was in a dungeon run new to this addon (Fellowship/Clears.lua). Counted here like falls and quests, so every copy
--- shows the same count: the History keeps only its newest entries, and a copy passed on carries fewer. The first count
--- starts from what my History holds.
-function FS:CountRun(f)
-  if f ~= F:Current() then return end
+-- My dungeon runs, counted here like falls and quests, so every copy shows the same count: the History keeps only its
+-- newest entries, and a copy passed on carries fewer. The first count starts from what my History holds. A run counts
+-- once, however my name reached its History line: my own kill, another's report, or a line taken from another copy
+-- (Clears:Merge; code review of 0.13.0). The visits counted are kept (tally.at: { key, time, last }), as the History
+-- tells one visit from another (Clears.SAME_RUN).
+FS.RUNS_KEPT = 120
+
+local function myRun(e, me)
+  if e.type ~= "run" or type(e.key) ~= "string" or type(e.names) ~= "table" then return false end
+  for _, x in ipairs(e.names) do if x == me then return true end end
+  return false
+end
+
+-- The tally for f, with what my History holds counted already (before anything new is added to it).
+function FS:RunsSeen(f)
+  if not f or f ~= F:Current() then return nil end
   local t = ns.char.tally
   if type(t) ~= "table" or t.fid ~= f.id then t = { fid = f.id }; ns.char.tally = t end
   if t.runs == nil then t.runs = self:HistoryRuns(f, ns.Me()) end
-  self:Count("runs")
+  if type(t.at) ~= "table" then
+    t.at = {}
+    for _, e in ipairs(f.history or {}) do
+      if myRun(e, ns.Me()) and #t.at < self.RUNS_KEPT then t.at[#t.at + 1] = { e.key, e.time, e.last or e.time } end
+    end
+  end
+  return t
+end
+
+-- Counts the runs in my History with me in them that are not counted yet.
+function FS:CountRuns(f)
+  local t = self:RunsSeen(f)
+  if not t then return end
+  local me, gap, any = ns.Me(), ns.Clears.SAME_RUN, false
+  for _, e in ipairs(f.history or {}) do
+    if myRun(e, me) then
+      local last, seen = e.last or e.time, nil
+      for _, v in ipairs(t.at) do
+        if v[1] == e.key and e.time < v[3] + gap and last > v[2] - gap then seen = v; break end
+      end
+      if seen then
+        seen[2], seen[3] = math.min(seen[2], e.time), math.max(seen[3], last)
+      else
+        table.insert(t.at, 1, { e.key, e.time, last })
+        while #t.at > self.RUNS_KEPT do table.remove(t.at) end
+        t.runs = t.runs + 1
+        any = true
+      end
+    end
+  end
+  if any then share() end
 end
 
 -- What goes with my state: my deeds, and my tallies in this fellowship.

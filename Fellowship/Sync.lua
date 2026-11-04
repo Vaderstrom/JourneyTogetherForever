@@ -3,8 +3,11 @@
 --   INVA         receipt: the invited player's addon has the invite
 --   ACCOK / ACCX the inviter's addon took the Accept / the invite is no longer open
 --   OP           one change, with the new version    SNAPQ / SNAP  ask for / send the whole fellowship
--- Invites work while both players are online: an invite that is not received at once (offline, no addon, busy in a
--- fight) is removed and the inviter is told; an Accept the inviter's addon does not take is reported to the player.
+-- Invites wait up to a day (the owner, 3 Nov 2026): an invite to someone offline stays open, and one online
+-- Adventurer's addon (the courier: the Leader when online, else the first by name) sends it again every few minutes
+-- until their addon has it (Sync:Deliver). The invite lists who may take the answer (who), so Accept reaches whoever of
+-- them is online, not only the inviter. An invite that reaches a player whose addon does not answer (no addon, busy in
+-- a fight) is removed and the inviter is told.
 -- A change is applied when its version is exactly one more than ours. On a gap we ask the sender for the whole
 -- fellowship; on a clash (two changes at once) the leader puts it on top and sends everyone its copy, and two
 -- Adventurers swap copies. At login (HELLO) and with every state after it (STATE, Fellowship/Hero.lua), versions and
@@ -21,10 +24,12 @@ local S = {}
 ns.Sync = S
 
 S.RECEIPT_WAIT = 6  -- seconds to wait for the invited player's receipt
-S.ACCEPT_WAIT = 10  -- seconds to wait for the inviter's addon after Accept
+S.ACCEPT_WAIT = 10  -- seconds to wait for each Adventurer's addon after Accept
 S.EXPIRE = 86400    -- an invite not answered within a day is removed
+S.DELIVER_EVERY = 300 -- seconds between the courier's tries to deliver an open invite
+S.WHO_MAX = 8       -- Adventurers an invite names to take the answer
 
--- The invites this client sent in this session: sent[name] = { at (GetTime), received (time) }.
+-- The invites this client sent in this session: sent[name] = { at (GetTime), received (time), offline, again }.
 S.sent = {}
 
 S.LOG_MAX = 150 -- changes each addon keeps per fellowship, to make again on top of another copy
@@ -86,18 +91,71 @@ function S:Replay(f, list)
   F:AfterChange(f)
 end
 
--- The invited player's addon answers INVA (a receipt). Without one in RECEIPT_WAIT seconds the invite is removed.
-function S:SendInvite(f, name)
-  local s = { at = GetTime() }
+-- Who may take the answer to an invite to name: the Leader, the inviter, this character, then the others heard from
+-- most lately (an Accept tries them in turn until one is online).
+function S:Answerers(f, name)
+  local out, seen = {}, { [name] = true }
+  local function add(n)
+    if n and f.members[n] and not seen[n] and #out < self.WHO_MAX and P.Can(f, n, "answer") then seen[n] = true; out[#out + 1] = n end
+  end
+  add(f.leader); add(f.inviteFrom and f.inviteFrom[name]); add(ns.Me())
+  local rest = {}
+  for n in pairs(f.members) do if not seen[n] then rest[#rest + 1] = n end end
+  table.sort(rest, function(a, b)
+    local x, y = ns.Hero:LastSeen(f, a), ns.Hero:LastSeen(f, b)
+    if x ~= y then return x > y end
+    return a < b
+  end)
+  for _, n in ipairs(rest) do add(n) end
+  return out
+end
+
+-- The invited player's addon answers INVA (a receipt). The first time: without one in RECEIPT_WAIT seconds (online
+-- without the addon, or in a fight) the invite is removed; offline, it waits for the courier (Sync:Deliver). again:
+-- the courier's try, which only the day's limit ends.
+function S:SendInvite(f, name, again)
+  local s = { at = GetTime(), again = again or nil }
   self.sent[name] = s
   Comm:Send(name, "INV", { fid = f.id, name = f.name, leader = f.leader, color = f.color, emblem = f.emblem,
     heroes = F:Count(f), faction = f.faction, friend = f.inviteFriend and f.inviteFriend[name] or nil,
-    oneclass = f.challenges and f.challenges.oneclass, nohealers = f.challenges and f.challenges.nohealers }, true)
+    oneclass = f.challenges and f.challenges.oneclass, nohealers = f.challenges and f.challenges.nohealers,
+    t = tonumber(f.invites[name]), who = self:Answerers(f, name) }, true)
+  if again then return end
   -- Only this invite: a newer one to the same player has its own wait.
   C_Timer.After(self.RECEIPT_WAIT, function()
     local cur = F:Current()
-    if S.sent[name] == s and not s.received and cur and cur.invites[name] then S:DropInvite(cur, name, L.INVITE_NOANSWER, true) end
+    if S.sent[name] == s and not s.received and not s.offline and cur and cur.invites[name] then
+      S:DropInvite(cur, name, L.INVITE_NOANSWER, true)
+    end
   end)
+end
+
+-- The one addon that delivers open invites, so they are not sent twice: the Leader when online, else the online
+-- Adventurer first by name (every addon works it out from who it hears).
+function S:Courier(f)
+  if ns.Hero:Online(f, f.leader) then return f.leader end
+  local best
+  for name in pairs(f.members) do
+    if ns.Hero:Online(f, name) and (not best or name < best) then best = name end
+  end
+  return best
+end
+
+-- The courier's round (every DELIVER_EVERY seconds): each open invite this addon has not seen received is sent again.
+-- A whisper to someone still offline fails quietly (Core/Comm.lua hides the game's line).
+function S:Deliver()
+  local f = F:Current()
+  if not f or self:Courier(f) ~= ns.Me() or Comm:Held() then return 0 end
+  local n, now, clock = 0, time(), GetTime()
+  for name, t in pairs(f.invites) do
+    local s = self.sent[name]
+    local fresh = now - (tonumber(t) or 0) <= self.EXPIRE
+    if fresh and not (s and (s.received or clock - s.at < self.DELIVER_EVERY - 5)) then
+      self:SendInvite(f, name, true)
+      n = n + 1
+    end
+  end
+  return n
 end
 
 -- Removes an invite this client sent, and tells the inviter why. noAddon: the invite reached them but their addon did
@@ -114,15 +172,27 @@ function S:DropInvite(f, name, text, noAddon)
   ns:Toast(nil, L.INVITE_NOT_RECEIVED, text:format(ns.Short(name)))
 end
 
--- "received" (their addon has it) or "sending" (waiting for the receipt). Nil when someone else sent it.
+-- "received" (their addon has it), "offline" (it waits until they are online) or "sending" (waiting for the
+-- receipt). Nil when this addon has not sent it.
 function S:InviteStatus(name)
   local s = self.sent[name]
   if not s then return nil end
-  return s.received and "received" or "sending"
+  return s.received and "received" or (s.offline and "offline") or "sending"
 end
 
--- Open invites that cannot work any more: the ones this character sent in an earlier session (the receiver could not
--- reach a logged-out inviter), and any older than a day. The receiver is told (INVX).
+-- How long the open invite to name still waits before it is removed (S:Tidy), in seconds; nil when none.
+function S:InviteLeft(f, name)
+  local t = f and f.invites and tonumber(f.invites[name])
+  return t and math.max(0, self.EXPIRE - (time() - t)) or nil
+end
+
+-- "offline: it reaches them when they log in  ·  23 hours left" (Manage, the Adventurers page).
+function S:OfflineText(f, name)
+  local left = self:InviteLeft(f, name)
+  return left and (L.INV_OFFLINE .. "  ·  " .. L.INV_LEFT:format(ns.TimeLeft(left))) or L.INV_OFFLINE
+end
+
+-- Open invites older than a day are removed, and the receiver is told (INVX).
 function S:Tidy()
   local f = F:Current()
   if not f then return end
@@ -130,8 +200,7 @@ function S:Tidy()
   for name, t in pairs(f.invites) do
     -- (Each one this character may cancel: the leader any, an Adventurer their own.)
     if not P.Can(f, me, "uninvite", name) then t = nil end
-    local mine = f.inviteFrom and f.inviteFrom[name] == me and not self.sent[name]
-    if t and (mine or now - (tonumber(t) or 0) > self.EXPIRE) then
+    if t and now - (tonumber(t) or 0) > self.EXPIRE then
       if F:Do({ k = "uninvite", name = name }) then Comm:Send(name, "INVX", { fid = f.id }) end
     end
   end
@@ -158,18 +227,26 @@ function S:AskSnap(name, f) Comm:Send(name, "SNAPQ", { fid = f.id, v = f.v }, fa
 -- A key is { v, lv, leader, holder }: the newer version; then the newer leadership (a takeover or a handover the other
 -- copy has not seen: its count, f.lv); then the leader whose name sorts first (two leadership changes at once); then
 -- the copy the leader holds; then the holder whose name sorts first. Each side compares its own copy with the other's.
+-- A copy from an addon before 0.13 has no lv (nil): that addon takes another copy at the same version only from its
+-- leader, so the newer addon's copy wins only when its holder is that leader, and otherwise takes the older addon's
+-- copy (and makes its own changes again on top). Never both sides refusing (code review of 0.13.0).
 function S:Key(f, holder) return { v = f.v, lv = f.lv or 0, leader = f.leader, holder = holder } end
 function S:Beats(a, b)
   if a.v ~= b.v then return a.v > b.v end
+  if (a.lv == nil) ~= (b.lv == nil) then
+    local old, new = a.lv == nil and a or b, a.lv == nil and b or a
+    return (new.holder == old.leader) == (a == new)
+  end
   if a.lv ~= b.lv then return a.lv > b.lv end
   if a.leader ~= b.leader then return a.leader < b.leader end
   local al, bl = a.holder == a.leader, b.holder == b.leader
   if al ~= bl then return al end
   return a.holder < b.holder
 end
--- The other copy's key from what its addon sent (v, lv, ld); an older addon sends no lv or ld: ours stand in.
+-- The other copy's key from what its addon sent (v, lv, ld); an older addon sends no lv (nil, above) or ld (our
+-- leader stands in).
 function S:TheirKey(f, sender, d)
-  return { v = tonumber(d.v) or 0, lv = tonumber(d.lv) or f.lv or 0, leader = type(d.ld) == "string" and d.ld or f.leader, holder = sender }
+  return { v = tonumber(d.v) or 0, lv = tonumber(d.lv), leader = type(d.ld) == "string" and d.ld or f.leader, holder = sender }
 end
 
 -- Compares our copy with another Adventurer's (HELLO, HI and STATE carry v, lv, ld and the fingerprint h): the
@@ -189,17 +266,30 @@ end
 -- not send itself every minute). Behind them: ask for their copy. Ahead: nothing (their addon asks when it hears our
 -- state; pushing ours sent whole copies for a change still on its way). The same version with other content: GRACE
 -- seconds later, if it still differs (two changes crossing settle themselves).
-S.comparedAt, S.fixed, S.GRACE = {}, {}, 5
+S.GRACE = 5
 S.swappedAt, S.SWAP_EVERY = {}, 30
+
+-- The limit both comparisons while online use (this one and Clears:CompareSoon): at most once EVERY seconds for each
+-- Adventurer, and the same difference (key) only once in SAME seconds. Ready is checked before the fingerprints are
+-- made (they cost the most), Take once the difference is known.
+local Limiter = { EVERY = 60, SAME = 1800 }
+Limiter.__index = Limiter
+function S.Limiter() return setmetatable({ at = {}, last = {} }, Limiter) end
+function Limiter:Ready(who) return not self.at[who] or GetTime() - self.at[who] >= self.EVERY end
+function Limiter:Take(who, key)
+  local now, last = GetTime(), self.last[who]
+  if last and last.key == key and now - last.at < self.SAME then return false end
+  self.at[who], self.last[who] = now, { key = key, at = now }
+  return true
+end
+function Limiter:Reset(who) self.at[who], self.last[who] = nil, nil end
+
+S.compared = S.Limiter()
 function S:CompareSoon(sender, f, d)
-  local now = GetTime()
-  if self.comparedAt[sender] and now - self.comparedAt[sender] < 60 then return end
+  if not self.compared:Ready(sender) then return end
   local v, mine = tonumber(d.v) or 0, self:Digest(f)
   if v < f.v or (v == f.v and (not d.h or d.h == mine)) then return end
-  local key = f.v .. ":" .. v .. ":" .. tostring(d.h) .. ":" .. mine
-  local last = self.fixed[sender]
-  if last and last.key == key and now - last.at < 1800 then return end
-  self.comparedAt[sender], self.fixed[sender] = now, { key = key, at = now }
+  if not self.compared:Take(sender, f.v .. ":" .. v .. ":" .. tostring(d.h) .. ":" .. mine) then return end
   if v > f.v then self:AskSnap(sender, f) return end
   C_Timer.After(self.GRACE, function()
     local g = F:Get(f.id)
@@ -230,13 +320,26 @@ Comm:On("INV", function(sender, d)
   if d.faction ~= (UnitFactionGroup("player")) then return end
   -- The receipt: this addon has the invite (or is already in that fellowship).
   Comm:Send(sender, "INVA", { fid = d.fid }, true)
+  -- Declined already (the courier did not hear it yet): said again, and not shown again.
+  local no = type(ns.char.declined) == "table" and tonumber(ns.char.declined[d.fid])
+  -- (An older addon sends no t and never tries again: its invite is a new one.)
+  if no and tonumber(d.t) and tonumber(d.t) <= no then Comm:Send(sender, "DEC", { fid = d.fid }) return end
   local cur = F:Current()
   if cur and cur.id == d.fid then return end
+  -- Who may take the answer (an older addon sends none: only the sender).
+  local who = {}
+  for _, n in ipairs(type(d.who) == "table" and d.who or {}) do
+    if type(n) == "string" and #n <= 64 and #who < S.WHO_MAX then who[#who + 1] = n end
+  end
+  -- The same invite again (the courier's try) keeps its day: from when it was made, never later than now. A new
+  -- invite (made later, after the old one was cancelled) has its own day (code review of 1.0.0).
+  local old, now = ns.char.invites[d.fid], time()
+  local made = math.min(tonumber(d.t) or now, now)
   ns.char.invites[d.fid] = { from = sender, name = d.name, leader = d.leader, color = d.color, emblem = d.emblem,
-    heroes = tonumber(d.heroes) or 1, time = time(), friend = d.friend == true or nil,
+    heroes = tonumber(d.heroes) or 1, time = (not tonumber(d.t) and old and old.time) or made, friend = d.friend == true or nil,
     oneclass = type(d.oneclass) == "string" and d.oneclass:match("^%u+$") and #d.oneclass <= 16 and d.oneclass or nil,
-    nohealers = d.nohealers == true or nil }
-  F:Changed()
+    nohealers = d.nohealers == true or nil, who = who }
+  if not old then F:Changed() end
 end)
 
 Comm:On("INVA", function(sender, d)
@@ -248,16 +351,20 @@ Comm:On("INVA", function(sender, d)
   ns:Fire("HEROES")
 end)
 
--- A whisper to someone failed: they are offline (Core/Comm.lua). An invite to them is removed at once; an Accept
--- sent to an inviter who is offline is reported to the player.
+-- A whisper to someone failed: they are offline (Core/Comm.lua). An invite to them waits (the inviter is told once);
+-- an Accept goes on to the next Adventurer who may take it.
 ns:On("OFFLINE", function(name)
   local s, f = S.sent[name], F:Current()
-  if s and not s.received and f and f.invites[name] then S:DropInvite(f, name, L.INVITE_OFFLINE) end
-  for fid, p in pairs(F.pendingJoin) do
-    if p.from == name and not p.ok then
-      F.pendingJoin[fid] = nil
-      ns:Toast(nil, L.ACCEPT_FAILED, L.ACCEPT_OFFLINE:format(ns.Short(name)))
+  if s and not s.received and not s.offline and f and f.invites[name] then
+    s.offline = true
+    if not s.again then
+      ns:Print(L.INVITE_OFFLINE:format(ns.Short(name)), true)
+      ns:Toast(nil, L.INVITE_WAITING_T, L.INVITE_OFFLINE:format(ns.Short(name)))
     end
+    ns:Fire("HEROES")
+  end
+  for fid, p in pairs(F.pendingJoin) do
+    if p.from == name and not p.ok then F:AcceptNext(fid) end
   end
 end)
 
@@ -292,13 +399,18 @@ end)
 -- The inviter's addon took my Accept: the fellowship is on its way (SNAP).
 Comm:On("ACCOK", function(sender, d)
   local p = type(d) == "table" and F.pendingJoin[d.fid]
-  if p and p.from == sender then p.ok = true end
+  if p and p.from == sender then p.ok = true; ns.char.invites[d.fid] = nil end
 end)
 
 Comm:On("ACCX", function(sender, d)
   local p = type(d) == "table" and F.pendingJoin[d.fid]
   if p and p.from == sender then
+    -- Not open in their copy (cancelled, or they have not heard of it yet): the next Adventurer in turn, while there is
+    -- one (F:AcceptNext tells the player when every one said so). A challenge's refusal is final.
+    if not d.no then p.closed = sender; F:AcceptNext(d.fid) return end
     F.pendingJoin[d.fid] = nil
+    ns.char.invites[d.fid] = nil
+    F:Changed()
     local text = L.ACCEPT_CLOSED:format(ns.Short(sender))
     if d.no == "nohealers" then text = L.CHAL_NOHEALERS_NO
     elseif d.no == "oneclass" and type(d.class) == "string" then text = L.CHAL_ONECLASS_NO:format(ns.Challenges.ClassName(d.class)) end
@@ -309,7 +421,8 @@ end)
 Comm:On("DEC", function(sender, d)
   local f = F:Current()
   if type(d) ~= "table" or not f or f.id ~= d.fid or not f.invites[sender] then return end
-  if P.Can(f, ns.Me(), "uninvite", sender) then F:Do({ k = "uninvite", name = sender }) end
+  -- (Any Adventurer who may take the answer removes it: the player said no.)
+  F:Do({ k = "uninvite", name = sender, declined = true })
 end)
 
 Comm:On("OP", function(sender, d)
@@ -369,6 +482,8 @@ Comm:On("SNAPQ", function(sender, d)
 end)
 
 Comm:On("SNAP", function(sender, d)
+  -- (A copy from an addon before 0.13 has no leadership count: Sync:Beats.)
+  local old = type(d) == "table" and type(d.f) == "table" and d.f.lv == nil
   local snap = type(d) == "table" and F:Sanitize(d.f)
   if not snap or not snap.members[sender] and snap.leader ~= sender then return end
   local me, mine = ns.Me(), F:Get(snap.id)
@@ -385,8 +500,16 @@ Comm:On("SNAP", function(sender, d)
   end
   local joining = F.pendingJoin[snap.id] ~= nil and snap.members[me] ~= nil
   -- Taken when it wins over ours (Beats: the same answer on both sides).
-  local newer = mine and (mine.members[sender] or mine.leader == sender) and S:Beats(S:Key(snap, sender), S:Key(mine, me))
+  local theirs = S:Key(snap, sender)
+  if old then theirs.lv = nil end
+  local newer = mine and (mine.members[sender] or mine.leader == sender) and S:Beats(theirs, S:Key(mine, me))
   if not joining and not newer then return end
+  -- (It keeps our count of leadership changes: its addon does not count them.)
+  if old and mine then snap.lv = mine.lv end
+  -- (A run line with me in it, new here, counts for my runs tally: Firsts:CountRuns.)
+  if mine then ns.Firsts:RunsSeen(mine) end
+  -- The same changes and other content: a bug, reported (Fellowship/Conflicts.lua). This copy goes on from theirs.
+  if mine and not joining then ns.Conflicts:Taking(mine, snap, sender) end
   S:KeepLocal(snap, mine)
   -- Our changes the copy has not seen are made again on top of it (nothing made while apart is lost). Not when the
   -- copy no longer lists us (we were removed while away), and not when joining: changes kept from an earlier time in
@@ -394,6 +517,7 @@ Comm:On("SNAP", function(sender, d)
   local missing = mine and snap.members[me] and not joining and S:Missing(snap) or {}
   if joining and ns.db.oplog then ns.db.oplog[snap.id] = nil end
   ns.db.fellowships[snap.id] = snap
+  ns.Firsts:CountRuns(snap)
   if joining then
     F.pendingJoin[snap.id] = nil
     ns.char.fellowshipId = snap.id
@@ -473,4 +597,6 @@ end
 ns:On("LOGIN", function()
   C_Timer.After(6, function() S:Tidy() end)
   C_Timer.NewTicker(3600, function() S:Tidy() end)
+  C_Timer.After(30, function() S:Deliver() end)
+  C_Timer.NewTicker(S.DELIVER_EVERY, function() S:Deliver() end)
 end)

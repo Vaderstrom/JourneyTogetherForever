@@ -7,7 +7,7 @@ or falling behind. You create a **fellowship**, invite your Adventurers, and wal
 **chapters**. Each chapter has a level floor, a level cap and the dungeons you clear as a group. When the chapter is
 done, the next one opens for everyone.
 
-Built for **WoW Forever**. Until Forever is out, it is developed and tested on the retail client.
+Built for **WoW Forever**.
 
 ![The Overview: where you stand, Play now, where the Adventurers stand and this chapter's dungeons](.github/screenshots/overview.jpg)
 
@@ -35,7 +35,7 @@ Built for **WoW Forever**. Until Forever is out, it is developed and tested on t
     [Discord](#discord)
   - [On your screen](#on-your-screen): [toasts and tracker](#toasts-the-tracker-and-the-picture-moment),
     [look and settings](#look-and-settings)
-- [Commands](#commands) · [Playing at different times](#playing-at-different-times) · [Status](#status-beta) ·
+- [Commands](#commands) · [Playing at different times](#playing-at-different-times) · [Status](#status) ·
   [Install](#install) · [License and credits](#license-and-credits)
 
 ## How it works
@@ -310,10 +310,7 @@ keeps its own copy of the fellowship and catches up from the others when you log
 offline arrive once someone who has them is online. In dungeons and during boss fights the game holds addon messages;
 they go out when you leave. Characters you have not played for a while show "as of" when you last did.
 
-## Status: beta
-This is a beta. Version 1.0 comes when WoW Forever launches: the addon will be tested there, and its
-dungeon and raid lists brought in line with Forever's.
-
+## Status
 Everything above is built and checked with the addon's own self-test and screenshot tour on retail, with one account.
 Tests with two or more real accounts are still to come. Everyone in a fellowship should use the same version.
 Please report problems as GitHub issues, with a screenshot and the text of any Lua error (`/console scriptErrors 1`).
@@ -321,7 +318,7 @@ Please report problems as GitHub issues, with a screenshot and the text of any L
 
 ## Install
 Install it with the [CurseForge app](https://www.curseforge.com/wow/addons/journey-together-forever), or download the
-zip from the latest GitHub release and unpack it into `World of Warcraft/_retail_/Interface/AddOns/` (the folder must
+zip from the latest GitHub release and unpack it into `World of Warcraft/_forever_/Interface/AddOns/` (the folder must
 be called `JourneyTogetherForever`). Restart the game fully after installing or updating, then type `/jtf`.
 
 ## License and credits
