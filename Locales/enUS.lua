@@ -914,7 +914,6 @@ ns.L = setmetatable({
   GONE_REMOVED = "You are no longer in %s.",
   GONE_DISBANDED = "%s was disbanded.",
   INVITE_TAG_NONE = "No Battle.net friend with the BattleTag %s is playing a character you can invite right now: online, in this game and on your faction.",
-  INVITE_TAG_ELSEWHERE = "%s is playing on another realm or ruleset. Only characters on your own can share a fellowship with you.",
   INVITE_REALM = "%s is on %s. Only your realm and the realms connected to it can share a fellowship.",
   INVITE_OFFLINE = "%s is offline. The invite stays open for a day and reaches them when they come online.",
   INVITE_WAITING_T = "Invite waiting",

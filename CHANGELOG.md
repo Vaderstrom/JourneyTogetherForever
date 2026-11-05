@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.4 (5 November 2026)
+- WoW Forever: an invited player who accepts now joins the fellowship. Each ruleset is split over several realms,
+  and the addon named players after the realm of whoever's computer it ran on. So the invited player's addon did not
+  find itself in the fellowship it was sent, and the invite looked open on their side. Names now carry the ruleset,
+  the same for everyone. A player who accepted before this update: cancel or remove them and invite them again.
+- WoW Forever: Battle.net friends on another realm are offered again (1.0.3 left them out, but a realm does not tell
+  the ruleset).
+
 ## 1.0.3 (5 November 2026)
 - WoW Forever: a Battle.net friend playing on another realm or ruleset (PvE, PvP, RP, Hardcore) is no longer offered
   in the invite box. A name belongs to one character per ruleset, so the invite would have gone to someone else. Their

@@ -24,17 +24,45 @@ end
 ---------------------------------------------------------------------------
 -- Names. Heroes are stored as "Name-Realm" and shown as "Name".
 ---------------------------------------------------------------------------
-function ns.Realm()
+-- The realm the game puts this character on ("CAMWOWEU4Realm9RPPvP" in WoW Forever).
+function ns.GameRealm()
   local r = GetNormalizedRealmName and GetNormalizedRealmName()
   if not r or r == "" then r = (GetRealmName() or ""):gsub("[%s%-]", "") end
   return r
+end
+
+-- WoW Forever splits each ruleset (PvE, PvP, RP, Hardcore) over numbered realms ("CAMWOW EU4 Realm 9 RP PvP"), and a
+-- name is one character in its whole ruleset. Two Adventurers on one ruleset can be on two realms: when keys ended with
+-- each addon's own realm, the copy of the fellowship an invited player got named them under another realm, and their
+-- addon dropped it (the first invite in Forever, 5 Nov 2026). So keys end with the ruleset, the same for everyone on it
+-- (as Syndicator, Auctionator and AceDB keep Forever characters): "Arielas Fireson-PvP".
+local function ruleset()
+  local R, E = C_GameRules, Enum and Enum.GameRule
+  if not (R and R.IsGameRuleActive and E) then return nil end
+  local function on(rule)
+    if rule == nil then return false end
+    local ok, active = pcall(R.IsGameRuleActive, rule)
+    return ok and active == true
+  end
+  local key = (on(E.HardcoreRuleset) and "HC" or "") .. (on(E.RPRuleset) and "RP" or "") .. (on(E.PvPRuleset) and "PvP" or "")
+  return key ~= "" and key or "PvE"
+end
+
+-- The realm part of every key: your realm; WoW Forever, your ruleset.
+function ns.Realm()
+  if ns.IsForever() then
+    ns.ruleset = ns.ruleset or ruleset()
+    if ns.ruleset then return ns.ruleset end
+  end
+  return ns.GameRealm()
 end
 
 -- Your realm, or one connected to it (GetAutoCompleteRealms; the game leaves the list empty when it has none).
 local function realmKey(r) return (r or ""):gsub("[%s%-]", ""):lower() end
 function ns.IsRealm(r)
   if type(r) ~= "string" or r == "" then return false end
-  if realmKey(r) == realmKey(ns.Realm()) or realmKey(r) == realmKey(GetRealmName and GetRealmName()) then return true end
+  local k = realmKey(r)
+  if k == realmKey(ns.Realm()) or k == realmKey(ns.GameRealm()) or k == realmKey(GetRealmName and GetRealmName()) then return true end
   local list = GetAutoCompleteRealms and GetAutoCompleteRealms()
   for _, x in ipairs(type(list) == "table" and list or {}) do
     if realmKey(x) == realmKey(r) then return true end
@@ -45,8 +73,8 @@ end
 -- WoW Forever names a character "First Surname" (each part letters only, unique together in the region). The game
 -- shows a space between the two and reads a hyphen as that space: an addon whisper to "Arielas-Realm" was looked for
 -- as "Arielas Realm" (the first check in Forever, 5 Nov 2026). So in Forever "First-Surname" is the same name, and a
--- part after the hyphen that is no realm (realms here carry digits) is the surname. Keys stay "Name-Realm":
--- "Arielas Fireson-Realm". Returns the name and its realm ("" for none).
+-- part after the hyphen that is no realm (realms here carry digits) is the surname. Keys stay "Name-Realm", with the
+-- ruleset for the realm (ns.Realm): "Arielas Fireson-PvP". Returns the name and its realm ("" for none).
 local function split(text)
   local name, realm = text:match("^([^%-]+)%-?(.*)$")
   if not name then return nil end
@@ -55,9 +83,8 @@ local function split(text)
     local sur, rest = realm:match("^([^%-]+)%-?(.*)$")
     if sur and not sur:find("[%s%d]") then name, realm = name .. " " .. sur, rest end
   end
-  -- A whole Forever name is one character in the whole region: the realm adds nothing, so it is always yours (a
-  -- sender's realm the game writes otherwise still finds the same Adventurer).
-  if ns.IsForever() and name:find(" ", 1, true) then realm = "" end
+  -- In Forever the realm a name comes with (the sender's numbered realm) says nothing: it is always your ruleset.
+  if ns.IsForever() then realm = "" end
   return name, realm
 end
 

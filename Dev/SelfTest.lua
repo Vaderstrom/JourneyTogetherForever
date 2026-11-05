@@ -1166,6 +1166,12 @@ step("invite: names as the game has them (WoW Forever: First Surname)", function
   if ns.IsForever() then
     c:Eq(ns.FullName(ns.CleanName("arielas-fireson")), "Arielas Fireson-" .. ns.Realm(), "a hyphen is the space")
     c:Eq(ns.WhisperTarget(full("Arielas Fireson")), "Arielas Fireson", "whispers go to the name alone")
+    -- (5 Nov 2026: a ruleset is several numbered realms; keys end with the ruleset, the same for everyone on it.)
+    if C_GameRules and C_GameRules.IsGameRuleActive then
+      c:That(not ns.Realm():find("%d"), "keys end with your ruleset, not your numbered realm: " .. ns.Realm()
+        .. " (the game's realm: " .. tostring(ns.GameRealm()) .. ")")
+      c:Eq(ns.FullName("Arielas Fireson-" .. ns.GameRealm()), "Arielas Fireson-" .. ns.Realm(), "a sender's realm becomes the ruleset")
+    end
     if type(second) == "string" and second ~= "" then
       c:That(ns.Self():find(" " .. second, 1, true) ~= nil, "your key has your surname: " .. ns.Self())
     end

@@ -80,32 +80,45 @@ function ns:Debug(msg)
   DEFAULT_CHAT_FRAME:AddMessage("|cff8a98c0JTF debug|r: " .. tostring(msg))
 end
 
--- WoW Forever, up to 1.0.1: a character was known by its first name alone ("Erathor-Realm"); since 1.0.2 by its whole
--- name ("Erathor Vaelstrom-Realm", Core/Util.lua). Once per character, its old name is replaced everywhere in the saved
--- data, so it still leads its fellowship. (No invite reached anyone in Forever before: nobody else has the old name.)
-local function rename(t, old, new, seen)
+-- WoW Forever: up to 1.0.1 a character was known by its first name alone ("Erathor-<realm>"); in 1.0.2 and 1.0.3 every
+-- name ended with this addon's own numbered realm ("Arielas Fireson-CAMWOWEU4Realm9RPPvP"); since 1.0.4 with the
+-- ruleset ("Arielas Fireson-PvP", Core/Util.lua). Once per character, the saved data is moved to the new keys: this
+-- character's first-name key becomes its whole name, and every name on its realm gets the ruleset.
+local function remap(t, fix, seen)
   seen[t] = true
+  local moves = {}
   for k, v in pairs(t) do
     if type(v) == "table" then
-      if not seen[v] then rename(v, old, new, seen) end
-    elseif v == old then
-      t[k] = new
+      if not seen[v] then remap(v, fix, seen) end
+    elseif type(v) == "string" then
+      local n = fix(v)
+      if n then t[k] = n end
+    end
+    if type(k) == "string" then
+      local n = fix(k)
+      if n and n ~= k then moves[k] = n end
     end
   end
-  if t[old] ~= nil then
-    if t[new] == nil then t[new] = t[old] end
-    t[old] = nil
+  for k, n in pairs(moves) do
+    if t[n] == nil then t[n] = t[k] end
+    t[k] = nil
   end
 end
 
 function ns.KeepWholeName()
   if not (ns.db and ns.char and ns.IsForever()) then return end
-  local me = ns.Self()
-  local first, realm = (me or ""):match("^(%S+) [^%-]+%-(.+)$")
+  local me, new, old = ns.Self(), ns.Realm(), ns.GameRealm()
+  local first = (me or ""):match("^(%S+) [^%-]+%-")
   if not first or ns.char.wholeName == me then return end
-  local old = first .. "-" .. realm
-  rename(ns.char, old, me, {})
-  rename(ns.db, old, me, {})
+  local mine, tail = first .. "-" .. old, "-" .. old
+  local function fix(s)
+    if s == mine then return me end
+    if new ~= old and #s > #tail and s:sub(-#tail) == tail and not s:sub(1, -#tail - 1):find("-", 1, true) then
+      return s:sub(1, -#tail - 1) .. "-" .. new
+    end
+  end
+  remap(ns.char, fix, {})
+  remap(ns.db, fix, {})
   ns.char.wholeName = me
 end
 
