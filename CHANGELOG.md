@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.3 (5 November 2026)
+- WoW Forever: a Battle.net friend playing on another realm or ruleset (PvE, PvP, RP, Hardcore) is no longer offered
+  in the invite box. A name belongs to one character per ruleset, so the invite would have gone to someone else. Their
+  BattleTag now says why it cannot be sent.
+
 ## 1.0.2 (5 November 2026)
 - WoW Forever: invites reach players again. Forever names every character "First Surname", and the addon sent the
   invite to a name the game could not find, then said the player was offline (even in your party). Names are now

@@ -8,8 +8,22 @@ ns.Friends = Fr
 
 -- Every candidate once: { name = "Name-Realm", online = true|false, afk = true|nil, source = "friend"|"bnet"|"guild",
 -- tag = the BattleTag of a Battle.net friend ("Arielas#2345") }.
+-- WoW Forever: is this Battle.net friend's character on your realm? A name is one character only on its ruleset (PvE,
+-- PvP, RP, Hardcore: the game's auction house and other addons keep them apart), and a whisper goes to the one with
+-- that name on yours. The game's realm ID or realm name says it; without either, yes.
+local function sameRealm(g)
+  local mine = GetRealmID and GetRealmID()
+  if type(g.realmID) == "number" and g.realmID > 0 and type(mine) == "number" and mine > 0 then
+    return g.realmID == mine or ns.IsRealm(g.realmName)
+  end
+  if type(g.realmName) == "string" and g.realmName ~= "" then return ns.IsRealm(g.realmName) end
+  return true
+end
+
 function Fr:All()
   local out, seen = {}, {}
+  -- BattleTags (lower case) of Battle.net friends playing on another realm or ruleset (Fr:ByTag says so).
+  self.elsewhere = {}
   local me, faction = ns.Me(), (UnitFactionGroup("player"))
   local function add(name, online, source, afk, tag)
     if type(name) ~= "string" or name == "" then return end
@@ -39,7 +53,11 @@ function Fr:All()
           and (not g.factionName or g.factionName == faction) then
           -- (WoW Forever: the name alone; its names are unique in the region, and a realm would read as a surname.)
           local realm = not ns.IsForever() and g.realmName and (g.realmName:gsub("[%s%-]", "")) or ""
-          add(realm ~= "" and (g.characterName .. "-" .. realm) or g.characterName, g.isOnline, "bnet", g.isGameAFK, tag)
+          if ns.IsForever() and not sameRealm(g) then
+            if tag then self.elsewhere[tag:lower()] = true end
+          else
+            add(realm ~= "" and (g.characterName .. "-" .. realm) or g.characterName, g.isOnline, "bnet", g.isGameAFK, tag)
+          end
         end
       end
     end
@@ -78,7 +96,8 @@ function Fr:SourceText(e)
 end
 
 -- A Battle.net friend's BattleTag ("Arielas#2345", any case) -> the character they play now, in this game and on your
--- faction ("Name-Realm"). Addon messages go to a character, never to an account. nil when none (or several).
+-- faction ("Name-Realm"). Addon messages go to a character, never to an account. nil when none (or several), with
+-- "elsewhere" when that friend plays on another realm or ruleset.
 function Fr:ByTag(text)
   local q = strtrim(text or ""):lower()
   if not q:find("#", 1, true) then return nil end
@@ -89,6 +108,7 @@ function Fr:ByTag(text)
       hit = e.name
     end
   end
+  if not hit and self.elsewhere and self.elsewhere[q] then return nil, "elsewhere" end
   return hit
 end
 

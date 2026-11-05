@@ -1184,6 +1184,18 @@ step("invite: a BattleTag nobody on your list has is not sent", function(c)
   c:Eq(ns.Fellowship:Invite("Jtfnobody#0000"), nil, "not sent")
   c:That(cur().invites[full("Jtfnobody#0000")] == nil, "no invite made")
   c:That(toastSeen(nil, "Jtfnobody#0000"), "a toast says no friend with it is playing")
+  -- Rulesets (5 Nov 2026): what the game gives for a Battle.net friend's realm, beside yours (to read in the report;
+  -- friends on another realm or ruleset are left out of the suggestions).
+  local mine = GetRealmID and GetRealmID()
+  for i = 1, (BNGetNumFriends and (BNGetNumFriends()) or 0) do
+    for j = 1, (C_BattleNet and C_BattleNet.GetFriendNumGameAccounts and C_BattleNet.GetFriendNumGameAccounts(i)) or 0 do
+      local g = C_BattleNet.GetFriendGameAccountInfo(i, j)
+      if g and g.isOnline and g.clientProgram == (BNET_CLIENT_WOW or "WoW") and g.characterName then
+        c:That(true, ("Battle.net: %s on realm %s (%s); yours %s / %s (%s)"):format(tostring(g.characterName),
+          tostring(g.realmName), tostring(g.realmID), tostring(GetRealmName and GetRealmName()), ns.Realm(), tostring(mine)))
+      end
+    end
+  end
 end)
 
 step("invite: a real name that is offline", function(c)

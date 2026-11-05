@@ -34,7 +34,7 @@ end
 local function realmKey(r) return (r or ""):gsub("[%s%-]", ""):lower() end
 function ns.IsRealm(r)
   if type(r) ~= "string" or r == "" then return false end
-  if realmKey(r) == realmKey(ns.Realm()) then return true end
+  if realmKey(r) == realmKey(ns.Realm()) or realmKey(r) == realmKey(GetRealmName and GetRealmName()) then return true end
   local list = GetAutoCompleteRealms and GetAutoCompleteRealms()
   for _, x in ipairs(type(list) == "table" and list or {}) do
     if realmKey(x) == realmKey(r) then return true end

@@ -481,9 +481,10 @@ function F:Invite(text, friend)
   local f = self:Current()
   -- A Battle.net friend's BattleTag ("Arielas#2345"): the character they play now.
   if type(text) == "string" and text:find("#", 1, true) then
-    local who = ns.Friends:ByTag(text)
+    local who, why = ns.Friends:ByTag(text)
     if not who then
-      if f then ns:Toast(nil, L.INVITE_NOT_SENT, L.INVITE_TAG_NONE:format(strtrim(text))) end
+      local msg = why == "elsewhere" and L.INVITE_TAG_ELSEWHERE or L.INVITE_TAG_NONE
+      if f then ns:Toast(nil, L.INVITE_NOT_SENT, msg:format(strtrim(text))) end
       return nil
     end
     text = who
