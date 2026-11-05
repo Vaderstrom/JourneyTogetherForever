@@ -30,11 +30,42 @@ function ns.Realm()
   return r
 end
 
+-- Your realm, or one connected to it (GetAutoCompleteRealms; the game leaves the list empty when it has none).
+local function realmKey(r) return (r or ""):gsub("[%s%-]", ""):lower() end
+function ns.IsRealm(r)
+  if type(r) ~= "string" or r == "" then return false end
+  if realmKey(r) == realmKey(ns.Realm()) then return true end
+  local list = GetAutoCompleteRealms and GetAutoCompleteRealms()
+  for _, x in ipairs(type(list) == "table" and list or {}) do
+    if realmKey(x) == realmKey(r) then return true end
+  end
+  return false
+end
+
+-- WoW Forever names a character "First Surname" (each part letters only, unique together in the region). The game
+-- shows a space between the two and reads a hyphen as that space: an addon whisper to "Arielas-Realm" was looked for
+-- as "Arielas Realm" (the first check in Forever, 5 Nov 2026). So in Forever "First-Surname" is the same name, and a
+-- part after the hyphen that is no realm (realms here carry digits) is the surname. Keys stay "Name-Realm":
+-- "Arielas Fireson-Realm". Returns the name and its realm ("" for none).
+local function split(text)
+  local name, realm = text:match("^([^%-]+)%-?(.*)$")
+  if not name then return nil end
+  name = strtrim(name)
+  if ns.IsForever() and realm ~= "" and not name:find(" ", 1, true) and not ns.IsRealm(realm) then
+    local sur, rest = realm:match("^([^%-]+)%-?(.*)$")
+    if sur and not sur:find("[%s%d]") then name, realm = name .. " " .. sur, rest end
+  end
+  -- A whole Forever name is one character in the whole region: the realm adds nothing, so it is always yours (a
+  -- sender's realm the game writes otherwise still finds the same Adventurer).
+  if ns.IsForever() and name:find(" ", 1, true) then realm = "" end
+  return name, realm
+end
+
 function ns.FullName(name)
   if not name or name == "" then return nil end
-  name = strtrim(name)
-  if name:find("-", 1, true) then return name end
-  return name .. "-" .. ns.Realm()
+  local base, realm = split((strtrim(name):gsub("%s+", " ")))
+  if not base or base == "" then return nil end
+  return base .. "-" .. (realm ~= "" and realm or ns.Realm())
 end
 
 -- WoW Forever, or retail (where we test until Forever is out)? The game's project ID says it (Forever:
@@ -80,22 +111,34 @@ function ns.RealmOf(name) return type(name) == "string" and name:match("%-(.+)$"
 
 -- Can fellowship messages reach this character? Addon whispers reach your own realm and the realms connected to it.
 -- The game lists those (GetAutoCompleteRealms; empty when the realm has no partners). Without that list: yes.
-local function realmKey(r) return (r or ""):gsub("[%s%-]", ""):lower() end
 function ns.Reachable(name)
   local realm = ns.RealmOf(name)
   if not realm or realmKey(realm) == realmKey(ns.Realm()) then return true end
   local list = GetAutoCompleteRealms and GetAutoCompleteRealms()
   if type(list) ~= "table" then return true end
-  for _, r in ipairs(list) do
-    if realmKey(r) == realmKey(realm) then return true end
-  end
-  return false
+  return ns.IsRealm(realm)
 end
 
-function ns.Short(name) return name and (Ambiguate(name, "short")) or "" end
+-- "Name" ("First Surname" in WoW Forever).
+function ns.Short(name)
+  if not name then return "" end
+  if ns.IsForever() then return (name:match("^[^%-]+")) or name end
+  return (Ambiguate(name, "short"))
+end
 
--- "Name" for this realm, "Name-Realm" for another.
-function ns.Display(name) return name and (Ambiguate(name, "none")) or "" end
+-- "Name" for this realm, "Name-Realm" for another. WoW Forever: the name alone (names are unique in the region).
+function ns.Display(name)
+  if not name then return "" end
+  if ns.IsForever() then return ns.Short(name) end
+  return (Ambiguate(name, "none"))
+end
+
+-- Who an addon whisper goes to. WoW Forever: the name alone, "Arielas Fireson", as chat whispers it (with a realm the
+-- game took the realm for the surname and found nobody: the invite said "offline" though both were in one party).
+function ns.WhisperTarget(name)
+  if ns.IsForever() then return ns.Short(name) end
+  return name
+end
 
 function ns.Me()
   -- While the book draws another character's fellowship (Fellowship/Watch.lua), "me" is that character.
@@ -105,14 +148,26 @@ function ns.Me()
 end
 
 -- The character being played, also while the book draws another one's fellowship (the "player" unit, models).
-function ns.Self() return ns.FullName(UnitName("player")) end
+function ns.Self() return ns.UnitFull("player") or ns.FullName(UnitName("player")) end
 
--- Character names: letters only, first one capital (as the game shows them).
+-- A player unit's key ("Name-Realm"); nil for none or a name the game keeps secret. Retail: UnitName gives the name
+-- and, for another realm, the realm. WoW Forever: the first name and the surname, and no realm (the player's own may
+-- come as one "First Surname").
+function ns.UnitFull(unit)
+  local n, r = UnitName(unit)
+  if issecretvalue and (issecretvalue(n) or issecretvalue(r)) then return nil end
+  if type(n) ~= "string" or n == "" then return nil end
+  if type(r) ~= "string" or r == "" then return ns.FullName(n) end
+  if ns.IsForever() then return ns.FullName(n:find(" ", 1, true) and n or (n .. " " .. r)) end
+  return n .. "-" .. r
+end
+
+-- Character names as the game shows them: each part with a capital first letter ("arielas fireson" is "Arielas
+-- Fireson": WoW Forever's surname too; it was "Arielas fireson", whom the game did not find).
 function ns.CleanName(text)
-  text = strtrim(text or "")
-  local name, realm = text:match("^([^%-]+)%-?(.*)$")
+  local name, realm = split((strtrim(text or ""):gsub("%s+", " ")))
   if not name or name == "" then return nil end
-  name = name:sub(1, 1):upper() .. name:sub(2):lower()
+  name = name:gsub("[^ ]+", function(p) return p:sub(1, 1):upper() .. p:sub(2):lower() end)
   return realm ~= "" and (name .. "-" .. realm) or name
 end
 

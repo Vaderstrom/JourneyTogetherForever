@@ -479,7 +479,19 @@ end
 -- a fight, a dungeon) or nil (not allowed / no name). Whether it arrived comes a few seconds later (Fellowship/Sync.lua).
 function F:Invite(text, friend)
   local f = self:Current()
+  -- A Battle.net friend's BattleTag ("Arielas#2345"): the character they play now.
+  if type(text) == "string" and text:find("#", 1, true) then
+    local who = ns.Friends:ByTag(text)
+    if not who then
+      if f then ns:Toast(nil, L.INVITE_NOT_SENT, L.INVITE_TAG_NONE:format(strtrim(text))) end
+      return nil
+    end
+    text = who
+  end
   local name = ns.FullName(ns.CleanName(text))
+  -- The name as the game has it: a friend, guild member or someone in the group (WoW Forever: "Arielas" finds
+  -- Arielas Fireson in your party).
+  name = name and ns.Friends:Resolve(name) or name
   if not f or not name or not P.Can(f, ns.Me(), "invite") then return nil end
   if not ns.Reachable(name) then
     ns:Toast(nil, L.INVITE_NOT_SENT, L.INVITE_REALM:format(ns.Short(name), ns.RealmOf(name)))

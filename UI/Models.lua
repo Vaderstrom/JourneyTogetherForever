@@ -14,11 +14,8 @@ ns.Models = MD
 
 local function secret(v) return issecretvalue and issecretvalue(v) end
 
-local function unitName(unit)
-  local n, r = UnitName(unit)
-  if not n or secret(n) or secret(r) then return nil end
-  return (r and r ~= "") and (n .. "-" .. r) or ns.FullName(n)
-end
+-- (WoW Forever: "First Surname-Realm"; Core/Util.lua.)
+local function unitName(unit) return ns.UnitFull(unit) end
 
 -- A player the game has as this unit, by name ("Name-Realm"); nil for nobody, an NPC, or a name kept secret.
 local function playerName(unit)

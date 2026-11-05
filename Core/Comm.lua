@@ -85,7 +85,10 @@ function C:Pump(dt)
     self.recent[item.target] = now
     self.recent[ns.Short(item.target)] = now
     self.fullName[ns.Short(item.target)] = item.target
-    local result = C_ChatInfo.SendAddonMessage(self.PREFIX, item.msg, "WHISPER", item.target)
+    -- (WoW Forever: to "First Surname", without the realm; Core/Util.lua.)
+    local to = ns.WhisperTarget(item.target)
+    self.recent[to], self.fullName[to] = now, item.target
+    local result = C_ChatInfo.SendAddonMessage(self.PREFIX, item.msg, "WHISPER", to)
     if result == LOCKDOWN then
       -- Not allowed right now: keep it (and everything after it) and try again a little later.
       table.insert(self.queue, 1, item)

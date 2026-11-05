@@ -14,7 +14,9 @@ Sh.URL = "https://www.curseforge.com/wow/addons/journey-together-forever"
 function Sh:WhisperText(name)
   name = ns.CleanName(name)
   if not name then return nil end
-  return ("/w %s %s"):format(ns.Display(name), L.SHARE_MESSAGE:format(self.URL))
+  -- (WoW Forever: "/w Arielas-Fireson": the game reads the hyphen as the space, and a space would end the name.)
+  local to = ns.IsForever() and (ns.Display(name):gsub(" ", "-")) or ns.Display(name)
+  return ("/w %s %s"):format(to, L.SHARE_MESSAGE:format(self.URL))
 end
 
 function Sh:Whisper(name)

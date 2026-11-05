@@ -12,7 +12,7 @@ function C:Update()
   local className, class = UnitClass("player")
   local f = ns.Fellowship:Current()
   local faction, factionName = UnitFactionGroup("player")
-  ns.db.characters[me] = { name = UnitName("player"), realm = ns.Realm(), class = class, className = className,
+  ns.db.characters[me] = { name = ns.Short(me), realm = ns.Realm(), class = class, className = className,
     level = UnitLevel("player"), fellowshipId = f and f.id or nil, lastSeen = time(), faction = faction, factionName = factionName }
 end
 

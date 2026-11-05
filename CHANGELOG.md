@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.2 (5 November 2026)
+- WoW Forever: invites reach players again. Forever names every character "First Surname", and the addon sent the
+  invite to a name the game could not find, then said the player was offline (even in your party). Names are now
+  read as the game has them, a lower-case "arielas fireson" works, and a first name alone finds the one friend,
+  guild member or group member who has it. Your own fellowship stays yours: the addon moves it to your whole name.
+- Invite a Battle.net friend by BattleTag ("Name#1234"): the invite goes to the character they are playing. Friends
+  in the suggestions show their BattleTag.
+
 ## 1.0.1 (4 November 2026)
 - Lord of the Rings: a fellowship whose Ring-bearer left before 1.0 no longer shows "Something does not match" every
   day. The Leader's addon passes the Ring to the next in line, as it now does when a bearer leaves.

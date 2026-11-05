@@ -1157,6 +1157,35 @@ step("invite: a pretend Hero declines", function(c)
   c:That(not cur().members[full("Fenna")], "not a Hero")
 end)
 
+-- The first check in WoW Forever (5 Nov 2026): an invite to "Arielas Fireson" went to "Arielas fireson-Realm", which
+-- the game did not find, and said "offline" though both were in one party. Forever names are "First Surname".
+step("invite: names as the game has them (WoW Forever: First Surname)", function(c)
+  c:Eq(ns.CleanName("arielas fireson"), "Arielas Fireson", "each part of a name gets its capital")
+  c:That(cur().members[ns.Me()] ~= nil, "you are in your fellowship under your own name (" .. tostring(ns.Me()) .. ")")
+  local _, second = UnitName("player")
+  if ns.IsForever() then
+    c:Eq(ns.FullName(ns.CleanName("arielas-fireson")), "Arielas Fireson-" .. ns.Realm(), "a hyphen is the space")
+    c:Eq(ns.WhisperTarget(full("Arielas Fireson")), "Arielas Fireson", "whispers go to the name alone")
+    if type(second) == "string" and second ~= "" then
+      c:That(ns.Self():find(" " .. second, 1, true) ~= nil, "your key has your surname: " .. ns.Self())
+    end
+    -- In a group: a first name alone finds the one in it who has it.
+    local other = ns.UnitFull("party1")
+    if other and ns.Short(other):find(" ", 1, true) then
+      c:Eq(ns.Friends:Resolve(full(ns.Short(other):match("^(%S+)"))), other, "a first name finds " .. ns.Short(other))
+    end
+  else
+    c:Eq(ns.WhisperTarget("Bob-OtherRealm"), "Bob-OtherRealm", "retail whispers keep the realm")
+  end
+end)
+
+-- The owner, 5 Nov 2026: invite a Battle.net friend by BattleTag (the character they play now).
+step("invite: a BattleTag nobody on your list has is not sent", function(c)
+  c:Eq(ns.Fellowship:Invite("Jtfnobody#0000"), nil, "not sent")
+  c:That(cur().invites[full("Jtfnobody#0000")] == nil, "no invite made")
+  c:That(toastSeen(nil, "Jtfnobody#0000"), "a toast says no friend with it is playing")
+end)
+
 step("invite: a real name that is offline", function(c)
   c:Eq(ns.Fellowship:Invite(OFFLINE_NAME), "sent", "sent")
 end, 3)

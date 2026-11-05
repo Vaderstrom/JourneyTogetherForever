@@ -101,17 +101,17 @@ local function build(pf)
   local R1 = pf.rscroll.child
   pf.ihead = UI.Heading(R1, width, L.INVITE_HEROES, "")
   pf.nameLabel = UI.Text(R1, 13, "ink2")
-  pf.nameLabel:SetText(L.CHARACTER_NAME)
+  pf.nameLabel:SetText(L.INVITE_NAME)
   local function send()
     if F:Invite(pf.invite:GetText(), pf.asFriendOn) == "sent" then pf.invite:SetText(""); pf.asFriendOn = nil; pf.asFriend:Refresh() end
   end
-  pf.invite = UI.EditBox(R1, width - 110, 48, L.CHARACTER_NAME, send)
+  pf.invite = UI.EditBox(R1, width - 110, 48, L.INVITE_NAME, send)
   -- Friends, Battle.net friends and guild members whose name starts with what is typed (online first).
   pf.suggest = UI.Autocomplete(pf.invite, width - 110, function(text)
     local f, out = F:Current(), {}
     local skip = function(name) return f ~= nil and (f.members[name] ~= nil or f.invites[name] ~= nil) end
     for _, e in ipairs(ns.Friends:Suggest(text, skip, 8)) do
-      out[#out + 1] = { text = ns.Display(e.name), sub = L["SRC_" .. e.source:upper()], online = e.online }
+      out[#out + 1] = { text = ns.Display(e.name), sub = ns.Friends:SourceText(e), online = e.online }
     end
     return out
   end, function(e) pf.invite:SetText(e.text) end)

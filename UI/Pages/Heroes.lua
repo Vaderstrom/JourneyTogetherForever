@@ -234,12 +234,12 @@ local function buildList(pf, width)
       pf.invite:SetText(""); pf.asFriendOn = nil; pf.asFriend:Refresh(); ns.Window:Refresh()
     end
   end
-  pf.invite = UI.EditBox(R, width - 118, 48, L.CHARACTER_NAME, send)
+  pf.invite = UI.EditBox(R, width - 118, 48, L.INVITE_NAME, send)
   pf.suggest = UI.Autocomplete(pf.invite, width - 118, function(text)
     local f, out = F:Current(), {}
     local skip = function(name) return f ~= nil and (f.members[name] ~= nil or f.invites[name] ~= nil) end
     for _, e in ipairs(ns.Friends:Suggest(text, skip, 8)) do
-      out[#out + 1] = { text = ns.Display(e.name), sub = L["SRC_" .. e.source:upper()], online = e.online }
+      out[#out + 1] = { text = ns.Display(e.name), sub = ns.Friends:SourceText(e), online = e.online }
     end
     return out
   end, function(e) pf.invite:SetText(e.text) end)

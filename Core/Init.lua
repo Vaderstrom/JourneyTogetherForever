@@ -80,6 +80,35 @@ function ns:Debug(msg)
   DEFAULT_CHAT_FRAME:AddMessage("|cff8a98c0JTF debug|r: " .. tostring(msg))
 end
 
+-- WoW Forever, up to 1.0.1: a character was known by its first name alone ("Erathor-Realm"); since 1.0.2 by its whole
+-- name ("Erathor Vaelstrom-Realm", Core/Util.lua). Once per character, its old name is replaced everywhere in the saved
+-- data, so it still leads its fellowship. (No invite reached anyone in Forever before: nobody else has the old name.)
+local function rename(t, old, new, seen)
+  seen[t] = true
+  for k, v in pairs(t) do
+    if type(v) == "table" then
+      if not seen[v] then rename(v, old, new, seen) end
+    elseif v == old then
+      t[k] = new
+    end
+  end
+  if t[old] ~= nil then
+    if t[new] == nil then t[new] = t[old] end
+    t[old] = nil
+  end
+end
+
+function ns.KeepWholeName()
+  if not (ns.db and ns.char and ns.IsForever()) then return end
+  local me = ns.Self()
+  local first, realm = (me or ""):match("^(%S+) [^%-]+%-(.+)$")
+  if not first or ns.char.wholeName == me then return end
+  local old = first .. "-" .. realm
+  rename(ns.char, old, me, {})
+  rename(ns.db, old, me, {})
+  ns.char.wholeName = me
+end
+
 ns:RegisterEvent("ADDON_LOADED", function(_, name)
   if name ~= ADDON then return end
   -- The dungeons, raids and quests of the game this copy runs in (WoW Forever or retail), before anything reads them.
@@ -89,6 +118,7 @@ ns:RegisterEvent("ADDON_LOADED", function(_, name)
   -- Per character: this character's membership, personal settings and window position.
   _G[CHAR_NAME] = _G[CHAR_NAME] or { schema = 1 }
   ns.db, ns.char = _G[DB_NAME], _G[CHAR_NAME]
+  ns.KeepWholeName()
   -- This copy's version (from the TOC; the packager fills it in), shared with the other Heroes.
   local meta = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
   ns.VERSION = meta and meta(ADDON, "Version") or nil
@@ -97,6 +127,7 @@ ns:RegisterEvent("ADDON_LOADED", function(_, name)
 end)
 
 ns:RegisterEvent("PLAYER_LOGIN", function()
+  ns.KeepWholeName() -- (in case the game gave no surname yet when the addon loaded)
   ns:Fire("LOGIN")
   ns:Print(L.LOADED)
 end)

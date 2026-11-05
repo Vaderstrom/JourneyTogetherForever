@@ -168,11 +168,8 @@ end
 ---------------------------------------------------------------------------
 -- The group
 ---------------------------------------------------------------------------
-local function unitName(unit)
-  local n, r = UnitName(unit)
-  if not n or secret(n) or secret(r) then return nil end
-  return (r and r ~= "") and (n .. "-" .. r) or ns.FullName(n)
-end
+-- (WoW Forever: "First Surname-Realm"; Core/Util.lua.)
+local function unitName(unit) return ns.UnitFull(unit) end
 
 -- Heroes of the fellowship in this character's group (this character first). "/jtf debug group" adds pretend Heroes.
 function C:GroupHeroes(f)
