@@ -314,8 +314,9 @@ offline arrive once someone who has them is online. In dungeons and during boss 
 they go out when you leave. Characters you have not played for a while show "as of" when you last did.
 
 ## Status
-Everything above is built and checked with the addon's own self-test and screenshot tour on retail, with one account.
-Tests with two or more real accounts are still to come. Everyone in a fellowship should use the same version.
+Journey Together Forever is released for WoW Forever. Every version is checked in WoW Forever with the addon's own
+self-test and screenshot tour. Everyone in a fellowship should use the same version: the addon tells you when a newer one
+is out.
 Please report problems as GitHub issues, with a screenshot and the text of any Lua error (`/console scriptErrors 1`).
 `CHANGELOG.md` lists what changed.
 
