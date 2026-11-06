@@ -34,7 +34,7 @@ function S:Build(rank)
   local f = {
     id = self.ID, v = 1, name = L.SAMPLE_NAME, faction = (UnitFactionGroup("player")), color = "2E6A8A",
     emblem = ns.Emblems:First(), leader = leader, officers = {}, members = {}, invites = {}, inviteFrom = {},
-    rules = ns.Rules.Clean(nil), journey = ns.BuildJourney("classic"), chronicle = {}, heroes = {}, runs = {}, kills = {},
+    rules = ns.Rules.Clean(nil), journey = ns.BuildJourney("forever"), chronicle = {}, heroes = {}, runs = {}, kills = {},
     undone = {}, history = {}, ticks = {}, updated = now, sample = true,
   }
   local function add(name, class, role, level, ago)

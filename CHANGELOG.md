@@ -1,5 +1,83 @@
 # Changelog
 
+## 1.1.0 (6 November 2026)
+- What's New shows this update's news once: sync in real time, names filled in as you type, and quests by zone.
+- The invite box fills in names like the game's mail box: type the first letters and a list of friends, guild
+  members, your group and the people you played with lately drops down. The first name is filled in, the rest of
+  it highlighted in gold; Tab, Enter or
+  a click takes it, the arrow keys move through the list and Escape keeps what you typed. Online names show in
+  their class colour with their level, and a soft click plays when a name is filled in.
+- The docked tracker fades in at its new place when the game's quest tracker shows or hides, instead of jumping
+  (not with Reduce effects).
+- Tournament cards: the winner's name is in gold, and a duel decided since you last looked gleams once.
+- Upper Blackrock Spire, Hyjal Summit and the Scarlet Monastery's Library, Armory and Cathedral show the game's own
+  picture of them, no longer the same one as the place next door.
+- Shaper's Terrace and Barrow Deeps have a picture of their own: the titan terrace above Un'Goro Crater, and the
+  Wardens' prison beneath Mount Hyjal. The game has none for them yet.
+- Raids: a raid whose bosses the game does not list yet (Barrow Deeps) says so under Bosses, instead of an empty
+  heading. Journey Admin: such a place reads "Bosses: not known yet", which now fits on its card; hover for why.
+- A smaller download: the developer's test tools are no longer in it.
+- Journey Admin: each dungeon of the chosen chapter shows its picture, small and square, beside its name.
+- The docked tracker no longer jumps to the top-left corner when you have no quests (the game then hides its own
+  tracker). It stays where the game's tracker last was.
+- The "Your own journey" tile on Found a fellowship is easier to read: a shorter text on one line, over a darker
+  picture.
+- WoW Forever: tournament cards and the clears table in Chapter show first names, with the surname only when two
+  Adventurers share a first name, so the names are no longer cut off.
+- Journey Admin's ruler no longer prints chapter numbers under the magnifier (XV and XVI ran into each other).
+- Sync in real time: outside dungeons and raids the addon no longer waits a second between messages (the game
+  only limits that for whispers inside instances), sends at once, and packs long messages about four times smaller.
+  A new Adventurer is in within a second or two. A change that got lost on the way is noticed within about 15
+  seconds, not at the next five-minute check, so everyone's copy agrees soon after they are online together. Both
+  players need this version for packing.
+- Smoother sync while you quest in a group, above all in dungeons: only your newest quest list waits for each
+  Adventurer (the older ones no longer pile up in front of other changes), and the links between quests go only
+  when they changed, which halves most lists.
+- Less work in raids, cities and busy places: the addon no longer looks at every aura and spell of everyone near
+  you, no longer reloads the 3D looks of Adventurers who are not on screen, reads your bags for the Ring only in a
+  Lord of the Rings fellowship, and reads your friends and guild once while you type a name, not at every letter.
+- WoW Forever's own dungeons: rare bosses and bosses an event calls no longer hold back a clear. Optional now:
+  Lyn the Ignored and the Mana Wraith (City of Dalaran), the Lordaeron Captain, Viktor the Vile and The Abandoned
+  (Ruins of Lordaeron), and the Highland Horror (Excavation Site). The Leader can still tick any of them in Journey
+  Admin.
+- The Ring's road in the rulebook is a path: each bearer a step with their class icon, joined by a line, the
+  Ring on who carries it now.
+- When an invite gets no answer, the message lists the usual causes: an older version on either side, a trial
+  account, a fight; in WoW Forever also only the first name typed (it needs their first and last name) and a
+  different ruleset.
+- An invite to someone offline has a thin bar under it in Manage that empties over its day, and Needs attention
+  says how long it still waits.
+- The Ring-bearer has a small ring after their name in "Where the Adventurers stand" (Overview and Chapter) and in
+  the tracker on the screen. The toast when the Ring passes on shows the two names with their class icons.
+- Syncing is much faster. A new Adventurer is in the fellowship within a few seconds of accepting (it could take a
+  minute late in a journey), and a change reaches everyone at once instead of waiting behind a copy on its way to
+  someone else. XP shows to the others every 30 seconds. Both players need this version for the full speed.
+- The minimap button can be gathered by button collectors (Minimap Button Bag, HidingBar, SexyMap, ElvUI and the
+  like): it uses LibDBIcon when another addon has it, and otherwise has a name they find. The addon is also listed in
+  the game's addon compartment, so the book opens with the button hidden.
+- Dungeon bosses reviewed: rare spawns, bosses that need a quest item or an event, and bosses players often spare no
+  longer hold back a clear. Optional now: Ezra Grimm, Ragglesnout, Urok Doomhowl, Kirtonos, the Avatar of Hakkar,
+  Grubbis, the Vault, Hurley Blackbreath, Ribbly Screwspigot, Plugger Spazzring, Princess Moira, and Dire Maul North's
+  guards and Cho'Rush (a tribute run counts). The Leader can still tick any of them in Journey Admin. A fellowship
+  founded before this keeps its Blackrock Depths list until the Leader changes it there.
+- The story button on dungeons and raids opens Spoken's story of the place when Spoken has one, and Lore Forever
+  otherwise (the two can talk over each other). Settings, Other addons: choose which comes first. Spoken keeps a
+  place you have not found yet to itself, and the book says how to unlock it.
+- "First to ride a mount" now needs a riding mount of your own: a flight path or a vehicle no longer gives it.
+- An Adventurer who founds or joins a fellowship already past level 10, 20 and so on gets those level firsts if
+  nobody had them, quietly, from the moment they came in.
+- The addon tells you when a newer version is out, once a session, in chat and as a toast: it hears it from anyone
+  in your guild or group who has the addon, not only from your fellowship.
+- The Quests page is clearer. The tabs are Quests, Quest chains, and Attunements & keys. Its two parts, Together now
+  and Pick up and join, are headings with a count. Quests are grouped by zone, with the zone you are in first (You
+  are here), then the zones on your continent (Nearby), then the rest; each quest is a card with an icon and your
+  progress, and a chain shows a mark for each part. A quest says which Adventurers are in its zone now, and the
+  other Adventurers on the right say where they are. Attunement rows are larger, with an icon, and banded.
+- A new journey preset, Forever: every dungeon, Classic's and Forever's new ones (what Classic was until now). The
+  Classic preset now has only Classic's own 25 dungeons, in 12 chapters. In every preset Ragefire Chasm is only for
+  Horde fellowships, and mandatory there; Hall of Thanes is only for Alliance ones. No other dungeon depends on the
+  faction. A journey already started keeps its dungeons.
+
 ## 1.0.4 (5 November 2026)
 - WoW Forever: an invited player who accepts now joins the fellowship. Each ruleset is split over several realms,
   and the addon named players after the realm of whoever's computer it ran on. So the invited player's addon did not

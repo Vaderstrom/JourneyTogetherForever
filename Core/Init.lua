@@ -39,20 +39,40 @@ local function trace(err)
   return { msg = err, stack = debugstack and debugstack(2, 12, 0) or (debug and debug.traceback and debug.traceback()) }
 end
 
+-- One handler, its errors logged. (The game's xpcall passes arguments on: no table or function is made per event.
+-- The ponytail audit of 6 Nov 2026: every addon message of every addon in a raid made both, twice.)
+local XARGS = select(2, xpcall(function(a) return a end, function() end, true)) == true
+local function run(fn, event, ...)
+  local ok, e
+  if XARGS then ok, e = xpcall(fn, trace, event, ...)
+  else
+    local n, args = select("#", ...), { ... }
+    ok, e = xpcall(function() fn(event, unpack(args, 1, n)) end, trace)
+  end
+  if not ok then
+    ns:LogError(event, e.msg, e.stack)
+    if geterrorhandler then geterrorhandler()(e.msg) else error(e.msg, 0) end
+  end
+end
+
 frame:SetScript("OnEvent", function(_, event, ...)
   if ns.off then
     if event == "PLAYER_LOGIN" then DEFAULT_CHAT_FRAME:AddMessage("|cffe2b857" .. L.ADDON_NAME .. "|r: " .. L.TWO_COPIES:format(ADDON, ns.off)) end
     return
   end
-  local n, args = select("#", ...), { ... }
-  for _, fn in ipairs(handlers[event]) do
-    local ok, e = xpcall(function() fn(event, unpack(args, 1, n)) end, trace)
-    if not ok then
-      ns:LogError(event, e.msg, e.stack)
-      if geterrorhandler then geterrorhandler()(e.msg) else error(e.msg, 0) end
-    end
-  end
+  for _, fn in ipairs(handlers[event]) do run(fn, event, ...) end
 end)
+
+-- An event of one unit only ("player"): the game hands over no other. UNIT_AURA and UNIT_SPELLCAST_SUCCEEDED come for
+-- every unit in a raid and on every nameplate, many times a second, and the addon only reads its own (ponytail audit).
+-- (ns.unitEvents: their frames by event, for the self-test.)
+ns.unitEvents = {}
+function ns:RegisterUnitEvent(event, unit, fn)
+  local f = CreateFrame("Frame")
+  f:RegisterUnitEvent(event, unit)
+  f:SetScript("OnEvent", function(_, ev, ...) if not ns.off then run(fn, ev, ...) end end)
+  ns.unitEvents[event] = f
+end
 
 -- A protected action blocked or forbidden for this addon (for example a group invite without a click).
 local function blocked(event, addon, fn)

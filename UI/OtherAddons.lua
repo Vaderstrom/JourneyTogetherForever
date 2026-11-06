@@ -1,5 +1,5 @@
--- Shortcuts to other addons that tell more (asked for 29 Oct 2026): Lore Forever tells a dungeon's or a raid's story,
--- Spoken reads quests aloud. Neither is needed, and both are made for Forever (and Classic), not retail. Their
+-- Shortcuts to other addons that tell more (asked for 29 Oct 2026): Lore Forever and Spoken tell a dungeon's or a
+-- raid's story (Settings: Stories from, 6 Nov 2026), Spoken reads quests aloud. Neither is needed, and both are made for Forever (and Classic), not retail. Their
 -- buttons always show, as the Dungeon Journal's does (UI/Window.lua): without the addon a click says, in a toast,
 -- what installing it would give (30 Oct 2026; they showed only while the addon ran, so nobody learnt of them).
 -- Lore Forever has no API for other addons: its chat command is asked about the place by name ("/lore The
@@ -22,18 +22,83 @@ function OA:HasLore() return self:LoreCommand() ~= nil end
 -- The name Lore Forever knows a place by: ours shortens Scarlet Monastery's wings ("SM: Library").
 function OA.LoreName(name) return (name:gsub("^SM: ", "Scarlet Monastery ")) end
 
--- Opens Lore Forever on a dungeon's or a raid's story; without it, a toast says to install it. Returns true when it
--- was asked.
+---------------------------------------------------------------------------
+-- Spoken's stories of places (the owner, 6 Nov 2026: Spoken instead of Lore Forever, the two talk over each other)
+---------------------------------------------------------------------------
+-- Spoken's Places part tells a dungeon's story: SpokenDungeons.dungeons[instance ID].story = { map, area }, opened
+-- with SpokenPlaces:ShowLoreFor, which Spoken lists for other addons (docs/places/ADDON.md in Spoken). Its caller
+-- checks that the part is on and the place not locked (not found yet). Our instance IDs are Data/Dungeons.lua's.
+-- Returns SpokenPlaces, the map and the area, or nil.
+local function spokenStory(key)
+  local places, list = SpokenPlaces, SpokenDungeons
+  if type(places) ~= "table" or type(places.ShowLoreFor) ~= "function" then return nil end
+  if type(Spoken) == "table" and type(Spoken.IsPartOn) == "function" then
+    local ok, on = pcall(Spoken.IsPartOn, Spoken, "places")
+    if ok and on == false then return nil end
+  end
+  local where = ns.DUNGEON_MAPS[ns.BaseKey(key)]
+  local d = where and type(list) == "table" and type(list.dungeons) == "table" and list.dungeons[where[1]]
+  local story = type(d) == "table" and type(d.story) == "table" and d.story
+  if not (story and story[1] and story[2]) then return nil end
+  return places, story[1], story[2]
+end
+
+function OA:HasSpokenStory(key) return spokenStory(key) ~= nil end
+
+-- Opens Spoken's story of the place: "open", "locked" (Spoken tells it once this character has found the place) or
+-- nil (Spoken has none).
+function OA:SpokenLore(key)
+  local places, map, area = spokenStory(key)
+  if not places then return nil end
+  if type(places.IsLocked) == "function" then
+    local ok, locked = pcall(places.IsLocked, places, map, area)
+    if ok and locked then return "locked" end
+  end
+  return pcall(places.ShowLoreFor, places, map, area) and "open" or nil
+end
+
+-- Which addon the story button opens for key now: "spoken", "lore" or nil (neither has it). The setting says which
+-- comes first; the other stands in when the first has no story for the place.
+function OA:StoryFrom(key)
+  local spoken, lore = self:HasSpokenStory(key), self:HasLore()
+  if ns.Settings:Get("storyFrom") == "lore" then
+    return lore and "lore" or (spoken and "spoken") or nil
+  end
+  return spoken and "spoken" or (lore and "lore") or nil
+end
+
+-- The story button's tooltip: who tells it.
+function OA:StoryTip(key)
+  local from = self:StoryFrom(key)
+  return from == "spoken" and L.LORE_TIP_SPOKEN or (from == "lore" and L.LORE_TIP) or L.LORE_TIP_NONE
+end
+
+-- Opens a dungeon's or a raid's story, in Spoken or Lore Forever (Settings: Stories from); with neither, a toast
+-- says to install one. Returns true when one was asked.
 function OA:Lore(key)
   local d = key and ns.Dungeon(key)
   if not d then return false end
-  local ask = self:LoreCommand()
-  if not ask then
-    ns:Toast(nil, L.LORE_FOREVER, L.LORE_MISSING)
-    return false
+  local function forever()
+    local ask = self:LoreCommand()
+    if not ask then return false end
+    ask(self.LoreName(d[2]))
+    return true
   end
-  ask(self.LoreName(d[2]))
-  return true
+  local first = self:StoryFrom(key)
+  if first == "lore" then return forever() end
+  if first == "spoken" then
+    local got = self:SpokenLore(key)
+    if got == "open" then return true end
+    -- Not found yet: Spoken keeps it to itself (no spoilers); Lore Forever tells it when it is there.
+    if got == "locked" then
+      if forever() then return true end
+      ns:Toast(nil, L.SPOKEN, L.SPOKEN_STORY_LOCKED)
+      return false
+    end
+    if forever() then return true end
+  end
+  ns:Toast(nil, L.STORIES, L.LORE_MISSING)
+  return false
 end
 
 ---------------------------------------------------------------------------

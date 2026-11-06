@@ -13,7 +13,7 @@ ns.CreateState = C
 function C:Reset()
   -- The banner starts in the side's colour: Alliance blue, Horde crimson (a Horde fellowship started blue; seen in game).
   local horde = ns.Theme:Horde()
-  self.step, self.name, self.color, self.emblem, self.role, self.preset = 1, "", ns.BANNERS[horde and 2 or 1][2], ns.Emblems:First(), "DPS", "classic"
+  self.step, self.name, self.color, self.emblem, self.role, self.preset = 1, "", ns.BANNERS[horde and 2 or 1][2], ns.Emblems:First(), "DPS", ns.Rules.Suggest("party")[2]
   self.rules = ns.Rules.New()
   self.size = "party"
   self.fine = false -- step 2: the full rules form instead of the styles
@@ -40,7 +40,7 @@ end
 function C:SetSize(key)
   local R = ns.Rules
   self.size = key
-  local suggest = R.SIZE_SUGGEST[key]
+  local suggest = R.Suggest(key)
   self.rules = R.WithStyle(R.WithSize(self.rules, key), suggest[1])
   self.preset = suggest[2]
 end
@@ -53,7 +53,7 @@ function C:JourneyTitle() return self.own and L.PRESET_OWN or ns.PRESETS[self.pr
 function C:ChooseOwn()
   self.own = true
   if not self.journey then
-    local suggest = ns.Rules.SIZE_SUGGEST[self.size] or ns.Rules.SIZE_SUGGEST.party
+    local suggest = ns.Rules.Suggest(self.size)
     self.journey, self.sel = ns.BuildJourney(suggest[2]), 1
   end
 end
@@ -215,7 +215,7 @@ local function chalNumber(parent, w, onDown, onUp, getText, getNote)
 end
 
 local STYLE_ART = { relaxed = 3, together = 1, strict = 13 }   -- chapter pictures on the style tiles
-local PRESET_ART = { classic = 1, short = 5, long = 9, scratch = 12 }
+local PRESET_ART = { forever = 1, classic = 3, short = 5, long = 9, scratch = 12 }
 
 local function styleName(key) return ns.Rules.StyleName(key) end
 local function sizeName(key) return ns.Rules.SizeName(key) end
@@ -459,7 +459,7 @@ local function build(pf)
     card.title:SetText(L["SIZE_" .. key:upper()])
     card.sub = UI.Text(card, 12, "ink2")
     card.sub:SetPoint("TOPLEFT", card.title, "BOTTOMLEFT", 0, -4)
-    local suggest = ns.Rules.SIZE_SUGGEST[key]
+    local suggest = ns.Rules.Suggest(key)
     card.sub:SetText(L.SIZE_SUGGESTS:format(styleName(suggest[1]), ns.PRESETS[suggest[2]].title))
     card.check = UI.Check(card, 18)
     card.check:SetPoint("TOPRIGHT", -8, -8)
@@ -594,25 +594,30 @@ local function build(pf)
   local jp = UI.Text(s3, 15, "ink", "title")
   jp:SetPoint("TOPLEFT"); jp:SetText(L.JOURNEY_PICK)
   pf.presets = {}
-  for i, key in ipairs({ "classic", "short", "long", "own" }) do
+  -- Five tiles end where the three style tiles of step 2 end, above Back (Forever and Classic since 6 Nov 2026).
+  local tileKeys = { "forever", "classic", "short", "long", "own" }
+  local tileH = math.floor((352 - (#tileKeys - 1) * 6) / #tileKeys)
+  for i, key in ipairs(tileKeys) do
     local own = key == "own"
     local P = ns.PRESETS[key] or { title = L.PRESET_OWN, text = L.PRESET_OWN_TEXT }
-    -- Four tiles end where the three style tiles of step 2 end, above Back.
-    local tile = UI.PictureTile(s3, width, 84, function(tex, w, h) ns.Pages:SetChapterArt(tex, PRESET_ART[own and "scratch" or key], w, h, 0.5) end,
+    local tile = UI.PictureTile(s3, width, tileH, function(tex, w, h) ns.Pages:SetChapterArt(tex, PRESET_ART[own and "scratch" or key], w, h, 0.5) end,
       function() if own then C:ChooseOwn() else C:ChoosePreset(key) end W:Refresh() end)
     -- (The count is the journey's own: with the Prologue, Classic has 15 chapters; the tile said 14.)
     local chapters = own and { { floor = 15, cap = 60 } } or ns.BuildJourney(key).chapters
     tile.count = #chapters
     tile:Set(P.title, P.text)
-    tile:SetPoint("TOPLEFT", 0, -(26 + (i - 1) * 90))
+    -- Your own journey's picture is the brightest (fire and sunset): dimmed so its gold title and text read (check of
+    -- 6 Nov 2026, the owner: "hard to read"; its text also took two lines and pushed the title off the tile).
+    if own then tile.pic:SetVertexColor(0.55, 0.5, 0.47) end
+    tile:SetPoint("TOPLEFT", 0, -(26 + (i - 1) * (tileH + 6)))
     -- Chapter strip along the top: each chapter's share of the levels (1-60 with the Prologue, else 15-60).
     local lo = chapters[1] and chapters[1].floor or 15
     local bx = 12
     for _, c in ipairs(chapters) do
       local seg = UI.Solid(tile, "OVERLAY", own and "goldText" or c.color)
       local w = (width - 24) * (c.cap - c.floor) / (60 - lo)
-      seg:SetSize(math.max(1, w - 1), 6)
-      seg:SetPoint("TOPLEFT", bx, -8)
+      seg:SetSize(math.max(1, w - 1), 5)
+      seg:SetPoint("TOPLEFT", bx, -5)
       bx = bx + w
     end
     tile.key = key
@@ -809,7 +814,7 @@ local function refresh(pf)
   local fine = key == "style" and C.fine
   for k, b in pairs(pf.body) do b:SetShown(k == key) end
   for k, r in pairs(pf.side) do r:SetShown(k == key and not fine) end
-  local suggest = ns.Rules.SIZE_SUGGEST[C.size] or ns.Rules.SIZE_SUGGEST.party
+  local suggest = ns.Rules.Suggest(C.size)
   local function recommended(on) return on and ("  ·  " .. L.STYLE_RECOMMENDED) or "" end
 
   -- Step 1.

@@ -326,7 +326,7 @@ function C:PassRing(f, gone, t, to)
     while #r.passes > self.PASSES_MAX do table.remove(r.passes, 1) end
     r.who, r.item, r.id, r.guid = to, nil, nil, nil
     if fresh(f, t) then
-      ns:Toast("challenge", L.T_RING_PASSED, L.CH_RING_PASSED:format(ns.Short(gone), ns.Short(to)), "chronicle",
+      ns:Toast("challenge", L.T_RING_PASSED, self:HandOver(f, gone, to), "chronicle",
         self:ToastOf("ring", { framed = true, sound = "ring" }))
     end
   end
@@ -616,6 +616,17 @@ function C:CardNote(f, name, noRing)
   return #parts > 0 and table.concat(parts, "  ·  ") or nil
 end
 
+-- The Ring's hand-over for its toast (U56): "<icon> Brannic  »  <icon> Corwin", the two names with their class icons
+-- (the sentence left its last word alone on a line; the Chronicle keeps the sentence).
+function C:HandOver(f, from, to)
+  local function who(name)
+    local _, token = ns.Hero:ClassName(f, name)
+    local icon = ns.ClassIconMarkup and ns.ClassIconMarkup(token, 16) or ""
+    return (icon ~= "" and (icon .. " ") or "") .. ns.Short(name)
+  end
+  return L.RING_HANDOVER:format(who(from), who(to))
+end
+
 -- Is name the Ring-bearer now (the quest open)?
 function C:Bearer(f, name)
   local r = f.ring
@@ -630,6 +641,17 @@ function C:RingRoad(f, hl)
   local names = { hl(ns.Short((r.first or r).who)) }
   for _, p in ipairs(r.passes or {}) do names[#names + 1] = hl(ns.Short(p.to)) end
   return table.concat(names, L.RING_ROAD_THEN)
+end
+
+-- The Ring's road as steps for the rulebook's path (U58): { { name, bearer } }, its finder first; bearer marks who
+-- carries it now (nobody once the quest is done or lost).
+function C:RingSteps(f)
+  local r = f.ring
+  if not r then return nil end
+  local steps = { { name = (r.first or r).who } }
+  for _, p in ipairs(r.passes or {}) do steps[#steps + 1] = { name = p.to } end
+  if not r.state then steps[#steps].bearer = true end
+  return steps
 end
 
 -- The Chronicle's entries (UI/Pages/Chronicle.lua, under All): the falls, the broken rules, the Ring, the race and
@@ -716,7 +738,11 @@ function C:Book(f, hl)
     if r.state then note("ring", self:RingText(f) .. " " .. L.CHAL_BOOK_ON:format(day(r.tEnd or r.t)))
     elseif r.passes and not r.guid then note("ring", L.CHAL_BOOK_RING_WAIT:format(hl(ns.Short(r.who))))
     else note("ring", L.CHAL_BOOK_RING:format(hl(ns.Short(r.who)), r.item or L.RING_A_RING)) end
-    if r.passes then note("ring", L.CHAL_BOOK_RING_ROAD:format(self:RingRoad(f, hl))) end
+    -- (U58: under its block the road is a path of steps; the words stay in the paragraph.)
+    if r.passes then
+      local line = L.CHAL_BOOK_RING_ROAD:format(self:RingRoad(f, hl))
+      if byKey.ring then byKey.ring.road, byKey.ring.roadText = self:RingSteps(f), line else note("ring", line) end
+    end
   elseif self:Has(f, "ring") then
     note("ring", L.CHAL_BOOK_RING_NONE)
   end
@@ -740,6 +766,7 @@ function C:Book(f, hl)
     parts[#parts + 1] = L.CHAL_BOOK_ONE:format(it.name, it.rule)
     if it.broken then parts[#parts + 1] = it.broken end
     for _, line in ipairs(it.notes) do parts[#parts + 1] = line end
+    if it.roadText then parts[#parts + 1] = it.roadText end
   end
   for _, line in ipairs(after) do parts[#parts + 1] = line end
   return { title = L.CHAL_BOOK, intro = L.CHAL_BOOK_INTRO, items = items, after = after, text = table.concat(parts, " ") }

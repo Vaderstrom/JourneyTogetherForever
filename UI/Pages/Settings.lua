@@ -283,6 +283,10 @@ local function build(pf)
   pf.trackerPeek = opt(L.TRACKER_PEEK, "trackerPeek", L.TRACKER_PEEK_HINT, true)
   pf.trackerCombat = opt(L.TRACKER_HIDE_COMBAT, "trackerHideCombat")
   pf.trackerInstance = opt(L.TRACKER_HIDE_INSTANCE, "trackerHideInstance", L.TRACKER_HIDE_INSTANCE_HINT)
+  -- Other addons the book opens (6 Nov 2026): whose stories the dungeons' story button tells.
+  local FROM = { spoken = L.SPOKEN, lore = L.LORE_FOREVER }
+  right:Head("addons", L.SET_ADDONS, nil, { sum = function() return FROM[Settings:Get("storyFrom")] or "" end })
+  right:Row(L.STORY_FROM, dropdown(Rp, { { L.SPOKEN, "spoken" }, { L.LORE_FOREVER, "lore" } }, "storyFrom"), L.STORY_FROM_HINT)
   pf.heights = { left = left:MaxHeight(), right = right:MaxHeight() }
   function pf.layout() left:Layout(); right:Layout() end
   -- Opens or folds a section; opening one of a group folds the others.

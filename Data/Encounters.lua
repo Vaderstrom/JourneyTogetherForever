@@ -7,7 +7,7 @@
 --     "d" or "r", best level from, to, a raid's players (0: not given), picture file, the bosses of a wing... }.
 local _, ns = ...
 ns.ENCOUNTERS = {
-  wowf = { build = "1.60.1.70753",
+  wowf = { build = "1.60.1.70790",
   finder = {
     [1] = "Wailing Caverns",
     [2] = "Scholomance",
@@ -77,7 +77,7 @@ ns.ENCOUNTERS = {
     [2999] = { "Ruins of Lordaeron", { 3353, "Witherfang" }, { 3357, "The Abandoned" }, { 3355, "The Butcher" }, { 3408, "Lordaeron Captain" }, { 3411, "Viktor the Vile" }, { 3412, "Bjork" }, { 3354, "Rath'mael" } },
     [3065] = { "The Hall of Thanes", { 3493, "Faldrim Anvilmar" }, { 3495, "Infurnus" }, { 3494, "Plunder" }, { 3496, "Durgen Dirgehammer" } },
   } },
-  wow = { build = "12.1.5.70688",
+  wow = { build = "12.1.5.70783",
   guide = {
     { 63, 36, "Deadmines", 0, "d", 7, 30, 0, 522352 },
     { 64, 33, "Shadowfang Keep", 0, "d", 8, 30, 0, 522358 },

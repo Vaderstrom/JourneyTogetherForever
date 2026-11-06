@@ -12,7 +12,7 @@ local F, Comm = ns.Fellowship, ns.Comm
 local Q = { SEND_DELAY = 15, LINK_WITHIN = 60 }
 ns.Quests = Q
 
-local function secret(v) return issecretvalue ~= nil and issecretvalue(v) end
+local secret = ns.Secret
 
 local function db()
   ns.db.questLinks = ns.db.questLinks or {}
@@ -304,20 +304,36 @@ end
 -- Sending
 ---------------------------------------------------------------------------
 -- Sends my quests to every other Hero (or one), only when they changed unless force.
+-- Only the newest list waits for each Hero (replace), and the chain links go only when they changed or to one Hero
+-- (a login, a newcomer): the ponytail audit of 6 Nov 2026 measured a list at about 9 KB, half of it links, sent to
+-- every Hero every 15 seconds while questing; with five Adventurers that is all the bytes the game lets an addon send,
+-- and the lists piled up (in a dungeon, one more each time a quest moved), with every change waiting behind them.
 function Q:Send(to, force)
   local f = F:Current()
   if not f then return end
   local log = self:MyLog()
   local doneList = self:MyDone()
   local keys = ns.QuestLists and ns.QuestLists:MyKeys() or {}
-  local data = { fid = f.id, q = log, d = doneList, ln = self:MyLinks(log, doneList), k = keys, t = time() }
+  local links = self:MyLinks(log, doneList)
+  local data = { fid = f.id, q = log, d = doneList, ln = links, k = keys, t = time() }
   local key = ns.Serialize.Encode({ log, doneList, keys })
   self:Store(f, ns.Me(), data, data.t)
   if not to and not force and key == self.lastKey then return end
   if not to then self.lastKey = key end
+  local lkey = ns.Serialize.Encode(links)
+  local same = not to and not force and lkey == self.lastLinks
+  if not to then self.lastLinks = lkey end
+  local short
+  if same then
+    short = {}
+    for k, v in pairs(data) do if k ~= "ln" then short[k] = v end end
+  end
   local me = ns.Me()
   for name in pairs(f.members) do
-    if name ~= me and (not to or name == to) then Comm:Send(name, "QUESTS", data) end
+    -- (A list still waiting for them may carry links they have not had yet: the newer one takes them over.)
+    if name ~= me and (not to or name == to) then
+      Comm:Send(name, "QUESTS", (short and not Comm:Waiting(name, "QUESTS")) and short or data, false, true)
+    end
   end
   ns:Fire("HEROES")
 end
@@ -487,6 +503,56 @@ function Q:Classify(x)
     x.join = not x.mine and others and id ~= nil and not done(id) and (not x.level or x.level == 0 or lvl >= x.level - self.JOIN_BELOW)
   end
   return x.together or x.join
+end
+
+-- Where I am, for sorting quests by how close they are (the owner, 6 Nov 2026: "a better way to divide between zones
+-- and close by"). here: the names of the zone and subzone I am in; near: every map on my continent (the game's map
+-- tree, from my map up to its continent). Quest log headers name a quest's zone, so names are compared, in lower case.
+local CONTINENT = 2 -- Enum.UIMapType.Continent
+Q.continentMaps = {}
+function Q:Whereabouts()
+  local here, near = {}, {}
+  local function add(set, name) if type(name) == "string" and name ~= "" and not secret(name) then set[name:lower()] = true end end
+  add(here, GetRealZoneText and GetRealZoneText()); add(here, GetZoneText and GetZoneText())
+  add(here, GetSubZoneText and GetSubZoneText())
+  local map = C_Map and C_Map.GetBestMapForUnit and C_Map.GetBestMapForUnit("player")
+  local info = map and C_Map.GetMapInfo(map)
+  if info then add(here, info.name) end
+  local guard = 0
+  while info and (info.mapType or 0) > CONTINENT and (info.parentMapID or 0) > 0 and guard < 8 do
+    info, guard = C_Map.GetMapInfo(info.parentMapID), guard + 1
+  end
+  if info and info.mapType == CONTINENT and C_Map.GetMapChildrenInfo then
+    local names = self.continentMaps[info.mapID]
+    if not names then
+      names = {}
+      for _, child in ipairs(C_Map.GetMapChildrenInfo(info.mapID, nil, true) or {}) do add(names, child.name) end
+      self.continentMaps[info.mapID] = names
+    end
+    near = names
+  end
+  return { here = here, near = near }
+end
+
+-- How close a quest's zone is: "here" (I am in it), "near" (on my continent) or nil. w: Whereabouts(), once per list.
+function Q:Nearness(zone, w)
+  if type(zone) ~= "string" or zone == "" then return nil end
+  w = w or self:Whereabouts()
+  local z = zone:lower()
+  if w.here[z] then return "here" end
+  if w.near[z] then return "near" end
+  return nil
+end
+
+-- The others on a quest who are online in its zone now (from their last state; Fellowship/Hero.lua sends the zone).
+function Q:ThereNow(f, x)
+  local out = {}
+  if type(x.zone) ~= "string" or x.zone == "" then return out end
+  for _, name in ipairs(x.others) do
+    local h = f.heroes and f.heroes[name]
+    if h and type(h.zone) == "string" and h.zone:lower() == x.zone:lower() and ns.Hero:Online(f, name) then out[#out + 1] = name end
+  end
+  return out
 end
 
 -- Shared quests and chains in my log that others are still on (for What's next on the Overview).

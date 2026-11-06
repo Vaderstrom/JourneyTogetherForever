@@ -116,8 +116,11 @@ function M:Check(f)
   end
   for name in pairs(a.lv) do if not f.members[name] then a.lv[name] = nil end end
   -- The fellowship's firsts (Fellowship/Firsts.lua, SPEC §8).
+  -- (Not a level brought in when joining: nothing happened then, U62.)
   for _, x in ipairs(ns.Firsts and ns.Firsts:List(f) or {}) do
-    self:Add(f, { id = "first:" .. x.key, k = "first", time = x.time, names = { x.name }, first = x.key })
+    if not ns.Firsts:BroughtIn(f, x) then
+      self:Add(f, { id = "first:" .. x.key, k = "first", time = x.time, names = { x.name }, first = x.key })
+    end
   end
   -- The Guild Master tournament's champion (the chronicle's line).
   for _, e in ipairs(f.chronicle) do

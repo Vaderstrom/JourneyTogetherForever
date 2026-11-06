@@ -23,13 +23,13 @@ SlashCmdList.JOURNEYTOGETHERFOREVER = function(msg)
   elseif cmd == "settings" then W:OpenSettings()
   elseif cmd == "photo" then ns.Photo:Open()
   elseif cmd == "news" then ns.News:Open()
-  elseif cmd == "debug" then ns.Dev:Command(rest)
-  elseif cmd == "check" then ns.Check:Run(rest)
-  elseif cmd == "tests" then ns.Manual:Command(rest)
-  elseif cmd == "selftest" then ns.SelfTest:Run(rest:lower())
-  elseif cmd == "tour" then ns.Tour:Run(rest:lower())
-  elseif cmd == "brand" then ns.Tour:Brand() -- the README's pictures (Dev/Tour.lua); not in the help
-  elseif cmd == "lab" then ns.Lab:Toggle() -- the developer's test lab (Dev/Lab.lua); not in the help
+  elseif cmd == "debug" and ns.Dev then ns.Dev:Command(rest)
+  elseif cmd == "check" and ns.Check then ns.Check:Run(rest)
+  elseif cmd == "tests" and ns.Manual then ns.Manual:Command(rest)
+  elseif cmd == "selftest" and ns.SelfTest then ns.SelfTest:Run(rest:lower())
+  elseif cmd == "tour" and ns.Tour then ns.Tour:Run(rest:lower())
+  elseif cmd == "brand" and ns.Tour then ns.Tour:Brand() -- the README's pictures (Dev/Tour.lua); not in the help
+  elseif cmd == "lab" and ns.Lab then ns.Lab:Toggle() -- the developer's test lab (Dev/Lab.lua); not in the help
   else
     for _, c in ipairs(ns.COMMANDS) do ns:Print(c[1] .. "  -  " .. c[2], true) end
     ns:Print(ns.COMMAND_NEWS[1] .. "  -  " .. ns.COMMAND_NEWS[2], true)

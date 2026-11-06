@@ -12,7 +12,7 @@ local MD = { frames = { portrait = {}, body = {} }, TICK = 10, NEAR = { "target"
   PLATE_CVARS = { "nameplateShowFriendlyPlayers", "nameplateShowFriends" } }
 ns.Models = MD
 
-local function secret(v) return issecretvalue and issecretvalue(v) end
+local secret = ns.Secret
 
 -- (WoW Forever: "First Surname-Realm"; Core/Util.lua.)
 local function unitName(unit) return ns.UnitFull(unit) end
@@ -155,13 +155,21 @@ function MD:Clear(holder)
 end
 
 -- In the background: load the models of the Companions whom the game can draw now (grouped or near).
+-- A model already loaded and not on screen is left: it sets its unit again when shown (OnShow, above). Reloading every
+-- hidden model every 10 seconds, and on every model change of anyone near, was wasted work (ponytail audit, 6 Nov 2026).
 function MD:Tick()
   local f = ns.Fellowship:Current()
   if not f then return end
   for name in pairs(f.members) do
     if name ~= ns.Self() then
       local unit = self:UnitFor(name)
-      if unit and drawable(unit) then self:Load(name, "portrait"); self:Load(name, "body") end
+      if unit and drawable(unit) then
+        near(name)
+        for _, kind in ipairs({ "portrait", "body" }) do
+          local m = self.frames[kind][name]
+          if not (m and m.loaded and not m:IsVisible()) then self:Load(name, kind) end
+        end
+      end
     end
   end
 end
@@ -185,4 +193,5 @@ ns:RegisterEvent("UPDATE_MOUSEOVER_UNIT", function() MD:Spot("mouseover") end)
 ns:RegisterEvent("PLAYER_EQUIPMENT_CHANGED", function()
   for _, kind in ipairs({ "portrait", "body" }) do if MD.frames[kind][ns.Self()] then MD:Load(ns.Self(), kind) end end
 end)
-ns:RegisterEvent("UNIT_MODEL_CHANGED", function() MD:Tick() end)
+-- (Only the unit whose looks changed: the event comes for anyone near, mounting or changing form.)
+ns:RegisterEvent("UNIT_MODEL_CHANGED", function(_, unit) MD:Spot(unit) end)

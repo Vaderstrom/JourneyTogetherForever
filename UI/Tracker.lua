@@ -150,7 +150,11 @@ function TK:BuildDock()
   head.click:SetPoint("TOPLEFT"); head.click:SetPoint("BOTTOMRIGHT", -24, 0)
   head.click:SetScript("OnClick", fold)
   fr.dock = head
-  local function follow() if TK:Docked() then TK:Place() end end
+  -- The game's tracker shown or hidden: ours fades in at its new place instead of jumping (the owner, 6 Nov 2026).
+  fr.fadeIn = fr:CreateAnimationGroup()
+  local a = fr.fadeIn:CreateAnimation("Alpha")
+  a:SetFromAlpha(0); a:SetToAlpha(1); a:SetDuration(0.3)
+  local function follow() TK:Follow() end
   hooksecurefunc(ot, "SetCollapsed", function() if TK:Docked() then TK:Refresh() end end)
   ot:HookScript("OnShow", follow); ot:HookScript("OnHide", follow)
   ot.NineSlice:HookScript("OnShow", follow); ot.NineSlice:HookScript("OnHide", follow)
@@ -160,6 +164,17 @@ function TK:BuildDock()
     if ObjectiveTrackerManager and ObjectiveTrackerManager[method] then
       hooksecurefunc(ObjectiveTrackerManager, method, function() if TK:Docked() then TK:Refresh() end end)
     end
+  end
+end
+
+-- Docked, after the game's tracker showed or hid: placed again, faded in (not when hidden, nor with Reduce effects).
+-- TK.fadedAt: when it last faded (the self-test reads it).
+function TK:Follow()
+  local fr = self.frame
+  if not self:Docked() then return end
+  self:Place()
+  if fr:IsShown() and not fr.invisible and not Settings:Get("reduce") then
+    fr.fadeIn:Stop(); fr.fadeIn:Play(); self.fadedAt = GetTime()
   end
 end
 
@@ -182,8 +197,17 @@ function TK:Place()
   if not self:Docked() then place(fr) return end
   local ot = self:GameTracker()
   fr:ClearAllPoints()
-  if not ot:IsVisible() then
-    fr:SetPoint("TOPLEFT", ot, "TOPLEFT")
+  -- With no quests the game hides its tracker, and its layout then leaves it without a place: anchored to it, ours
+  -- went to the top left corner of the screen (the owner, 6 Nov 2026). It stays where the game's tracker last stood
+  -- (kept per character, for a login without quests), else in its own place.
+  local left, top = ot:GetLeft(), ot:GetTop()
+  if ot:IsVisible() and left and top then
+    local s = ot:GetEffectiveScale() / UIParent:GetEffectiveScale()
+    ns.char.trackerDockAt = { math.floor(left * s + 0.5), math.floor(top * s + 0.5) }
+  end
+  if not ot:IsVisible() or not left then
+    local at = ns.char.trackerDockAt
+    if at then fr:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", at[1], at[2]) else place(fr) end
   elseif ot.NineSlice:IsShown() then
     local a, b = ot:GetLeft(), ot.NineSlice:GetLeft()
     fr:SetPoint("TOPLEFT", ot.NineSlice, "BOTTOMLEFT", (a and b) and (a - b) or self.DOCK_X, 0)
@@ -245,7 +269,10 @@ function TK:Content(f)
   local you = T:You(f)
   local steps = J:NextSteps(f)
   local online = {}
-  for _, name in ipairs(T:Online(f)) do online[#online + 1] = ns.Short(name) end
+  -- (The Ring-bearer with the ring after the name, U55.)
+  for _, name in ipairs(T:Online(f)) do
+    online[#online + 1] = ns.Short(name) .. (ns.Challenges:Bearer(f, name) and (" " .. ns.RingMark(11)) or "")
+  end
   local gather
   for _, g in ipairs(G:Upcoming(f)) do
     if g.at >= time() - 3600 and g.at - time() <= self.SOON then gather = L.TRACK_GATHER:format(G.When(g.at), G.What(g)) break end

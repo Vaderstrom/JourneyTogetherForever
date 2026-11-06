@@ -4,6 +4,7 @@ ignore:
   - docs
   - reference
   - tests
+  - Dev
   - tools
   - art
   - CLAUDE.md

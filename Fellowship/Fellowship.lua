@@ -121,6 +121,8 @@ local function cleanHistory(list)
   return out
 end
 
+F.CleanHistory = cleanHistory
+
 -- Fills in anything missing, so a copy from another Hero (or an older version) is safe to use.
 function F:Sanitize(f)
   if type(f) ~= "table" or type(f.id) ~= "string" or type(f.leader) ~= "string" or type(f.members) ~= "table" then return nil end
@@ -160,7 +162,7 @@ function F:Sanitize(f)
     for name, t in pairs(f.led) do if type(name) == "string" and tonumber(t) then led[name] = tonumber(t) end end
   end
   f.led, f.lv = led, tonumber(f.lv) or 0
-  f.journey = ns.Journey.Clean(f.journey) or ns.BuildJourney("classic")
+  f.journey = ns.Journey.Clean(f.journey) or ns.BuildJourney("forever", f.faction)
   ns.Journey.MigrateKeys(f)
   -- Challenges chosen at founding, turned off since, the falls, broken rules, the Ring and the race (Fellowship/Challenges.lua).
   ns.Challenges:Sanitize(f)
@@ -456,8 +458,7 @@ function F:Do(op)
   local f = self:Current()
   if not f then return false end
   local me, t = ns.Me(), time()
-  local others = {}
-  for name in pairs(f.members) do if name ~= me then others[#others + 1] = name end end
+  local others = ns.Others(f)
   local r = P.Rank(f, me) == "leader" and "leader" or nil
   -- (Claims are written only into this addon's own change, also when applying it fails with an error.)
   self.making = true
@@ -550,7 +551,7 @@ function F:AcceptInvite(fid, role)
     ns:Toast(nil, L.ACCEPT_FAILED, why)
     return false
   end
-  local p = { list = self:InviteAnswerers(inv), i = 0, name = inv.name,
+  local p = { list = self:InviteAnswerers(inv), i = 0, name = inv.name, at = GetTime(),
     msg = { fid = fid, role = F.ROLES[role] and role or "DPS", class = info.class, level = info.level, guild = info.guild, gm = info.gm } }
   self.pendingJoin[fid] = p
   self:AcceptNext(fid)

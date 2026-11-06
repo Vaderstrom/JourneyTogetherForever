@@ -3,6 +3,7 @@
 --   INVA         receipt: the invited player's addon has the invite
 --   ACCOK / ACCX the inviter's addon took the Accept / the invite is no longer open
 --   OP           one change, with the new version    SNAPQ / SNAP  ask for / send the whole fellowship
+--   SNAPM        the rest of a new Adventurer's copy (Chronicle, History; U60)
 -- Invites wait up to a day (the owner, 3 Nov 2026): an invite to someone offline stays open, and one online
 -- Adventurer's addon (the courier: the Leader when online, else the first by name) sends it again every few minutes
 -- until their addon has it (Sync:Deliver). The invite lists who may take the answer (who), so Accept reaches whoever of
@@ -34,12 +35,17 @@ S.WHO_MAX = 8       -- Adventurers an invite names to take the answer
 S.sent = {}
 
 S.LOG_MAX = 150 -- changes each addon keeps per fellowship, to make again on top of another copy
+-- After a change goes out, this addon's state (its version and fingerprint) follows within STATE_AFTER seconds, so a
+-- copy that lost the change on the way notices it at once and asks for the copy (the soak test of 6 Nov 2026: a lost
+-- change was otherwise found only at the next heartbeat, five minutes later).
+S.STATE_AFTER = 10
 
 -- a: the character whose addon made the change (left out when it is this one); n: its count; by: whose rights it
 -- uses when that is not a (another character taking a place, Fellowship:TakePlace); r: "leader" when by led then.
 function S:SendOp(f, recipients, op, t, a, n, by, r)
   local msg = { fid = f.id, v = f.v, op = op, t = t, n = n, a = a ~= ns.Self() and a or nil, by = by ~= a and by or nil, r = r }
   for _, name in ipairs(recipients) do Comm:Send(name, "OP", msg) end
+  if #recipients > 0 and ns.Hero then ns.Hero:Soon("state", self.STATE_AFTER, function() ns.Hero:SendState() end) end
 end
 
 local function oplog(fid)
@@ -80,9 +86,7 @@ function S:Replay(f, list)
       if F:Apply(f, e.op, e.by or e.a, e.t, e.r) then
         f.v = f.v + 1
         f.seen[e.a] = e.n
-        local others = {}
-        for name in pairs(f.members) do if name ~= me then others[#others + 1] = name end end
-        self:SendOp(f, others, e.op, e.t, e.a, e.n, e.by or e.a, e.r)
+        self:SendOp(f, ns.Others(f), e.op, e.t, e.a, e.n, e.by or e.a, e.r)
       elseif e.a == me then
         lost = true
       end
@@ -126,7 +130,7 @@ function S:SendInvite(f, name, again)
   C_Timer.After(self.RECEIPT_WAIT, function()
     local cur = F:Current()
     if S.sent[name] == s and not s.received and not s.offline and cur and cur.invites[name] then
-      S:DropInvite(cur, name, L.INVITE_NOANSWER, true)
+      S:DropInvite(cur, name, S:NoAnswerText(), true)
     end
   end)
 end
@@ -161,6 +165,12 @@ end
 
 -- Removes an invite this client sent, and tells the inviter why. noAddon: the invite reached them but their addon did
 -- not answer (M25): they may not have it yet, so the share window opens (in the open book; else the toast opens it).
+-- No answer to an invite: the usual causes (a player on CurseForge, 6 Nov 2026, read it as "no addon" only). In
+-- WoW Forever also the full "First Surname" and the ruleset: addon messages do not cross rulesets.
+function S:NoAnswerText()
+  return ns.IsForever() and L.INVITE_NOANSWER_FOREVER or L.INVITE_NOANSWER
+end
+
 function S:DropInvite(f, name, text, noAddon)
   self.sent[name] = nil
   if f.invites[name] and P.Can(f, ns.Me(), "uninvite", name) then F:Do({ k = "uninvite", name = name }) end
@@ -219,8 +229,19 @@ function S:Copy(f)
   for i = 1, math.min(#(f.history or {}), self.SNAP_HISTORY) do copy.history[i] = f.history[i] end
   return copy
 end
-function S:SendSnap(name, f)
-  Comm:Send(name, "SNAP", { f = self:Copy(f) }, false, true)
+-- first: the copy a new Adventurer waits for (U60, 6 Nov 2026). It goes first, without the Chronicle and History
+-- (most of a copy late in the journey; neither is compared between copies), which follow in SNAPM. An older addon
+-- (no lanes, Core/Comm.lua) has no SNAPM: it gets the whole copy.
+function S:SendSnap(name, f, first)
+  local copy = self:Copy(f)
+  if not (first and (Comm.peers[name] or 1) >= Comm.LANES) then
+    Comm:Send(name, "SNAP", { f = copy }, first, true)
+    return
+  end
+  local more = { fid = f.id, chronicle = copy.chronicle, history = copy.history }
+  copy.chronicle, copy.history, copy.more = nil, nil, true
+  Comm:Send(name, "SNAP", { f = copy }, true, true)
+  Comm:Send(name, "SNAPM", more, false, true)
 end
 function S:AskSnap(name, f) Comm:Send(name, "SNAPQ", { fid = f.id, v = f.v }, false, true) end
 
@@ -273,7 +294,9 @@ S.swappedAt, S.SWAP_EVERY = {}, 30
 -- The limit both comparisons while online use (this one and Clears:CompareSoon): at most once EVERY seconds for each
 -- Adventurer, and the same difference (key) only once in SAME seconds. Ready is checked before the fingerprints are
 -- made (they cost the most), Take once the difference is known.
-local Limiter = { EVERY = 60, SAME = 1800 }
+-- (SAME was 30 minutes while a copy was slow and costly; packed and without the per-prefix wait, a failed swap is
+-- tried again after 2 minutes: the owner, 6 Nov 2026, "syncing always consolidates".)
+local Limiter = { EVERY = 60, SAME = 120 }
 Limiter.__index = Limiter
 function S.Limiter() return setmetatable({ at = {}, last = {} }, Limiter) end
 function Limiter:Ready(who) return not self.at[who] or GetTime() - self.at[who] >= self.EVERY end
@@ -287,7 +310,21 @@ function Limiter:Reset(who) self.at[who], self.last[who] = nil, nil end
 
 S.compared = S.Limiter()
 function S:CompareSoon(sender, f, d)
-  if not self.compared:Ready(sender) then return end
+  -- (Compared with them lately: not dropped but done when the limit allows, with the newest state heard.)
+  if not self.compared:Ready(sender) then
+    self.later = self.later or {}
+    local first = self.later[sender] == nil
+    self.later[sender] = { fid = f.id, d = d }
+    if first then
+      C_Timer.After(self.compared.EVERY - (GetTime() - (self.compared.at[sender] or GetTime())) + 1, function()
+        local w = S.later and S.later[sender]
+        if S.later then S.later[sender] = nil end
+        local g = w and F:Get(w.fid)
+        if g and g.members[sender] then S:CompareSoon(sender, g, w.d) end
+      end)
+    end
+    return
+  end
   local v, mine = tonumber(d.v) or 0, self:Digest(f)
   if v < f.v or (v == f.v and (not d.h or d.h == mine)) then return end
   if not self.compared:Take(sender, f.v .. ":" .. v .. ":" .. tostring(d.h) .. ":" .. mine) then return end
@@ -393,7 +430,7 @@ Comm:On("ACC", function(sender, d)
   end
   if F:Do({ k = "join", name = sender, role = d.role, class = d.class, level = d.level, guild = d.guild, gm = d.gm }) then
     Comm:Send(sender, "ACCOK", { fid = f.id }, true)
-    S:SendSnap(sender, f)
+    S:SendSnap(sender, f, true)
   end
 end)
 
@@ -497,6 +534,7 @@ end)
 Comm:On("SNAP", function(sender, d)
   -- (A copy from an addon before 0.13 has no leadership count: Sync:Beats.)
   local old = type(d) == "table" and type(d.f) == "table" and d.f.lv == nil
+  if type(d) == "table" and type(d.f) == "table" then d.f.more = nil end
   local snap = type(d) == "table" and F:Sanitize(d.f)
   if not snap or not snap.members[sender] and snap.leader ~= sender then return end
   local me, mine = ns.Me(), F:Get(snap.id)
@@ -532,6 +570,8 @@ Comm:On("SNAP", function(sender, d)
   ns.db.fellowships[snap.id] = snap
   ns.Firsts:CountRuns(snap)
   if joining then
+    -- (How long it took from Accept: /jtf debug sync.)
+    ns.Comm.waits.JOIN = GetTime() - (F.pendingJoin[snap.id].at or GetTime())
     F.pendingJoin[snap.id] = nil
     ns.char.fellowshipId = snap.id
     wipe(ns.char.invites)
@@ -540,6 +580,29 @@ Comm:On("SNAP", function(sender, d)
   F:AfterChange(snap)
   if joining then ns:Fire("JOINED") end
   if #missing > 0 then S:Replay(snap, missing) end
+end)
+
+-- The rest of a new Adventurer's copy (S:SendSnap): the Chronicle lines and History entries we do not have yet.
+Comm:On("SNAPM", function(sender, d)
+  local f = type(d) == "table" and F:Get(d.fid)
+  if not f or not f.members[sender] or not f.members[ns.Me()] then return end
+  local have, list = {}, {}
+  for _, e in ipairs(f.chronicle) do have[tostring(e.time) .. "|" .. tostring(e.text)] = true; list[#list + 1] = e end
+  for _, e in ipairs(type(d.chronicle) == "table" and d.chronicle or {}) do
+    local key = type(e) == "table" and tonumber(e.time) and type(e.text) == "string" and (e.time .. "|" .. e.text)
+    if key and not have[key] then
+      have[key] = true
+      list[#list + 1] = { text = e.text, time = tonumber(e.time), k = type(e.k) == "string" and e.k or nil, who = type(e.who) == "string" and e.who or nil }
+    end
+  end
+  -- (Newest first; lines with the same time keep their order.)
+  for i, e in ipairs(list) do e._i = i end
+  table.sort(list, function(a, b) if a.time ~= b.time then return a.time > b.time end return a._i < b._i end)
+  for _, e in ipairs(list) do e._i = nil end
+  while #list > F.CHRONICLE_MAX do table.remove(list) end
+  f.chronicle = list
+  ns.Clears:Merge(f, { history = F.CleanHistory(d.history) })
+  F:Changed()
 end)
 
 -- What a copy taken from another addon does not carry, kept from ours (mine: our copy, or nil). Also for a copy

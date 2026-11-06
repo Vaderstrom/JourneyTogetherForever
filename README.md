@@ -42,7 +42,8 @@ Built for **WoW Forever**.
 - A **fellowship** is a group of characters of one faction, from any guild or none. It has two ranks: the **Leader**
   and the **Adventurers**. Joining is by invitation only.
 - The **journey** is the road from level 1 to 60: a **Prologue** for levels 1-15, then chapters such as
-  *Heroes Awaken, 15-21* or *The Wailing and the Wolf, 21-25*. The Classic journey has 15 chapters.
+  *Heroes Awaken, 15-21* or *The Wailing and the Wolf, 21-25*. The Forever journey, with every
+  dungeon, has 15 chapters; the Classic journey, only Classic's own dungeons, has 12.
 - Each chapter has a **floor** (the lowest level) and a **cap** (the highest). Its **dungeons open** when every
   Adventurer has reached the floor. The chapter is **complete** when its dungeons are cleared; a chapter without
   dungeons is complete when everyone has reached the cap. Then the next chapter opens for the whole fellowship.
@@ -83,7 +84,8 @@ The **Overview** answers "what now?" at a glance:
 - A **clears table** (Adventurer by dungeon). The Leader can mark a clear or undo one; undoing a clear an earlier
   chapter needs reopens that chapter, and the question says so first.
 - Shortcuts to other addons when you have them: the **Dungeon Journal** addon (loot, quests, where to pick them up)
-  and **Lore Forever** (the story of the place). Nothing of theirs is copied into this addon.
+  and **Spoken** or **Lore Forever** (the story of the place; Settings says which comes first). Nothing of theirs is
+  copied into this addon.
 
 ![The Chapter page: the stage track, the dungeons and who has cleared what](.github/screenshots/chapter.jpg)
 
@@ -110,7 +112,8 @@ The **Overview** answers "what now?" at a glance:
   class crest and when they were last near you.
 - **Inspect**: their gear around the character in 3D, item level, XP, this chapter's dungeons, roles, Whisper and
   Invite to group.
-- **Invite Adventurers**: everyone can invite; the name box suggests friends, Battle.net friends and guild members.
+- **Invite Adventurers**: everyone can invite; the name box fills in names as you type, like the game's mail: friends,
+  Battle.net friends, guild members, your group and the people you played with lately.
   Someone without the addon? **Share it** gives you the addon's page to whisper them.
 - **Roles** and a secondary role, **I'm away**, and the fellowship's make-up (tanks, healers, damage).
 - **Old addon**: everyone sees who runs an older version, and you get one reminder per session when it is you.
@@ -121,11 +124,11 @@ The **Overview** answers "what now?" at a glance:
 ![The Adventurers page](.github/screenshots/adventurers.jpg)
 
 #### Quests and attunements
-- **Shared quests**: quests you and other Adventurers have (**Together**) and quests they have that you could pick
-  up (**You could join**), with everyone's progress and what you can do: **Ask to group up**, Invite to group, or
+- **Shared quests**: quests you and other Adventurers have (**Together now**) and quests they have that you could
+  pick up (**Pick up and join**), grouped by zone with the zone you are in first, with everyone's progress and what you can do: **Ask to group up**, Invite to group, or
   the game's **Share quest**.
 - **Quest chains** learned as the fellowship plays, or all of them from the start with Questie installed.
-- **Attunements and keys** up to 60 (Molten Core, Onyxia, Blackwing Lair, Upper Blackrock Spire, Scholomance,
+- **Attunements and keys** up to 60 (Onyxia, Upper Blackrock Spire, Scholomance,
   Blackrock Depths, Stratholme, Dire Maul and more): a grid of who has done what, and each one's steps.
 - Dungeon quests: how many of each dungeon's quests every Adventurer has picked up.
 
@@ -139,8 +142,8 @@ tracker show the next one.
 ![Gatherings](.github/screenshots/gatherings.jpg)
 
 #### The Endgame and raids
-When the last chapter is complete, **the Endgame** opens: the classic raids (Zul'Gurub, Onyxia's Lair, Molten Core,
-Blackwing Lair, Ruins and Temple of Ahn'Qiraj, Naxxramas), each with who is attuned, every boss with how many
+When the last chapter is complete, **the Endgame** opens: WoW Forever's raids (Barrow Deeps, Hyjal Summit and
+Onyxia's Lair, from 9 December 2026; more as Blizzard announces them), each with who is attuned, every boss with how many
 Adventurers have killed it, and **Find group** for the raid.
 
 ![The Endgame: raids](.github/screenshots/raids.jpg)
@@ -177,7 +180,7 @@ Five steps, and you can change everything later except the challenges:
    rules that fit) and the banner: a colour and an emblem from picture crests and 16 heraldic emblems.
 2. **Play style**: Relaxed, Together or Strict, each shown as a strip of levels: below the floor, slack, floor to
    cap, fellowship runs only, over the cap. Or fine-tune every rule yourself.
-3. **Journey**: Classic, Short chapters, Long chapters, or **your own journey** (one more step: the journey editor).
+3. **Journey**: Forever, Classic, Short chapters, Long chapters, or **your own journey** (one more step: the journey editor).
 4. **Challenges**: none, or any of [the challenge modes](#challenge-modes), on three banners side by side.
 5. **Review**: everything as rows, each with Change, then Create the fellowship.
 
@@ -292,7 +295,7 @@ log out; the app reads it from your saved data and posts nothing you have not ch
 - A **setup guide** the first time, and **Show me around**: a two-minute walkthrough of the book on a sample
   fellowship, for your rank.
 - Settings for every toast, the tracker's lines, chat messages, the cap warning, sounds, reduced effects and the
-  minimap button.
+  minimap button. Button collectors can gather the minimap button, and the addon is in the game's addon compartment.
 - **What's New**: once after an update, a page over the book with the update's news. `/jtf news` shows it again.
 
 ![What's New, once after each update](.github/screenshots/whats-new.jpg)
@@ -325,7 +328,7 @@ be called `JourneyTogetherForever`). Restart the game fully after installing or 
 MIT License, see `LICENSE`. Copyright (c) 2026 Vaderstrom.
 
 - Dungeon and boss data (`Data/Encounters.lua`) comes from the game's own data tables, via [wago.tools](https://wago.tools).
-- Questie, Dungeon Journal, Attune and Lore Forever are other people's addons. Journey Together Forever only opens
+- Questie, Dungeon Journal, Attune, Spoken and Lore Forever are other people's addons. Journey Together Forever only opens
   them when you have them installed; none of their data is included.
 
 Journey Together Forever is designed and developed by **Vaderstrom**. Claude, Anthropic's AI assistant, has assisted in

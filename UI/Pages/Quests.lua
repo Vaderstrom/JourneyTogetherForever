@@ -44,8 +44,11 @@ local function inkFor(f, name)
   return Theme:RGBA("ink")
 end
 
+-- A quest card's height and its progress strip's width (Quests tab and Quest chains tab).
+local ROW_H, BAR_W = 46, 96
+
 -- Names like Upper Blackrock Spire need about 180 pixels (they were cut off at 120; seen in the tour).
-local ATT_COLS, ATT_NAME_W = 5, 190
+local ATT_COLS, ATT_NAME_W, ATT_ROW_H = 5, 210, 32
 
 -- The Attunements tab (SPEC §6): left a grid of attunements × Heroes, right the chosen one's steps.
 local function buildAttune(pf, width)
@@ -68,11 +71,16 @@ local function buildAttune(pf, width)
   end
   pf.aRows = UI.Pool(function()
     local r = CreateFrame("Button", nil, Lc)
-    r:SetSize(width, 26)
-    r.sel = r:CreateTexture(nil, "BACKGROUND")
-    r.sel:SetAllPoints(); r.sel:SetColorTexture(0.72, 0.53, 0.18, 0.2)
-    r.name = UI.Text(r, 13, "ink", "title")
-    r.name:SetPoint("LEFT", 4, 0); r.name:SetWidth(ATT_NAME_W - 6)
+    r:SetSize(width, ATT_ROW_H)
+    -- Every other row a faint band, so a row reads across to its Adventurers (6 Nov 2026: clearer, bolder).
+    r.stripe = UI.Solid(r, "BACKGROUND", "line", 0.25)
+    r.stripe:SetAllPoints()
+    r.sel = r:CreateTexture(nil, "BACKGROUND", nil, 1)
+    r.sel:SetAllPoints(); r.sel:SetColorTexture(0.72, 0.53, 0.18, 0.25)
+    r.icon = UI.Round(r, "ARTWORK", 22)
+    r.icon:SetPoint("LEFT", 4, 0)
+    r.name = UI.Text(r, 14, "ink", "title")
+    r.name:SetPoint("LEFT", 32, 0); r.name:SetWidth(ATT_NAME_W - 34)
     r.cells = {}
     for i = 1, ATT_COLS do
       local t = UI.Text(r, 12, "ink", "body", "CENTER")
@@ -173,6 +181,8 @@ local function refreshAttune(pf, f, me)
     r.index = i
     -- Without the "(Armory and Cathedral)" part in the grid (cut off even at 190 pixels); the steps page has it.
     r.name:SetText((a.name:gsub("%s*%(.-%)$", "")))
+    UI.SetIcon(r.icon, ns.ICONS[a.kind == "raid" and "raids" or "bn_locked"])
+    r.stripe:SetShown(i % 2 == 0)
     r.sel:SetShown(i == pf.attSel)
     for c, t in ipairs(r.cells) do
       local n = heroes[c]
@@ -184,7 +194,7 @@ local function refreshAttune(pf, f, me)
         t:SetText("")
       end
     end
-    s:Place(r, 26, 2)
+    s:Place(r, ATT_ROW_H, 2)
   end
   pf.aRows:HideFrom(shown + 1)
   pf.aMore:SetShown(#heroes > ATT_COLS)
@@ -276,9 +286,9 @@ local function build(pf)
   local W = ns.Window
   local width = W.PAGE_W - 8
 
-  -- Tabs: Chains · Quests · Attunements (Quests first shown).
+  -- Tabs: Quests · Quest chains · Attunements & keys (the one shown first comes first; 6 Nov 2026).
   pf.tab = "quests"
-  pf.tabs = UI.Tabs(pf.left, { { L.TAB_CHAINS, "chains" }, { L.TAB_QUESTS, "quests" }, { L.TAB_ATTUNE, "attune" } },
+  pf.tabs = UI.Tabs(pf.left, { { L.TAB_QUESTS, "quests" }, { L.TAB_CHAINS, "chains" }, { L.TAB_ATTUNE, "attune" } },
     function() return pf.tab end, function(v) pf.tab = v; pf.sel = nil; W:Refresh() end, width,
     function(v)
       local f = ns.Fellowship:Current()
@@ -307,34 +317,51 @@ local function build(pf)
     ns.db.questieHintHidden = true; W:Refresh()
   end, "link", 12)
   pf.questie.hide:SetPoint("TOPRIGHT", 0, 2)
+  -- Two sections, each a book heading with its count and a "?" that explains it (two lines of help under each made
+  -- the page a wall of text; the owner, 6 Nov 2026: "more bold").
   pf.secs = {}
   for i = 1, 2 do
     local s = {}
-    s.title = UI.Text(Lc, 17, "ink", "title")
-    s.help = UI.WrapText(Lc, 12, "ink2", width)
+    s.head = UI.SectionHeader(Lc, width)
+    s.title = s.head.text
     s.empty = UI.Text(Lc, 12, "ink2")
     s.empty:SetText(L.Q_NOTHING)
     pf.secs[i] = s
   end
-  pf.secs[1].title:SetText(L.Q_SECTION_MINE); pf.secs[1].help:SetText(L.Q_SECTION_MINE_HELP)
-  pf.secs[2].title:SetText(L.Q_SECTION_OTHERS); pf.secs[2].help:SetText(L.Q_SECTION_OTHERS_HELP)
+  pf.secs[1].head:SetText(L.Q_SECTION_MINE); pf.secs[1].head:SetHelp(L.Q_SECTION_MINE_HELP)
+  pf.secs[2].head:SetText(L.Q_SECTION_OTHERS); pf.secs[2].head:SetHelp(L.Q_SECTION_OTHERS_HELP)
+  -- A zone's heading: its name, and on the right how close it is (You are here, Nearby).
   pf.groupLabels = UI.Pool(function()
-    local t = UI.Text(Lc, 12, "accent", "title")
-    return t
+    local g = CreateFrame("Frame", nil, Lc)
+    g:SetSize(width, 20)
+    g.text = UI.Text(g, 13, "accent", "title")
+    g.text:SetPoint("BOTTOMLEFT", 2, 3)
+    g.tag = UI.Text(g, 11, "ink2", "body", "RIGHT")
+    g.tag:SetPoint("BOTTOMRIGHT", -2, 4)
+    g.pin = g:CreateTexture(nil, "ARTWORK")
+    g.pin:SetSize(14, 14); g.pin:SetPoint("RIGHT", g.tag, "LEFT", -3, 0)
+    g.pin:SetTexture(ns.MARKS.current)
+    function g:GetText() return self.text:GetText() end
+    return g
   end)
+  -- A quest or chain as a card: its icon, name, a strip of your progress (a chain: one pip a part), and a line with
+  -- where you are and who else has it. Yours have a coloured edge.
   pf.rows = UI.Pool(function()
-    local r = CreateFrame("Button", nil, Lc)
-    r:SetSize(width, 38)
-    r.sel = r:CreateTexture(nil, "BACKGROUND")
-    r.sel:SetAllPoints(); r.sel:SetColorTexture(0.72, 0.53, 0.18, 0.2)
+    local r = UI.Card(Lc, "line", "Button")
+    r:SetSize(width, ROW_H)
     r.edge = UI.Solid(r, "ARTWORK", "accent", 1)
-    r.edge:SetWidth(3); r.edge:SetPoint("TOPLEFT"); r.edge:SetPoint("BOTTOMLEFT")
-    r.name = UI.Text(r, 13, "ink", "title")
-    r.name:SetPoint("TOPLEFT", 10, -5)
-    r.name:SetWidth(width - 16)
+    r.edge:SetWidth(3); r.edge:SetPoint("TOPLEFT", 1, -1); r.edge:SetPoint("BOTTOMLEFT", 1, 1)
+    r.icon = UI.Round(r, "ARTWORK", 28)
+    r.icon:SetPoint("LEFT", 10, 0)
+    r.name = UI.Text(r, 14, "ink", "title")
+    r.name:SetPoint("TOPLEFT", 46, -7)
+    r.name:SetWidth(width - 46 - BAR_W - 20)
+    r.bar = bar(r)
+    r.bar:SetHeight(8)
+    r.bar:SetPoint("TOPRIGHT", -12, -11)
     r.sub = UI.Text(r, 11, "ink2")
-    r.sub:SetPoint("TOPLEFT", r.name, "BOTTOMLEFT", 0, -3)
-    r.sub:SetWidth(width - 16)
+    r.sub:SetPoint("TOPLEFT", r.name, "BOTTOMLEFT", 0, -4)
+    r.sub:SetWidth(width - 56)
     local hl = r:CreateTexture(nil, "HIGHLIGHT")
     hl:SetAllPoints(); hl:SetColorTexture(1, 0.9, 0.6, 0.12)
     r:SetScript("OnClick", function() pf.sel = r.id; W:Refresh() end)
@@ -468,10 +495,12 @@ local function refresh(pf, ctx)
   pick = pick or items[1]
   pf.item = pick
 
-  -- Left: the note about Questie, then the two sections, chains first, then quests by zone.
+  -- Left: the note about Questie (on the Quest chains tab: it is about chains), then the two sections, each by zone:
+  -- the zone you are in first, then the ones on your continent, then the rest (the owner, 6 Nov 2026).
   local s = UI.Stack(pf.lscroll.child)
   local state = Q:QuestieState()
-  local note = state == "on" and L.Q_QUESTIE_ON or (not ns.db.questieHintHidden and (state == "off" and L.Q_QUESTIE_OFF or L.Q_QUESTIE_GET))
+  local note = pf.tab == "chains" and (state == "on" and L.Q_QUESTIE_ON
+    or (not ns.db.questieHintHidden and (state == "off" and L.Q_QUESTIE_OFF or L.Q_QUESTIE_GET)))
   pf.questie:SetShown(note ~= nil and note ~= false)
   if note then
     pf.questie.text:SetText(note)
@@ -480,43 +509,62 @@ local function refresh(pf, ctx)
     pf.questie:SetHeight(h)
     s:Place(pf.questie, h, 10)
   end
+  local where = Q:Whereabouts()
+  local RANK = { here = 0, near = 1 }
   local nRows, nLabels = 0, 0
+  pf.zoneOrder = {}
   for i, sec in ipairs(pf.secs) do
-    s:Place(sec.title, 22, 2)
-    s:Place(sec.help, sec.help:GetStringHeight(), 6)
-    local groups, byZone, zones = {}, {}, {}
+    local groups, byZone, count = {}, {}, 0
     for _, x in ipairs(items) do
       if (i == 1 and x.together) or (i == 2 and x.join) then
-        if x.chain then
-          if not groups[1] or groups[1].label ~= L.Q_CHAINS then table.insert(groups, 1, { label = L.Q_CHAINS, rows = {} }) end
-          table.insert(groups[1].rows, x)
-        else
-          if not byZone[x.zone] then byZone[x.zone] = { label = x.zone, rows = {} }; zones[#zones + 1] = x.zone end
-          table.insert(byZone[x.zone].rows, x)
+        count = count + 1
+        local z = x.zone or ""
+        if not byZone[z] then
+          byZone[z] = { label = z, rows = {}, near = Q:Nearness(z, where) }
+          groups[#groups + 1] = byZone[z]
         end
+        table.insert(byZone[z].rows, x)
       end
     end
-    table.sort(zones)
-    for _, z in ipairs(zones) do groups[#groups + 1] = byZone[z] end
+    table.sort(groups, function(a, b)
+      local ra, rb = RANK[a.near] or (a.label == "" and 3 or 2), RANK[b.near] or (b.label == "" and 3 or 2)
+      if ra ~= rb then return ra < rb end
+      return a.label < b.label
+    end)
+    sec.head:SetText((i == 1 and L.Q_SECTION_MINE or L.Q_SECTION_OTHERS) .. (count > 0 and ("  ·  " .. count) or ""))
+    s:Place(sec.head, 29, 6)
     sec.empty:SetShown(#groups == 0)
     if #groups == 0 then s:Place(sec.empty, 16, 10) end
     for _, g in ipairs(groups) do
       local lab = pf.groupLabels:Get(nLabels + 1)
       if not lab then break end
       nLabels = nLabels + 1
-      lab:SetText(g.label ~= "" and g.label or "-")
-      s:Place(lab, 18, 2)
+      lab.text:SetText(g.label ~= "" and g.label or L.Q_ZONE_UNKNOWN)
+      lab.tag:SetText(g.near == "here" and L.Q_ZONE_HERE or (g.near == "near" and L.Q_ZONE_NEAR or ""))
+      lab.tag:SetTextColor(Theme:RGBA(g.near == "here" and "3E7A3A" or "ink2"))
+      lab.pin:SetShown(g.near == "here")
+      pf.zoneOrder[#pf.zoneOrder + 1] = { sec = i, near = g.near }
+      s:Place(lab, 20, 3)
       for _, x in ipairs(g.rows) do
         local r = pf.rows:Get(nRows + 1)
         if not r then break end
         nRows = nRows + 1
         r.id = x.id
+        UI.SetIcon(r.icon, ns.ICONS[x.chain and "bn_chain" or "bn_quest"])
         r.name:SetText(x.name)
-        r.sub:SetText(rowSub(x, me))
-        r.sel:SetShown(pick ~= nil and x.id == pick.id)
+        local there = Q:ThereNow(f, x)
+        r.sub:SetText(rowSub(x, me) .. (#there > 0 and L.Q_THERE_NOW:format(Q.NameList(there)) or ""))
+        r:SetSelected(pick ~= nil and x.id == pick.id)
         r.edge:SetShown(x.mine)
-        s:Place(r, 38, 2)
+        -- Your progress: a pip for each part of a chain, or for each item or kill (a long goal: one fill).
+        local n, have
+        if x.mine and x.chain then n, have = #x.steps, math.min(x.at[me] or 0, #x.steps)
+        elseif x.mine then n, have = x.goal, x.have[me] end
+        r.bar:SetShown(n ~= nil and n > 0)
+        if n and n > 0 then r.bar:Set(BAR_W, have / n, have >= n, n <= UI.BAR_PIPS_MAX and n or nil) end
+        s:Place(r, ROW_H, 4)
       end
+      s:Skip(4)
     end
     s:Skip(10)
   end
@@ -602,7 +650,10 @@ local function refresh(pf, ctx)
       row.name:SetTextColor(inkFor(f, o.name))
       row.bar:Set(width - 116 - 70, o.pct, o.pct >= 1, o.goal)
       row.text:SetText(o.text)
-      row.rel:SetText(o.rel)
+      -- Where they are now, when online (who is close to it; 6 Nov 2026).
+      local h = f.heroes and f.heroes[o.name]
+      local zone = h and type(h.zone) == "string" and h.zone ~= "" and Hr:Online(f, o.name) and h.zone
+      row.rel:SetText(zone and ((o.rel ~= "" and (o.rel .. "  ·  ") or "") .. L.Q_IN_ZONE:format(zone)) or o.rel)
       r:Place(row, 36, 2)
     end
     -- What you can do.

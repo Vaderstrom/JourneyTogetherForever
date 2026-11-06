@@ -67,7 +67,7 @@ local function build(pf)
     UI.Tooltip(c.dj, L.DUNGEON_JOURNAL)
     -- The raid's story in Lore Forever; without it, a click says to install it (UI/OtherAddons.lua).
     c.lore = UI.RoundButton(c, 28, "lore", function() OA:Lore(c.key) end)
-    UI.Tooltip(c.lore, L.LORE_TIP)
+    UI.Tooltip(c.lore, function() return OA:StoryTip(c.key) end)
     c.lore:SetPoint("LEFT", c.dj, "RIGHT", 6, 0)
     return c
   end)
@@ -81,6 +81,8 @@ local function build(pf)
   pf.attText = UI.WrapText(R, 13, "ink", width, "book")
   pf.bossHead = UI.SectionHeader(R, width)
   pf.bossHead:SetText(L.RAID_BOSSES_HEAD)
+  pf.noBosses = UI.WrapText(R, 13, "ink2", width, "book")
+  pf.noBosses:SetText(L.BOSSES_UNKNOWN)
   pf.bosses = UI.Pool(function()
     local b = CreateFrame("Frame", nil, R)
     b:SetSize(width, 22)
@@ -169,6 +171,9 @@ local function refresh(pf, ctx)
     r:Place(row, 22, 2)
   end
   pf.bosses:HideFrom(#list + 1)
+  -- A raid the game has no boss list for yet (WoW Forever's new ones): said, not an empty heading.
+  pf.noBosses:SetShown(#list == 0)
+  if #list == 0 then r:Place(pf.noBosses, pf.noBosses:GetStringHeight(), 4) end
   pf.rscroll:SetContentHeight(r.y + 8)
 end
 

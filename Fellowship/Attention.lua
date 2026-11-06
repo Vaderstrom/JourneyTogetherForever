@@ -43,7 +43,11 @@ function A:Items(f)
   local invites = {}
   for name in pairs(f.invites) do invites[#invites + 1] = name end
   table.sort(invites)
-  for _, name in ipairs(invites) do add("group", L.NA_INVITE:format(ns.Short(name))) end
+  -- With the time it still waits (U57): "Jtfnobodyhere: 23 hours left".
+  for _, name in ipairs(invites) do
+    local left = ns.Sync and ns.Sync:InviteLeft(f, name)
+    add("group", left and L.NA_INVITE_LEFT:format(ns.Short(name), ns.TimeLeft(left)) or L.NA_INVITE:format(ns.Short(name)))
+  end
   -- Older addon versions than the newest one seen in the fellowship (as on the Adventurers page).
   for _, name in ipairs(names) do
     local ver, newest = Hr:OldVersion(f, name)

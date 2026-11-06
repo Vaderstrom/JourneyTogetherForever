@@ -153,6 +153,31 @@ function ns.Short(name)
   return (Ambiguate(name, "short"))
 end
 
+-- The name where room is tight (tournament cards, the clears table): in WoW Forever the first name alone, as friends
+-- call each other; the whole name when another of the names given shares that first name (a fellowship's members,
+-- by key). Elsewhere ns.Short. (Check of 6 Nov 2026: "Malferion Oathstream" was cut on every card.)
+function ns.Brief(name, others)
+  local short = ns.Short(name)
+  if not ns.IsForever() then return short end
+  local first = short:match("^(%S+)%s") or short
+  if first == short then return short end
+  for other in pairs(others or {}) do
+    if other ~= name and (ns.Short(other):match("^(%S+)") == first) then return short end
+  end
+  return first
+end
+
+-- A value the game keeps from addons (12.0's secret values: in combat and in instances). Never compare, join or
+-- keep one.
+function ns.Secret(v) return issecretvalue ~= nil and issecretvalue(v) or false end
+
+-- The other members of f (not this character): who a change or a state goes to.
+function ns.Others(f)
+  local me, list = ns.Me(), {}
+  for name in pairs(f.members) do if name ~= me then list[#list + 1] = name end end
+  return list
+end
+
 -- "Name" for this realm, "Name-Realm" for another. WoW Forever: the name alone (names are unique in the region).
 function ns.Display(name)
   if not name then return "" end

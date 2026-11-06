@@ -156,6 +156,13 @@ function FS:List(f)
   return out
 end
 
+-- A level first its Adventurer brought in when joining (noted at the join time; U62): in the Chronicle's firsts, but
+-- no toast and no Moment.
+function FS:BroughtIn(f, x)
+  local m = f.members[x.name]
+  return x.key:find("^lvl") ~= nil and m ~= nil and m.joined == x.time
+end
+
 -- "Brannic is the first to reach level 20."
 function FS.Text(x) return (L["FIRST_" .. x.key:upper()] or x.key):format(ns.Short(x.name)) end
 
@@ -230,7 +237,7 @@ function FS:Check(f)
     if seen[x.key] ~= x.name then
       seen[x.key] = x.name
       n = n + 1
-      if now() - x.time <= self.RECENT then
+      if now() - x.time <= self.RECENT and not self:BroughtIn(f, x) then
         ns:Toast("first", L.T_FIRST:format(ns.Short(x.name)), self.Text(x), "chronicle")
       end
     end
@@ -284,8 +291,27 @@ function FS:CheckProfessions()
   end
 end
 
+-- A riding mount of your own (U61): the game says mounted on a flight path too, so a taxi or a vehicle (a boat, a
+-- siege engine) gives nothing. In WoW Forever the first riding mount comes at level 40.
 function FS:CheckMount()
-  if IsMounted and IsMounted() then self:Note("mount") end
+  if not (IsMounted and IsMounted()) then return end
+  if UnitOnTaxi and UnitOnTaxi("player") then return end
+  if (UnitInVehicle and UnitInVehicle("player")) or (UnitHasVehicleUI and UnitHasVehicleUI("player")) then return end
+  self:Note("mount")
+end
+
+-- Coming in at or past a level (U62): founding or joining at level 12 gives the level 10 first, at the moment you came
+-- in (your join time), so whoever was in the fellowship first takes it when several are past it. Taken quietly: no
+-- toast for levels you brought with you (FS:Check).
+function FS:NoteLevelsBroughtIn()
+  local f = F:Current()
+  local m = f and f.members[ns.Me()]
+  local lvl = (ns.Dev and ns.Dev.myLevel) or UnitLevel("player") or 0
+  if not m or m.friend then return end
+  for _, key in ipairs(self.KEYS) do
+    local at = tonumber(key:match("^lvl(%d+)$"))
+    if at and lvl >= at then self:Note(key, m.joined or now()) end
+  end
 end
 
 -- My death: the first to fall, the tally, and "FELL" for a survival challenge (Fellowship/Challenges.lua records it
@@ -308,6 +334,7 @@ ns:RegisterEvent("PLAYER_LEVEL_UP", function(_, level)
   if level and level % 10 == 0 and level >= 10 and level <= 60 then FS:Note("lvl" .. level) end
 end)
 ns:RegisterEvent("PLAYER_DEAD", function() FS:Fell() end)
+ns:On("JOINED", function() FS:NoteLevelsBroughtIn() end)
 ns:RegisterEvent("QUEST_TURNED_IN", function() FS:Count("quests") end)
 ns:RegisterEvent("PLAYER_EQUIPMENT_CHANGED", function() FS:CheckGear() end)
 ns:RegisterEvent("PLAYER_MONEY", function() FS:CheckMoney() end)

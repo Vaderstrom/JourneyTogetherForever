@@ -90,10 +90,10 @@ end)
 shot("create-2-fine", "Create: step 2 (fine-tune)", "Every rule, left and right page, and the way back to the styles", function()
   ns.CreateState.fine = true; W():Refresh()
 end)
-shot("create-3", "Create: step 3 (journey)", "The journey tiles with their chapters; the chosen journey's chapters on the right page", function()
+shot("create-3", "Create: step 3 (journey)", "Five journey tiles (Forever, Classic, Short, Long, Your own), each with its chapters as a strip; the chosen journey's chapters on the right page", function()
   ns.CreateState.fine = false; ns.CreateState.step = 3; W():Refresh()
 end)
-shot("create-3-own", "Create: step 3 (your own journey)", "Your own journey chosen: five steps, its chapters (a copy of Classic) on the right", function()
+shot("create-3-own", "Create: step 3 (your own journey)", "Your own journey chosen: six steps, its chapters (a copy of the suggested journey) on the right", function()
   ns.CreateState:ChooseOwn(); W():Refresh()
 end)
 shot("create-chapters", "Create: Chapters (the journey editor)", "The ruler with its gold marks, Split / Merge / Remove, chapters with dungeon chips; chapter II and its dungeons", function()
@@ -158,7 +158,7 @@ prep(function() pf("rules").pkey, pf("rules").pval = "floorTol", nil; ns.Fellows
 
 -- Phase C: the leader of a new fellowship (empty states).
 prep(function()
-  ns.Fellowship:Create({ name = TR.look.name, role = TR.look.role or "Tank", preset = "classic", color = TR.look.color, emblem = TR.look.emblem })
+  ns.Fellowship:Create({ name = TR.look.name, role = TR.look.role or "Tank", preset = "forever", color = TR.look.color, emblem = TR.look.emblem })
   W():Open("overview")
 end, 0.5)
 -- The setup guide a new Companion sees once (the tour marks it seen, so here it is opened by hand).
@@ -224,7 +224,7 @@ shot("since", "Since you were last here", "What changed, who levelled, where the
   ns.Since.current = ns.Since:Digest(cur()); page("since")
 end)
 -- What's New (the check of 1 Nov 2026, 14:32): once after an update, over the book.
-shot("news", "What's New", "Over the book on parchment in its frame: What's New in gold, the big news (Challenge modes) in a round picture inside the gold ring, two picture cards (Fellowship firsts, Friend of the fellowship) with loading screens, Continue", function()
+shot("news", "What's New", "Over the book on parchment in its frame: What's New in gold, the big news (Sync in real time, Shaper's Terrace) in a round picture inside the gold ring, two picture cards (Names filled in, Quests by zone) with loading screens, Continue", function()
   local keep = ns.db.newsSeen
   ns.News:Show()
   ns.db.newsSeen = keep
@@ -295,7 +295,7 @@ shot("chronicle-sessions", "Chronicle (Sessions)", "Your session recaps: how lon
   W():Open("chronicle#session")
 end)
 -- M25: an invite that got no answer from the player's addon (pretend: the no-answer path as after the wait).
-shot("share-window", "Share the addon (no answer)", "Kim did not answer: the addon's page to copy and Whisper the link", function()
+shot("share-window", "Share the addon (no answer)", "Kim did not answer: the addon's page to copy and Whisper the link; the hint names the usual causes (the latest version, a trial account; in WoW Forever their first and last name and the same ruleset)", function()
   page("heroes")
   ns.Share:Open(full("Kim"), true)
 end)
@@ -361,8 +361,8 @@ prep(function()
   ns.Comm:Inject(full("Elyra"), "QUESTS", { fid = f.id, q = { [5121] = { t = "High Chief Winterfall", z = "Winterspring", l = 56, h = 2, g = 8, k = true, o = "Winterfall Shaman slain" } },
     d = { 7848 }, ln = {}, t = time() })
 end, 0.5)
-shot("quests", "Quests (Quests tab)", "The Questie line; Together and You could join; your quest's details: progress, others, what you can do", function()
-  page("quests"); local p = pf("quests"); p.tabs.buttons[2]:Click()
+shot("quests", "Quests (Quests tab)", "Together now and Pick up and join, each by zone (the zone you are in first, with You are here; then Nearby), quests as cards with an icon and your progress; your quest's details: progress, others and where they are, what you can do", function()
+  page("quests"); local p = pf("quests"); p.tabs.buttons[1]:Click()
 end)
 shot("quests-join", "Quests (a quest you could join)", "Another Hero's quest you have not done: who has it, how to join", function()
   local p = pf("quests")
@@ -379,9 +379,9 @@ shot("quests-showall", "Quests (Show all)", "Far-off quests included, and the wa
   local p = pf("quests"); p.all = nil; p.sel = nil; W():Refresh()
   if p.showAll:IsShown() then p.showAll:Click() end
 end)
-shot("quests-chains", "Quests (Chains tab)", "Learned chains (often empty at first)", function()
+shot("quests-chains", "Quests (Quest chains tab)", "The Questie line; learned chains as cards with a pip for each part (often empty at first)", function()
   ns.Quests.viewLevel = nil
-  local p = pf("quests"); p.all = nil; p.tabs.buttons[1]:Click()
+  local p = pf("quests"); p.all = nil; p.tabs.buttons[2]:Click()
 end)
 shot("quests-attune-none", "Quests (Attunements, level 30)", "None open yet: when the first one opens", function()
   ns.QuestLists.viewLevel = 30
@@ -391,7 +391,7 @@ end)
 local function attRow(key)
   for i, a in ipairs(ns.QuestLists:Attunements(ns.Fellowship:Current(), ns.Me())) do if a.key == key then return i end end
 end
-shot("quests-attune", "Quests (Attunements tab)", "The grid and Molten Core's steps (as seen at level 60)", function()
+shot("quests-attune", "Quests (Attunements & keys tab)", "The grid with an icon on each row and every other row banded; Molten Core's steps (as seen at level 60)", function()
   ns.QuestLists.viewLevel = 60
   pf("quests").attSel = attRow("mc") or 1; W():Refresh() -- (WoW Forever has not announced Molten Core: the first)
 end)
@@ -400,7 +400,7 @@ shot("quests-attune-ony", "Quests (Onyxia's steps)", "A long attunement chain", 
 end)
 shot("heroes", "Adventurers", "Banner, number tiles (a gold number over an icon), the level track (Adventurers at one level: one marker with a number), every Adventurer with a 3D head (yours) or class crest, status and XP", function()
   ns.QuestLists.viewLevel = nil
-  local p = pf("quests"); p.attSel = nil; p.tabs.buttons[2]:Click(); page("heroes")
+  local p = pf("quests"); p.attSel = nil; p.tabs.buttons[1]:Click(); page("heroes")
 end)
 -- Presence and versions (28 Oct 2026): Brannic's addon is older than Elyra's and not heard (the game still shows him
 -- online), Elyra is AFK, Corwin offline. Brannic keeps his old version for the rest of the tour (Needs attention).
@@ -443,7 +443,7 @@ shot("manage", "Manage: Adventurers", "Needs attention, every Adventurer with a 
   pf("heroes").sel = nil; dev("hero Corwin level 18"); page("manage")
 end)
 -- U51: an invite to someone offline, sent an hour ago (written straight into this copy: no whisper goes out).
-shot("manage-invite-offline", "Manage: an invite waiting for someone offline", "Jtfnobodyhere: offline: it reaches them when they log in · 23 hours left", function()
+shot("manage-invite-offline", "Manage: an invite waiting for someone offline", "Jtfnobodyhere: offline: it reaches them when they log in · 23 hours left, a thin bar under it nearly full (U57); Needs attention: The invite to Jtfnobodyhere is still open: 23 hours left", function()
   local name = full("Jtfnobodyhere")
   cur().invites[name] = time() - 3600
   ns.Sync.sent[name] = { offline = true }
@@ -452,6 +452,25 @@ end)
 prep(function()
   local name = full("Jtfnobodyhere")
   cur().invites[name] = nil; ns.Sync.sent[name] = nil
+end)
+-- Names filled in as in the game's mail box (6 Nov 2026), from a pretend list of people met lately.
+-- With two pretend guild members and friends online: in their class colours, with their levels (6 Nov 2026).
+shot("manage-invite-suggest", "Manage: names filled in as you type", "\"Zan\" typed: Zanara Moonbrook filled in with the rest highlighted; under the box four names: Zanara (priest white, Level 23 · Guild) and Zandar (warrior brown, Level 31 · Friend) online in their class colours, then Zandor and Zandrel (Played with lately)", function()
+  page("manage")
+  ns.Dev.pretendNames = { "Zandrel Brightwater", "Zandor Stonefist" }
+  local Fr = ns.Friends
+  Fr.all, Fr.allAt, Fr.allMe = {
+    { name = ns.FullName("Zanara Moonbrook"), online = true, source = "guild", class = "PRIEST", level = 23 },
+    { name = ns.FullName("Zandar Flintbeard"), online = true, source = "friend", class = "WARRIOR", level = 31 },
+  }, GetTime(), ns.Me()
+  local p = pf("manage")
+  p.invite.edit:SetFocus()
+  p.invite:SetText("Zan"); p.invite.edit:GetScript("OnTextChanged")(p.invite.edit, true)
+end)
+prep(function()
+  local p = pf("manage")
+  ns.Dev.pretendNames, ns.Friends.all = nil, nil
+  p.invite:SetText(""); p.invite.edit:ClearFocus(); p.suggest:Hide()
 end)
 shot("manage-fellowship", "Manage: The fellowship", "Name, banner colour, every emblem; your banner as the others see it; Leave (hands over)", function()
   page("managefellowship")
@@ -510,7 +529,7 @@ shot("rules-challenges-more", "Rules (the challenges, X3-X5)", "The article: a b
   page("rules"); bottom(pf("rules").lscroll); bottom(pf("rules").rscroll)
 end)
 -- U49: the Ring went from Brannic to Corwin (written straight into this copy; the prep after puts it back).
-shot("rules-ring-road", "Rules (the Ring's road)", "Under Lord of the Rings: The Ring's road: Brannic, then Corwin; the rule ends with how the Ring passes on (U53)", function()
+shot("rules-ring-road", "Rules (the Ring's road)", "Under Lord of the Rings: The Ring's road as a path, Brannic then Corwin, each with a class icon, a gold line between, the Ring on Corwin (U58); the rule ends with how the Ring passes on (U53)", function()
   local r = cur().ring
   if r then
     r.first = { who = r.who, item = r.item }
@@ -518,6 +537,10 @@ shot("rules-ring-road", "Rules (the Ring's road)", "Under Lord of the Rings: The
     r.who, r.guid = full("Corwin"), nil
   end
   page("rules"); bottom(pf("rules").lscroll)
+end)
+-- U55: Corwin carries it now; the standings mark him.
+shot("overview-ring-bearer", "Overview (the Ring-bearer)", "Where the Adventurers stand: a small ring after Corwin's name, his presence mark after it; nobody else has one (U55)", function()
+  page("overview"); top(pf("overview").rscroll)
 end)
 shot("manage-rules-ironman", "Manage: Rules (Ironman Fellowship)", "Hardcore Fellowship and White gear only: Held by Ironman Fellowship instead of Turn off", function()
   page("rulesadmin"); top(pf("rulesadmin").lscroll)
@@ -566,7 +589,7 @@ shot("inbox-size", "Inbox (a new size)", "Use the rules for a party? Use them / 
   ns:Fire("FELLOWSHIP")
   W():OpenPanel("inbox")
 end, { toast = true, wait = 0.3 })
-shot("admin-chapter-2", "Journey Admin (chapter 2)", "Another chapter selected, its dungeons", function()
+shot("admin-chapter-2", "Journey Admin (chapter 2)", "Another chapter selected, its dungeons, each with its picture small and square at the left of its card (6 Nov 2026)", function()
   if tourRules then ns.Fellowship:SetRules(tourRules); tourRules = nil end
   if ns.char.sizeToasted then ns.char.sizeToasted[cur().id] = nil end
   W():HidePanels(); local A = ns.AdminDraft; A.sel = 2; page("admin"); pf("admin").editor:ShowTab("chapter")
@@ -618,7 +641,7 @@ shot("chapter-milestones", "Chapter (milestones)", "A Required level milestone a
 end)
 -- The Endgame, as if the journey were complete (only for this shot; no "Endgame is open" toast).
 local tourReached
-shot("raids", "Raids (the Endgame)", "Each raid with its picture, attunement and boss progress", function()
+shot("raids", "Raids (the Endgame)", "Each raid with its picture (Barrow Deeps its own, 6 Nov 2026), attunement and boss progress", function()
   local f = cur()
   ns.char.endgameSeen = ns.char.endgameSeen or {}
   ns.char.endgameSeen[f.id] = time()
@@ -629,7 +652,7 @@ shot("raids", "Raids (the Endgame)", "Each raid with its picture, attunement and
   if pf("raids") then pf("raids").raid = nil end
   page("raids")
 end)
-shot("raids-mc", "Raids (Molten Core chosen)", "Boss progress after two kills, who is attuned, Find group for a raid", function()
+shot("raids-mc", "Raids (one raid chosen)", "Molten Core where the game has it: boss progress after two kills, who is attuned, Find group. In WoW Forever (no Molten Core yet) the raid with the most bosses, not open yet: 0 kills (they count from the day it opens), no Find group", function()
   -- Molten Core where the game has it; in WoW Forever (no Molten Core announced) the raid with the most bosses.
   local key = ns.Raid("mc") and "mc"
   if not key then
@@ -687,7 +710,7 @@ shot("tourney-20", "Tournament (20 entrants)", "Round by round: round 1's winner
   dev("tourney big"); page("tourney")
 end)
 prep(function() dev("tourney big off") end)
-shot("settings", "Settings", "Folding sections (U10): the book, messages and help on the left; the toasts open on the right, the tracker folded with what is set", function()
+shot("settings", "Settings", "Folding sections (U10): the book, messages and help on the left; the toasts open on the right, the tracker folded with what is set; Other addons: Stories from (Spoken or Lore Forever)", function()
   ns.AdminDraft:Discard(); W():OpenSettings(); pf("settings"):Fold("toasts", true)
 end)
 shot("settings-tracker-off", "Settings (tracker off)", "The tracker open (the toasts fold), its lines faded while it is off", function()
@@ -704,7 +727,8 @@ local function toast(kind, title, text, more)
     ns.Toasts:StopMove(); W():Close()
     local m = more and { dungeon = more.dungeon } or nil
     if m and type(m.dungeon) == "function" then m.dungeon = m.dungeon() end
-    ns.Toasts:Push(kind, title, text, nil, m)
+    -- A text can be a function, made when the shot runs: ns.VERSION, say, is set only at ADDON_LOADED, after this file.
+    ns.Toasts:Push(kind, type(title) == "function" and title() or title, type(text) == "function" and text() or text, nil, m)
   end
 end
 -- A clear message (U7): the place's picture on the left, its name, and who was there in their class colours.
@@ -728,11 +752,18 @@ shot("toast-clear", "Toast: dungeon cleared", "The dungeon's picture, its name a
   cleared(function() return first(ns.DUNGEONS, "dm") end), { toast = true })
 shot("toast-clear-raid", "Toast: raid cleared", "The raid's picture, its name and who was there",
   cleared(function() return first(ns.RAIDS, "mc") end), { toast = true })
+shot("toast-clear-new", "Toast: a new Forever dungeon cleared", "Shaper's Terrace with its own picture (6 Nov 2026); another dungeon where this game has no Shaper's Terrace",
+  cleared(function() return first(ns.DUNGEONS, "shaper") end), { toast = true })
 shot("toast-hero-floor", "Toast: a Hero reaches the floor", "A normal toast", toast("heroFloor", L.T_HERO_FLOOR:format("Brannic"), L.T_HERO_FLOOR_TEXT:format(21, "Corwin")), { toast = true })
 shot("toast-chapter", "Toast: chapter unlocked (big)", "The big banner", toast("chapter", L.T_CHAPTER:format("IV"), L.T_CHAPTER_TEXT:format("Chains and Tides", 25, 29)), { toast = true })
 shot("toast-journey", "Toast: journey complete (big)", "The biggest moment", toast("journey", L.T_JOURNEY, L.T_JOURNEY_TEXT:format("Tour")), { toast = true })
 shot("toast-gathering", "Toast: a Gathering soon", "The reminder, with the dungeon's picture (U8)", toast("gathering", L.G_SOON,
   L.G_SOON_TEXT:format("The Deadmines", "20:00"), { dungeon = function() return first(ns.DUNGEONS, "dm") end }), { toast = true })
+-- The version notice (6 Nov 2026): heard from someone in the guild or group with a newer version.
+shot("toast-version", "Toast: a newer version is out", "Brannic has 9.9.0 (you have yours): update when you can", toast("version",
+  L.TOAST_VERSION_TITLE, function() return L.TOAST_VERSION_TEXT:format("Brannic", "9.9.0",
+    ns.ParseVersion(ns.VERSION) and ns.VERSION or "1.0.4") end), -- the Dev copy has no version: a pretend one
+  { toast = true })
 shot("toast-ahead", "Toast: you pull ahead", "Two or more levels above an Adventurer", toast("ahead", L.T_AHEAD:format(3, "Corwin"),
   L.T_AHEAD_TEXT:format("Corwin")), { toast = true })
 shot("toast-session", "Toast: session recap (big)", "After playing together: how long, with whom, what you did", function()
@@ -744,11 +775,13 @@ end, { toast = true })
 shot("toast-long", "Toast: a long text", "Wraps to more lines; the banner grows", toast("clear", L.TOAST_CLEARED,
   L.TOAST_CLEAR_FOR:format("Brannic, Elyra, Corwin and you") .. " " .. L.TOAST_ENDGAME_TEXT), { toast = true })
 shot("toast-attune", "Toast: an attunement opens", "At the level where it can be started, with the raid's picture (U8)",
-  toast("attune", L.TOAST_ATTUNE_TITLE:format("Molten Core"), L.TOAST_ATTUNE_RAID, { dungeon = function() return first(ns.RAIDS, "mc") end }), { toast = true })
+  -- The title names the raid whose picture it shows (WoW Forever has no Molten Core; check of 6 Nov 2026).
+  toast("attune", function() return L.TOAST_ATTUNE_TITLE:format(ns.Raid(first(ns.RAIDS, "mc"))[2]) end, L.TOAST_ATTUNE_RAID,
+    { dungeon = function() return first(ns.RAIDS, "mc") end }), { toast = true })
 shot("toast-first", "Toast: a fellowship first", "\"Brannic is the first to ride a mount.\"", toast("first", L.T_FIRST:format("Brannic"), L.FIRST_MOUNT:format("Brannic")), { toast = true })
-shot("toast-ring-passed", "Toast: the Ring passes on", "Brannic left: the Ring passes to Corwin, in the big moments' gold frame at the normal size, with a soft chime (U52)", function()
+shot("toast-ring-passed", "Toast: the Ring passes on", "Brannic left: the Ring passes to Corwin, shown as the two names with their class icons, Brannic » Corwin (U56), in the big moments' gold frame at the normal size, with a soft chime (U52)", function()
   ns.Toasts:StopMove(); W():Close()
-  ns.Toasts:Push("challenge", L.T_RING_PASSED, L.CH_RING_PASSED:format("Brannic", "Corwin"), nil,
+  ns.Toasts:Push("challenge", L.T_RING_PASSED, ns.Challenges:HandOver(cur(), full("Brannic"), full("Corwin")), nil,
     ns.Challenges:ToastOf("ring", { framed = true, sound = "ring" }))
 end, { toast = true })
 shot("toast-fallen", "Toast: an Adventurer has fallen", "Hardcore: Brannic has fallen, his level, the place and the foe; honoured in the Chronicle", function()
@@ -957,6 +990,7 @@ function TR:Finish(keep)
   dev("pace off"); dev("level off"); dev("group off"); dev("tourney off")
   ns.Dev:WatchForget()
   ns.Dev.pretendTrial = nil
+  ns.Dev.pretendNames = nil
   if ns.Walkthrough then ns.Walkthrough:Stop() end
   ns.quiet = nil
   -- The pretend Heroes go, then you leave: alone, leaving ends the fellowship.

@@ -11,10 +11,10 @@ local COL_W = 196
 -- 2026: the small cards left most of the page empty).
 local CARD_W, CARD_H, GAP = COL_W - 18, 60, 10
 
-local function who(x)
+local function who(x, f)
   if x == false then return L.T_BYE end
   if x == nil then return L.T_TBD end
-  return ns.Short(x)
+  return ns.Brief(x, f and f.members)
 end
 
 local function build(pf)
@@ -85,6 +85,14 @@ local function build(pf)
       -- The winner's line has a light gold band behind it (29 Oct 2026: who won was hard to see).
       l.band = UI.Solid(c, "ARTWORK", "gold", 0.18)
       l.band:SetPoint("TOPLEFT", 3, y + 4); l.band:SetPoint("TOPRIGHT", -3, y + 4); l.band:SetHeight(22)
+      -- A duel just decided: the band gleams once (the owner, 6 Nov 2026).
+      l.gleam = UI.Solid(c, "OVERLAY", "goldText", 1)
+      l.gleam:SetAllPoints(l.band); l.gleam:SetBlendMode("ADD"); l.gleam:SetAlpha(0)
+      l.gleam.anim = l.gleam:CreateAnimationGroup()
+      local up = l.gleam.anim:CreateAnimation("Alpha")
+      up:SetFromAlpha(0); up:SetToAlpha(0.6); up:SetDuration(0.25); up:SetOrder(1)
+      local down = l.gleam.anim:CreateAnimation("Alpha")
+      down:SetFromAlpha(0.6); down:SetToAlpha(0); down:SetDuration(0.7); down:SetOrder(2)
       l.name = UI.Text(c, 14, "ink", "title")
       l.name:SetPoint("TOPLEFT", 8, y); l.name:SetWidth(CARD_W - 74)
       l.level = UI.Text(c, 12, "ink2", "body", "RIGHT")
@@ -318,7 +326,8 @@ local function refresh(pf, ctx)
   pf.lscroll:SetContentHeight(s.y + 8)
 
   -- Right: the structure.
-  local view = { B = B, format = format, seeds = list, duels = t and t.duels or {}, bo = bo, done = phase == "done" }
+  local view = { B = B, format = format, seeds = list, duels = t and t.duels or {}, bo = bo, done = phase == "done",
+    tid = t and t.id }
   local rs = UI.Stack(pf.rscroll.child)
   local nHead, nLab, nCard, nRow, nText, nLink = 0, 0, 0, 0, 0, 0
   local Rc = pf.rscroll.child
@@ -354,8 +363,12 @@ local function refresh(pf, ctx)
     fs:SetTextColor(Theme:RGBA(role or "ink"))
     rs:Place(fs, fs:GetStringHeight(), 4)
   end
-  -- A match card at (x, y), w wide: the winner on a gold band, larger, green and ticked; the loser faded; byes and
-  -- players not known yet in grey; your own line tagged "You", your card in gold.
+  -- A match card at (x, y), w wide: the winner on a gold band, in gold and ticked; the loser faded; byes and
+  -- players not known yet in grey; your own line tagged "You", your card in gold. A duel decided since you last saw
+  -- this tournament gleams once (ns.char.tourneySeen: its decided duels you saw; not with Reduce effects).
+  local seen = ns.char.tourneySeen
+  if not seen or seen.id ~= view.tid then seen = { id = view.tid, keys = {} }; ns.char.tourneySeen = seen end
+  local winInk = Theme:Current().light and "8A5A10" or "F2C25B"
   local function card(m, x, top, w)
     nCard = nCard + 1
     local c = pf.cards:Get(nCard)
@@ -367,18 +380,22 @@ local function refresh(pf, ctx)
       local l, n = side[1], side[2]
       local known = type(n) == "string"
       local won, lost = decided and m.w == n, decided and known and m.w ~= n
-      -- The winner as large as the others: the gold band, green and the tick mark them (a larger name was cut
+      -- The winner as large as the others: the gold band, gold and the tick mark them (a larger name was cut
       -- beside its icon and You; check of 1 Nov 2026).
       l.name:SetFont(Theme.FONT_TITLE, 14, "")
       local icon = known and ns.ClassIconMarkup(select(2, Hr:ClassName(f, n)), 14) or ""
-      l.name:SetText((icon ~= "" and (icon .. " ") or "") .. who(n))
+      l.name:SetText((icon ~= "" and (icon .. " ") or "") .. who(n, f))
       l.level:SetText(known and level(n) or "")
       l.level:SetAlpha(lost and 0.45 or 1)
-      l.name:SetTextColor(Theme:RGBA(not known and "ink2" or (won and "3E7A3A" or "ink")))
+      l.name:SetTextColor(Theme:RGBA(not known and "ink2" or (won and winInk or "ink")))
       l.name:SetAlpha(lost and 0.45 or 1)
       l.score:SetAlpha(lost and 0.45 or 1)
       l.band:SetShown(won)
       l.mark:SetShown(won)
+      if won and pf:IsVisible() and not seen.keys[m.key] then
+        seen.keys[m.key] = true
+        if not ns.Settings:Get("reduce") then l.gleam.anim:Stop(); l.gleam.anim:Play(); pf.gleamed = m.key end
+      end
       l.score:SetText(view.bo > 1 and known and (wins[n] or 0) or "")
       -- Without a score (one duel a round) the level moves into its place and the name gets the room.
       local scored = view.bo > 1

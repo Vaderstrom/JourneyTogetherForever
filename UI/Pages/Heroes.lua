@@ -229,27 +229,7 @@ local function buildList(pf, width)
   pf.oldNote.text:SetPoint("TOPLEFT", 12, -9)
   pf.invHead = UI.SectionHeader(R, width - 8)
   pf.invHead:SetText(L.INVITE_HEROES)
-  local function send()
-    if F:Invite(pf.invite:GetText(), pf.asFriendOn) == "sent" then
-      pf.invite:SetText(""); pf.asFriendOn = nil; pf.asFriend:Refresh(); ns.Window:Refresh()
-    end
-  end
-  pf.invite = UI.EditBox(R, width - 118, 48, L.INVITE_NAME, send)
-  pf.suggest = UI.Autocomplete(pf.invite, width - 118, function(text)
-    local f, out = F:Current(), {}
-    local skip = function(name) return f ~= nil and (f.members[name] ~= nil or f.invites[name] ~= nil) end
-    for _, e in ipairs(ns.Friends:Suggest(text, skip, 8)) do
-      out[#out + 1] = { text = ns.Display(e.name), sub = ns.Friends:SourceText(e), online = e.online }
-    end
-    return out
-  end, function(e) pf.invite:SetText(e.text) end)
-  pf.invite.edit:HookScript("OnEditFocusGained", function() ns.Friends:Request() end)
-  pf.send = UI.TextButton(R, L.SEND_INVITE, send, "primary", 13)
-  -- Invite as a Friend of the fellowship (SPEC §1.1): they play along without counting.
-  pf.asFriend = UI.LabeledCheck(R, width - 8, L.INVITE_AS_FRIEND, L.INVITE_AS_FRIEND_TIP,
-    function() return pf.asFriendOn end, function(on) pf.asFriendOn = on or nil end)
-  -- Friends without the addon (M25): the share window, for the name in the box.
-  pf.share = UI.TextButton(R, L.SHARE_ADDON, function() ns.Share:Open(pf.invite:GetText()) end, "plain", 12)
+  UI.InviteBox(pf, R, width - 118, width - 8)
   pf.invRows = UI.Pool(function()
     local r = CreateFrame("Frame", nil, R)
     r:SetSize(width - 8, 28)

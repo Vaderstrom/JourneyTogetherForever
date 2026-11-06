@@ -321,8 +321,13 @@ function JED.New(left, right, lw, rw, src)
   ed.drows = UI.Pool(function()
     local c = UI.Card(R, "line", "Button")
     c:SetSize(rw, 58)
+    -- The dungeon's picture, small and square, beside it (the owner, 6 Nov 2026).
+    c.edge = UI.Solid(c, "BORDER", "line", 1)
+    c.edge:SetSize(48, 48); c.edge:SetPoint("TOPLEFT", 5, -5)
+    c.pic = c:CreateTexture(nil, "ARTWORK")
+    c.pic:SetSize(46, 46); c.pic:SetPoint("TOPLEFT", 6, -6)
     c.name = UI.Text(c, 14, "ink")
-    c.name:SetPoint("TOPLEFT", 10, -8)
+    c.name:SetPoint("TOPLEFT", 60, -8)
     c.levels = UI.Text(c, 12, "ink2")
     c.levels:SetPoint("LEFT", c.name, "RIGHT", 8, 0)
     c.x = CreateFrame("Button", nil, c, "UIPanelCloseButton")
@@ -332,10 +337,12 @@ function JED.New(left, right, lw, rw, src)
     c.roles = UI.Choice(c, { { L.ROLE_MANDATORY, "m" }, { L.ROLE_BRIDGE, "b" }, { L.ROLE_OPTIONAL, "o" } },
       function() local j = src.journey(); local p = j and j.place[c.key]; return p and p.role end,
       function(v) src.edit(function(j) JE.SetRole(j, c.key, v) end) end)
-    c.roles:SetPoint("TOPLEFT", 10, -28)
+    c.roles:SetPoint("TOPLEFT", 60, -28)
     -- Which bosses are needed for a clear (every boss until it is chosen).
     c.bosses = UI.TextButton(c, "", function() ed:PickBosses(c.key) end, "plain", 11)
     c.bosses:SetPoint("TOPLEFT", c.roles, "TOPRIGHT", 8, 1)
+    -- A place the game has no boss list for: a short label (the long one ran out of the card; check of 6 Nov 2026).
+    UI.Tooltip(c.bosses, function() return c.unknown and L.BOSSES_UNKNOWN or nil end)
     c:RegisterForDrag("LeftButton")
     c:SetScript("OnDragStart", function() ed:BeginDrag({ key = c.key }, c.name:GetText()) end)
     c:SetScript("OnDragStop", function() ed:EndDrag() end)
@@ -634,7 +641,8 @@ function JED:Refresh()
       -- A chapter of one level (60-60) still gets a part to click, inside the ruler (it had none; seen in the check
       -- of 29 Oct 2026).
       local w = math.max(10, xOf(c.cap) - xOf(c.floor) - 1)
-      seg:ClearAllPoints(); seg:SetPoint("TOPLEFT", self.ruler, "TOPLEFT", math.min(xOf(c.floor), rulerW - w), 0)
+      seg.x = math.min(xOf(c.floor), rulerW - w)
+      seg:ClearAllPoints(); seg:SetPoint("TOPLEFT", self.ruler, "TOPLEFT", seg.x, 0)
       seg:SetSize(w, RULER_H)
       seg.c = c
       seg.n:SetText(w >= 22 and ns.Journey.Roman(i) or "")
@@ -646,7 +654,8 @@ function JED:Refresh()
           local cx = math.min(xOf(c.floor), rulerW - w) + w / 2
           self.lens:SetSize(lensW, RULER_H + 8)
           self.lens:ClearAllPoints()
-          self.lens:SetPoint("LEFT", self.ruler, "LEFT", ns.Clamp(cx - lensW / 2, 0, rulerW - lensW), 0)
+          self.lens.x = ns.Clamp(cx - lensW / 2, 0, rulerW - lensW)
+          self.lens:SetPoint("LEFT", self.ruler, "LEFT", self.lens.x, 0)
           self.lens.n:SetText(ns.Journey.Roman(i))
           -- Its own part under the lens carries no number: "XV" stood twice (check of 31 Oct 22:14).
           seg.n:SetText("")
@@ -664,6 +673,14 @@ function JED:Refresh()
         seg.n:SetTextColor(ns.Hex("2A1C10")); seg.n:SetShadowColor(1, 1, 1, 0.35)
       end
       seg.n:SetShadowOffset(1, -1)
+    end
+  end
+  -- The lens covers its neighbours' parts: their numbers go under it ("XV" stood beside the lens's "XVI"; check of
+  -- 6 Nov 2026).
+  if self.lens:IsShown() then
+    local a, b = self.lens.x, self.lens.x + self.lens:GetWidth()
+    for i, seg in ipairs(self.segs) do
+      if i ~= sel and seg:IsShown() and seg.x < b and seg.x + seg:GetWidth() > a then seg.n:SetText("") end
     end
   end
   for _, m in ipairs(self.marks) do
@@ -768,6 +785,7 @@ function JED:Refresh()
     if not c then break end
     shown = i
     c.key = pl.key
+    c.pic:SetShown(ns.SetDungeonArt(c.pic, pl.key, 46, 46))
     c.name:SetText(pl.d[2])
     c.levels:SetText(pl.d[3] .. "-" .. pl.d[4])
     c.roles:Refresh()
@@ -775,6 +793,7 @@ function JED:Refresh()
     local p = j.place[pl.key]
     c.bosses:SetLabel(#bosses > 0 and L.ADMIN_BOSSES:format(#(p.bosses or ns.Clears:DefaultNeeded(pl.key)), #bosses) or L.ADMIN_BOSSES_NONE)
     c.bosses:SetEnabled(#bosses > 0)
+    c.unknown = #bosses == 0
     r:Place(c, 58, 6)
   end
   self.drows:HideFrom(shown + 1)

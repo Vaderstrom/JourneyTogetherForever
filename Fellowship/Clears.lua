@@ -21,7 +21,7 @@ C.HISTORY_MAX = 100
 C.SAME_RUN = 7200 -- kills in one dungeon less than two hours apart are one run in the history
 C.REPEAT = 300    -- the same boss again within 5 minutes is the same kill
 
-local function secret(v) return issecretvalue ~= nil and issecretvalue(v) end
+local secret = ns.Secret
 
 local function dname(key) local d = ns.Dungeon(key); return d and d[2] or key end
 

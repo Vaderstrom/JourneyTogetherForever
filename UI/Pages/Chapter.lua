@@ -160,9 +160,9 @@ local function build(pf)
     -- The Dungeon Journal as a book icon (a symbol, as in the first mockup; the text button was wide).
     c.dj = UI.RoundButton(c, 26, "journal", function() W:DungeonJournal(c.key) end)
     UI.Tooltip(c.dj, L.DUNGEON_JOURNAL)
-    -- The dungeon's story in Lore Forever; without it, a click says to install it (UI/OtherAddons.lua).
+    -- The dungeon's story in Spoken or Lore Forever; with neither, a click says to install one (UI/OtherAddons.lua).
     c.lore = UI.RoundButton(c, 26, "lore", function() OA:Lore(c.key) end)
-    UI.Tooltip(c.lore, L.LORE_TIP)
+    UI.Tooltip(c.lore, function() return OA:StoryTip(c.key) end)
     c.group = UI.TextButton(c, L.FIND_GROUP, function()
       local f = ns.Fellowship:Current()
       if f and c.key then ns.Together:FindGroup(f, c.key) end
@@ -350,7 +350,7 @@ local function refreshMatrix(pf, ctx, list, r, width)
     if not row then break end
     nRows = i
     row:ClearAllPoints(); row:SetPoint("TOPLEFT", M, "TOPLEFT", 3, -y); row:Show()
-    row.name:SetText(ns.Short(name))
+    row.name:SetText(ns.Brief(name, f.members))
     local _, token = Hr:ClassName(f, name)
     local ink = ns.ClassHex(token, light)
     if ink then row.name:SetTextColor(ns.Hex(ink)) else row.name:SetTextColor(Theme:RGBA("ink")) end

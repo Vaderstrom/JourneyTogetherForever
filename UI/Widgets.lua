@@ -428,9 +428,12 @@ function UI.Lives(parent, width)
 end
 
 -- A one-line tooltip on hover (icon buttons say what they do).
+-- A function may return nil: no tooltip then.
 function UI.Tooltip(frame, text)
   frame:HookScript("OnEnter", function()
-    GameTooltip:SetOwner(frame, "ANCHOR_TOP"); GameTooltip:SetText(type(text) == "function" and text() or text); GameTooltip:Show()
+    local t = type(text) == "function" and text() or text
+    if not t then return end
+    GameTooltip:SetOwner(frame, "ANCHOR_TOP"); GameTooltip:SetText(t, nil, nil, nil, nil, true); GameTooltip:Show()
   end)
   frame:HookScript("OnLeave", function() GameTooltip:Hide() end)
 end
@@ -1364,6 +1367,9 @@ function UI.EditBox(parent, width, maxLetters, placeholder, onEnter)
   eb:SetMaxLetters(maxLetters or 48)
   -- The game's input box is dark: light text on it (dark ink could not be read while typing; seen in game).
   Theme:TextColor(eb, "chipText")
+  -- The selected part (the rest of a name filled in as you type) in the list's gold: the game's grey hardly showed on
+  -- the dark box (check of 6 Nov 2026, 17:50).
+  eb:SetHighlightColor(1, 0.82, 0.4, 0.35)
   -- On the edit box itself, above the box's art (on the holder it was drawn under it and cut off; seen in game).
   local ph = UI.Text(eb, 13, "muted", "body")
   ph:SetDrawLayer("OVERLAY")
@@ -1382,8 +1388,11 @@ function UI.EditBox(parent, width, maxLetters, placeholder, onEnter)
 end
 
 -- Suggestions under an EditBox while it has focus. source(text) returns { { text, sub, online }, ... };
--- onPick(entry) when one is clicked. Rows are made at once (never during combat). The list belongs to the
+-- onPick(entry) when one is clicked or taken. Rows are made at once (never during combat). The list belongs to the
 -- window, not to the (scrolling) page, so it is never cut off.
+-- Like the game's mail box (the owner, 6 Nov 2026: "only type the first characters, then a list pops up"): as you
+-- type, the rest of the first name is filled in, highlighted, so typing on replaces it; Tab or Enter takes it (Enter
+-- then does not send yet), Escape takes it back; the arrow keys move through the list.
 function UI.Autocomplete(box, width, source, onPick, rows)
   local owner = ns.Window.frame or box
   local list = UI.Card(owner, "gold")
@@ -1393,11 +1402,14 @@ function UI.Autocomplete(box, width, source, onPick, rows)
   list:SetWidth(width)
   list:SetFrameLevel(owner:GetFrameLevel() + 100)
   list:Hide()
-  list.rows = {}
+  list.rows, list.entries, list.typed = {}, {}, ""
+  local eb = box.edit
   for i = 1, rows or 8 do
     local r = CreateFrame("Button", nil, list)
     r:SetSize(width - 8, 22)
     r:SetPoint("TOPLEFT", 4, -4 - (i - 1) * 22)
+    r.chosen = r:CreateTexture(nil, "BACKGROUND")
+    r.chosen:SetAllPoints(); r.chosen:SetColorTexture(1, 0.82, 0.4, 0.28); r.chosen:Hide()
     r.dot = r:CreateTexture(nil, "ARTWORK")
     r.dot:SetSize(8, 8); r.dot:SetPoint("LEFT", 4, 0); r.dot:SetTexture(ns.WHITE)
     r.name = UI.Text(r, 13, "ink")
@@ -1406,31 +1418,121 @@ function UI.Autocomplete(box, width, source, onPick, rows)
     r.sub:SetPoint("RIGHT", -4, 0)
     local hl = r:CreateTexture(nil, "HIGHLIGHT")
     hl:SetAllPoints(); hl:SetColorTexture(1, 0.9, 0.6, 0.2)
-    r:SetScript("OnClick", function() list:Hide(); onPick(r.entry) end)
+    r:SetScript("OnClick", function() list.pending = nil; list:Hide(); onPick(r.entry) end)
     list.rows[i] = r
   end
-  function list:Update()
-    local entries = source(box:GetText())
-    local n = math.min(#entries, #self.rows)
+  local function mark()
+    for i, r in ipairs(list.rows) do r.chosen:SetShown(i == list.sel) end
+  end
+  -- The name e in the box, the part not typed yet highlighted after the cursor; the game's soft list click when the
+  -- name in the box changes (list.shown: the one filled in now).
+  local function fill(e)
+    if e.text ~= list.shown then ns.Sound("fill"); list.shown = e.text end
+    local typed = list.typed
+    local same = e.text:sub(1, #typed):lower() == typed:lower()
+    eb:SetText(e.text) -- in its own capitals, like the mail box
+    eb:HighlightText(same and #typed or 0, -1)
+    eb:SetCursorPosition(same and #typed or #e.text)
+    list.pending = (e.text:lower() ~= typed:lower()) and e or nil
+  end
+  -- Takes the filled-in name: the whole name in the box, the list closed.
+  local function take()
+    local e = list.pending
+    list.pending, list.sel = nil, nil
+    list:Hide()
+    eb:HighlightText(0, 0)
+    eb:SetCursorPosition(#e.text)
+    onPick(e)
+  end
+  function list:Update(typing)
+    local text = box:GetText()
+    local grew = typing and #text > #self.typed
+    if typing or self.typed == "" then self.typed = text end
+    self.pending, self.sel = nil, nil
+    self.entries = source(self.typed)
+    local n = math.min(#self.entries, #self.rows)
     for i, r in ipairs(self.rows) do
-      local e = entries[i]
+      local e = self.entries[i]
       r:SetShown(e ~= nil)
       if e then
         r.entry = e
-        r.name:SetText(e.text)
+        r.name:SetText(e.hex and ("|cff" .. e.hex .. e.text .. "|r") or e.text)
         r.sub:SetText(e.sub or "")
         r.dot:SetVertexColor(e.online and 0.25 or 0.5, e.online and 0.8 or 0.5, e.online and 0.3 or 0.5, 1)
       end
     end
+    mark()
     self:SetHeight(n * 22 + 8)
-    self:SetShown(n > 0 and box.edit:HasFocus() ~= false)
+    self:SetShown(n > 0 and eb:HasFocus())
+    -- Only while letters are added: after a Backspace the name is not filled in again.
+    local first = self.entries[1]
+    if grew and first and self.typed ~= "" and first.text:sub(1, #self.typed):lower() == self.typed:lower() then
+      self.sel = 1; mark()
+      fill(first)
+    else
+      self.shown = nil
+    end
   end
-  local eb = box.edit
-  eb:HookScript("OnEditFocusGained", function() list:Update() end)
-  eb:HookScript("OnTextChanged", function(_, user) if user ~= false then list:Update() end end)
+  eb:HookScript("OnEditFocusGained", function() list.typed = box:GetText(); list:Update(false) end)
+  eb:HookScript("OnTextChanged", function(_, user) if user then list:Update(true) end end)
   eb:HookScript("OnEditFocusLost", function() C_Timer.After(0.2, function() list:Hide() end) end)
+  eb:SetScript("OnArrowPressed", function(_, key)
+    if not list:IsShown() or (key ~= "UP" and key ~= "DOWN") then return end
+    local n = math.min(#list.entries, #list.rows)
+    if n == 0 then return end
+    list.sel = ((list.sel or (key == "DOWN" and 0 or 1)) + (key == "DOWN" and 1 or -1) - 1) % n + 1
+    mark()
+    fill(list.entries[list.sel])
+  end)
+  eb:SetScript("OnTabPressed", function() if list.pending then take() end end)
+  local enter, escape = eb:GetScript("OnEnterPressed"), eb:GetScript("OnEscapePressed")
+  eb:SetScript("OnEnterPressed", function(self, ...)
+    if list.pending then take() return end
+    if enter then enter(self, ...) end
+  end)
+  eb:SetScript("OnEscapePressed", function(self, ...)
+    if list.pending then
+      eb:SetText(list.typed); eb:SetCursorPosition(#list.typed)
+      list.pending, list.sel = nil, nil
+      list:Hide()
+      return
+    end
+    if escape then escape(self, ...) end
+  end)
   box:HookScript("OnHide", function() list:Hide() end)
   return list
+end
+
+-- The invite box of the Adventurers page and Manage (one, so a change reaches both; ponytail audit, 6 Nov 2026): the
+-- name box with names filled in as you type, Send invite, Invite as a Friend of the fellowship (SPEC §1.1) and the share
+-- window for friends without the addon (M25). Fills pf.invite, pf.suggest, pf.send, pf.asFriend and pf.share; the
+-- page places them.
+function UI.InviteBox(pf, parent, boxW, checkW)
+  local L, F = ns.L, ns.Fellowship
+  local function send()
+    if F:Invite(pf.invite:GetText(), pf.asFriendOn) == "sent" then
+      pf.invite:SetText(""); pf.asFriendOn = nil; pf.asFriend:Refresh(); ns.Window:Refresh()
+    end
+  end
+  pf.invite = UI.EditBox(parent, boxW, 48, L.INVITE_NAME, send)
+  -- Friends, Battle.net friends, guild members and the game's own names whose name starts with what is typed; online
+  -- ones in their class colour, with the level where the game's lists give it (the owner, 6 Nov 2026).
+  pf.suggest = UI.Autocomplete(pf.invite, boxW, function(text)
+    local f, out = F:Current(), {}
+    local skip = function(name) return f ~= nil and (f.members[name] ~= nil or f.invites[name] ~= nil) end
+    local light = ns.Theme:Current().light
+    for _, e in ipairs(ns.Friends:Suggest(text, skip, 8)) do
+      local src = ns.Friends:SourceText(e)
+      out[#out + 1] = { text = ns.Display(e.name), sub = e.level and L.SRC_WITH_LEVEL:format(e.level, src) or src,
+        online = e.online, hex = e.online and ns.ClassHex(e.class, light) or nil }
+    end
+    return out
+  end, function(e) pf.invite:SetText(e.text) end)
+  pf.invite.edit:HookScript("OnEditFocusGained", function() ns.Friends:Request() end)
+  pf.send = UI.TextButton(parent, L.SEND_INVITE, send, "primary", 13)
+  pf.asFriend = UI.LabeledCheck(parent, checkW, L.INVITE_AS_FRIEND, L.INVITE_AS_FRIEND_TIP,
+    function() return pf.asFriendOn end, function(on) pf.asFriendOn = on or nil end)
+  pf.share = UI.TextButton(parent, L.SHARE_ADDON, function() ns.Share:Open(pf.invite:GetText()) end, "plain", 12)
 end
 
 -- Role icons from the game's group finder (Tank, Healer, DPS).
@@ -2152,6 +2254,10 @@ function UI.Standings(parent, width)
     r.dot:SetPoint("LEFT", 18, 0)
     r.name = UI.Text(r, 13, nil)
     r.name:SetPoint("LEFT", 32, 0)
+    -- The Ring-bearer: the ring after the name (U55).
+    r.ring = UI.Round(r, "ARTWORK", 14)
+    r.ring:SetPoint("LEFT", r.name, "RIGHT", 4, 0)
+    UI.SetIcon(r.ring, ns.ICONS.chal_ring)
     -- Online, AFK, offline or away: the mark of the Adventurers page, and its word.
     r.presence = UI.Presence(r, 8)
     r.presence:SetPoint("LEFT", r.name, "RIGHT", 6, 0)
@@ -2196,6 +2302,10 @@ function UI.Standings(parent, width)
           local ink = ns.ClassHex(token, light)
           hr.dot:SetColorTexture(ns.Hex(ink or "999999"))
           hr.name:SetText(ns.Short(row.name))
+          local ring = ns.Challenges ~= nil and ns.Challenges:Bearer(f, row.name)
+          hr.ring:SetShown(ring)
+          hr.presence:ClearAllPoints()
+          hr.presence:SetPoint("LEFT", ring and hr.ring or hr.name, "RIGHT", 6, 0)
           if ink then hr.name:SetTextColor(ns.Hex(ink)) else hr.name:SetTextColor(Theme:RGBA("ink")) end
           local kind = Hr:Presence(f, row.name)
           hr.presence:Set(kind)

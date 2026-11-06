@@ -1,5 +1,5 @@
 -- Sounds (M20): the game's own book and button sounds, so the book feels like the spellbook. Settings → Sounds turns
--- them off. ns.Sound("open" | "close" | "page" | "choose" | "ring" | "bell").
+-- them off. ns.Sound("open" | "close" | "page" | "choose" | "fill" | "ring" | "bell").
 local _, ns = ...
 
 -- SOUNDKIT names, with their numbers for clients without the table.
@@ -8,6 +8,7 @@ local KIT = {
   close = { "IG_SPELLBOOK_CLOSE", 830 },
   page = { "IG_ABILITY_PAGE_TURN", 836 },
   choose = { "IG_MAINMENU_OPTION_CHECKBOX_ON", 856 },
+  fill = { "U_CHAT_SCROLL_BUTTON", 1115 }, -- a name filled in as you type (the soft click of the game's lists)
   ring = { "UI_EPICLOOT_TOAST", 31578 }, -- the Ring passes on (a soft shimmer, the game's epic loot toast)
 }
 

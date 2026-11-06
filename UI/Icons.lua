@@ -3,6 +3,12 @@
 local _, ns = ...
 local I = "Interface\\Icons\\"
 
+-- The Ring in a line of text, after its bearer's name (U55): the ring icon without its frame.
+function ns.RingMark(size)
+  size = size or 12
+  return ("|T%sINV_Jewelry_Ring_03:%d:%d:0:0:64:64:5:59:5:59|t"):format(I, size, size)
+end
+
 ns.ICONS = {
   -- Sidebar
   overview = I .. "INV_Misc_Book_09",

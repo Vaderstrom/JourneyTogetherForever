@@ -97,6 +97,7 @@ UI\Pages\Settings.lua
 UI\Walkthrough.lua
 UI\Panels\Inbox.lua
 UI\Panels\Characters.lua
+#@do-not-package@
 Dev\Debug.lua
 Dev\Peers.lua
 Dev\Areas.lua
@@ -108,4 +109,5 @@ Dev\Check.lua
 Dev\ManualSteps.lua
 Dev\Manual.lua
 Dev\Lab.lua
+#@end-do-not-package@
 Core\Slash.lua

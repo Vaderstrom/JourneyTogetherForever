@@ -102,26 +102,7 @@ local function build(pf)
   pf.ihead = UI.Heading(R1, width, L.INVITE_HEROES, "")
   pf.nameLabel = UI.Text(R1, 13, "ink2")
   pf.nameLabel:SetText(L.INVITE_NAME)
-  local function send()
-    if F:Invite(pf.invite:GetText(), pf.asFriendOn) == "sent" then pf.invite:SetText(""); pf.asFriendOn = nil; pf.asFriend:Refresh() end
-  end
-  pf.invite = UI.EditBox(R1, width - 110, 48, L.INVITE_NAME, send)
-  -- Friends, Battle.net friends and guild members whose name starts with what is typed (online first).
-  pf.suggest = UI.Autocomplete(pf.invite, width - 110, function(text)
-    local f, out = F:Current(), {}
-    local skip = function(name) return f ~= nil and (f.members[name] ~= nil or f.invites[name] ~= nil) end
-    for _, e in ipairs(ns.Friends:Suggest(text, skip, 8)) do
-      out[#out + 1] = { text = ns.Display(e.name), sub = ns.Friends:SourceText(e), online = e.online }
-    end
-    return out
-  end, function(e) pf.invite:SetText(e.text) end)
-  pf.invite.edit:HookScript("OnEditFocusGained", function() ns.Friends:Request() end)
-  pf.send = UI.TextButton(R1, L.SEND_INVITE, send, "primary", 13)
-  -- Invite as a Friend of the fellowship (SPEC §1.1).
-  pf.asFriend = UI.LabeledCheck(R1, width, L.INVITE_AS_FRIEND, L.INVITE_AS_FRIEND_TIP,
-    function() return pf.asFriendOn end, function(on) pf.asFriendOn = on or nil end)
-  -- Friends without the addon (M25): the share window, for the name in the box.
-  pf.share = UI.TextButton(R1, L.SHARE_ADDON, function() ns.Share:Open(pf.invite:GetText()) end, "plain", 12)
+  UI.InviteBox(pf, R1, width - 110, width)
   pf.noPerm = UI.WrapText(R1, 12, "ink2", width)
   pf.noPerm:SetText(L.NO_INVITE_PERM)
   pf.invites = UI.Pool(function()
@@ -137,6 +118,9 @@ local function build(pf)
     r.wait:SetPoint("RIGHT", r.cancel, "LEFT", -8, 0)
     r.wait:SetWordWrap(true); r.wait:SetJustifyH("LEFT")
     r.wait:SetText(L.WAITING_ANSWER)
+    -- The time an offline invite still waits, as a thin bar that empties over its day (U57).
+    r.left = UI.Bar(r, 4)
+    r.left:SetPoint("BOTTOMLEFT", 0, 2)
     return r
   end)
   pf.noInvites = UI.Text(R1, 12, "ink2")
@@ -233,7 +217,13 @@ local function refresh(pf, ctx)
     r.wait:SetText(text)
     r.wait:SetTextColor(Theme:RGBA(color))
     r.cancel:SetShown(P.Can(f, me, "uninvite", name))
-    local h = math.max(32, math.ceil(r.wait:GetStringHeight() or 0) + 12)
+    local left = st == "offline" and ns.Sync:InviteLeft(f, name)
+    r.left:SetShown(left ~= nil and left ~= false)
+    local h = math.max(32, math.ceil(r.wait:GetStringHeight() or 0) + 12) + (left and 6 or 0)
+    if left then
+      r.left:SetColor(left < 3 * 3600 and "B0321E" or "B8742A")
+      r.left:Set(width - (r.cancel:IsShown() and (r.cancel:GetWidth() + 8) or 0), left / ns.Sync.EXPIRE)
+    end
     r:SetHeight(h)
     t:Place(r, h, 2)
   end

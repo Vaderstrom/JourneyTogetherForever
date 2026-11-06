@@ -20,7 +20,7 @@ ns.DUNGEONS = {
   { "bmh", "Blackmaw Hold", 55, 58, 13, "b" }, { "lbrs", "Lower Blackrock Spire", 57, 60, 14, "m" },
   { "dme", "Dire Maul: East", 57, 60, 14, "m" }, { "dmw", "Dire Maul: West", 57, 60, 14, "o" },
   { "dmn", "Dire Maul: North", 57, 60, 14, "o" }, { "strat", "Stratholme", 58, 60, 14, "m" }, { "scholo", "Scholomance", 58, 60, 14, "m" },
-  { "ubrs", "Upper Blackrock Spire", 60, 60, 14, "o" }, { "rfc", "Ragefire Chasm", 13, 18, 1, "o" },
+  { "ubrs", "Upper Blackrock Spire", 60, 60, 14, "o" }, { "rfc", "Ragefire Chasm", 13, 18, 1, "m" },
   { "shaper", "Shaper's Terrace", 58, 60, 14, "m" },
 }
 
@@ -87,6 +87,17 @@ ns.DUNGEON_SPLITS = {
   },
 }
 
+-- WoW Forever's own dungeons, its nine new ones: in the Forever preset, not in the Classic one (the owner, 6 Nov 2026).
+ns.FOREVER_OWN = {
+  hot = true, rol = true, exc = true, dal = true, drown = true, krol = true, alcaz = true, bmh = true, shaper = true,
+}
+
+-- Dungeons in one faction's lands: in a preset only for that faction's fellowships (the owner, 6 Nov 2026: "ragefire
+-- is only added for Horde, and Hall of Thanes only for Alliance fellowships"; their entrances are in the other
+-- faction's capital). No other dungeon depends on the faction. Ragefire Chasm is mandatory for the Horde. The journey
+-- editor still has them.
+ns.DUNGEON_FACTION = { rfc = "Horde", hot = "Alliance" }
+
 -- The placement key of part i of a split ("brd", "brd#2").
 function ns.PartKey(key, i) return i == 1 and key or (key .. "#" .. i) end
 
@@ -148,13 +159,30 @@ ns.GUIDE_PLAN = {
 }
 
 -- Rare spawns and bosses that need a summon or an item: listed, but not needed for a clear by default
--- (Journey Admin can tick them).
+-- (Journey Admin can tick them). Reviewed against Forever's boss data on 6 Nov 2026 (the owner asked): rares (Ezra
+-- Grimm, Ragglesnout), bosses that need a quest item or an event (Urok Doomhowl, Kirtonos, the Avatar of Hakkar,
+-- Grubbis, the Vault, Hurley Blackbreath), and ones players spare on purpose: Princess Moira (her quest rewards
+-- sparing her), the Grim Guzzler's Ribbly and Plugger (the bar turns on you), and Dire Maul North's guards and
+-- Cho'Rush (a tribute run leaves them alive). Forever's own dungeons, from the guides of 6 Nov 2026 (the owner: "Rare
+-- bosses should not be counted for a run"): Lyn the Ignored (City of Dalaran, a rare summoned with the Tome of
+-- Dalaran), Mana Wraith (in the game's list, met by no guide), Lordaeron Captain (Ruins of Lordaeron, a rare), Viktor the
+-- Vile and The Abandoned (Ruins of Lordaeron, each called by an event: the chimney's kindling, the knight statue),
+-- Highland Horror (Excavation Site, for the Alliance quest Horrors in the Highland only). The Hall of Thanes has none.
 ns.OPTIONAL_BOSSES = {
   ["Miner Johnson"] = true, ["Tsu'zee"] = true, ["Lord Hel'nurath"] = true, ["Lord Valthalak"] = true, ["Kormok"] = true,
   ["Skul"] = true, ["Stonespine"] = true, ["Hearthsinger Forresten"] = true, ["Postmaster Malown"] = true,
   ["Black Guard Swordsmith"] = true, ["Crimson Hammersmith"] = true, ["Gahz'rilla"] = true,
+  ["Ezra Grimm"] = true, ["Ragglesnout"] = true, ["Urok Doomhowl"] = true, ["Kirtonos"] = true, ["Avatar of Hakkar"] = true,
+  ["Grubbis"] = true, ["The Vault"] = true, ["Hurley Blackbreath"] = true, ["Princess Moira Bronzebeard"] = true,
+  ["Ribbly Screwspigot"] = true, ["Plugger Spazzring"] = true,
+  ["Guard Mol'dar"] = true, ["Stomper Kreeg"] = true, ["Guard Fengus"] = true, ["Guard Slip'kik"] = true,
+  ["Captain Kromcrush"] = true, ["Cho'Rush the Observer"] = true,
+  ["Lyn the Ignored"] = true, ["Mana Wraith"] = true, ["Lordaeron Captain"] = true, ["Viktor the Vile"] = true,
+  ["The Abandoned"] = true, ["Highland Horror"] = true,
   -- Raids: summoned and optional bosses.
   ["Edge of Madness"] = true, ["Gahz'ranka"] = true, ["Silithid Royalty"] = true, ["Viscidus"] = true, ["Ouro"] = true,
+  -- (Forever's Molten Core lists an encounter by the raid's own name, not in Classic: not needed until it is known.)
+  ["The Molten Core"] = true,
 }
 
 -- The game's picture of each dungeon (from the Adventure Guide's art, which Forever's files also have):
@@ -190,8 +218,15 @@ ns.DUNGEON_SCREEN = {
 }
 -- Our own tiles (Media\DungeonHot ...: art/incoming, A7) for Forever's own dungeons: shown where the game has no
 -- picture for them (retail, and the Forever dungeons not in the game's data yet). The game's loading screen comes first.
+-- Shaper's Terrace and Barrow Deeps (6 Nov 2026) have no game art at all: Gemini's, made from what Blizzard showed.
 ns.DUNGEON_TILE = { hot = "DungeonHot", rol = "DungeonRol", exc = "DungeonExc", drown = "DungeonDrown",
-  krol = "DungeonKrol", alcaz = "DungeonAlcaz", bmh = "DungeonBmh" }
+  krol = "DungeonKrol", alcaz = "DungeonAlcaz", bmh = "DungeonBmh", shaper = "DungeonShaper", barrow = "DungeonBarrow" }
+-- The game's own picture for a place whose loading screen another place shares, or that has none (the owner, 6 Nov
+-- 2026: a picture of its own for each, the game's art first): the Adventure Guide's tiles as file IDs. Scarlet Halls
+-- (the Library and the Armory) and Scarlet Monastery (the Cathedral) from retail's guide, its Upper Blackrock Spire,
+-- and Hyjal Summit from the Battle for Mount Hyjal. The Graveyard and Lower Blackrock Spire keep the loading screen;
+-- Dire Maul's wings share one picture in the game too. Shown before the loading screen.
+ns.DUNGEON_GUIDE = { smlib = 643262, smarm = 643262, smcath = 608214, ubrs = 1042000, hyjal = 608198 }
 -- Where the picture is in each kind of file (left, right, top, bottom) and its shape (width / height on screen).
 -- classic starts below the tip of the frame under the logo, which reaches 0.255 (Shadowfang Keep's); it was 0.21
 -- until 30 Oct 2026, and a sliver of the logo showed.
@@ -222,6 +257,11 @@ end
 -- shows something better then).
 function ns.SetDungeonArt(tex, key, w, h)
   key = ns.BaseKey(key)
+  local mine = ns.DUNGEON_GUIDE[key]
+  if mine and tex:SetTexture(mine) then
+    tex:SetTexCoord(crop(BANDS.journal, w, h))
+    return true, false
+  end
   local screen = ns.DUNGEON_SCREEN[key]
   if screen and screen[2] == "forever" and not ns.IsForever() then screen = nil end
   if screen and tex:SetTexture(screen[1]) then

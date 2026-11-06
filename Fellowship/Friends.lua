@@ -7,25 +7,39 @@ local Fr = { FRESH = 5, ASK_EVERY = 60 }
 ns.Friends = Fr
 
 -- Every candidate once: { name = "Name-Realm", online = true|false, afk = true|nil, source = "friend"|"bnet"|"guild",
--- tag = the BattleTag of a Battle.net friend ("Arielas#2345") }.
+-- tag = the BattleTag of a Battle.net friend ("Arielas#2345"), class = "MAGE", level = 23 (when the list says) }.
+-- Kept FRESH seconds (the invite box asks at every letter, and a guild roster can be long); a change in the game's
+-- lists drops it (changed, below).
 function Fr:All()
+  local now, me = GetTime(), ns.Me()
+  if self.all and self.allMe == me and now - self.allAt < self.FRESH then return self.all end
   local out, seen = {}, {}
-  local me, faction = ns.Me(), (UnitFactionGroup("player"))
-  local function add(name, online, source, afk, tag)
+  local faction = UnitFactionGroup("player")
+  -- The friends lists give the class in your language: its token, for the class colour.
+  local function token(className)
+    for _, list in ipairs({ LOCALIZED_CLASS_NAMES_MALE or {}, LOCALIZED_CLASS_NAMES_FEMALE or {} }) do
+      for k, v in pairs(list) do if v == className then return k end end
+    end
+  end
+  local function add(name, online, source, afk, tag, class, level)
     if type(name) ~= "string" or name == "" then return end
     local full = ns.FullName(name)
     if full == me or not ns.Reachable(full) then return end
     afk = online == true and afk == true or nil
     local e = seen[full]
-    if e then e.online, e.afk, e.tag = e.online or online == true, e.afk or afk, e.tag or tag; return end
-    e = { name = full, online = online == true, afk = afk, source = source, tag = tag }
+    level = type(level) == "number" and level > 0 and level or nil
+    if e then
+      e.online, e.afk, e.tag, e.class, e.level = e.online or online == true, e.afk or afk, e.tag or tag, e.class or class, e.level or level
+      return
+    end
+    e = { name = full, online = online == true, afk = afk, source = source, tag = tag, class = class, level = level }
     seen[full] = e
     out[#out + 1] = e
   end
   if C_FriendList and C_FriendList.GetNumFriends then
     for i = 1, C_FriendList.GetNumFriends() or 0 do
       local info = C_FriendList.GetFriendInfoByIndex(i)
-      if info then add(info.name, info.connected, "friend", info.afk) end
+      if info then add(info.name, info.connected, "friend", info.afk, nil, token(info.className), info.level) end
     end
   end
   if BNGetNumFriends and C_BattleNet and C_BattleNet.GetFriendNumGameAccounts then
@@ -41,7 +55,8 @@ function Fr:All()
           -- (WoW Forever: a ruleset is several realms, so a friend's realm does not say whether they share yours; 1.0.3
           -- left out friends on another realm, wrongly. Their name is taken as on your ruleset.)
           local realm = not ns.IsForever() and g.realmName and (g.realmName:gsub("[%s%-]", "")) or ""
-          add(realm ~= "" and (g.characterName .. "-" .. realm) or g.characterName, g.isOnline, "bnet", g.isGameAFK, tag)
+          add(realm ~= "" and (g.characterName .. "-" .. realm) or g.characterName, g.isOnline, "bnet", g.isGameAFK, tag,
+            token(g.className), g.characterLevel)
         end
       end
     end
@@ -49,8 +64,39 @@ function Fr:All()
   if IsInGuild and IsInGuild() and GetNumGuildMembers then
     for i = 1, GetNumGuildMembers() or 0 do
       -- status: 1 is AFK (2 is busy; "<AFK>" in older clients).
-      local name, _, _, _, _, _, _, _, online, status = GetGuildRosterInfo(i)
-      add(name, online, "guild", status == 1 or status == "<AFK>")
+      local name, _, _, level, _, _, _, _, online, status, class = GetGuildRosterInfo(i)
+      add(name, online, "guild", status == 1 or status == "<AFK>", nil, class, level)
+    end
+  end
+  self.all, self.allAt, self.allMe = out, now, me
+  return out
+end
+
+-- The game's own names for what is typed, the list its mail box uses (AUTOCOMPLETE_LIST.MAIL): besides friends and
+-- guild, the people in your group and the ones you played or talked with lately (the owner, 6 Nov 2026: "the same
+-- type of pre fill as the email system"). { name, source = "group"|"recent" }; names the game keeps secret are left out.
+function Fr:GameNames(text)
+  local q = strtrim(text or "")
+  -- The check's pretend list (Dev/SelfTest.lua, Dev/Tour.lua), in place of the game's: never the game's own function.
+  local pretend = ns.Dev and ns.Dev.pretendNames
+  if pretend then
+    local out = {}
+    for _, n in ipairs(pretend) do
+      if q ~= "" and n:lower():sub(1, #q) == q:lower() then out[#out + 1] = { name = n, source = "recent" } end
+    end
+    return out
+  end
+  if q == "" or type(GetAutoCompleteResults) ~= "function" then return {} end
+  local spec = type(AUTOCOMPLETE_LIST) == "table" and AUTOCOMPLETE_LIST.MAIL or nil
+  local ok, results = pcall(GetAutoCompleteResults, q, 10, #q, true, spec and spec.include or 0xFFFFFFFF,
+    spec and spec.exclude or 0)
+  if not ok or type(results) ~= "table" then return {} end
+  local out = {}
+  for _, r in ipairs(results) do
+    local name = type(r) == "table" and r.name or r
+    if type(name) == "string" and not (issecretvalue and issecretvalue(name)) and name ~= "" then
+      local group = type(r) == "table" and AUTOCOMPLETE_PRIORITY_IN_GROUP ~= nil and r.priority == AUTOCOMPLETE_PRIORITY_IN_GROUP
+      out[#out + 1] = { name = name, source = group and "group" or "recent" }
     end
   end
   return out
@@ -59,11 +105,21 @@ end
 -- Names (or BattleTags) starting with text (all when empty), online first, at most max. skip(name) leaves a name out.
 function Fr:Suggest(text, skip, max)
   local q = strtrim(text or ""):lower()
-  local list = {}
+  local list, seen = {}, {}
+  local me = ns.Me()
   for _, e in ipairs(self:All()) do
+    seen[e.name] = true
     local short = ns.Short(e.name):lower()
     local tag = e.tag and e.tag:lower() or ""
     if (q == "" or short:sub(1, #q) == q or tag:sub(1, #q) == q) and not (skip and skip(e.name)) then list[#list + 1] = e end
+  end
+  for _, g in ipairs(self:GameNames(text)) do
+    local full = ns.FullName(g.name)
+    if not seen[full] and full ~= me and ns.Reachable(full) and ns.Short(full):lower():sub(1, #q) == q
+      and not (skip and skip(full)) then
+      seen[full] = true
+      list[#list + 1] = { name = full, online = g.source == "group", source = g.source }
+    end
   end
   table.sort(list, function(a, b)
     if a.online ~= b.online then return a.online end
@@ -166,7 +222,7 @@ end
 
 -- The game's lists changed: built again when next asked, and the open book redrawn (once for a burst).
 local function changed()
-  Fr.map = nil
+  Fr.map, Fr.all = nil, nil
   if ns.Window then ns.Window:RefreshSoon() end
 end
 for _, event in ipairs({ "FRIENDLIST_UPDATE", "BN_FRIEND_INFO_CHANGED", "GUILD_ROSTER_UPDATE", "GROUP_ROSTER_UPDATE",

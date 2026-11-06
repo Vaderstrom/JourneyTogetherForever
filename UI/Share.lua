@@ -63,7 +63,7 @@ function Sh:Open(name, noAnswer)
   local short = name ~= "" and ns.Short(name) or ""
   o.title:SetText(noAnswer and L.SHARE_NOANSWER_TITLE:format(short) or L.SHARE_TITLE)
   o.text:SetText(noAnswer and L.SHARE_NOANSWER:format(short) or L.SHARE_TEXT)
-  o.hint:SetText(noAnswer and L.SHARE_NOANSWER_HINT or "")
+  o.hint:SetText(noAnswer and (ns.IsForever() and L.SHARE_NOANSWER_HINT_FOREVER or L.SHARE_NOANSWER_HINT) or "")
   -- Top to bottom: the text, the hint, the page to copy, then who to whisper and the button.
   local y = 48 + o.text:GetStringHeight() + 6
   o.hint:ClearAllPoints(); o.hint:SetPoint("TOPLEFT", 16, -y)

@@ -93,6 +93,7 @@ end
 -- a gold ring, its name and rule, then who broke it (in red) and what stands now, each on a line of its own.
 -- :Set(item of ns.Challenges:Book) returns the height.
 local BLOCK_ICON, BLOCK_IN = 26, 38
+local ROAD_STEP, ROAD_ICON, ROAD_ROW = 74, 26, 50
 local BROKEN = "B0321E"
 local function chalBlock(parent, width)
   local b = CreateFrame("Frame", nil, parent)
@@ -108,7 +109,52 @@ local function chalBlock(parent, width)
   b.rule:SetPoint("TOPLEFT", b.name, "BOTTOMLEFT", 0, -3)
   b.broken = UI.WrapText(b, 12, BROKEN, width - BLOCK_IN, "book")
   b.notes = UI.WrapText(b, 12, "ink2", width - BLOCK_IN, "book")
-  function b:Set(it)
+  -- The Ring's road (U58): each bearer a step with their class icon, joined by a gold line, the Ring on who carries
+  -- it now.
+  b.roadHead = UI.Text(b, 12, "ink2", "title")
+  b.roadHead:SetText(L.RING_ROAD_HEAD)
+  b.steps = UI.Pool(function()
+    local st = CreateFrame("Frame", nil, b)
+    st:SetSize(ROAD_STEP, ROAD_ROW)
+    st.line = UI.Solid(st, "BACKGROUND", "gold", 0.8)
+    st.line:SetHeight(2)
+    st.line:SetPoint("RIGHT", st, "TOP", -ROAD_ICON / 2 - 2, -ROAD_ICON / 2 - 2)
+    st.line:SetWidth(ROAD_STEP - ROAD_ICON - 4)
+    st.crest = UI.ClassCrest(st, ROAD_ICON + 4)
+    st.crest:SetPoint("TOP", 0, 0)
+    st.ring = UI.Round(st, "OVERLAY", 16)
+    st.ring:SetPoint("CENTER", st.crest, "TOPRIGHT", -3, -3)
+    UI.SetIcon(st.ring, ns.ICONS.chal_ring)
+    st.name = UI.Text(st, 11, "ink", "body", "CENTER")
+    st.name:SetPoint("TOP", st.crest, "BOTTOM", 0, -2)
+    st.name:SetWidth(ROAD_STEP - 4)
+    return st
+  end)
+  function b:Road(steps, y, f)
+    self.roadHead:SetShown(steps ~= nil)
+    if not steps then self.steps:HideFrom(1); return y end
+    self.roadHead:ClearAllPoints(); self.roadHead:SetPoint("TOPLEFT", BLOCK_IN, -(y + 6))
+    y = y + 6 + 16
+    local per = math.max(1, math.floor((width - BLOCK_IN) / ROAD_STEP))
+    local n = 0
+    for i, one in ipairs(steps) do
+      local st = self.steps:Get(i)
+      if not st then break end
+      n = i
+      local col, row = (i - 1) % per, math.floor((i - 1) / per)
+      st:ClearAllPoints(); st:SetPoint("TOPLEFT", BLOCK_IN + col * ROAD_STEP, -(y + row * ROAD_ROW))
+      local _, token = ns.Hero:ClassName(f, one.name)
+      st.crest:Set(token)
+      st.name:SetText(ns.Short(one.name))
+      st.ring:SetShown(one.bearer == true)
+      st.line:SetShown(col > 0)
+      st.bearer = one.bearer
+      st:Show()
+    end
+    self.steps:HideFrom(n + 1)
+    return y + math.ceil(n / per) * ROAD_ROW
+  end
+  function b:Set(it, f)
     self.key = it.key
     if not UI.SetIcon(self.icon, ns.Challenges:Icon(it.key)) then UI.SetIcon(self.icon, ns.ICONS.hist_challenge) end
     self.name:SetText(it.title)
@@ -126,6 +172,7 @@ local function chalBlock(parent, width)
       self.notes:ClearAllPoints(); self.notes:SetPoint("TOPLEFT", BLOCK_IN, -(h + 5))
       h = h + 5 + self.notes:GetStringHeight()
     end
+    h = self:Road(it.road, h, f)
     h = math.ceil(math.max(h, BLOCK_ICON + 4))
     self:SetHeight(h)
     return h
@@ -254,7 +301,7 @@ local function refreshBook(pf, ctx)
       local b = c.blocks:Get(nb + 1)
       if not b then break end
       nb = nb + 1
-      s:Place(b, b:Set(it), 12)
+      s:Place(b, b:Set(it, f), 12)
       if it.key == "shared" and lives then
         c.lives:SetTip(lives.title, lives.lines)
         s:Skip(-4)

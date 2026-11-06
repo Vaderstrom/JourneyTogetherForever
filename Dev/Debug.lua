@@ -49,7 +49,7 @@ function D:TestFellowship(myRole)
   local level = UnitLevel("player")
   local f = {
     id = self.TEST_ID, v = 3, name = L.DEV_FELLOWSHIP, faction = (UnitFactionGroup("player")), color = "6A3A9A", emblem = "Her_Wolf",
-    leader = leader, officers = {}, invites = {}, rules = ns.Rules.New(), journey = ns.BuildJourney("classic"), chronicle = {},
+    leader = leader, officers = {}, invites = {}, rules = ns.Rules.New(), journey = ns.BuildJourney("forever"), chronicle = {},
     members = { [leader] = { role = "Tank", class = "WARRIOR", level = level, joined = now },
       [me] = { role = myRole, class = myClass, level = level, joined = now } },
     updated = now,
@@ -303,6 +303,17 @@ function D:SyncInfo()
   -- The fingerprint as text: it can be above 2^31, and the game's %d stops there ("integer overflow"; seen in game).
   ns:Debug(L.DEV_SYNC:format(f and f.v or 0, f and ("%.0f"):format(ns.Sync:Digest(f)) or "0", n,
     #who > 0 and table.concat(who, ", ") or "-", ns.Comm:Held() and L.ON or L.OFF))
+  -- How long the last message of each kind waited before it went out, and the join (Accept to the copy) (U60).
+  local waits, lanes = {}, {}
+  for tag, sec in pairs(ns.Comm.waits) do waits[#waits + 1] = ("%s %.1fs"):format(tag, sec) end
+  table.sort(waits)
+  for name, k in pairs(ns.Comm.peers) do lanes[#lanes + 1] = ns.Short(name) .. " " .. k end
+  table.sort(lanes)
+  ns:Debug(L.DEV_SYNC_WAITS:format(#waits > 0 and table.concat(waits, ", ") or "-", ns.Comm.throttled or 0,
+    #lanes > 0 and table.concat(lanes, ", ") or "-"))
+  -- Real-time sync (6 Nov 2026): whispers free of the per-prefix wait, and what packing saved.
+  ns:Debug(L.DEV_SYNC_PACKED:format(ns.Comm:Free() and L.ON or L.OFF, ns.Comm.Z and L.ON or L.OFF, ns.Comm.packed or 0,
+    ns.Comm.saved or 0))
 end
 
 -- The command list, one line each. "|" is the start of a colour code in the game's chat, so it is doubled to show as
@@ -339,7 +350,7 @@ function D:Watch(what)
   self.watchLevel = self.watchLevel or 17
   local f = {
     id = self.WATCH_ID, v = 2, name = L.DEV_WATCH_FELLOWSHIP, faction = (UnitFactionGroup("player")), color = "2E6A8A", emblem = "Her_Eagle",
-    leader = alt, officers = {}, invites = {}, rules = ns.Rules.New(), journey = ns.BuildJourney("classic"), chronicle = {},
+    leader = alt, officers = {}, invites = {}, rules = ns.Rules.New(), journey = ns.BuildJourney("forever"), chronicle = {},
     members = { [alt] = { role = "Tank", class = "WARRIOR", level = 16, joined = now - 86400 } }, updated = now - 7200,
   }
   for _, h in ipairs(self.WATCH_HEROES) do f.members[fake(h[1])] = { role = h[2], class = h[3], level = 16, joined = now - 86400 } end

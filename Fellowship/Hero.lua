@@ -15,7 +15,7 @@
 local _, ns = ...
 local L = ns.L
 local F, Comm = ns.Fellowship, ns.Comm
-local Hr = { HEARTBEAT = 300, ONLINE_FOR = 420, XP_EVERY = 60, timers = {} }
+local Hr = { HEARTBEAT = 300, ONLINE_FOR = 420, XP_EVERY = 30, timers = {} }
 ns.Hero = Hr
 
 -- Gear slots in the mockup's order: { label key, inventory slot }.
@@ -133,11 +133,7 @@ function Hr:Store(f, name, s, heardAt, relayed)
   h.ver = str(s.ver) or h.ver -- the Hero's addon version
   -- A Hero with a newer version: say once per session that an update is out, in chat and as a toast that opens the
   -- Adventurers page (it says so at the top until you update; 28 Oct 2026).
-  if name ~= ns.Me() and not Hr.toldNewer and ns.NewerVersion(h.ver, ns.VERSION) then
-    Hr.toldNewer = true
-    ns:Print(L.NEWER_VERSION:format(h.ver), true)
-    ns:Toast("version", L.TOAST_VERSION_TITLE, L.TOAST_VERSION_TEXT:format(ns.Short(name), h.ver, ns.VERSION), "heroes")
-  end
+  if name ~= ns.Me() then Hr:TellNewer(name, h.ver, "heroes") end
   -- The other characters on this Companion's account: they may watch the fellowship (Fellowship/Watch.lua).
   if type(s.alts) == "table" then
     local alts = {}
@@ -318,11 +314,7 @@ end
 ---------------------------------------------------------------------------
 -- Sending
 ---------------------------------------------------------------------------
-local function others(f)
-  local me, list = ns.Me(), {}
-  for name in pairs(f.members) do if name ~= me then list[#list + 1] = name end end
-  return list
-end
+local others = ns.Others
 
 -- Keeps my own entry up to date and sends my state to every other Hero.
 -- My next count: above anything of mine another addon has passed on (after a reinstall it started again at 1).
@@ -515,6 +507,52 @@ ns:On("LOGIN", function()
   C_Timer.After(5, function() Hr:Hello() end)
   C_Timer.NewTicker(Hr.HEARTBEAT, function() Hr:SendState() end)
 end)
+---------------------------------------------------------------------------
+-- Is a newer version out? (the owner, 6 Nov 2026: "report themselves if there is a newer version out", as other
+-- addons do). Fellowship members tell it in their state; anyone else with the addon in your guild or group tells it
+-- with a short announcement ("V:1.0.5" on JTF, GUILD, PARTY or RAID), sent at login and when the group changes, and
+-- in answer to an older one (so its player hears about the update too). Each channel at most once in ANNOUNCE_EVERY.
+-- Never inside an instance (Midnight rules) and never from a development copy (its version is not a number).
+---------------------------------------------------------------------------
+Hr.ANNOUNCE_EVERY = 120
+Hr.announced = {}
+
+-- Says once a session that version ver is out (in chat, and a toast that opens page, if any).
+function Hr:TellNewer(from, ver, page)
+  if self.toldNewer or not ns.NewerVersion(ver, ns.VERSION) then return end
+  -- (A version far ahead is not believed: more than one major version, from someone playing a joke.)
+  local v, mine = ns.ParseVersion(ver), ns.ParseVersion(ns.VERSION)
+  if v[1] > mine[1] + 1 then return end
+  self.toldNewer = true
+  ns:Print(L.NEWER_VERSION:format(ver), true)
+  ns:Toast("version", L.TOAST_VERSION_TITLE, L.TOAST_VERSION_TEXT:format(ns.Short(from), ver, ns.VERSION), page)
+end
+
+function Hr:Announce(channel)
+  if not ns.ParseVersion(ns.VERSION) or not (C_ChatInfo and C_ChatInfo.SendAddonMessage) then return end
+  if IsInInstance() then return end
+  if channel == "GUILD" and not IsInGuild() then return end
+  if (channel == "PARTY" or channel == "RAID") and not IsInGroup() then return end
+  local now = GetTime()
+  if self.announced[channel] and now - self.announced[channel] < self.ANNOUNCE_EVERY then return end
+  self.announced[channel] = now
+  C_ChatInfo.SendAddonMessage(Comm.PREFIX, "V:" .. ns.VERSION, channel)
+end
+
+local function groupChannel() return IsInRaid() and "RAID" or "PARTY" end
+
+ns:RegisterEvent("CHAT_MSG_ADDON", function(_, prefix, msg, channel, sender)
+  if issecretvalue and (issecretvalue(prefix) or issecretvalue(msg) or issecretvalue(sender) or issecretvalue(channel)) then return end
+  if prefix ~= Comm.PREFIX or type(msg) ~= "string" or not sender then return end
+  if channel ~= "GUILD" and channel ~= "PARTY" and channel ~= "RAID" then return end
+  local ver = msg:match("^V:(v?%d+%.%d+[%w%.%-]*)$")
+  if not ver or ns.FullName(sender) == ns.Me() then return end
+  Hr:TellNewer(sender, ver)
+  if ns.NewerVersion(ns.VERSION, ver) then Hr:Announce(channel) end
+end)
+ns:On("LOGIN", function() C_Timer.After(20, function() Hr:Announce("GUILD"); Hr:Announce(groupChannel()) end) end)
+ns:RegisterEvent("GROUP_ROSTER_UPDATE", function() Hr:Soon("announce", 10, function() Hr:Announce(groupChannel()) end) end)
+
 -- After joining (or founding), say hello at once.
 ns:On("JOINED", function() Hr:Hello() end)
 ns:RegisterEvent("PLAYER_LEVEL_UP", function() C_Timer.After(1, function() Hr:SendState() end) end)

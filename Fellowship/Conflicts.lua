@@ -114,8 +114,9 @@ end
 -- Adventurer, and the same difference once in half an hour.
 Cf.compared = ns.Sync.Limiter()
 function Cf:Compare(sender, f, d)
-  if type(d) ~= "table" or not d.ph or tonumber(d.v) ~= f.v or d.h ~= ns.Sync:Digest(f) then return end
-  if not self.compared:Ready(sender) then return end
+  -- (The limit first: the fingerprint is the costly part, and every state of every Adventurer comes here.)
+  if type(d) ~= "table" or not d.ph or tonumber(d.v) ~= f.v or not self.compared:Ready(sender) then return end
+  if d.h ~= ns.Sync:Digest(f) then return end
   local mine = self:Prints(f)
   local kills = d.k == ns.Clears:Digest(f)
   local parts = d.ph ~= mine.ph

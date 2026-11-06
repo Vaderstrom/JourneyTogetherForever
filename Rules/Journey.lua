@@ -542,9 +542,12 @@ function J.SplitTokens(base, i)
   local _, all = ns.Clears:DataBosses(base)
   local out = {}
   for _, name in ipairs(part) do
-    local tok = "n" .. name
-    for _, b in ipairs(all or {}) do if b.name == name then tok = b.tok end end
-    out[#out + 1] = tok
+    -- (Optional bosses stay out, as everywhere: Princess Moira, the Grim Guzzler's, the Vault.)
+    if not ns.OPTIONAL_BOSSES[name] then
+      local tok = "n" .. name
+      for _, b in ipairs(all or {}) do if b.name == name then tok = b.tok end end
+      out[#out + 1] = tok
+    end
   end
   return out
 end

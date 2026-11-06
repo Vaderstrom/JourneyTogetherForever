@@ -280,13 +280,17 @@ end
 -- A ring that came into my bags since I last looked, not from a quest, the auction house or the bank: the Ring, if
 -- nobody found one before. As its bearer: the Ring gone from my bags is destroyed inside Blackrock Mountain, or lost.
 -- Passed to me (Challenges:PassRing): a ring I wear or carry becomes the Ring, or the next one I get.
+-- Only while I may find the Ring or carry it: reading every bag slot at each loot was wasted for everyone else
+-- (ponytail audit, 6 Nov 2026).
 function CW:CheckRings()
+  local f = F:Current()
+  local r = f and f.ring
+  local finding = f and not r and C:Holds(f, me(), "ring")
+  if not finding and not (r and not r.state and r.who == me()) then self.rings = nil return end
   local now, known = self.Rings(), self.rings
   self.rings = now
-  local f = F:Current()
-  if not f or not known then return end
-  local r = f.ring
-  if not r and C:Holds(f, me(), "ring") then
+  if finding then
+    if not known then return end -- (the first look only remembers what I carry)
     local t = GetTime()
     local from = (self.questAt and t - self.questAt <= self.QUEST_SLACK) or (self.ahMailAt and t - self.ahMailAt <= self.QUEST_SLACK)
       or self.atAuction or self.atBank
@@ -379,14 +383,14 @@ ns:RegisterEvent("UI_INFO_MESSAGE", function(_, _, text) if text == ERR_TRADE_CO
 ns:RegisterEvent("PLAYER_EQUIPMENT_CHANGED", function() CW:CheckGear() end)
 ns:RegisterEvent("PLAYER_MONEY", function() CW:CheckGold() end)
 ns:RegisterEvent("PLAYER_CONTROL_LOST", function() C_Timer.After(CW.TAXI_WAIT, function() CW:CheckTaxi() end) end)
-ns:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED", function(_, unit, _, spell) CW:Cast(unit, spell) end)
+ns:RegisterUnitEvent("UNIT_SPELLCAST_SUCCEEDED", "player", function(_, unit, _, spell) CW:Cast(unit, spell) end)
 ns:RegisterEvent("QUEST_TURNED_IN", function(_, id, xp) CW:QuestDone(id, xp) end)
 ns:RegisterEvent("PLAYER_XP_UPDATE", function() C_Timer.After(CW.XP_WAIT, function() CW:CheckXP() end) end)
 ns:RegisterEvent("PLAYER_LEVEL_UP", function() C_Timer.After(1, function() CW:CheckRace() end) end)
 ns:RegisterEvent("TRAIT_CONFIG_UPDATED", function() CW:CheckTalents() end)
 ns:RegisterEvent("CHARACTER_POINTS_CHANGED", function() CW:CheckTalents() end)
 ns:RegisterEvent("SKILL_LINES_CHANGED", function() CW:CheckProfessions() end)
-ns:RegisterEvent("UNIT_AURA", function(_, unit) if unit == "player" then CW:CheckFood() end end)
+ns:RegisterUnitEvent("UNIT_AURA", "player", function() CW:CheckFood() end)
 ns:RegisterEvent("BAG_UPDATE_DELAYED", function() CW:CheckRings() end)
 ns:RegisterEvent("AUCTION_HOUSE_SHOW", function() CW.atAuction = true end)
 ns:RegisterEvent("AUCTION_HOUSE_CLOSED", function() CW.atAuction = nil; C_Timer.After(1, function() CW.rings = CW.Rings() end) end)

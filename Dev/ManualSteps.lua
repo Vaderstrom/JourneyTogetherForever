@@ -64,7 +64,7 @@ ns.ManualSteps = {
     todo = "Click Create a Fellowship. Step 1: click a size card and an emblem on the right page. Step 2: click each play style. Go to step 3 (Journey).",
     see = "Step 1: the banner on the right follows your colour and emblem. Step 2: each style's strip of levels, and the right page explains the chosen one. Step 3: Classic says 15 chapters; its colour strip starts with the Prologue's brown, and the right page lists its chapters.",
     auto = function()
-      local n = #ns.BuildJourney("classic").chapters
+      local n = #ns.BuildJourney("forever").chapters
       return n == 15, "Classic has " .. n .. " chapters"
     end },
   { id = "create-own", section = "Creating and joining",
