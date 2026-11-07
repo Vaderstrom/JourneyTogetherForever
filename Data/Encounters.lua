@@ -7,7 +7,7 @@
 --     "d" or "r", best level from, to, a raid's players (0: not given), picture file, the bosses of a wing... }.
 local _, ns = ...
 ns.ENCOUNTERS = {
-  wowf = { build = "1.60.1.70790",
+  wowf = { build = "1.60.1.70862",
   finder = {
     [1] = "Wailing Caverns",
     [2] = "Scholomance",
@@ -35,10 +35,15 @@ ns.ENCOUNTERS = {
     [45] = "Onyxia",
     [47] = "Molten Core",
     [49] = "Blackwing Lair",
+    [3267] = "The Shaper's Terrace",
+    [3268] = "Blackmaw Hold",
+    [3269] = "Alcaz Prison",
+    [3270] = "The Drowned City",
     [3271] = "City of Dalaran",
     [3272] = "Ruins of Lordaeron",
     [3273] = "Hall of Thanes",
     [3274] = "Excavation Site: Wetlands",
+    [3275] = "Krol'dok Stronghold",
   },
   maps = {
     [13] = { "Test Dungeon", { 3078, "Rahuz" } },
@@ -73,8 +78,13 @@ ns.ENCOUNTERS = {
     [2875] = { "Karazhan Crypts", { 3141, "Harbinger of Sin" }, { 3146, "Creeping Malison" }, { 3144, "Three Little Wolves" }, { 3145, "Dark Rider" }, { 3143, "Kharon" }, { 3152, "Unk'omon" }, { 3168, "Hans and Greta" }, { 3169, "The Ugly Goblin" }, { 3170, "Kaigy Maryla" }, { 3171, "Sairuh Maryla" }, { 3172, "Barian Maryla" } },
     [2921] = { "Naxxramas", { 3296, "Spirit of Mograine" } },
     [2959] = { "City of Dalaran", { 3298, "Arcane Anomaly" }, { 3299, "Fel Ancient" }, { 3300, "Mana Devourer" }, { 3301, "Mana Elemental" }, { 3302, "Unstable Sentinel" }, { 3310, "Lyn the Ignored" }, { 3311, "Atrexis the Grave Knight" }, { 3312, "Mana Wraith" }, { 3303, "Shade of the Archmage" } },
+    [2970] = { "The Drowned City", { 3474, "Zul'Alai" }, { 3475, "Var'Taka" }, { 3476, "Captain Dreadrise" }, { 3478, "Deathless Guardians" }, { 3511, "Primeval Elemental" }, { 3479, "Min'loth the Serpent" } },
+    [2974] = { "Blackmaw Hold", { 3315, "Withermaw" }, { 3316, "Impaan the Imprisoner" }, { 3327, "Elder Shaman Bloodmane" }, { 3322, "Bonesnout the Unbroken" }, { 3334, "Varrox Bleakhoof" }, { 3323, "Blackmaw Behemoth" }, { 3336, "Unbound Spirit" } },
+    [2994] = { "Alcaz Prison", { 3403, "Overseer Wrex" }, { 3410, "Tidemistress Ca'zass" }, { 3418, "Katerina the Cleaner" }, { 3415, "The Questioner" }, { 3409, "Blazeroar" } },
     [2998] = { "Excavation Site: Wetlands", { 3480, "Saltspine" }, { 3481, "Shadetooth" }, { 3644, "Highland Horror" }, { 3482, "Relic Guardian" } },
     [2999] = { "Ruins of Lordaeron", { 3353, "Witherfang" }, { 3357, "The Abandoned" }, { 3355, "The Butcher" }, { 3408, "Lordaeron Captain" }, { 3411, "Viktor the Vile" }, { 3412, "Bjork" }, { 3354, "Rath'mael" } },
+    [3001] = { "The Shaper's Terrace", { 3498, "Titanosaur" }, { 3499, "Ravasaur Hunters" }, { 3500, "Thunderhoof" }, { 3501, "Venomridge" }, { 3507, "Direhorn Matriarch" }, { 3503, "Cinder" }, { 3504, "King Op" }, { 3597, "Snowtalon" }, { 3505, "Bolt" }, { 3600, "Vitrix" }, { 3502, "Nanaya" } },
+    [3039] = { "Krol'dok Stronghold", { 3450, "Slavecrusher Grox" }, { 3452, "Twilight Commander Zarmok" }, { 3453, "Handler Ashka" }, { 3449, "Nar'gurk" }, { 3451, "Overseer Mugg" } },
     [3065] = { "The Hall of Thanes", { 3493, "Faldrim Anvilmar" }, { 3495, "Infurnus" }, { 3494, "Plunder" }, { 3496, "Durgen Dirgehammer" } },
   } },
   wow = { build = "12.1.5.70783",

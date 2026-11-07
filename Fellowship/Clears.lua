@@ -97,17 +97,40 @@ function C:DefaultNeeded(key)
   return out
 end
 
--- Tokens of the needed bosses of a dungeon in this fellowship's journey.
+-- A boss token as the game's data knows it. A boss learned on the kill ("n<name>") becomes its data token once a
+-- new build gave the dungeon its bosses: the leader's choices, kills recorded before the update and kills sent by
+-- copies still on the old data all count. Kills are stored as they came (so copies stay the same) and compared
+-- through this.
+function C:Token(key, tok)
+  if type(tok) ~= "string" or tok:sub(1, 1) ~= "n" then return tok end
+  local _, all = self:DataBosses(key)
+  for _, b in ipairs(all or {}) do if b.name == tok:sub(2) then return b.tok end end
+  return tok
+end
+
+-- The bosses a Hero was there for in a dungeon, by C:Token: { tok = time }.
+function C:Killed(f, key, name)
+  local out = {}
+  for tok, t in pairs(f.kills[key] and f.kills[key][name] or {}) do
+    local d = self:Token(key, tok)
+    out[d] = math.max(out[d] or 0, t)
+  end
+  return out
+end
+
+-- Tokens of the needed bosses of a dungeon in this fellowship's journey (by C:Token).
 function C:Needed(f, key)
   local p = f.journey.place[key]
-  if p and p.bosses then return p.bosses end
-  return self:DefaultNeeded(key)
+  if not (p and p.bosses) then return self:DefaultNeeded(key) end
+  local out = {}
+  for i, tok in ipairs(p.bosses) do out[i] = self:Token(key, tok) end
+  return out
 end
 
 -- How many needed bosses a Hero was there for, and how many are needed.
 function C:Progress(f, key, name)
   local needed = self:Needed(f, key)
-  local k = f.kills[key] and f.kills[key][name] or {}
+  local k = self:Killed(f, key, name)
   local n = 0
   for _, tok in ipairs(needed) do if k[tok] then n = n + 1 end end
   return n, #needed
@@ -318,7 +341,8 @@ function C:Record(f, key, t, names, tok)
   end
   -- History: one entry per visit, for the bosses that matter (or any, when none are chosen yet).
   local e
-  if has(needed, tok) or #needed == 0 then
+  local htok = self:Token(key, tok)
+  if has(needed, htok) or #needed == 0 then
     for _, h in ipairs(f.history) do
       if h.type == "run" and h.key == key and t > h.time - self.SAME_RUN and t < (h.last or h.time) + self.SAME_RUN then e = h; break end
     end
@@ -326,12 +350,13 @@ function C:Record(f, key, t, names, tok)
     for _, n in ipairs(names) do if not has(e.names, n) then e.names[#e.names + 1] = n end end
     for _, n in ipairs(newly) do if not has(e.cleared, n) then e.cleared[#e.cleared + 1] = n end end
     table.sort(e.names); table.sort(e.cleared)
-    e.killed[tok] = true
+    e.killed[htok] = true
     e.last = math.max(e.last or e.time, t)
     e.time = math.min(e.time, t)
     e.need = f.rules.minHeroes
-    local count = 0
-    for _, nt in ipairs(needed) do if e.killed[nt] then count = count + 1 end end
+    local killed, count = {}, 0
+    for kt in pairs(e.killed) do killed[self:Token(key, kt)] = true end
+    for _, nt in ipairs(needed) do if killed[nt] then count = count + 1 end end
     e.bossesKilled, e.bossesOf = count, #needed
     if ok then e.ok, e.reason = true, nil
     elseif not e.ok then e.ok, e.reason = false, (not open) and "locked" or "few" end
@@ -662,6 +687,11 @@ local function check()
   local f = F:Current()
   if f then C:CheckChapter(f) end
 end
+-- At login: kills that count now and did not before (a new build gave a dungeon its bosses, C:Token) grant their clears.
+ns:On("LOGIN", function()
+  for _, f in pairs(ns.db.fellowships or {}) do if not f.disbanded then C:Reevaluate(f) end end
+end)
+
 ns:On("FELLOWSHIP", check)
 ns:On("HEROES", check)
 ns:On("JOINED", check)

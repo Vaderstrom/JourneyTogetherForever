@@ -69,7 +69,7 @@ function A:PickBosses(f, key)
   local needed, items = self:Needed(f, key), {}
   for i, b in ipairs(list) do
     local on = false
-    for _, tok in ipairs(needed) do if tok == b.tok then on = true end end
+    for _, tok in ipairs(needed) do if ns.Clears:Token(key, tok) == b.tok then on = true end end
     items[i] = { text = b.name, on = on }
   end
   ns.Window:PickMany(L.ADMIN_BOSSES_TITLE:format(d[2]), items, function(ons)

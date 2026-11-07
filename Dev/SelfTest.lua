@@ -1595,6 +1595,20 @@ step("Journey Admin: needed bosses, publish", function(c)
   ns.Window:ShowPage("admin")
 end)
 
+-- A boss learned on the kill ("n<name>") counts by its data token once a build gives the dungeon its bosses: chosen
+-- by the leader, killed before the update, or sent by a copy still on the old data (hotfix 1.1.1).
+step("Journey Admin: bosses chosen or killed by name count by their data token", function(c)
+  local f, Cl, me = cur(), ns.Clears, ns.Me()
+  local b = Cl:Bosses("dm")[1]
+  c:Eq(Cl:Token("dm", "n" .. b.name), b.tok, "the name becomes the data token")
+  c:Eq(Cl:Token("dm", "nNobody at all"), "nNobody at all", "a name the data lacks stays")
+  local was = f.kills.dm
+  f.kills.dm = { [me] = { ["n" .. b.name] = time() } }
+  local n = Cl:Progress(f, "dm", me)
+  f.kills.dm = was
+  c:Eq(n, 1, "a kill saved by name counts")
+end)
+
 shot("journey admin")
 
 step("Journey Admin: add and remove a chapter, discard", function(c)

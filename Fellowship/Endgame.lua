@@ -41,13 +41,11 @@ end
 
 -- Per boss: { name, have (Heroes who killed it), of (counted) }.
 function E:BossProgress(f, key)
-  local counted, out = J:Counted(f), {}
+  local counted, out, killed = J:Counted(f), {}, {}
+  for i, name in ipairs(counted) do killed[i] = ns.Clears:Killed(f, key, name) end
   for _, b in ipairs(ns.Clears:Bosses(key)) do
     local have = 0
-    for _, name in ipairs(counted) do
-      local k = f.kills[key] and f.kills[key][name]
-      if k and k[b.tok] then have = have + 1 end
-    end
+    for i in ipairs(counted) do if killed[i][b.tok] then have = have + 1 end end
     out[#out + 1] = { name = b.name, have = have, of = #counted }
   end
   return out

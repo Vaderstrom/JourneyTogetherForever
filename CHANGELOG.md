@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.1 (7 November 2026)
+- Game data from WoW Forever 1.60.1.70862: The Drowned City, Krol'dok Stronghold, Alcaz Prison, Blackmaw Hold and
+  The Shaper's Terrace now know their bosses and their Dungeon Finder entries, so their clears count from the first
+  kill. Bosses killed or chosen there before the update still count, and so do kills reported by Adventurers
+  who have not updated yet.
+
 ## 1.1.0 (6 November 2026)
 - What's New shows this update's news once: sync in real time, names filled in as you type, and quests by zone.
 - The invite box fills in names like the game's mail box: type the first letters and a list of friends, guild

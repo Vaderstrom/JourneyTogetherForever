@@ -109,6 +109,7 @@ ns.DUNGEON_MAPS = {
   hot = { 3065 }, rol = { 2999 }, dm = { 36 }, wc = { 43 }, sfk = { 33 }, bfd = { 48 }, stocks = { 34 }, exc = { 2998 },
   dal = { 2959 }, rfk = { 47 }, gnomer = { 90 }, rfd = { 129 }, ulda = { 70 }, zf = { 209 }, mara = { 349 }, st = { 109 },
   strat = { 329 }, scholo = { 289 }, rfc = { 389 },
+  drown = { 2970 }, krol = { 3039 }, alcaz = { 2994 }, bmh = { 2974 }, shaper = { 3001 },
   zg = { 309 }, ony = { 249 }, mc = { 409 }, bwl = { 469 }, aq20 = { 509 }, aq40 = { 531 }, naxx = { 533 },
   smgy = { 189, "Interrogator Vishas", "Bloodmage Thalnos" },
   smlib = { 189, "Houndmaster Loksey", "Arcanist Doan" },
@@ -126,14 +127,14 @@ ns.DUNGEON_MAPS = {
 
 -- Where each dungeon and raid is in WoW Forever's Dungeon Finder table (ns.ENCOUNTERS.wowf.finder, its LFGDungeons
 -- IDs). It no longer decides what Forever shows (ns.FOREVER_SCHEDULE does, since 30 Oct 2026): the table is Classic's
--- with Forever's first four dungeons added. tools/update-game-data.ps1 reports new entries as a hint that something
+-- with Forever's own dungeons added. tools/update-game-data.ps1 reports new entries as a hint that something
 -- is coming.
 ns.FINDER_IDS = {
   wc = 1, scholo = 2, rfc = 3, dm = 5, sfk = 7, bfd = 9, stocks = 11, gnomer = 13, rfk = 15,
   smgy = 17, smlib = 17, smarm = 17, smcath = 17, rfd = 19, ulda = 21, zf = 23, mara = 25, st = 27, brd = 29,
   lbrs = 31, dme = 33, dmw = 35, dmn = 37, strat = 39, ubrs = 43,
   zg = 41, ony = 45, mc = 47, bwl = 49,
-  dal = 3271, rol = 3272, hot = 3273, exc = 3274,
+  dal = 3271, rol = 3272, hot = 3273, exc = 3274, shaper = 3267, bmh = 3268, alcaz = 3269, drown = 3270, krol = 3275,
 }
 
 -- Retail's Adventure Guide entries (ns.ENCOUNTERS.wow.guide, by journal ID) that are dungeons and raids of the
