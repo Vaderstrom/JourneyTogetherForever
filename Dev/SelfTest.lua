@@ -1245,6 +1245,23 @@ step("dungeon quests: the chosen dungeon's three groups, where each starts, Pin 
   c:That(true, "the zone's map: " .. tostring(map) .. "; waypoints there: " .. tostring(can and true or false))
 end)
 
+-- The list's counts are counted without building the groups, and each dungeon's quest list is made once (code review
+-- of 1.2.0: both were made again for every dungeon at each redraw).
+step("dungeon quests: the counts agree with the groups; each list made once", function(c)
+  local QL, f = ns.QuestLists, cur()
+  local key = listedDungeon()
+  if not key then return c:That(true, "no dungeon with a quest list in this journey") end
+  local g = QL:Groups(f, key)
+  local function open(list)
+    local n = 0
+    for _, x in ipairs(list) do if x.status ~= "done" then n = n + 1 end end
+    return n
+  end
+  local p, e, i = QL:Counts(f, key)
+  c:Eq(("%d %d %d"):format(p, e, i), ("%d %d %d"):format(open(g.pick), open(g.earlier), open(g.inside)), "the counts agree with the groups")
+  c:That(QL:DungeonQuests(f, key) == QL:DungeonQuests(f, key), "the dungeon's list is made once")
+end)
+
 step("dungeon quests: the Chapter page's map button opens the dungeon on the Dungeons tab", function(c)
   ns.Window:ShowPage("chapter")
   local row
@@ -1317,6 +1334,28 @@ step("room: the dungeon quests' levels in words, where to stop, the mobs", funct
   c:Eq(notes, mobs .. "  " .. L.ROOM_UNKNOWN_N:format(2), "the mobs and the quests whose XP is not known yet")
   c:Eq(R:Keep("nowhere", 20, 100), false, "a run in a place that is not a dungeon is not kept")
   c:Eq(R:Keep("dm", 20, 5000000), false, "XP that high is not kept")
+  -- One odd run neither sticks nor rules: the middle of the last three (the best run stayed forever: code review of
+  -- 1.2.0). On a list of its own, put back after the step.
+  local saved = ns.db.mobXP
+  c.undo = function() ns.db.mobXP = saved end
+  ns.db.mobXP = {}
+  -- (Each run kept as if half an hour after the one before; one run's figures count once: code review of 1.2.1.)
+  local function run(xp)
+    for _, e in ipairs(ns.db.mobXP.dm and ns.db.mobXP.dm[20] or {}) do e.t = e.t - R.SAME_RUN end
+    return R:Keep("dm", 20, xp)
+  end
+  run(9000)
+  for _, xp in ipairs({ 9100, 9300, 8900, 9200 }) do
+    c:Eq(R:Keep("dm", 20, xp), false, "the other four figures of a five-person run take no slot")
+  end
+  run(30000)
+  c:Eq(R:Keep("dm", 20, 29000), false, "nor the other figure of a duo's run")
+  run(8000)
+  c:Eq(#ns.db.mobXP.dm[20], 3, "three slots, three runs")
+  c:Eq(R.MobXP("dm", 20), 9000, "an inflated run does not rule")
+  run(8500); run(8200)
+  c:Eq(R.MobXP("dm", 20), 8200, "and is gone after three newer runs")
+  ns.db.mobXP = saved
   local r = R:Chapter(cur(), ns.Me())
   c:That(true, r and ("this chapter: %.1f levels, %d quests' XP not known, %d dungeons not run yet"):format(r.levels, r.unknown, r.unrun)
     or "nothing to count in this chapter")
@@ -1328,6 +1367,23 @@ step("room: counted from the level the book shows for you, and no card with noth
   if not r then return c:That(true, "no XP known to count in this chapter: no card") end
   c:That(r.levels > 0, ("something to count: %.1f levels"):format(r.levels))
   c:Eq(math.floor(r.now), (ns.Dev and ns.Dev.myLevel) or UnitLevel("player"), "from the level every page shows for you")
+end)
+
+-- Code review of 1.2.0: picking up a dungeon quest left the Overview's room card as it was (a quest list redrew only
+-- the quest pages). A dungeon quest picked up or dropped redraws every page; any other quest still does not.
+step("room: a dungeon quest picked up redraws every page, another quest only the quest pages", function(c)
+  local name = full("Elyra")
+  local f, Q = { members = { [name] = {} }, heroes = {} }, ns.Quests
+  local function log(ids)
+    local q = {}
+    for _, id in ipairs(ids) do q[id] = { t = "Quest " .. id, z = "", l = 1, h = 0, g = 1 } end
+    return { q = q }
+  end
+  Q:Store(f, name, log({ 783 }))
+  c:Eq(Q:Store(f, name, log({ 783, 1 })), false, "another quest: the quest pages only")
+  c:Eq(Q:Store(f, name, log({ 783, 1, 166 })), true, "a dungeon quest picked up: every page")
+  c:Eq(Q:Store(f, name, log({ 783, 1, 166 })), false, "the same log again: the quest pages only")
+  c:Eq(Q:Store(f, name, log({ 783, 1 })), true, "a dungeon quest dropped: every page")
 end)
 
 step("room: two warnings, half a level before the stop point and at it, once each", function(c)
@@ -2244,8 +2300,12 @@ step("Chronicle: the fellowship's firsts and tallies", function(c)
   if podium and q then c:Has(podium.places[1].name:GetText(), ns.Short(q.top[1].name), "first place: " .. ns.Short(q.top[1].name)) end
   ns.Moments:Check(f)
   c:That(ns.Moments:Find(f, "first:fall") ~= nil, "a Moments card for the first to fall")
+  -- (Settled at once here: waiting for the others has its own step, "board: a first goes to Discord only once ...".)
+  local settle = ns.Board.SETTLE
+  ns.Board.SETTLE = 0
   local news = 0
   for _, n in ipairs(ns.Board:News(f)) do if n.kind == "first" then news = news + 1 end end
+  ns.Board.SETTLE = settle
   c:That(news >= 3, news .. " firsts in the Discord outbox")
   pf.filter = "all"
   b.deeds, b.tally, e.deeds, e.tally = keep[1], keep[2], keep[3], keep[4]
@@ -2880,6 +2940,26 @@ step("friends without the addon: closed", function(c)
   local o = ns.Window.overlays and ns.Window.overlays.share
   if o then o:Hide() end
   c:That(not (o and o:IsShown()), "closed")
+end)
+
+-- Code review of 1.2.0: a first heard later took its Moment over, but Discord already had the first name. A first goes
+-- out only once every other Adventurer has been heard from after it, or a day later. On a made-up fellowship.
+step("board: a first goes to Discord only once nobody can take it over", function(c)
+  -- (Deed times are the server's clock, heard this PC's own: right whatever this PC's clock says; code review of 1.2.1.)
+  local B, me, other, now, S = ns.Board, ns.Me(), full("Elyra"), time(), ns.Firsts.Now()
+  local f = { members = { [me] = {}, [other] = {} }, heroes = { [other] = { heard = now - 600 } } }
+  c:Eq(B:Settled(f, { name = me, time = S - 300 }), false, "someone not heard from since may still bring an earlier one")
+  f.heroes[other].heard = now - 10
+  c:Eq(B:Settled(f, { name = me, time = S - 300 }), true, "heard from after it: it goes out")
+  f.heroes[other].heard = nil
+  c:Eq(B:Settled(f, { name = me, time = S - B.SETTLE }), true, "a day later it goes out anyway")
+  -- A first that waited a day keeps its place past the twenty newest clears.
+  f.id, f.history = "selftest-board", {}
+  for i = 1, B.NEWS + 5 do f.history[i] = { id = "run" .. i, type = "run", key = "dm", time = S - i, cleared = { other } } end
+  f.heroes[other] = { deeds = { fall = S - B.SETTLE - 60 } }
+  local firsts = 0
+  for _, n in ipairs(B:News(f)) do if n.kind == "first" then firsts = firsts + 1 end end
+  c:Eq(firsts, 1, "a first that waited is not cut with the older news")
 end)
 
 -- What WoW Addon Webhooks for Discord posts (Fellowship/Board.lua, docs/SAVED-DATA.md): written at logout; here only

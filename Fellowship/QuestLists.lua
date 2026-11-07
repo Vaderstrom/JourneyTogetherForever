@@ -122,12 +122,20 @@ end
 ---------------------------------------------------------------------------
 -- Dungeon quests
 ---------------------------------------------------------------------------
--- The quests of a dungeon for this fellowship's side: { { id, name } }.
+-- The quests of a dungeon for this fellowship's side: { { id, name } }. The lists never change while playing, so each
+-- is made once per side and shared: read it, never change it (ChapterList made them again on every call, for every
+-- dungeon; code review of 1.2.0).
+QL.made = {}
 function QL:DungeonQuests(f, key)
-  local s, list = side(f), {}
-  for _, q in ipairs(ns.DUNGEON_QUESTS[ns.BaseKey(key)] or {}) do
+  local s, base = side(f), ns.BaseKey(key)
+  local id = (s or "-") .. ":" .. tostring(base)
+  local list = self.made[id]
+  if list then return list end
+  list = {}
+  for _, q in ipairs(ns.DUNGEON_QUESTS[base] or {}) do
     if forSide({ side = q[3] }, s) then list[#list + 1] = { id = q[1], name = q[2] } end
   end
+  self.made[id] = list
   return list
 end
 
@@ -185,6 +193,9 @@ local function statusOf(h, id)
   return h.quests and h.quests[id] and "log" or "no"
 end
 
+-- The group a quest belongs to by where it starts: inside, earlier (a chain) or pick.
+local function groupOf(st) return st.inside and "inside" or (st.after and "earlier" or "pick") end
+
 -- A dungeon's quests for this fellowship's side in three groups (SPEC §4.6): pick (pick up before you go), earlier
 -- (a chain to start earlier) and inside (starts in the dungeon), each lowest level first. A quest: { id, name, start,
 -- status (yours: "done", "log" or "no"), others (other Adventurers with it in their log), steps = { { id, name, lvl,
@@ -206,7 +217,7 @@ function QL:Groups(f, key)
       x.steps = {}
       for _, s in ipairs(st.after) do x.steps[#x.steps + 1] = { id = s[1], name = s[2], lvl = s[3], status = statusOf(mine, s[1]) } end
     end
-    local list = st.inside and g.inside or (st.after and g.earlier or g.pick)
+    local list = g[groupOf(st)]
     list[#list + 1] = x
   end
   for _, list in pairs(g) do
@@ -220,15 +231,20 @@ function QL:Groups(f, key)
 end
 
 -- How many quests of each group you have not done: pick, earlier, inside (nil when the dungeon has no list).
+-- Only counted: the Dungeons tab asks this for every dungeon of the journey at each redraw, and building their groups
+-- (every Adventurer's log, the chain steps, the sorting) each time was too much (code review of 1.2.0).
 function QL:Counts(f, key)
-  local g = self:Groups(f, key)
-  if not g then return nil end
-  local function open(list)
-    local n = 0
-    for _, x in ipairs(list) do if x.status ~= "done" then n = n + 1 end end
-    return n
+  local quests = self:DungeonQuests(f, key)
+  if #quests == 0 then return nil end
+  local mine = Hr:Get(f, ns.Me()) or {}
+  local n = { pick = 0, earlier = 0, inside = 0 }
+  for _, q in ipairs(quests) do
+    if statusOf(mine, q.id) ~= "done" then
+      local g = groupOf(self:Start(q.id) or {})
+      n[g] = n[g] + 1
+    end
   end
-  return open(g.pick), open(g.earlier), open(g.inside)
+  return n.pick, n.earlier, n.inside
 end
 
 -- "4 quests to pick up  ·  2 to start earlier" (only quests you have not done), or nil; then the two counts (nil

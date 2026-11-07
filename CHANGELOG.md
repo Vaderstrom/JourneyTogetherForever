@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.1 (7 November 2026)
+- Room for the dungeon quests: the Overview's card updates as soon as you pick up one of the chapter's dungeon quests (it waited for something else to redraw the page).
+- Room for the dungeon quests: the dungeons' mobs count from the middle of your fellowship's last three runs at your level, so one odd run (a duo, which shares the kills among fewer, or a run cut short) no longer sets the estimate for good. A run counts once, however many in the group share their figure.
+- The Dungeons tab and the Chapter page do less work at each redraw.
+- Discord: a first ("Brannic is the first to fall") is posted only once nobody can take it over any more: when every other Adventurer has been heard from after it, or a day later. A fall held back in a dungeon could put the wrong name on Discord. A first that waited keeps its place among the news, and a PC clock that runs fast cannot let one out early.
+
 ## 1.2.0 (7 November 2026)
 - What's New shows this update's news once: the Dungeons tab, room for the dungeon quests, and Recommended next.
 - The Dungeon Journal button opens the DungeonJournal addon at the dungeon (it only opened or closed its window).
