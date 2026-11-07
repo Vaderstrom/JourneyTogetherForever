@@ -316,6 +316,76 @@ function D:SyncInfo()
     ns.Comm.saved or 0))
 end
 
+---------------------------------------------------------------------------
+-- /jtf perf (U70, 7 Nov 2026): the game's own profiler for this addon, and how long JTF's busiest jobs took since
+-- login (each timed around its method; kept in ns.db.perf so the check report shows it after a /reload).
+---------------------------------------------------------------------------
+D.PERF_JOBS = { { "state", "Hero", "SendState" }, { "gear", "Hero", "SendGear" }, { "quests", "Quests", "Send" },
+  { "receive", "Comm", "Receive" }, { "send", "Comm", "SendAll" }, { "page", "Window", "Refresh" },
+  { "tracker", "Tracker", "Refresh" }, { "copy", "Sync", "SendSnap" }, { "change", "Fellowship", "Do" } }
+D.PERF_METRICS = { "RecentAverageTime", "PeakTime", "CountTimeOver5Ms", "CountTimeOver50Ms" }
+
+local function jobs()
+  ns.db.perf = type(ns.db.perf) == "table" and ns.db.perf or {}
+  ns.db.perf.jobs = ns.db.perf.jobs or {}
+  return ns.db.perf.jobs
+end
+
+local function timed(label, t0, ...)
+  local ms = debugprofilestop() - t0
+  if ns.db then
+    local j = jobs()[label] or { n = 0, ms = 0, worst = 0 }
+    j.n, j.ms, j.worst = j.n + 1, j.ms + ms, math.max(j.worst, ms)
+    jobs()[label] = j
+  end
+  return ...
+end
+
+function D:PerfWrap()
+  self.perfWrapped = 0
+  for _, job in ipairs(self.PERF_JOBS) do
+    local t, key = ns[job[2]], job[3]
+    local fn = t and t[key]
+    if type(fn) == "function" then
+      t[key] = function(...) return timed(job[1], debugprofilestop(), fn(...)) end
+      self.perfWrapped = self.perfWrapped + 1
+    end
+  end
+end
+
+-- The game's numbers for this addon ({ metric = value }), nil where the client has no profiler or refuses.
+function D:PerfMetrics()
+  local P, E = C_AddOnProfiler, Enum and Enum.AddOnProfilerMetric
+  if not (P and P.GetAddOnMetric and E) then return nil end
+  local out = {}
+  for _, m in ipairs(self.PERF_METRICS) do
+    local ok, v = pcall(P.GetAddOnMetric, ns.ADDON, E[m])
+    if ok and type(v) == "number" then out[m] = v end
+  end
+  return out
+end
+
+function D:Perf()
+  local m = self:PerfMetrics()
+  ns.db.perf = type(ns.db.perf) == "table" and ns.db.perf or {}
+  ns.db.perf.game, ns.db.perf.at = m, time()
+  if m then
+    ns:Debug(L.DEV_PERF_GAME:format(m.RecentAverageTime or 0, m.PeakTime or 0, m.CountTimeOver5Ms or 0, m.CountTimeOver50Ms or 0))
+  else
+    ns:Debug(L.DEV_PERF_NOGAME)
+  end
+  local list = {}
+  for label, j in pairs(jobs()) do list[#list + 1] = { label = label, j = j } end
+  table.sort(list, function(a, b) return a.j.worst > b.j.worst end)
+  for _, e in ipairs(list) do
+    ns:Debug(L.DEV_PERF_JOB:format(e.label, e.j.n, e.j.n > 0 and e.j.ms / e.j.n or 0, e.j.worst))
+  end
+end
+
+ns:On("LOGIN", function() if ns.db then ns.db.perf = { jobs = {} } end end)
+ns:RegisterEvent("PLAYER_LOGOUT", function() if ns.db and ns.db.perf then ns.db.perf.game, ns.db.perf.at = D:PerfMetrics(), time() end end)
+D:PerfWrap()
+
 -- The command list, one line each. "|" is the start of a colour code in the game's chat, so it is doubled to show as
 -- itself (the list came out garbled; seen in game).
 function D:Help()

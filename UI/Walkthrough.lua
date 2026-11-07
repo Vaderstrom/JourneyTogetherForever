@@ -50,6 +50,14 @@ WK.STEPS = {
   { id = "DONE", ranks = ALL },
 }
 
+-- About this page (the owner, 7 Nov 2026): the header's "?" walks through the page you are on, on your own fellowship
+-- (no sample), so what each page does can be looked up any time without the whole tour. Two steps: its left page
+-- (what the page is for) and its right page. Texts: WALK_PG_<PAGE>_T / WALK_PG_<PAGE> and WALK_PG_<PAGE>_R_T /
+-- WALK_PG_<PAGE>_R.
+WK.PAGES = { welcome = true, create = true, join = true, overview = true, chapter = true, quests = true,
+  chronicle = true, moments = true, raids = true, heroes = true, gatherings = true, rules = true, history = true,
+  tourney = true, since = true, settings = true, manage = true, managefellowship = true, rulesadmin = true, admin = true }
+
 -- Your rank in your own fellowship: "leader" or "member" (nil outside one).
 function WK:MyRank()
   local f = ns.Fellowship:Current()
@@ -208,7 +216,7 @@ local function place()
 end
 local function fill(step, n, of, rank)
   local c = WK.card
-  c.kicker:SetText(L["WALK_TOUR_" .. rank:upper()]:upper())
+  c.kicker:SetText((WK.page and L.WALK_PAGE or L["WALK_TOUR_" .. rank:upper()]):upper())
   c.count:SetText(n and L.WALK_COUNT:format(n, of) or "")
   c.track:SetShown(n ~= nil); c.fill:SetShown(n ~= nil)
   if n then c.fill:SetWidth(math.max(3, (CARD_W - 32) * n / of)) end
@@ -224,20 +232,53 @@ end
 ---------------------------------------------------------------------------
 -- Running a tour
 ---------------------------------------------------------------------------
+-- Frames are made out of combat only: a start in combat before the card exists waits for the combat to end.
+local function later(fn)
+  if WK.card or not ns.Combat:InCombat() then return false end
+  ns.Combat:AfterCombat(fn)
+  return true
+end
+
 -- rank: the tour's rank (default: yours); since: only what is new since that rank (after a promotion).
 function WK:Start(rank, since)
   if not ns.Fellowship:Current() then return false end
+  if later(function() WK:Start(rank, since) end) then return false end
   rank = rank or self:MyRank() or "member"
   build()
   self.rank, self.since = rank, since
   self.steps = self:Steps(rank, since)
+  self.page = nil
   self.i, self.on, self.offer = 1, true, nil
   self.card.back:SetLabel(L.WALK_BACK)
+  self.card.skip:SetLabel(L.WALK_SKIP)
   local Wt = ns.Watch
   Wt.demo, Wt.as, Wt.fid, Wt.active = ns.Sample:Build(rank), ns.Self(), nil, true
   W():HidePanels()
   W():Open("overview")
   W():WhenBuilt(function() WK:Go(1) end)
+  return true
+end
+
+function WK:HasHelp(id) return id ~= nil and self.PAGES[id] == true end
+
+-- About this page: its left page, then its right page (a half that does not show is passed over by Go: the card then
+-- sits in the middle). Stays on the page and changes nothing.
+function WK:StartPage(id)
+  id = id or W().current
+  if self.on or not self:HasHelp(id) then return false end
+  if later(function() if W().frame:IsShown() then WK:StartPage() end end) then return false end
+  build()
+  local key = "PG_" .. id:upper()
+  self.rank, self.since, self.page = self:MyRank() or "member", nil, id
+  self.steps = {
+    { id = key, target = function() return pf(id) and pf(id).left end },
+    { id = key .. "_R", target = function() return pf(id) and pf(id).right end },
+  }
+  self.i, self.on, self.offer = 1, true, nil
+  self.card.back:SetLabel(L.WALK_BACK)
+  self.card.skip:SetLabel(L.WALK_CLOSE)
+  W():HidePanels()
+  self:Go(1)
   return true
 end
 
@@ -268,8 +309,8 @@ function WK:Go(i)
   fill(step, n and count or nil, of, self.rank)
   local c = self.card
   c.back:SetShown(i > 1)
-  c.next:SetLabel(step.id == "DONE" and L.WALK_FINISH or L.WALK_NEXT)
-  c.skip:SetShown(step.id ~= "DONE")
+  c.next:SetLabel((step.id == "DONE" or (self.page and i == #self.steps)) and L.WALK_FINISH or L.WALK_NEXT)
+  c.skip:SetShown(step.id ~= "DONE" and not (self.page and i == #self.steps))
   c:Show()
   place()
   -- Places again once the frames have their final positions.
@@ -282,17 +323,20 @@ function WK:Back() if self.offer then return self:Later() end self:Go(math.max(1
 -- Ends the tour (done = it went to the end); your own fellowship shows again.
 function WK:Stop(done)
   local was = self.on
+  local page = self.page
+  self.page = nil
   self.on, self.offer = false, nil
   if self.card then self.card:Hide() end
   if self.glow then self.glow:Off() end
   if self.dim then self.dim:Hide() end
   local Wt = ns.Watch
   if Wt.demo then Wt.demo, Wt.as, Wt.active = nil, nil, false end
-  if was and ns.char then
+  if was and ns.char and not page then
     ns.char.walk = ns.char.walk or {}
     ns.char.walk[self.rank or "member"] = done and "done" or "skipped"
   end
-  if was and W():IsOpen() then
+  if was and page and W():IsOpen() then W():Refresh() end
+  if was and not page and W():IsOpen() then
     local hp = pf("heroes")
     if hp then hp.sel = nil end
     W():ShowPage("overview")

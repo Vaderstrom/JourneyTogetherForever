@@ -386,7 +386,7 @@ ns:RegisterEvent("PLAYER_CONTROL_LOST", function() C_Timer.After(CW.TAXI_WAIT, f
 ns:RegisterUnitEvent("UNIT_SPELLCAST_SUCCEEDED", "player", function(_, unit, _, spell) CW:Cast(unit, spell) end)
 ns:RegisterEvent("QUEST_TURNED_IN", function(_, id, xp) CW:QuestDone(id, xp) end)
 ns:RegisterEvent("PLAYER_XP_UPDATE", function() C_Timer.After(CW.XP_WAIT, function() CW:CheckXP() end) end)
-ns:RegisterEvent("PLAYER_LEVEL_UP", function() C_Timer.After(1, function() CW:CheckRace() end) end)
+ns:RegisterEvent("PLAYER_LEVEL_UP", function() C_Timer.After(ns.LEVEL_UP.race, function() CW:CheckRace() end) end)
 ns:RegisterEvent("TRAIT_CONFIG_UPDATED", function() CW:CheckTalents() end)
 ns:RegisterEvent("CHARACTER_POINTS_CHANGED", function() CW:CheckTalents() end)
 ns:RegisterEvent("SKILL_LINES_CHANGED", function() CW:CheckProfessions() end)

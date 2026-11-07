@@ -92,10 +92,34 @@ function J:EarlyBridges(f, n)
 end
 
 -- A chapter's dungeons as its pages list them: its own, then the next chapter's bridges.
+-- The suggested order (the owner, 7 Nov 2026): the mandatory ones first, lowest levels first (ties: the one with more
+-- dungeon quests), then the bridges and the optional ones, so the first mandatory one not cleared is the one to do next.
+local ROLE_ORDER = { m = 1, b = 2, o = 3 }
 function J:ChapterList(f, n)
-  local list = self:InChapter(f, n)
+  local list, quests = self:InChapter(f, n), {}
+  for _, x in ipairs(list) do quests[x.key] = ns.QuestLists and #ns.QuestLists:DungeonQuests(f, x.key) or 0 end
+  table.sort(list, function(a, b)
+    local ra, rb = ROLE_ORDER[a.role] or 3, ROLE_ORDER[b.role] or 3
+    if ra ~= rb then return ra < rb end
+    if a.d[3] ~= b.d[3] then return a.d[3] < b.d[3] end
+    if quests[a.key] ~= quests[b.key] then return quests[a.key] > quests[b.key] end
+    return a.key < b.key
+  end)
   for _, x in ipairs(self:EarlyBridges(f, n)) do list[#list + 1] = x end
   return list
+end
+
+-- The dungeon to do next in chapter n: the first mandatory one not cleared, in the suggested order. nil when the
+-- chapter has fewer than two mandatory dungeons (one needs no suggestion) or all are cleared.
+function J:NextDungeon(f, n, list)
+  local count, key = 0, nil
+  for _, x in ipairs(list or self:ChapterList(f, n)) do
+    if x.role == "m" and not x.early then
+      count = count + 1
+      if not key and self:DungeonState(f, n, x) ~= "cleared" then key = x.key end
+    end
+  end
+  return count >= 2 and key or nil
 end
 
 -- Each role's colour: { on parchment and cards, on dark pictures }. Mandatory gold, bridge blue, optional green.
@@ -502,9 +526,8 @@ function J.Clean(journey)
     if i > J.MAX_CHAPTERS or type(c) ~= "table" then return nil end
     local floor, cap = tonumber(c.floor), tonumber(c.cap)
     local name = type(c.name) == "string" and strtrim(c.name) or ""
-    -- floor = cap is allowed: a one-level chapter, such as 60-60 for raids. Up to the game's cap (retail: the newest
-    -- expansion's, so a Leader whose account has it is still heard).
-    if not floor or not cap or floor < 1 or cap > ns.HighestLevel() or floor > cap or name == "" or #name > 48 then return nil end
+    -- floor = cap is allowed: a one-level chapter, such as 60-60 for raids. Up to the game's cap.
+    if not floor or not cap or floor < 1 or cap > ns.LevelCap() or floor > cap or name == "" or #name > 48 then return nil end
     -- art: the chapter's picture (a preset chapter's number, or "prologue"); none: by its place, as before.
     local art = c.art == "prologue" and "prologue" or (tonumber(c.art) and math.floor(c.art) >= 1 and math.floor(c.art) <= 30 and math.floor(c.art)) or nil
     out.chapters[i] = { name = name, floor = math.floor(floor), cap = math.floor(cap), color = type(c.color) == "string" and c.color:match("^%x%x%x%x%x%x$") and c.color or ns.PALETTE[(i - 1) % #ns.PALETTE + 1],

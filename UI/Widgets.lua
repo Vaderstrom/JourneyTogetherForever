@@ -438,6 +438,41 @@ function UI.Tooltip(frame, text)
   frame:HookScript("OnLeave", function() GameTooltip:Hide() end)
 end
 
+-- A dungeon's or raid's picture shown large while the mouse is on its small one (U64), as the Adventure Guide does.
+-- keyOf(frame) gives the place's key; nothing shows for one without a picture of its own. One frame for all, made at
+-- the first hover out of combat.
+UI.PICTIP_W, UI.PICTIP_H = 384, 192
+function UI.PictureTip(frame, keyOf)
+  frame:HookScript("OnEnter", function()
+    local key = keyOf(frame)
+    local t = UI.pictureTip
+    if not key or (not t and InCombatLockdown()) then return end
+    if not t then
+      t = CreateFrame("Frame", nil, UIParent)
+      t:SetSize(UI.PICTIP_W, UI.PICTIP_H); t:SetFrameStrata("TOOLTIP"); t:SetClampedToScreen(true)
+      t.tex = t:CreateTexture(nil, "ARTWORK")
+      UI.FramePicture(t, t.tex)
+      local fade = t:CreateTexture(nil, "ARTWORK", nil, 2)
+      fade:SetPoint("BOTTOMLEFT", UI.PIC_INSET, UI.PIC_INSET); fade:SetPoint("BOTTOMRIGHT", -UI.PIC_INSET, UI.PIC_INSET)
+      fade:SetHeight(math.floor(UI.PICTIP_H * 0.4))
+      UI.SetGradient(fade, "VERTICAL", { 0.05, 0.03, 0.01, 0.92 }, { 0.05, 0.03, 0.01, 0 })
+      t.name = UI.Text(t, 16, "goldText", "fancy")
+      t.name:SetPoint("BOTTOMLEFT", 12, 10)
+      t.name:SetShadowOffset(1, -1); t.name:SetShadowColor(0, 0, 0, 1)
+      UI.pictureTip = t
+    end
+    local p = UI.PIC_INSET
+    local ok, default = ns.SetDungeonArt(t.tex, key, UI.PICTIP_W - 2 * p, UI.PICTIP_H - 2 * p)
+    if not ok or default then t:Hide() return end
+    local d = ns.Dungeon(key) or ns.Raid(key)
+    t.name:SetText(d and d[2] or "")
+    t:ClearAllPoints(); t:SetPoint("BOTTOMLEFT", frame, "TOPLEFT", 0, 6)
+    t.key = key
+    t:Show()
+  end)
+  frame:HookScript("OnLeave", function() if UI.pictureTip then UI.pictureTip:Hide() end end)
+end
+
 -- Small badge with a number (inbox count).
 function UI.Badge(parent)
   local f = UI.Box(parent, 1, "badge", 1, "goldText", 1)
@@ -1456,7 +1491,9 @@ function UI.Autocomplete(box, width, source, onPick, rows)
       r:SetShown(e ~= nil)
       if e then
         r.entry = e
-        r.name:SetText(e.hex and ("|cff" .. e.hex .. e.text .. "|r") or e.text)
+        -- e.icon: a class token, its round icon before the name (U65: the class reads without the colour).
+        local icon = e.icon and ns.ClassIconMarkup(e.icon, 14) or ""
+        r.name:SetText((icon ~= "" and icon .. " " or "") .. (e.hex and ("|cff" .. e.hex .. e.text .. "|r") or e.text))
         r.sub:SetText(e.sub or "")
         r.dot:SetVertexColor(e.online and 0.25 or 0.5, e.online and 0.8 or 0.5, e.online and 0.3 or 0.5, 1)
       end
@@ -1524,7 +1561,7 @@ function UI.InviteBox(pf, parent, boxW, checkW)
     for _, e in ipairs(ns.Friends:Suggest(text, skip, 8)) do
       local src = ns.Friends:SourceText(e)
       out[#out + 1] = { text = ns.Display(e.name), sub = e.level and L.SRC_WITH_LEVEL:format(e.level, src) or src,
-        online = e.online, hex = e.online and ns.ClassHex(e.class, light) or nil }
+        online = e.online, hex = e.online and ns.ClassHex(e.class, light) or nil, icon = e.online and e.class or nil }
     end
     return out
   end, function(e) pf.invite:SetText(e.text) end)

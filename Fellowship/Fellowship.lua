@@ -476,8 +476,8 @@ end
 ---------------------------------------------------------------------------
 -- Actions used by the pages
 ---------------------------------------------------------------------------
--- Returns "sent", "member", "invited", "realm" (a realm messages cannot reach), "busy" (messages are not allowed now:
--- a fight, a dungeon) or nil (not allowed / no name). Whether it arrived comes a few seconds later (Fellowship/Sync.lua).
+-- Returns "sent", "member", "invited", "busy" (messages are not allowed now: a fight, a dungeon) or nil (not allowed /
+-- no name). Whether it arrived comes a few seconds later (Fellowship/Sync.lua).
 function F:Invite(text, friend)
   local f = self:Current()
   -- A Battle.net friend's BattleTag ("Arielas#2345"): the character they play now.
@@ -494,10 +494,7 @@ function F:Invite(text, friend)
   -- Arielas Fireson in your party).
   name = name and ns.Friends:Resolve(name) or name
   if not f or not name or not P.Can(f, ns.Me(), "invite") then return nil end
-  if not ns.Reachable(name) then
-    ns:Toast(nil, L.INVITE_NOT_SENT, L.INVITE_REALM:format(ns.Short(name), ns.RealmOf(name)))
-    return "realm"
-  end
+
   if ns.Comm:Held() then
     ns:Toast(nil, L.INVITE_NOT_SENT, L.INVITE_BUSY)
     return "busy"
@@ -754,7 +751,7 @@ function F:FinishTake(main, fid)
   self:AfterChange(f)
   ns.Hero:Hello()
   ns:Toast(nil, L.TAKE_DONE, L.TAKE_DONE_TEXT:format(ns.Short(main), f.name))
-  if ns.Window then ns.Window.page = "overview"; ns.Window:RefreshSoon() end
+  if ns.Window then ns.Window.page = "overview"; ns.Window:Refresh() end
   return true
 end
 ---------------------------------------------------------------------------

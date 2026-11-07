@@ -406,6 +406,38 @@ local function refreshLives(b, f, stack)
   stack:Place(b, h, 6)
 end
 
+-- Room for the dungeon quests (U78): a card of its own, for you: the level the chapter's dungeon quests and mobs take
+-- you to, and where to stop questing when they would not fit under the cap (it must be clear: the stop in red).
+local function buildRoom(parent, width)
+  local c = UI.Card(parent)
+  c:SetWidth(width)
+  c.label = UI.Text(c, 11, "accent", "title")
+  c.label:SetPoint("TOPLEFT", 12, -10)
+  c.label:SetText(L.ROOM_TITLE:upper())
+  c.main = UI.WrapText(c, 13, "ink", width - 24, "book")
+  c.main:SetPoint("TOPLEFT", 12, -28)
+  c.stop = UI.WrapText(c, 14, "B0321E", width - 24, "title")
+  c.notes = UI.WrapText(c, 11, "ink2", width - 24)
+  return c
+end
+
+local function refreshRoom(c, f, stack, watching)
+  local r = not watching and ns.Room:Chapter(f, ns.Me()) or nil
+  c:SetShown(r ~= nil)
+  if not r then return end
+  local main, stop, notes = ns.Room.Lines(r)
+  c.main:SetText(main)
+  c.stop:SetText(stop or ""); c.stop:SetShown(stop ~= nil)
+  c.notes:SetText(notes)
+  local y = 28 + c.main:GetStringHeight() + 4
+  c.stop:ClearAllPoints(); c.stop:SetPoint("TOPLEFT", 12, -y)
+  if stop then y = y + c.stop:GetStringHeight() + 4 end
+  c.notes:ClearAllPoints(); c.notes:SetPoint("TOPLEFT", 12, -y)
+  y = y + c.notes:GetStringHeight() + 12
+  c:SetHeight(y)
+  stack:Place(c, y, 10)
+end
+
 local function build(pf)
   local W = ns.Window
   local width = W.PAGE_W - 8
@@ -418,6 +450,7 @@ local function build(pf)
   pf.start = buildStart(Lc, width)
   pf.gather = buildGatherings(Lc, width)
   pf.lives = buildLives(Lc, width)
+  pf.room = buildRoom(Lc, width)
   pf.contents = UI.Text(Lc, 12, "ink2")
   pf.contents:SetText(L.CONTENTS)
   pf.tocDone = UI.TextButton(Lc, "", function() pf.allCh = true; W:Refresh() end, "link", 13)
@@ -490,8 +523,14 @@ local function build(pf)
     d:SetSize(width, 22)
     d.mark = UI.Mark(d, 14)
     d.mark:SetPoint("LEFT")
+    -- U66: a small square picture before the name, as on Journey Admin; larger on hover (U64).
+    d.pic = CreateFrame("Frame", nil, d)
+    d.pic:SetSize(20, 20); d.pic:SetPoint("LEFT", 18, 0); d.pic:EnableMouse(true)
+    d.pic.tex = d.pic:CreateTexture(nil, "ARTWORK")
+    d.pic.tex:SetAllPoints()
+    UI.PictureTip(d.pic, function() return d.key end)
     d.name = UI.Text(d, 13, "ink")
-    d.name:SetPoint("LEFT", 20, 0)
+    d.name:SetPoint("LEFT", 44, 0)
     d.note = UI.Text(d, 12, "ink2", "body", "RIGHT")
     d.note:SetPoint("RIGHT")
     return d
@@ -528,6 +567,7 @@ local function refresh(pf, ctx)
   pf.gather:SetShown(not ctx.watching)
   if not ctx.watching then refreshGatherings(pf.gather, f, s) end
   refreshLives(pf.lives, f, s)
+  refreshRoom(pf.room, f, s, ctx.watching)
   s:Skip(10)
   s:Place(pf.contents, 16, 4)
   -- Done chapters fold into one line and only the next few show, unless the player opens them all (fourteen rows
@@ -612,6 +652,8 @@ local function refresh(pf, ctx)
     shown = i
     local state = J:DungeonState(f, sel, x)
     d.mark:SetMark(state)
+    d.key = x.key
+    d.pic:SetShown(ns.SetDungeonArt(d.pic.tex, x.key, 20, 20))
     d.name:SetText(x.d[2])
     -- Open in a dark amber ("accent" is pale gold, and the lighter amber B8742A was still hard to read on parchment;
     -- seen in the tour and the check of 29 Oct 2026).

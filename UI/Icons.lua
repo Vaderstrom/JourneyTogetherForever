@@ -31,6 +31,7 @@ ns.ICONS = {
   characters = I .. "INV_Misc_GroupLooking",
   inbox = I .. "INV_Letter_15",
   settings = I .. "Trade_Engineering",
+  help = I .. "INV_Misc_QuestionMark",
   -- Toasts (one per event; "default" for other toasts)
   toast_chapter = I .. "INV_Misc_Book_09",
   toast_floor = I .. "Ability_Warrior_RallyingCry",
@@ -38,9 +39,11 @@ ns.ICONS = {
   toast_heroFloor = I .. "Spell_ChargePositive",
   toast_heroCap = I .. "Ability_Warrior_DefensiveStance",
   toast_overCap = I .. "Spell_Shadow_DeathScream",
+  toast_room = I .. "INV_Misc_Map_01",
   toast_default = I .. "INV_Misc_Book_09",
   toast_gathering = I .. "INV_Misc_GroupNeedMore",
   toast_attune = I .. "INV_Misc_Key_03",
+  toast_dquest = I .. "INV_Misc_Map_01",
   toast_ahead = I .. "INV_Misc_GroupNeedMore",
   toast_session = I .. "INV_Misc_GroupNeedMore",
   -- Status banner and "What's next" (the mockup's 🔒 ⏳ ⚔ ⚑ ✓ ✋)
@@ -123,7 +126,7 @@ ns.ICON_SET = {
   bn_waiting = 4, bn_level = 4, bn_chain = 2, bn_quest = 3,
   toast_heroFloor = 6, toast_heroCap = 6, bn_group = 6, toast_ahead = 6, toast_session = 6, hist_session = 6,
   bn_locked = 7, toast_attune = 7,
-  toast_overCap = 10, bn_cap = 10, hist_cap = 10,
+  toast_overCap = 10, bn_cap = 10, hist_cap = 10, toast_room = 10,
   bn_away = 11,
 }
 

@@ -126,7 +126,7 @@ local function remap(t, fix, seen)
 end
 
 function ns.KeepWholeName()
-  if not (ns.db and ns.char and ns.IsForever()) then return end
+  if not (ns.db and ns.char) then return end
   local me, new, old = ns.Self(), ns.Realm(), ns.GameRealm()
   local first = (me or ""):match("^(%S+) [^%-]+%-")
   if not first or ns.char.wholeName == me then return end
@@ -144,7 +144,7 @@ end
 
 ns:RegisterEvent("ADDON_LOADED", function(_, name)
   if name ~= ADDON then return end
-  -- The dungeons, raids and quests of the game this copy runs in (WoW Forever or retail), before anything reads them.
+  -- The dungeons, raids and quests WoW Forever offers, before anything reads them.
   ns.KeepThisGame()
   -- Account-wide: every character's last known fellowship (for "Your characters").
   _G[DB_NAME] = _G[DB_NAME] or { schema = 1, characters = {}, fellowships = {} }

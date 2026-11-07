@@ -8,6 +8,16 @@ local E = ns.Endgame
 local OA = ns.OtherAddons
 
 local PIC_H = 96
+local SOON_H = 200 -- U63: a raid not open yet, its picture large on the right page
+
+-- "Opens in 33 days  ·  9 December" (U63); nil when it is open or has no date.
+local function countdown(key, f)
+  local at = ns.Opens(key)
+  if not at or ns.IsOpen(key, f) then return nil end
+  local days = math.max(1, math.ceil((at - time()) / 86400))
+  if days == 1 then return L.RAID_COUNTDOWN_1:format(ns.OpensText(key)) end
+  return L.RAID_COUNTDOWN:format(days, ns.OpensText(key))
+end
 
 local function names(list, me)
   local out = {}
@@ -17,8 +27,8 @@ local function names(list, me)
   return table.concat(out, ", ")
 end
 
--- "40-player raid", or "Raid" where the game gives no size (retail's newer raids take 10 to 30 players).
-local function size(r) return r[4] > 0 and L.RAID_SIZE:format(r[4]) or L.RAID_ANY_SIZE end
+-- "40-player raid".
+local function size(r) return L.RAID_SIZE:format(r[4]) end
 
 local function build(pf)
   local W = ns.Window
@@ -76,6 +86,18 @@ local function build(pf)
   pf.rscroll:SetAllPoints()
   local R = pf.rscroll.child
   pf.head = UI.Heading(R, width, "", nil, 20)
+  -- U63: a raid not open yet, its picture large with the countdown on it.
+  pf.soon = CreateFrame("Frame", nil, R)
+  pf.soon:SetSize(width, SOON_H)
+  pf.soon.tex = pf.soon:CreateTexture(nil, "ARTWORK")
+  UI.FramePicture(pf.soon, pf.soon.tex)
+  local fade = pf.soon:CreateTexture(nil, "ARTWORK", nil, 2)
+  fade:SetPoint("BOTTOMLEFT", UI.PIC_INSET, UI.PIC_INSET); fade:SetPoint("BOTTOMRIGHT", -UI.PIC_INSET, UI.PIC_INSET)
+  fade:SetHeight(math.floor(SOON_H * 0.45))
+  UI.SetGradient(fade, "VERTICAL", { 0.05, 0.03, 0.01, 0.92 }, { 0.05, 0.03, 0.01, 0 })
+  pf.soon.text = UI.Text(pf.soon, 18, "goldText", "fancy")
+  pf.soon.text:SetPoint("BOTTOMLEFT", 14, 12)
+  pf.soon.text:SetShadowOffset(1, -1); pf.soon.text:SetShadowColor(0, 0, 0, 1)
   pf.attHead = UI.SectionHeader(R, width)
   pf.attHead:SetText(L.RAID_ATTUNE_HEAD)
   pf.attText = UI.WrapText(R, 13, "ink", width, "book")
@@ -152,6 +174,15 @@ local function refresh(pf, ctx)
   chosen = chosen or ns.RAIDS[1]
   pf.head:Set(chosen[2], size(chosen))
   r:Place(pf.head, pf.head:GetHeight(), 6)
+  local soon = countdown(chosen[1], f)
+  pf.soon:SetShown(soon ~= nil)
+  if soon then
+    local w, h = width - 2 * UI.PIC_INSET, SOON_H - 2 * UI.PIC_INSET
+    local _, default = ns.SetDungeonArt(pf.soon.tex, chosen[1], w, h)
+    if default then ns.Pages:SetChapterArt(pf.soon.tex, nil, w, h, 0.5) end
+    pf.soon.text:SetText(soon)
+    r:Place(pf.soon, SOON_H, 10)
+  end
   r:Place(pf.attHead, 29, 4)
   local st = E:AttuneStatus(f, chosen)
   if not chosen[5] then pf.attText:SetText(L.RAID_NO_ATTUNE)

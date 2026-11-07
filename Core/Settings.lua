@@ -3,13 +3,14 @@ local _, ns = ...
 local S = {}
 ns.Settings = S
 
-S.TOAST_EVENTS = { "chapter", "floor", "clear", "heroFloor", "heroCap", "overCap", "ahead", "session", "gathering", "attune", "version", "first",
+S.TOAST_EVENTS = { "chapter", "floor", "clear", "heroFloor", "heroCap", "overCap", "ahead", "session", "gathering", "attune", "dquest", "room", "version", "first",
   "challenge" }
 
 S.DEFAULTS = {
   theme = "journal", size = 1, fullscreen = false, chat = "all", warnCap = true, warnPct = 75, reduce = false, minimap = true, lang = "en",
   picture = true, -- the picture moment after a dungeon's final boss (UI/Picture.lua)
   sounds = true, -- the book's sounds (UI/Sound.lua)
+  roomMobs = true, -- room for the dungeon quests counts the dungeons' mobs too (Fellowship/Room.lua, U78)
   storyFrom = "spoken", -- the story button: Spoken first, or Lore Forever ("lore") (UI/OtherAddons.lua; 6 Nov 2026)
   tracker = true, -- the on-screen tracker (UI/Tracker.lua)
   trackerHover = false, -- hidden mode: the tracker is invisible until the mouse is over it

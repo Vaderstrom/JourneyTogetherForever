@@ -10,6 +10,10 @@ end
 
 function ns.Clamp(v, lo, hi) return math.max(lo, math.min(hi, v)) end
 
+-- A level-up starts several jobs. Each waits its own moment, so they run in separate frames within two seconds
+-- instead of all on the game's busiest second (U73); the state goes first, so the others hear of it at once.
+ns.LEVEL_UP = { state = 1, characters = 1.3, race = 1.6, attune = 1.9 }
+
 -- Messages between modules: ns:On("SETTING", fn), ns:Fire("SETTING", key, value).
 local listeners = {}
 function ns:On(event, fn)
@@ -48,13 +52,10 @@ local function ruleset()
   return key ~= "" and key or "PvE"
 end
 
--- The realm part of every key: your realm; WoW Forever, your ruleset.
+-- The realm part of every key: your ruleset (your realm when the game does not say).
 function ns.Realm()
-  if ns.IsForever() then
-    ns.ruleset = ns.ruleset or ruleset()
-    if ns.ruleset then return ns.ruleset end
-  end
-  return ns.GameRealm()
+  ns.ruleset = ns.ruleset or ruleset()
+  return ns.ruleset or ns.GameRealm()
 end
 
 -- Your realm, or one connected to it (GetAutoCompleteRealms; the game leaves the list empty when it has none).
@@ -74,57 +75,34 @@ end
 -- shows a space between the two and reads a hyphen as that space: an addon whisper to "Arielas-Realm" was looked for
 -- as "Arielas Realm" (the first check in Forever, 5 Nov 2026). So in Forever "First-Surname" is the same name, and a
 -- part after the hyphen that is no realm (realms here carry digits) is the surname. Keys stay "Name-Realm", with the
--- ruleset for the realm (ns.Realm): "Arielas Fireson-PvP". Returns the name and its realm ("" for none).
+-- ruleset for the realm (ns.Realm): "Arielas Fireson-PvP". Returns the name; the realm a name comes with (the
+-- sender's numbered realm) says nothing: it is always your ruleset.
 local function split(text)
   local name, realm = text:match("^([^%-]+)%-?(.*)$")
   if not name then return nil end
   name = strtrim(name)
-  if ns.IsForever() and realm ~= "" and not name:find(" ", 1, true) and not ns.IsRealm(realm) then
-    local sur, rest = realm:match("^([^%-]+)%-?(.*)$")
-    if sur and not sur:find("[%s%d]") then name, realm = name .. " " .. sur, rest end
+  if realm ~= "" and not name:find(" ", 1, true) and not ns.IsRealm(realm) then
+    local sur = realm:match("^([^%-]+)")
+    if sur and not sur:find("[%s%d]") then name = name .. " " .. sur end
   end
-  -- In Forever the realm a name comes with (the sender's numbered realm) says nothing: it is always your ruleset.
-  if ns.IsForever() then realm = "" end
-  return name, realm
+  return name
 end
 
 function ns.FullName(name)
   if not name or name == "" then return nil end
-  local base, realm = split((strtrim(name):gsub("%s+", " ")))
+  local base = split((strtrim(name):gsub("%s+", " ")))
   if not base or base == "" then return nil end
-  return base .. "-" .. (realm ~= "" and realm or ns.Realm())
+  return base .. "-" .. ns.Realm()
 end
 
--- WoW Forever, or retail (where we test until Forever is out)? The game's project ID says it (Forever:
--- WOW_PROJECT_CAMELOT, 18, defined only there); without it, the interface number: Forever's are 1xxxx (16001 for
--- 1.60.1), retail's 12xxxx.
-function ns.IsForever()
-  if WOW_PROJECT_ID and WOW_PROJECT_CAMELOT then return WOW_PROJECT_ID == WOW_PROJECT_CAMELOT end
-  local toc = select(4, GetBuildInfo()) or 0
-  return toc >= 10000 and toc < 20000
-end
+-- The game this copy runs in, as the game data names it (Data/Encounters.lua): "wowf", WoW Forever (the only game the
+-- addon supports since 6 Nov 2026).
+function ns.Game() return "wowf" end
 
--- The game this copy runs in, as the game data names it (Data/Encounters.lua): "wowf" WoW Forever, "wow" retail.
-function ns.Game() return ns.IsForever() and "wowf" or "wow" end
+-- The game's level cap: WoW Forever's 60, the journey's own.
+function ns.LevelCap() return 60 end
 
--- The game's level cap (30 Oct 2026: WoW Forever 60, retail 80): a journey may reach it, the presets stay 1-60.
--- Forever's is the journey's own 60; retail's is the game's for this account.
-function ns.LevelCap()
-  if ns.IsForever() then return 60 end
-  local cap = GetMaxLevelForPlayerExpansion and GetMaxLevelForPlayerExpansion()
-  if type(cap) ~= "number" or (issecretvalue and issecretvalue(cap)) or cap < 60 then return 60 end
-  return cap
-end
-
--- The highest cap anyone in this game can have: the newest expansion's (an account without it has a lower one).
--- Journeys and milestones from other Heroes are checked against it, so a Leader with a higher cap is still heard.
-function ns.HighestLevel()
-  local top = not ns.IsForever() and GetMaxLevelForLatestExpansion and GetMaxLevelForLatestExpansion()
-  if type(top) ~= "number" or (issecretvalue and issecretvalue(top)) then top = 0 end
-  return math.max(ns.LevelCap(), top)
-end
-
--- Trial accounts and accounts without game time cannot send addon messages (Forever, and retail from 12.1.7), so a
+-- Trial accounts and accounts without game time cannot send addon messages, so a
 -- fellowship never hears them. Allowed, with a clear warning: a line on Welcome, a toast when founding or joining,
 -- and a bar across the book (27 Oct 2026).
 function ns.Trial()
@@ -133,32 +111,18 @@ function ns.Trial()
   return (IsTrialAccount and IsTrialAccount()) or (IsVeteranTrialAccount and IsVeteranTrialAccount()) or false
 end
 
--- The realm of "Name-Realm" (nil for a bare name).
-function ns.RealmOf(name) return type(name) == "string" and name:match("%-(.+)$") or nil end
-
--- Can fellowship messages reach this character? Addon whispers reach your own realm and the realms connected to it.
--- The game lists those (GetAutoCompleteRealms; empty when the realm has no partners). Without that list: yes.
-function ns.Reachable(name)
-  local realm = ns.RealmOf(name)
-  if not realm or realmKey(realm) == realmKey(ns.Realm()) then return true end
-  local list = GetAutoCompleteRealms and GetAutoCompleteRealms()
-  if type(list) ~= "table" then return true end
-  return ns.IsRealm(realm)
-end
 
 -- "Name" ("First Surname" in WoW Forever).
 function ns.Short(name)
   if not name then return "" end
-  if ns.IsForever() then return (name:match("^[^%-]+")) or name end
-  return (Ambiguate(name, "short"))
+  return (name:match("^[^%-]+")) or name
 end
 
 -- The name where room is tight (tournament cards, the clears table): in WoW Forever the first name alone, as friends
 -- call each other; the whole name when another of the names given shares that first name (a fellowship's members,
--- by key). Elsewhere ns.Short. (Check of 6 Nov 2026: "Malferion Oathstream" was cut on every card.)
+-- by key). (Check of 6 Nov 2026: "Malferion Oathstream" was cut on every card.)
 function ns.Brief(name, others)
   local short = ns.Short(name)
-  if not ns.IsForever() then return short end
   local first = short:match("^(%S+)%s") or short
   if first == short then return short end
   for other in pairs(others or {}) do
@@ -178,18 +142,15 @@ function ns.Others(f)
   return list
 end
 
--- "Name" for this realm, "Name-Realm" for another. WoW Forever: the name alone (names are unique in the region).
+-- The name alone (WoW Forever's names are unique in the region).
 function ns.Display(name)
-  if not name then return "" end
-  if ns.IsForever() then return ns.Short(name) end
-  return (Ambiguate(name, "none"))
+  return ns.Short(name)
 end
 
 -- Who an addon whisper goes to. WoW Forever: the name alone, "Arielas Fireson", as chat whispers it (with a realm the
 -- game took the realm for the surname and found nobody: the invite said "offline" though both were in one party).
 function ns.WhisperTarget(name)
-  if ns.IsForever() then return ns.Short(name) end
-  return name
+  return ns.Short(name)
 end
 
 function ns.Me()
@@ -202,25 +163,22 @@ end
 -- The character being played, also while the book draws another one's fellowship (the "player" unit, models).
 function ns.Self() return ns.UnitFull("player") or ns.FullName(UnitName("player")) end
 
--- A player unit's key ("Name-Realm"); nil for none or a name the game keeps secret. Retail: UnitName gives the name
--- and, for another realm, the realm. WoW Forever: the first name and the surname, and no realm (the player's own may
--- come as one "First Surname").
+-- A player unit's key ("Name-Realm"); nil for none or a name the game keeps secret. UnitName gives the first name and
+-- the surname, and no realm (the player's own may come as one "First Surname").
 function ns.UnitFull(unit)
   local n, r = UnitName(unit)
   if issecretvalue and (issecretvalue(n) or issecretvalue(r)) then return nil end
   if type(n) ~= "string" or n == "" then return nil end
   if type(r) ~= "string" or r == "" then return ns.FullName(n) end
-  if ns.IsForever() then return ns.FullName(n:find(" ", 1, true) and n or (n .. " " .. r)) end
-  return n .. "-" .. r
+  return ns.FullName(n:find(" ", 1, true) and n or (n .. " " .. r))
 end
 
 -- Character names as the game shows them: each part with a capital first letter ("arielas fireson" is "Arielas
 -- Fireson": WoW Forever's surname too; it was "Arielas fireson", whom the game did not find).
 function ns.CleanName(text)
-  local name, realm = split((strtrim(text or ""):gsub("%s+", " ")))
+  local name = split((strtrim(text or ""):gsub("%s+", " ")))
   if not name or name == "" then return nil end
-  name = name:gsub("[^ ]+", function(p) return p:sub(1, 1):upper() .. p:sub(2):lower() end)
-  return realm ~= "" and (name .. "-" .. realm) or name
+  return (name:gsub("[^ ]+", function(p) return p:sub(1, 1):upper() .. p:sub(2):lower() end))
 end
 
 ---------------------------------------------------------------------------

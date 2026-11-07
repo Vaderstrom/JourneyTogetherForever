@@ -88,8 +88,7 @@ local PLATE_PAD, PLATE_TOP, PLATE_BELOW = 12, 12, 26 -- PLATE_BELOW: room for th
 local FOLD_W = 14 -- each side of the fold's shade
 JED.PLATE_PAD = PLATE_PAD
 
--- The ruler's last level: the game's cap (Forever 60, retail 80), or the journey's last cap when it reaches higher
--- (a Leader whose account has a higher cap).
+-- The ruler's last level: the game's cap (60), or the journey's last cap when it reaches higher.
 function JED.RulerTop(j)
   local last = j.chapters[#j.chapters]
   return math.max(ns.LevelCap(), last and last.cap or 0)
@@ -193,10 +192,10 @@ function JED.New(left, right, lw, rw, src)
   ed.lens.n:SetPoint("CENTER", 0, 0)
   ed.lens.n:SetShadowOffset(1, -1); ed.lens.n:SetShadowColor(0, 0, 0, 0.8)
   ed.lens:Hide()
-  -- Level marks under the ruler: a short one every 5 levels, a long one every 10, up to the game's cap (30 Oct 2026:
-  -- Forever 60, retail 80; marks past the ruler's end are hidden).
+  -- Level marks under the ruler: a short one every 5 levels, a long one every 10, up to the game's cap (marks past
+  -- the ruler's end are hidden).
   ed.marks = {}
-  for v = 5, ns.HighestLevel(), 5 do
+  for v = 5, ns.LevelCap(), 5 do
     local m = UI.Solid(ed.ruler, "BORDER", "ink2", 0.7)
     m:SetWidth(1); m:SetHeight(v % 10 == 0 and 6 or 3)
     ed.marks[#ed.marks + 1] = { tex = m, v = v }
@@ -224,7 +223,7 @@ function JED.New(left, right, lw, rw, src)
   end
   -- The levels: every 10 (10, 20 ... the cap), and where the journey starts (1 with the Prologue).
   ed.ticks = {}
-  for v = 0, ns.HighestLevel(), 10 do
+  for v = 0, ns.LevelCap(), 10 do
     local t = UI.Text(ed.plate, 11, "ink2", "body", "CENTER")
     t:SetText(v)
     ed.ticks[#ed.ticks + 1] = { fs = t, v = v }
@@ -326,6 +325,10 @@ function JED.New(left, right, lw, rw, src)
     c.edge:SetSize(48, 48); c.edge:SetPoint("TOPLEFT", 5, -5)
     c.pic = c:CreateTexture(nil, "ARTWORK")
     c.pic:SetSize(46, 46); c.pic:SetPoint("TOPLEFT", 6, -6)
+    -- Larger on hover (U64): a texture takes no mouse, so a frame over it does.
+    c.picHit = CreateFrame("Frame", nil, c)
+    c.picHit:SetAllPoints(c.pic); c.picHit:EnableMouse(true)
+    UI.PictureTip(c.picHit, function() return c.key end)
     c.name = UI.Text(c, 14, "ink")
     c.name:SetPoint("TOPLEFT", 60, -8)
     c.levels = UI.Text(c, 12, "ink2")
@@ -357,30 +360,17 @@ function JED.New(left, right, lw, rw, src)
   ed.shelf:SetWidth(rw)
   ed.shelf.bg = ed.shelf:CreateTexture(nil, "BACKGROUND")
   ed.shelf.bg:SetAllPoints(); ed.shelf.bg:SetTexture(ns.WHITE)
-  -- By level; where the game has dungeons of several expansions (retail's Adventure Guide, 30 Oct 2026), grouped by
-  -- expansion under its name (the game's own text).
-  local list, exps = {}, {}
-  local function exp(d) return ns.EXPANSION[d[1]] or 0 end
-  for _, d in ipairs(ns.DUNGEONS) do list[#list + 1] = d; exps[exp(d)] = true end
+  -- By level, then name.
+  local list = {}
+  for _, d in ipairs(ns.DUNGEONS) do list[#list + 1] = d end
   table.sort(list, function(a, b)
-    if exp(a) ~= exp(b) then return exp(a) < exp(b) end
     if a[3] ~= b[3] then return a[3] < b[3] end
     return a[2] < b[2]
   end)
-  local grouped = next(exps, next(exps)) ~= nil
-  ed.shelfChips, ed.shelfBy, ed.shelfHeads = {}, {}, {}
+  ed.shelfChips, ed.shelfBy = {}, {}
   local cw = math.floor((rw - 6) / 2)
-  local y, col, group = 4, 0, nil
+  local y, col = 4, 0
   for i, d in ipairs(list) do
-    if grouped and exp(d) ~= group then
-      if col == 1 then y, col = y + 26, 0 end
-      group = exp(d)
-      local head = UI.SectionHeader(ed.shelf, rw)
-      head:SetPoint("TOPLEFT", 0, -y)
-      head:SetText(_G["EXPANSION_NAME" .. group] or L.ED_EXPANSION:format(group + 1))
-      ed.shelfHeads[#ed.shelfHeads + 1] = head
-      y = y + 29 + 4
-    end
     local b = chip(ed.shelf, ed, function(self) ed:AddHere(self.item.base) end)
     b:SetSize(cw, 22)
     b:SetPoint("TOPLEFT", col * (cw + 6), -y)
@@ -819,8 +809,8 @@ function JED:Refresh()
     elseif fits then paint(b, "gold", 0.3, "gold", "ink")
     else paint(b, "page2", 0.95, "bookEdge", #chs > 0 and "ink2" or "ink") end
     b.check:SetShown(here)
-    -- The name gets the room the check does not take. A name still too long (retail's "Dire Maul - Warpwood
-    -- Quarter", check of 30 Oct 2026, 22:00) takes the level range's room too: the tooltip has both.
+    -- The name gets the room the check does not take. A name still too long (check of 30 Oct 2026, 22:00)
+    -- takes the level range's room too: the tooltip has both.
     local room = b:GetWidth() - 12 - (here and 18 or 0)
     local long = full(b.text) > room - full(b.sub) - 4
     b.sub:SetShown(not long)

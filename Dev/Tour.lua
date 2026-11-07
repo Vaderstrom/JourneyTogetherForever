@@ -54,7 +54,7 @@ end
 local function prep(fn, wait) shots[#shots + 1] = { fn = fn, wait = wait, prep = true } end
 
 -- Phase A: no fellowship.
-shot("welcome", "Welcome", "No fellowship: logo, features, Found / Join, Your characters (without a fellowship: hidden)", function()
+shot("welcome", "Welcome", "No fellowship: logo, features, Found / Join, Your characters (without a fellowship: hidden) with How a journey works right under it, down to the page's foot (U67)", function()
   ns.Characters.showAll = false
   W().startView = "welcome"; W():Open(); W():Refresh()
 end)
@@ -224,7 +224,7 @@ shot("since", "Since you were last here", "What changed, who levelled, where the
   ns.Since.current = ns.Since:Digest(cur()); page("since")
 end)
 -- What's New (the check of 1 Nov 2026, 14:32): once after an update, over the book.
-shot("news", "What's New", "Over the book on parchment in its frame: What's New in gold, the big news (Sync in real time, Shaper's Terrace) in a round picture inside the gold ring, two picture cards (Names filled in, Quests by zone) with loading screens, Continue", function()
+shot("news", "What's New", "Over the book on parchment in its frame: What's New in gold, the big news (The Dungeons tab, the Deadmines) in a round picture inside the gold ring, two picture cards (Room for the quests, Recommended next) with loading screens, Continue", function()
   local keep = ns.db.newsSeen
   ns.News:Show()
   ns.db.newsSeen = keep
@@ -245,9 +245,17 @@ shot("chapter-tooltip", "Chapter (clears table tooltip)", "A column's full dunge
   local enter = col and col:GetScript("OnEnter")
   if enter then enter(col) end
 end)
+shot("chapter-picture", "Chapter (a dungeon's picture on hover)", "The first dungeon's picture large over its row, with its name (U64); the game's default tile shows nothing", function()
+  if GameTooltip then GameTooltip:Hide() end
+  pf("chapter").sel = nil; page("chapter"); top(pf("chapter").lscroll)
+  local row = pf("chapter").rows.items[1]
+  local enter = row and row.pic:GetScript("OnEnter")
+  if enter then enter(row.pic) end
+end)
 -- (Chapter numbers count the Prologue, chapter I, since 27 Oct 2026.)
 shot("chapter-next", "Chapter (next, not started)", "A chapter that is not open yet", function()
   if GameTooltip then GameTooltip:Hide() end
+  if ns.UI.pictureTip then ns.UI.pictureTip:Hide() end
   -- The chapter after opening the page: ShowPage starts it at the current one (both shots showed Chapter III; check
   -- of 29 Oct 2026).
   local p = pf("chapter"); page("chapter"); p.sel = ns.Journey:CurrentIndex(cur()) + 1; W():Refresh()
@@ -361,8 +369,40 @@ prep(function()
   ns.Comm:Inject(full("Elyra"), "QUESTS", { fid = f.id, q = { [5121] = { t = "High Chief Winterfall", z = "Winterspring", l = 56, h = 2, g = 8, k = true, o = "Winterfall Shaman slain" } },
     d = { 7848 }, ln = {}, t = time() })
 end, 0.5)
-shot("quests", "Quests (Quests tab)", "Together now and Pick up and join, each by zone (the zone you are in first, with You are here; then Nearby), quests as cards with an icon and your progress; your quest's details: progress, others and where they are, what you can do", function()
+shot("quests-dungeons", "Quests (Dungeons tab)", "The first tab: every dungeon of the journey with how many of its quests you still have to pick up or start earlier; the Deadmines' quests (Ragefire Chasm for the Horde) in three groups (Pick up before you go, Start earlier, Starts inside), each with its level, where it starts, your status, who else has it, and a map pin where the place is known (U79)", function()
   page("quests"); local p = pf("quests"); p.tabs.buttons[1]:Click()
+  p.dSel = UnitFactionGroup("player") == "Horde" and "rfc" or "dm"; W():Refresh()
+end)
+-- Room for the dungeon quests (U78): a made-up chapter total stands in for this character's (its quests' XP may not
+-- be known yet), put back after the three shots.
+prep(function()
+  local R, ch = ns.Room, ns.Journey:Current(cur())
+  local cap = ch and ch.cap or 20
+  local fake = { now = cap - 2, levels = 2.4, to = cap + 0.4, cap = cap, tol = 0, limit = cap, stop = cap - 2.4,
+    quests = 2.1, mobs = 0.3, unknown = 1, unrun = 0, n = ch and ch.n or 0 }
+  R.realChapter = R.realChapter or R.Chapter
+  R.Chapter = function() return fake end
+end)
+shot("overview-room", "Overview (room for the dungeon quests)", "A card: the level the chapter's dungeon quests and mobs take you to, of the cap; in red, where to stop questing; the mobs and the quests whose XP is not known yet (U78)", function()
+  local p = pf("overview"); p.sel = nil; page("overview")
+  -- To the card itself: the page's end is the contents and history (the check of 7 Nov 2026 showed no card).
+  local _, _, _, _, y = p.room:GetPoint(1)
+  if not (p.room:IsShown() and y and p.lscroll:Reveal(-y, p.room:GetHeight())) then return bottom(p.lscroll) end
+end)
+shot("chapter-room", "Chapter (room for the dungeon quests)", "Under where the Adventurers stand: the chapter's total and, in red, where to stop questing (U78)", function()
+  local p = pf("chapter"); p.sel = nil; page("chapter"); W():Refresh(); top(p.rscroll)
+end)
+shot("quests-dungeons-room", "Quests (Dungeons tab, Show everyone)", "Under the dungeon's quests: its share in the title, your room, Count the mobs' XP, and Show everyone ticked with each Adventurer's line (U78)", function()
+  page("quests"); local p = pf("quests"); p.tabs.buttons[1]:Click()
+  p.dEveryone = true; W():Refresh(); return bottom(p.drscroll)
+end)
+prep(function()
+  local R = ns.Room
+  if R.realChapter then R.Chapter, R.realChapter = R.realChapter, nil end
+  pf("quests").dEveryone = nil
+end)
+shot("quests", "Quests (Quests tab)", "Together now and Pick up and join, each by zone (the zone you are in first, with You are here; then Nearby), quests as cards with an icon and your progress; your quest's details: progress, others and where they are, what you can do", function()
+  page("quests"); local p = pf("quests"); p.tabs.buttons[2]:Click()
 end)
 shot("quests-join", "Quests (a quest you could join)", "Another Hero's quest you have not done: who has it, how to join", function()
   local p = pf("quests")
@@ -381,11 +421,11 @@ shot("quests-showall", "Quests (Show all)", "Far-off quests included, and the wa
 end)
 shot("quests-chains", "Quests (Quest chains tab)", "The Questie line; learned chains as cards with a pip for each part (often empty at first)", function()
   ns.Quests.viewLevel = nil
-  local p = pf("quests"); p.all = nil; p.tabs.buttons[2]:Click()
+  local p = pf("quests"); p.all = nil; p.tabs.buttons[3]:Click()
 end)
 shot("quests-attune-none", "Quests (Attunements, level 30)", "None open yet: when the first one opens", function()
   ns.QuestLists.viewLevel = 30
-  local p = pf("quests"); p.sel = nil; p.tabs.buttons[3]:Click()
+  local p = pf("quests"); p.sel = nil; p.tabs.buttons[4]:Click()
 end)
 -- The row of an attunement on the Attunements tab, by its key (the list is sorted by start level).
 local function attRow(key)
@@ -641,7 +681,7 @@ shot("chapter-milestones", "Chapter (milestones)", "A Required level milestone a
 end)
 -- The Endgame, as if the journey were complete (only for this shot; no "Endgame is open" toast).
 local tourReached
-shot("raids", "Raids (the Endgame)", "Each raid with its picture (Barrow Deeps its own, 6 Nov 2026), attunement and boss progress", function()
+shot("raids", "Raids (the Endgame)", "Each raid with its picture (Barrow Deeps its own, 6 Nov 2026), attunement and boss progress; a raid not open yet: its picture large and \"Opens in N days · 9 December\" on the right page (U63)", function()
   local f = cur()
   ns.char.endgameSeen = ns.char.endgameSeen or {}
   ns.char.endgameSeen[f.id] = time()
@@ -778,6 +818,12 @@ shot("toast-attune", "Toast: an attunement opens", "At the level where it can be
   -- The title names the raid whose picture it shows (WoW Forever has no Molten Core; check of 6 Nov 2026).
   toast("attune", function() return L.TOAST_ATTUNE_TITLE:format(ns.Raid(first(ns.RAIDS, "mc"))[2]) end, L.TOAST_ATTUNE_RAID,
     { dungeon = function() return first(ns.RAIDS, "mc") end }), { toast = true })
+shot("toast-dquest", "Toast: dungeon quests to pick up", "Once per dungeon of this chapter or the next, when its first quest opens to you, with the dungeon's picture (U79)",
+  toast("dquest", function() return ns.Dungeon("dm")[2] end, function()
+    return L.TOAST_DQ_PICK_IN:format(L.DQ_N_QUESTS:format(3), "Westfall") .. " " .. L.TOAST_DQ_CHAIN:format("Red Silk Bandanas")
+  end, { dungeon = "dm" }), { toast = true })
+shot("toast-room", "Toast: leave room for the dungeons", "At the stop point (and half a level before it): the dungeon quests will take you to the cap, stop questing elsewhere (U78)",
+  toast("room", L.TOAST_ROOM_NOW_TITLE, L.TOAST_ROOM_NOW), { toast = true })
 shot("toast-first", "Toast: a fellowship first", "\"Brannic is the first to ride a mount.\"", toast("first", L.T_FIRST:format("Brannic"), L.FIRST_MOUNT:format("Brannic")), { toast = true })
 shot("toast-ring-passed", "Toast: the Ring passes on", "Brannic left: the Ring passes to Corwin, shown as the two names with their class icons, Brannic » Corwin (U56), in the big moments' gold frame at the normal size, with a soft chime (U52)", function()
   ns.Toasts:StopMove(); W():Close()
@@ -850,6 +896,12 @@ shot("walk-rulesadmin", "Walkthrough: the Rules tab (Leader)", "The draft and Pu
 shot("walk-member-invite", "Walkthrough: Invite (Adventurer)", "Everyone invites on the Adventurers page", function() walk("member", "INVITE") end)
 shot("walk-member-rules", "Walkthrough: Rules (Adventurer)", "Propose and vote; the sample's open vote", function() walk("member", "RULES") end)
 shot("walk-done", "Walkthrough: the end", "Done; Start the tour again from Settings", function() walk("member", "DONE") end)
+prep(function() ns.Walkthrough:Stop() end)
+-- About this page: the header's ? (beside Your characters) on your own fellowship.
+shot("page-help", "About this page: Chapter", "After the header's ?: Chapter's left page framed, the card says what the page is for, About this page, 1 of 2, Next and Close", function()
+  hideOverlays(); W():Open(); page("chapter"); ns.Walkthrough:StartPage("chapter")
+end)
+shot("page-help-right", "About this page: its right page", "Next: Chapter's right page framed, 2 of 2, Back and Done", function() ns.Walkthrough:Next() end)
 prep(function() ns.Walkthrough:Stop() end)
 
 -- Following another character's fellowship (Fellowship/Watch.lua): the pretend alt "Altara" (/jtf debug watch).
@@ -978,9 +1030,30 @@ function TR:ShowGameUI()
   self.uiAlpha = nil
 end
 
+-- The game's HDR output dims every screenshot (the check of 7 Nov 2026: the parchment at about half its brightness):
+-- off while the tour takes them, then as it was. The old value is kept in the saved data, so after a /reload in the
+-- middle it is put back at login.
+local HDR = "HDROutput"
+local function cvar(k) return C_CVar and C_CVar.GetCVar and C_CVar.GetCVar(k) or nil end
+function TR:HdrOff()
+  local v = cvar(HDR)
+  if v and v ~= "0" then
+    ns.db.hdrWas = ns.db.hdrWas or v
+    pcall(C_CVar.SetCVar, HDR, "0")
+  end
+  return v
+end
+function TR:HdrBack()
+  if not ns.db.hdrWas then return end
+  pcall(C_CVar.SetCVar, HDR, ns.db.hdrWas)
+  ns.db.hdrWas = nil
+end
+ns:RegisterEvent("PLAYER_ENTERING_WORLD", function() if not TR.running then TR:HdrBack() end end)
+
 function TR:Finish(keep)
   local r = self.rec
   self:ShowGameUI()
+  self:HdrBack()
   hideOverlays()
   ns.Toasts:StopMove()
   ns.Theme.forceKey = nil
@@ -1056,6 +1129,8 @@ function TR:Run(arg, opts)
   end
   ns.Settings:Set("chat", "off")
   ns.quiet = true
+  -- HDR as it was and as it is now, for the report: was "1", now "0" when the tour turned it off.
+  rec.hdr = { was = self:HdrOff(), now = cvar(HDR) }
   -- The pages as a full account sees them (on an account without game time the warning bar covered every shot); the
   -- "trial-bar" shot shows it on its own.
   ns.Dev.pretendTrial = false
@@ -1141,9 +1216,7 @@ TR.BRAND = {
   { id = "news", file = "whats-new" },
   { id = "moments", file = "moments" },
   { id = "group-photo", file = "group-photo", crop = "screen" },
-  -- Only in WoW Forever: retail has no attunements since 30 Oct 2026 (its picture was an empty page; brand run of
-  -- 1 Nov 2026). The README keeps the picture of 30 Oct until a run in Forever.
-  { id = "quests-attune", file = "attunements", forever = true },
+  { id = "quests-attune", file = "attunements" },
   { id = "heroes", file = "adventurers" },
   { id = "rules-vote", file = "rules" },
   { id = "gatherings", file = "gatherings" },
@@ -1164,9 +1237,7 @@ TR.BRAND_PAD = { book = 4, toast = 28, tracker = 14 }
 function TR:Brand()
   if UnitFactionGroup("player") ~= "Alliance" then ns:Print(L.BRAND_FACTION, true) return end
   local ids = {}
-  for _, b in ipairs(self.BRAND) do
-    if not b.forever or ns.IsForever() then ids[b.id] = b end
-  end
+  for _, b in ipairs(self.BRAND) do ids[b.id] = b end
   self:Run(nil, { ids = ids, brand = self.BRAND_LOOK })
 end
 

@@ -173,12 +173,18 @@ function PH:StandIn(name)
   return a.loaded and a or nil
 end
 
--- In the background: the members in your group whom the game can draw now.
+-- In the background: the members in your group whom the game can draw now, once each. Opening the photo loads them
+-- all again (fresh gear); reloading them every TICK with the photo closed made the game stutter (7 Nov 2026).
+function PH:Preload(name)
+  local a = self.actors[name]
+  if not (a and a.loaded) then self:Load(name) end
+end
+
 function PH:Tick()
   local f = F:Current()
   if not f or not self.frame then return end
   for name in pairs(f.members) do
-    if name ~= ns.Me() then self:Load(name) end
+    if name ~= ns.Me() then self:Preload(name) end
   end
 end
 

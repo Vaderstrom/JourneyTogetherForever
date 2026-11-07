@@ -27,12 +27,9 @@ R.SIZES = {
 R.SIZE_RANGE = { duo = { 1, 2 }, trio = { 3, 3 }, party = { 4, 5 }, large = { 6, math.huge } }
 R.SIZE_SUGGEST = { duo = { "strict", "short" }, trio = { "together", "short" }, party = { "together", "forever" },
   large = { "relaxed", "long" } }
--- What a size suggests, { style, preset }: a party gets the Forever preset in WoW Forever, Classic in other games
--- (they have none of Forever's new dungeons; the owner, 6 Nov 2026).
+-- What a size suggests, { style, preset }.
 function R.Suggest(size)
-  local s = R.SIZE_SUGGEST[size] or R.SIZE_SUGGEST.party
-  if s[2] == "forever" and not ns.IsForever() then return { s[1], "classic" } end
-  return s
+  return R.SIZE_SUGGEST[size] or R.SIZE_SUGGEST.party
 end
 -- Play style: the slack. How far under the floor or over the cap a Companion may be, and XP from runs over the cap.
 R.STYLE_ORDER = { "relaxed", "together", "strict" }

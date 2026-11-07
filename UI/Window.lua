@@ -333,8 +333,11 @@ local function buildHeader(f)
   h.inbox.badge:SetFrameLevel(h.inbox:GetFrameLevel() + 5)
   h.chars = UI.RoundButton(h, 40, "characters", function() W:TogglePanel("characters") end)
   h.chars:SetPoint("RIGHT", h.inbox, "LEFT", -8, 0)
-  for key, b in pairs({ chars = h.chars, inbox = h.inbox, settings = h.settings, close = h.close }) do
-    local label = ({ chars = L.YOUR_CHARACTERS, inbox = L.INBOX, settings = L.SETTINGS, close = L.CLOSE })[key]
+  -- About this page (the owner, 7 Nov 2026): a short walk through the page you are on (UI/Walkthrough.lua).
+  h.help = UI.RoundButton(h, 40, "help", function() ns.Walkthrough:StartPage() end)
+  h.help:SetPoint("RIGHT", h.chars, "LEFT", -8, 0)
+  for key, b in pairs({ chars = h.chars, inbox = h.inbox, settings = h.settings, close = h.close, help = h.help }) do
+    local label = ({ chars = L.YOUR_CHARACTERS, inbox = L.INBOX, settings = L.SETTINGS, close = L.CLOSE, help = L.WALK_PAGE })[key]
     b:SetScript("OnEnter", function() GameTooltip:SetOwner(b, "ANCHOR_BOTTOM"); GameTooltip:SetText(label); GameTooltip:Show() end)
     b:SetScript("OnLeave", function() GameTooltip:Hide() end)
   end
@@ -940,17 +943,26 @@ end
 -- The DungeonJournal addon's chat command (/dj), when it is installed: its function in SlashCmdList, or nil.
 function W:JournalCommand() return ns.SlashCommand("/dj", "/dungeonjournal") end
 
--- Dungeon Journal: a shortcut to the DungeonJournal addon (loot, quests and where to find them), with the dungeon's
--- name; without the addon, a toast says where to get it. Returns true when it opened.
-function W:DungeonJournal(key)
+-- What /dj takes to open a dungeon: its own short words ("/dj sfk", "/dj smlib"), not names; given "The Deadmines"
+-- or "SM: Library" it only opened or closed its window (a player, 7 Nov 2026). Our keys are its words, but these.
+-- A dungeon it lacks (Forever's own, the raids) opens it at its start.
+local JOURNAL_WORD = { exc = "exca" }
+function W:JournalWord(key)
   local d = ns.Dungeon(key)
-  if not d then return false end
+  return d and (JOURNAL_WORD[d[1]] or d[1]) or nil
+end
+
+-- Dungeon Journal: a shortcut to the DungeonJournal addon (loot, quests and where to find them), at the dungeon;
+-- without the addon, a toast says where to get it. Returns true when it opened.
+function W:DungeonJournal(key)
+  local word = self:JournalWord(key)
+  if not word then return false end
   local open = self:JournalCommand()
   if not open then
     ns:Toast(nil, L.DUNGEON_JOURNAL, L.DJ_MISSING)
     return false
   end
-  open(d[2])
+  open(word)
   return true
 end
 
@@ -1105,6 +1117,7 @@ function W:RefreshHeader(ctx)
   h.chip:SetPoint("TOPLEFT", h, "TOPLEFT", (ctx.inFellow and 96 or 98) + dx, ctx.inFellow and -58 or -54)
   local n = ns.Inbox and ns.Inbox:Count() or 0
   h.inbox.badge:SetCount(n)
+  h.help:SetShown(ns.Walkthrough:HasHelp(self.current) and not ns.Walkthrough.on)
 end
 
 function W:RefreshNav(ctx, page)
@@ -1325,11 +1338,14 @@ function W:Draw()
   if def and def.refresh then def.refresh(self.pageFrames[page], ctx) end
 end
 
--- Other Heroes' news arrives in bursts (a login, a heartbeat round, a quest log): one redraw for the whole burst.
--- HEROES fired with `now` (the player clicked something) redraws at once.
-W.SOON = 0.25
-function W:RefreshSoon()
+-- Other Heroes' news arrives in bursts (a login, a heartbeat round, a quest log): one redraw a second at most (U74).
+-- HEROES fired with `now` (the player clicked something) redraws at once. News of one kind ("quests", "gear")
+-- redraws only a page that shows it (its `news`): a quest list arriving does not redraw the Overview.
+W.SOON = 1
+function W:RefreshSoon(what)
   if self.soon or not self:IsOpen() then return end
+  local def = what and ns.Pages:Get(self.current)
+  if def and not (def.news and def.news[what]) then return end
   self.soon = true
   C_Timer.After(self.SOON, function() self.soon = nil; self:Refresh() end)
 end
@@ -1342,7 +1358,7 @@ ns:On("SETTING", function(key)
 end)
 -- Joining, leaving, being removed or a disband: outside a fellowship the book always opens on Welcome.
 -- Levels decide the current chapter, standings and the header chip: every page can change.
-ns:On("HEROES", function(now) if now then W:Refresh() else W:RefreshSoon() end end)
+ns:On("HEROES", function(now, what) if now then W:Refresh() else W:RefreshSoon(what) end end)
 ns:On("LOGIN", function() W.wasInFellow = ns.Fellowship:Current() ~= nil end)
 ns:On("FELLOWSHIP", function()
   local inFellow = ns.Fellowship:Current() ~= nil

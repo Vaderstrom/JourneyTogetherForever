@@ -70,12 +70,17 @@ function Hr:MyState()
   -- run: in a fellowship run right now (levels gained there may pass the cap, Fellowship/Progress.lua).
   local f = F:Current()
   local xp, xpMax = UnitXP("player"), UnitXPMax("player")
-  -- A max-level character has no XP bar: with a pretend level, pretend 40% of a level too.
-  if ns.Dev and ns.Dev.myLevel and (xpMax or 0) <= 0 then xp, xpMax = 400, 1000 end
+  -- A pretend level has no XP bar of its own: pretend 40% of it, its size from the game's table (the real one was
+  -- level 1's in the check of 7 Nov 2026).
+  if ns.Dev and ns.Dev.myLevel and ns.Dev.myLevel ~= UnitLevel("player") then
+    xpMax = ns.Pace.LEVEL_XP[lvl] or 1000
+    xp = math.floor(xpMax * 0.4)
+  end
   return { level = lvl, xp = xp, xpMax = xpMax, rested = GetXPExhaustion() or 0,
     zone = GetZoneText and GetZoneText() or nil, class = class, className = className, race = race, guild = guild,
     gm = guild ~= nil and rankIndex == 0 or nil, run = f and ns.Progress:InRun(f) or nil,
     pace = ns.Pace and ns.Pace:PerHour() or nil, ver = ns.VERSION, t = time(), alts = self:MyAlts(),
+    mark = ns.Watch and ns.Watch:Mark() or nil, -- this account's mark: any character of it may follow (U68)
     -- My deeds and tallies, for the fellowship's firsts (Fellowship/Firsts.lua).
     deeds = ns.Firsts and (ns.Firsts:State()) or nil, tally = ns.Firsts and select(2, ns.Firsts:State()) or nil,
     -- My online minutes in this tournament round, for the referee's walkovers (Fellowship/Tourney.lua).
@@ -140,6 +145,7 @@ function Hr:Store(f, name, s, heardAt, relayed)
     for _, a in ipairs(s.alts) do if type(a) == "string" and #a <= 64 and #alts < 20 then alts[#alts + 1] = a end end
     h.alts = alts
   end
+  if type(s.mark) == "string" and #s.mark <= 32 then h.mark = s.mark end
   -- Deeds for the firsts: only the known ones, as times; the tallies as counts (Fellowship/Firsts.lua).
   if type(s.deeds) == "table" and ns.Firsts then
     local d = {}
@@ -175,6 +181,17 @@ function Hr:StoreGear(f, name, gear, t, n, relayed)
 end
 
 function Hr:Get(f, name) return f.heroes and f.heroes[name] end
+
+-- The others, without those the game just said are offline (a whisper to them failed and nothing came since): quests
+-- and gear wait for them, and come with the answer to their HELLO when they log in (U76, 7 Nov 2026).
+function Hr:Reachable(f)
+  local me, list = ns.Me(), {}
+  for name in pairs(f.members) do
+    local h = f.heroes and f.heroes[name]
+    if name ~= me and not (h and h.offline) then list[#list + 1] = name end
+  end
+  return list
+end
 
 -- Online: me always; others while their heartbeat keeps coming and no whisper to them has failed.
 function Hr:Online(f, name)
@@ -347,7 +364,7 @@ function Hr:SendState(tag, to)
   if tag == "HELLO" or tag == "HI" then data.sq, data.gq, data.qq = self:Counts(f) end
   -- Only the newest one waits: held in a dungeon, a state every minute piled up and held back everything behind it
   -- (code review, 30 Oct 2026).
-  for _, name in ipairs(to and { to } or others(f)) do Comm:Send(name, tag or "STATE", data, false, true) end
+  Comm:SendAll(to and { to } or others(f), tag or "STATE", data, false, true)
   ns:Fire("HEROES")
 end
 
@@ -362,7 +379,7 @@ function Hr:SendGear(to)
   local n = same and mine.gseq or nextCount("gseq", mine and mine.gseq)
   if not same then self:StoreGear(f, ns.Me(), g, t, n) end
   local gt = same and mine.gearTime or t
-  for _, name in ipairs(to and { to } or others(f)) do Comm:Send(name, "GEAR", { fid = f.id, g = g, t = gt, n = n }, false, true) end
+  Comm:SendAll(to and { to } or Hr:Reachable(f), "GEAR", { fid = f.id, g = g, t = gt, n = n }, false, true)
 end
 
 -- Sends `to` the states, gear and quests of others that this addon has newer than they do (their counts sq, gq, qq).
@@ -379,7 +396,7 @@ function Hr:Relay(f, to, sq, gq, qq)
       if (h.seq or 0) > (tonumber(sq[name]) or 0) then
         states[name] = { level = h.level, xp = h.xp, xpMax = h.xpMax, rested = h.rested, zone = h.zone, class = h.class,
           className = h.className, race = h.race, guild = h.guild, gm = h.gm, pace = h.pace, ver = h.ver, t = h.t,
-          alts = h.alts, seq = h.seq, heard = h.heard, deeds = h.deeds, tally = h.tally, ton = h.ton }
+          alts = h.alts, mark = h.mark, seq = h.seq, heard = h.heard, deeds = h.deeds, tally = h.tally, ton = h.ton }
       end
       if h.gear and (h.gseq or 0) > (tonumber(gq[name]) or 0) then gears[name] = { g = h.gear, t = h.gearTime, n = h.gseq } end
       -- (An older addon sends no quest times: nothing is passed on to it.)
@@ -451,7 +468,7 @@ Comm:On("STATE", function(sender, d)
 end)
 Comm:On("GEAR", function(sender, d)
   local f = fellowshipFor(sender, d)
-  if f then Hr:StoreGear(f, sender, d.g, d.t, tonumber(d.n)); ns:Fire("HEROES") end
+  if f then Hr:StoreGear(f, sender, d.g, d.t, tonumber(d.n)); ns:Fire("HEROES", nil, "gear") end
 end)
 -- Passed on by another Adventurer: taken only when newer than what we have.
 Comm:On("RELAY", function(sender, d)
@@ -470,16 +487,16 @@ end)
 Comm:On("RELAYQ", function(sender, d)
   local f = fellowshipFor(sender, d)
   if not f or type(d.q) ~= "table" then return end
-  local me, any = ns.Me(), false
+  local me, any, done = ns.Me(), false, false
   for name, x in pairs(d.q) do
     local h = f.heroes and f.heroes[name]
     local t = type(x) == "table" and tonumber(x.t)
     if type(name) == "string" and name ~= me and name ~= sender and t and t > ((h and h.questsTime) or 0) then
-      ns.Quests:Store(f, name, x, t)
+      done = ns.Quests:Store(f, name, x, t) or done
       any = true
     end
   end
-  if any then ns:Fire("HEROES") end
+  if any then ns:Fire("HEROES", nil, not done and "quests" or nil) end
 end)
 Comm:On("RELAYG", function(sender, d)
   local f = fellowshipFor(sender, d)
@@ -490,7 +507,7 @@ Comm:On("RELAYG", function(sender, d)
       if Hr:StoreGear(f, name, x.g, x.t, tonumber(x.n), true) then any = true end
     end
   end
-  if any then ns:Fire("HEROES") end
+  if any then ns:Fire("HEROES", nil, "gear") end
 end)
 
 -- A whisper to this Hero failed: they are offline.
@@ -555,7 +572,7 @@ ns:RegisterEvent("GROUP_ROSTER_UPDATE", function() Hr:Soon("announce", 10, funct
 
 -- After joining (or founding), say hello at once.
 ns:On("JOINED", function() Hr:Hello() end)
-ns:RegisterEvent("PLAYER_LEVEL_UP", function() C_Timer.After(1, function() Hr:SendState() end) end)
+ns:RegisterEvent("PLAYER_LEVEL_UP", function() C_Timer.After(ns.LEVEL_UP.state, function() Hr:SendState() end) end)
 ns:RegisterEvent("PLAYER_XP_UPDATE", function() Hr:Soon("xp", Hr.XP_EVERY, function() Hr:SendState() end) end)
 ns:RegisterEvent("UPDATE_EXHAUSTION", function() Hr:Soon("xp", Hr.XP_EVERY, function() Hr:SendState() end) end)
 ns:RegisterEvent("ZONE_CHANGED_NEW_AREA", function() Hr:Soon("zone", 10, function() Hr:SendState() end) end)

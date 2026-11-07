@@ -368,4 +368,5 @@ end
 
 -- A tool, not a page to read: the flat sheet, its title across the top (29 Oct 2026).
 ns.Pages:Register({ id = "admin", label = L.NAV_ADMIN, build = build, refresh = refresh, flat = true, header = "both",
+  news = { quests = true }, -- the milestone form picks from the shared quest logs
   title = function() return L.TITLE_ADMIN, L.SUB_ADMIN end })

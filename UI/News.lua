@@ -11,11 +11,11 @@ local N = {}
 ns.News = N
 
 -- This update's news: a new ID shows the screen once more on every account. art: a dungeon's key (its picture).
-N.ID = "1.1"
-N.BIG = { art = "shaper", title = "NEWS_BIG_TITLE", text = "NEWS_BIG_TEXT" }
+N.ID = "1.2"
+N.BIG = { art = "dm", title = "NEWS_BIG_TITLE", text = "NEWS_BIG_TEXT" }
 N.CARDS = {
-  { art = "sfk", title = "NEWS_A_TITLE", text = "NEWS_A_TEXT" },
-  { art = "zf", title = "NEWS_B_TITLE", text = "NEWS_B_TEXT" },
+  { art = "wc", title = "NEWS_A_TITLE", text = "NEWS_A_TEXT" },
+  { art = "bfd", title = "NEWS_B_TITLE", text = "NEWS_B_TEXT" },
 }
 
 local BOX_W, BOX_H = 800, 510

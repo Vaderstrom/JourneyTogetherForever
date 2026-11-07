@@ -2,9 +2,9 @@
 -- another character on your account, read-only and live, so you can follow your mates (for example while your main
 -- waits at the cap). Each Companion shares the other characters on their account (HeroState.alts); a Companion's
 -- addon answers only those. Messages:
---   WATCHQ  alt -> every Companion of the watched fellowship: who is online and can answer? { fid, v }
+--   WATCHQ  alt -> every Companion of the watched fellowship: who is online and can answer? { fid, v, m }
 --   WATCHA  Companion -> alt: I can. { fid, v }
---   WATCHG  alt -> the first who answered: send it. { fid, v }
+--   WATCHG  alt -> the first who answered: send it. { fid, v, m }  (m: the account's mark, WT:Mark)
 --   WATCHS  Companion -> alt: the whole fellowship when the versions differ (Sync:Copy), and every Companion's level,
 --           XP and when last heard. { fid, f?, h = { name = state } }
 -- The alt asks every POLL seconds in the background (a toast when the watched fellowship opens a chapter), and every
@@ -38,7 +38,7 @@ end
 -- Asks every Companion of f but the watched character (that is you, not playing it) who can answer.
 function WT:Ask(key, f)
   self.pending[f.id] = true
-  for name in pairs(f.members) do if name ~= key then Comm:Send(name, "WATCHQ", { fid = f.id, v = f.v }) end end
+  for name in pairs(f.members) do if name ~= key then Comm:Send(name, "WATCHQ", { fid = f.id, v = f.v, m = self:Mark() }) end end
 end
 
 -- Asks for news of every watchable fellowship, or of one.
@@ -82,11 +82,25 @@ end
 ---------------------------------------------------------------------------
 -- A Companion's side: answer the alts of the fellowship's Companions
 ---------------------------------------------------------------------------
-local function allowed(f, sender)
+-- This account's mark (U68, 7 Nov 2026): kept in the account-wide save and shared with the Companions in the state, so
+-- any character of the account can show it, also one made since the main last logged in (not in its alts list yet).
+-- shortcut: every Companion hears the mark, so one could pass it on to an outsider, who could then follow (read only,
+-- never change) the fellowship; a joining or take-over check still uses the alts list only. Upgrade if members are
+-- not trusted.
+function WT:Mark()
+  local db = ns.db
+  if not db then return nil end
+  if type(db.accountMark) ~= "string" then db.accountMark = ("%08x%08x"):format(math.random(0, 0x7fffffff), math.random(0, 0x7fffffff)) end
+  return db.accountMark
+end
+
+-- May sender follow f: a character on a Companion's account, named in their alts list or showing their mark?
+local function allowed(f, sender, mark)
   if not f or f.disbanded or not f.members[ns.Me()] or f.members[sender] then return false end
   for name, h in pairs(f.heroes or {}) do
-    if f.members[name] and type(h.alts) == "table" then
-      for _, a in ipairs(h.alts) do if a == sender then return true end end
+    if f.members[name] then
+      if type(mark) == "string" and h.mark == mark then return true end
+      for _, a in ipairs(type(h.alts) == "table" and h.alts or {}) do if a == sender then return true end end
     end
   end
   return false
@@ -103,12 +117,12 @@ end
 
 Comm:On("WATCHQ", function(sender, d)
   local f = type(d) == "table" and F:Get(d.fid)
-  if allowed(f, sender) then Comm:Send(sender, "WATCHA", { fid = f.id, v = f.v }, true) end
+  if allowed(f, sender, d.m) then Comm:Send(sender, "WATCHA", { fid = f.id, v = f.v }, true) end
 end)
 
 Comm:On("WATCHG", function(sender, d)
   local f = type(d) == "table" and F:Get(d.fid)
-  if not allowed(f, sender) then return end
+  if not allowed(f, sender, d.m) then return end
   local heroes = {}
   for name, h in pairs(f.heroes or {}) do
     if f.members[name] then
@@ -118,7 +132,7 @@ Comm:On("WATCHG", function(sender, d)
   end
   local me = Hr:MyState()
   local mine = Hr:Get(f, ns.Me())
-  me.alts, me.heard, me.seq = nil, time(), mine and mine.seq
+  me.alts, me.mark, me.heard, me.seq = nil, nil, time(), mine and mine.seq
   heroes[ns.Me()] = me
   local full = (tonumber(d.v) or 0) ~= f.v and ns.Sync:Copy(f) or nil
   Comm:Send(sender, "WATCHS", { fid = f.id, f = full, h = heroes }, false, true)
@@ -131,7 +145,7 @@ Comm:On("WATCHA", function(sender, d)
   local f = type(d) == "table" and F:Get(d.fid)
   if not f or not f.members[sender] or not WT.pending[f.id] then return end
   WT.pending[f.id] = nil
-  Comm:Send(sender, "WATCHG", { fid = f.id, v = f.v }, true)
+  Comm:Send(sender, "WATCHG", { fid = f.id, v = f.v, m = WT:Mark() }, true)
 end)
 
 Comm:On("WATCHS", function(sender, d)

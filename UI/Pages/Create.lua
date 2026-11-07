@@ -337,7 +337,7 @@ local function roadView(parent, width)
   end)
   function v:Set(j, title)
     self.head:SetText(title)
-    -- From the first floor to the last cap: 60, or higher for a journey stretched to retail's cap (30 Oct 2026).
+    -- From the first floor to the last cap (60).
     local lo, hi = 60, 60
     for _, c in ipairs(j.chapters) do lo, hi = math.min(lo, c.floor), math.max(hi, c.cap) end
     local span = math.max(1, hi - lo)

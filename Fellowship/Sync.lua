@@ -44,7 +44,7 @@ S.STATE_AFTER = 10
 -- uses when that is not a (another character taking a place, Fellowship:TakePlace); r: "leader" when by led then.
 function S:SendOp(f, recipients, op, t, a, n, by, r)
   local msg = { fid = f.id, v = f.v, op = op, t = t, n = n, a = a ~= ns.Self() and a or nil, by = by ~= a and by or nil, r = r }
-  for _, name in ipairs(recipients) do Comm:Send(name, "OP", msg) end
+  Comm:SendAll(recipients, "OP", msg)
   if #recipients > 0 and ns.Hero then ns.Hero:Soon("state", self.STATE_AFTER, function() ns.Hero:SendState() end) end
 end
 
@@ -165,10 +165,10 @@ end
 
 -- Removes an invite this client sent, and tells the inviter why. noAddon: the invite reached them but their addon did
 -- not answer (M25): they may not have it yet, so the share window opens (in the open book; else the toast opens it).
--- No answer to an invite: the usual causes (a player on CurseForge, 6 Nov 2026, read it as "no addon" only). In
--- WoW Forever also the full "First Surname" and the ruleset: addon messages do not cross rulesets.
+-- No answer to an invite: the usual causes (a player on CurseForge, 6 Nov 2026, read it as "no addon" only), with
+-- the full "First Surname" and the ruleset: addon messages do not cross rulesets.
 function S:NoAnswerText()
-  return ns.IsForever() and L.INVITE_NOANSWER_FOREVER or L.INVITE_NOANSWER
+  return L.INVITE_NOANSWER
 end
 
 function S:DropInvite(f, name, text, noAddon)
@@ -507,7 +507,9 @@ Comm:On("OP", function(sender, d)
     if F:Apply(f, op, by, d.t, r) then
       f.v = f.v + 1
       if n then S:Note(f, a, n, by, op, d.t, r) end
-      for name in pairs(f.members) do if name ~= f.leader then S:SendSnap(name, f) end end
+      local rest = {}
+      for name in pairs(f.members) do if name ~= f.leader then rest[#rest + 1] = name end end
+      Comm:SendAll(rest, "SNAP", { f = S:Copy(f) }, nil, true)
       F:AfterChange(f)
     end
   elseif f.leader ~= sender and ns.Hero:Online(f, f.leader) then

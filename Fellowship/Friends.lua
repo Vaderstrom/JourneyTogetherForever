@@ -1,6 +1,5 @@
 -- People to invite: in-game friends, Battle.net friends playing WoW (this game and faction) and guild members.
--- Used by the invite boxes (Adventurers and Manage pages) to suggest names while typing. Characters on realms that
--- fellowship messages cannot reach (ns.Reachable) are left out.
+-- Used by the invite boxes (Adventurers and Manage pages) to suggest names while typing.
 -- The same lists (and your group) tell the presence marks what the game itself says: online, or AFK (Fr:Status).
 local _, ns = ...
 local Fr = { FRESH = 5, ASK_EVERY = 60 }
@@ -24,7 +23,7 @@ function Fr:All()
   local function add(name, online, source, afk, tag, class, level)
     if type(name) ~= "string" or name == "" then return end
     local full = ns.FullName(name)
-    if full == me or not ns.Reachable(full) then return end
+    if full == me then return end
     afk = online == true and afk == true or nil
     local e = seen[full]
     level = type(level) == "number" and level > 0 and level or nil
@@ -51,12 +50,10 @@ function Fr:All()
         if g and g.clientProgram == (BNET_CLIENT_WOW or "WoW") and g.characterName and g.characterName ~= ""
           and (not g.wowProjectID or not WOW_PROJECT_ID or g.wowProjectID == WOW_PROJECT_ID)
           and (not g.factionName or g.factionName == faction) then
-          -- (WoW Forever: the name alone; its names are unique in the region, and a realm would read as a surname.)
-          -- (WoW Forever: a ruleset is several realms, so a friend's realm does not say whether they share yours; 1.0.3
-          -- left out friends on another realm, wrongly. Their name is taken as on your ruleset.)
-          local realm = not ns.IsForever() and g.realmName and (g.realmName:gsub("[%s%-]", "")) or ""
-          add(realm ~= "" and (g.characterName .. "-" .. realm) or g.characterName, g.isOnline, "bnet", g.isGameAFK, tag,
-            token(g.className), g.characterLevel)
+          -- (The name alone; names are unique in the region, and a realm would read as a surname. A ruleset is
+          -- several realms, so a friend's realm does not say whether they share yours; 1.0.3 left out friends on
+          -- another realm, wrongly. Their name is taken as on your ruleset.)
+          add(g.characterName, g.isOnline, "bnet", g.isGameAFK, tag, token(g.className), g.characterLevel)
         end
       end
     end
@@ -115,7 +112,7 @@ function Fr:Suggest(text, skip, max)
   end
   for _, g in ipairs(self:GameNames(text)) do
     local full = ns.FullName(g.name)
-    if not seen[full] and full ~= me and ns.Reachable(full) and ns.Short(full):lower():sub(1, #q) == q
+    if not seen[full] and full ~= me and ns.Short(full):lower():sub(1, #q) == q
       and not (skip and skip(full)) then
       seen[full] = true
       list[#list + 1] = { name = full, online = g.source == "group", source = g.source }
@@ -191,7 +188,7 @@ function Fr:Resolve(full)
   local want = full:lower()
   for _, name in ipairs(names) do if name:lower() == want then return name end end
   local first = ns.Short(full):lower()
-  if not ns.IsForever() or first:find(" ", 1, true) then return nil end
+  if first:find(" ", 1, true) then return nil end
   local hit
   for _, name in ipairs(names) do
     if (ns.Short(name):lower():match("^(%S+) ")) == first then

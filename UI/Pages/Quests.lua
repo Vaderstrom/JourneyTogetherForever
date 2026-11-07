@@ -286,13 +286,14 @@ local function build(pf)
   local W = ns.Window
   local width = W.PAGE_W - 8
 
-  -- Tabs: Quests · Quest chains · Attunements & keys (the one shown first comes first; 6 Nov 2026).
-  pf.tab = "quests"
-  pf.tabs = UI.Tabs(pf.left, { { L.TAB_QUESTS, "quests" }, { L.TAB_CHAINS, "chains" }, { L.TAB_ATTUNE, "attune" } },
+  -- Tabs: Dungeons · Quests · Quest chains · Attunements & keys (the one shown first comes first; 6 Nov 2026; Dungeons
+  -- first since U79, 7 Nov 2026).
+  pf.tab = "dungeons"
+  pf.tabs = UI.Tabs(pf.left, { { L.TAB_DUNGEONS, "dungeons" }, { L.TAB_QUESTS, "quests" }, { L.TAB_CHAINS, "chains" }, { L.TAB_ATTUNE, "attune" } },
     function() return pf.tab end, function(v) pf.tab = v; pf.sel = nil; W:Refresh() end, width,
     function(v)
       local f = ns.Fellowship:Current()
-      if not f or v == "attune" then return nil end
+      if not f or v == "attune" or v == "dungeons" then return nil end
       local n = 0
       for _, x in ipairs(Q:Items(f)) do
         if (v == "chains") == (x.chain == true) and (x.together or x.join) then n = n + 1 end
@@ -436,6 +437,7 @@ local function build(pf)
   UI.Tooltip(pf.listen, L.LISTEN_TIP)
   pf.shareWhy = UI.WrapText(R, 12, "ink2", width)
   buildAttune(pf, width)
+  ns.QuestDungeons.Build(pf, width)
 end
 
 -- Quests tab: quests near this chapter's levels first (from 3 below the floor to 3 over the cap; unknown levels too).
@@ -468,12 +470,20 @@ local function refresh(pf, ctx)
   if not f then return end
   local width = ns.Window.PAGE_W - 8
   local me = ctx.me
+  -- A dungeon to show (the Chapter page's quest line, the reminder toast): the Dungeons tab at it.
+  local W = ns.Window
+  if W.questDungeon then pf.tab, pf.dSel, W.questDungeon = "dungeons", W.questDungeon, nil end
   pf.tabs:Refresh()
-  local attune = pf.tab == "attune"
-  pf.lscroll:SetShown(not attune); pf.rscroll:SetShown(not attune)
+  local attune, dungeons = pf.tab == "attune", pf.tab == "dungeons"
+  pf.lscroll:SetShown(not (attune or dungeons)); pf.rscroll:SetShown(not (attune or dungeons))
   pf.alscroll:SetShown(attune); pf.arscroll:SetShown(attune)
+  pf.dlscroll:SetShown(dungeons); pf.drscroll:SetShown(dungeons)
   if attune then
     refreshAttune(pf, f, me)
+    return
+  end
+  if dungeons then
+    ns.QuestDungeons.Refresh(pf, f, me)
     return
   end
   -- The items of this tab: chains, or single quests (near this chapter's levels unless Show all). Only what is about
@@ -705,5 +715,5 @@ local function refresh(pf, ctx)
   pf.qArt:Fit(show and r.y or math.huge)
 end
 
-ns.Pages:Register({ id = "quests", label = L.NAV_QUESTS, build = build, refresh = refresh,
+ns.Pages:Register({ id = "quests", label = L.NAV_QUESTS, build = build, refresh = refresh, news = { quests = true },
   title = function() return L.TITLE_QUESTS, L.SUB_QUESTS end })

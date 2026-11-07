@@ -68,6 +68,9 @@ The **Overview** answers "what now?" at a glance:
   cap, over the cap, away.
 - **Play now**: the one best thing to do with whoever is online, with one button (Find group or Invite to group).
 - **Where the Adventurers stand**, grouped the same way, and the chapter's dungeons.
+- **Room for the dungeon quests**: how far the chapter's dungeon quests (and the dungeons' mobs, once your fellowship
+  has run them) will take you, and where to stop questing so they still fit under the cap. Two toasts warn you half a
+  level before that point and at it.
 - The **contents** of the whole journey (later chapters can stay hidden until reached), the next Gathering and the
   recent history.
 - **Since you were last here**: what changed while you were away, who levelled, and where the fellowship stands now.
@@ -77,7 +80,12 @@ The **Overview** answers "what now?" at a glance:
   below the floor, a waiting box says who, how far, and about how long at their pace.
 - The **level track**: the chapter's floor and cap with every Adventurer on one line, also on the Adventurers page.
 - Every dungeon as a row with its picture, role, levels and state ("4 of 7 bosses", "2 still need it"), with
-  **Find group**, which invites the Adventurers online who still need it (a tank and a healer first).
+  **Find group**, which invites the Adventurers online who still need it (a tank and a healer first). Point at a
+  picture to see it large.
+- The dungeons in a **suggested order**: the mandatory ones first, lowest levels first, then the bridges and optional
+  ones. With several mandatory dungeons, the first one not cleared says **Recommended next**.
+- A **map button** on each row with the number of quests to pick up before you go: a click opens the dungeon on the
+  Quests page's Dungeons tab.
 - **Clears are picked up from boss kills** (no clicking needed). A message with the dungeon's picture and who was in
   the group tells everyone the moment the last needed boss dies; Adventurers outside the group hear it when the group
   leaves the instance.
@@ -118,8 +126,8 @@ The **Overview** answers "what now?" at a glance:
 - **Roles** and a secondary role, **I'm away**, and the fellowship's make-up (tanks, healers, damage).
 - **Old addon**: everyone sees who runs an older version, and you get one reminder per session when it is you.
 - **Your characters**: every character on your account with its fellowship, "as of" when you last played it.
-  **Follow** another character's fellowship live while you play an alt, and **take that character's place** in the
-  fellowship with the same rank and roles.
+  **Follow** another character's fellowship live while you play an alt (also one made today), and **take that
+  character's place** in the fellowship with the same rank and roles.
 
 ![The Adventurers page](.github/screenshots/adventurers.jpg)
 
@@ -130,7 +138,11 @@ The **Overview** answers "what now?" at a glance:
 - **Quest chains** learned as the fellowship plays, or all of them from the start with Questie installed.
 - **Attunements and keys** up to 60 (Onyxia, Upper Blackrock Spire, Scholomance,
   Blackrock Depths, Stratholme, Dire Maul and more): a grid of who has done what, and each one's steps.
-- Dungeon quests: how many of each dungeon's quests every Adventurer has picked up.
+- **Dungeons**: every dungeon of the journey with its quests for your side, in three groups: pick up before you go,
+  start earlier, and starts inside. Each shows its level, where it starts, whether you have done it or carry it, and
+  who else has it. **Pin on map** sets a waypoint to the quest giver (or opens the map with Questie), and a toast tells
+  you when a dungeon's first quest opens to you. Where a quest starts is learned when anyone in the fellowship picks
+  it up.
 
 ![Attunements: who has done which steps](.github/screenshots/attunements.jpg)
 
@@ -144,7 +156,8 @@ tracker show the next one.
 #### The Endgame and raids
 When the last chapter is complete, **the Endgame** opens: WoW Forever's raids (Barrow Deeps, Hyjal Summit and
 Onyxia's Lair, from 9 December 2026; more as Blizzard announces them), each with who is attuned, every boss with how many
-Adventurers have killed it, and **Find group** for the raid.
+Adventurers have killed it, and **Find group** for the raid. A raid not open yet shows its picture and a countdown
+("Opens in 33 days").
 
 ![The Endgame: raids](.github/screenshots/raids.jpg)
 
@@ -293,7 +306,7 @@ log out; the app reads it from your saved data and posts nothing you have not ch
   and frames). Drag the corner to resize it (80% to 120%), or go **full screen**, edge to edge.
 - **Themes**: Journal, Night, and Faction (Alliance blue or Horde red).
 - A **setup guide** the first time, and **Show me around**: a two-minute walkthrough of the book on a sample
-  fellowship, for your rank.
+  fellowship, for your rank. The **?** in the header walks you through the page you are on.
 - Settings for every toast, the tracker's lines, chat messages, the cap warning, sounds, reduced effects and the
   minimap button. Button collectors can gather the minimap button, and the addon is in the game's addon compartment.
 - **What's New**: once after an update, a page over the book with the update's news. `/jtf news` shows it again.

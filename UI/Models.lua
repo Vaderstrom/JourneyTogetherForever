@@ -179,8 +179,14 @@ function MD:Spot(unit)
   local f = ns.Fellowship:Current()
   local name = unit and playerName(unit)
   if not (f and name and name ~= ns.Self() and f.members[name] and drawable(unit)) then return end
-  self:Load(name, "portrait"); self:Load(name, "body")
-  if ns.Photo then ns.Photo:Load(name) end
+  -- Only models not loaded yet: a shown one is set again by Tick and OnShow. Each mouseover reloaded three models
+  -- (stutter in a group, 7 Nov 2026).
+  near(name)
+  for _, kind in ipairs({ "portrait", "body" }) do
+    local m = self.frames[kind][name]
+    if not (m and m.loaded) then self:Load(name, kind) end
+  end
+  if ns.Photo then ns.Photo:Preload(name) end
 end
 
 ns:On("LOGIN", function() C_Timer.NewTicker(MD.TICK, function() MD:Tick() end) end)

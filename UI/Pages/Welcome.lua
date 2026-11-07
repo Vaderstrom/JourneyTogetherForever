@@ -2,6 +2,7 @@
 local _, ns = ...
 local L = ns.L
 local UI = ns.UI
+local HOW_H = 230 -- How a journey works, at the least
 
 local function build(pf)
   local W = ns.Window
@@ -51,10 +52,11 @@ local function build(pf)
 
   local head = UI.Heading(pf.right, width, L.YOUR_CHARACTERS, L.CHARACTERS_SUB)
   head:SetPoint("TOPLEFT")
+  pf.head = head
   -- How it works (M21): the lower half of the page was empty (seen in the tour). The first chapter's picture with
-  -- the three steps of a journey on it.
+  -- the three steps of a journey on it, right under the list and down to the page's foot (U67, refresh).
   local how = CreateFrame("Frame", nil, pf.right)
-  how:SetSize(width, 230)
+  how:SetSize(width, HOW_H)
   how:SetPoint("BOTTOMLEFT")
   pf.how = how
   local hh = UI.SectionHeader(how, width)
@@ -65,6 +67,7 @@ local function build(pf)
   how.box = box
   box:SetPoint("TOPLEFT", 0, -34); box:SetPoint("BOTTOMRIGHT")
   local pic = box:CreateTexture(nil, "ARTWORK")
+  how.pic = pic
   local shade = box:CreateTexture(nil, "ARTWORK", nil, 2)
   UI.FramePicture(box, pic, shade)
   ns.Pages:SetChapterArt(pic, 1, width - 2 * UI.PIC_INSET, 196 - 2 * UI.PIC_INSET, 0.5)
@@ -93,7 +96,21 @@ local function refresh(pf)
   pf.invites:SetPoint("TOP", trial and pf.trial or pf.join, "BOTTOM", 0, trial and -4 or -6)
   pf.invites:SetShown(n > 0)
   pf.invites:SetLabel(ns.InlineTexture(ns.ICONS.inbox, 14) .. " " .. (n == 1 and L.INVITES_WAITING_1 or L.INVITES_WAITING_N:format(n)))
-  pf.scroll:SetContentHeight(pf.list:Refresh() + 8)
+  local listH = pf.list:Refresh() + 8
+  -- U67: the list only as tall as it is (it scrolls when How a journey works would get less than HOW_H), How right
+  -- under it and down to the page's foot: one character left most of the page bare.
+  local top = pf.head:GetHeight() + 6
+  local room = (pf.right:GetHeight() or 0) - top - 10
+  local h = math.max(40, math.min(listH, room - HOW_H))
+  pf.scroll:ClearAllPoints()
+  pf.scroll:SetPoint("TOPLEFT", 0, -top); pf.scroll:SetPoint("TOPRIGHT", 0, -top)
+  pf.scroll:SetHeight(h)
+  pf.scroll:SetContentHeight(listH, listH <= h) -- (exact when it fits: no scrolling for a short list)
+  local how = pf.how
+  how:ClearAllPoints()
+  how:SetPoint("TOPLEFT", pf.scroll, "BOTTOMLEFT", 0, -10); how:SetPoint("BOTTOMRIGHT")
+  local w, boxH = ns.Window.PAGE_W_WIDE - 2 * UI.PIC_INSET, math.max(HOW_H, room - h) - 34 - 2 * UI.PIC_INSET
+  ns.Pages:SetChapterArt(how.pic, 1, w, boxH, 0.5)
 end
 
 ns.Pages:Register({ id = "welcome", label = L.ADDON_NAME, header = "none", build = build, refresh = refresh,

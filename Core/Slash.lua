@@ -25,6 +25,7 @@ SlashCmdList.JOURNEYTOGETHERFOREVER = function(msg)
   elseif cmd == "news" then ns.News:Open()
   elseif cmd == "debug" and ns.Dev then ns.Dev:Command(rest)
   elseif cmd == "check" and ns.Check then ns.Check:Run(rest)
+  elseif cmd == "perf" and ns.Dev then ns.Dev:Perf() -- the performance report (Dev/Debug.lua, U70); not in the help
   elseif cmd == "tests" and ns.Manual then ns.Manual:Command(rest)
   elseif cmd == "selftest" and ns.SelfTest then ns.SelfTest:Run(rest:lower())
   elseif cmd == "tour" and ns.Tour then ns.Tour:Run(rest:lower())

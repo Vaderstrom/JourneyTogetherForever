@@ -964,7 +964,7 @@ local function refresh(pf, ctx)
   if inspecting then refreshInspect(pf, ctx, width) else refreshList(pf, ctx, width) end
 end
 
-ns.Pages:Register({ id = "heroes", label = L.NAV_HEROES, build = build, refresh = refresh,
+ns.Pages:Register({ id = "heroes", label = L.NAV_HEROES, build = build, refresh = refresh, news = { quests = true, gear = true },
   -- The title "The Heroes" sits on the right page in the list; inspect has its own headings.
   header = function(pf) return pf and pf.sel and "none" or "right" end,
   -- "3 Adventurers of Ashen Oath and 1 Friend": the Friends of the fellowship counted apart (SPEC §1.1).

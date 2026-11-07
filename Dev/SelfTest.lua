@@ -141,26 +141,23 @@ step("textures", function(c)
 end)
 
 -- Boss data (Data/Encounters.lua) for this game version: every dungeon and raid has its bosses, made from this
--- client's build. Forever is the game the addon is for: a gap there fails (run tools/update-game-data.ps1 on the new
--- build); on retail, where we test until Forever is out, it is a note.
+-- client's build. A gap fails (run tools/update-game-data.ps1 on the new build).
 step("boss data", function(c)
-  local set, built = ns.EncounterSet()
-  local forever = set == "wowf"
+  local _, built = ns.EncounterSet()
   local none = ns.Clears:NoBossData()
   report().noBossData = none
-  local note = forever and "" or " (retail: a note only)"
   -- Places Blizzard announced but has not put in the game's files yet (no map ID: the new dungeons and raids, check
   -- of 6 Nov 2026) are a note: there are no bosses to read until they are.
   local gap, later = {}, {}
   for _, key in ipairs(none) do
-    if ns.ALL_DUNGEON_MAPS[key] then gap[#gap + 1] = key else later[#later + 1] = key end
+    if ns.DUNGEON_MAPS[key] then gap[#gap + 1] = key else later[#later + 1] = key end
   end
-  c:That(not forever or #gap == 0,
-    (#gap == 0 and "every dungeon and raid in the game has its bosses" or ("no boss data: " .. table.concat(gap, ", "))) .. note)
+  c:That(#gap == 0,
+    #gap == 0 and "every dungeon and raid in the game has its bosses" or ("no boss data: " .. table.concat(gap, ", ")))
   if #later > 0 then c:That(true, "not in the game's files yet: " .. table.concat(later, ", ")) end
   local version, build = GetBuildInfo()
   local client = tostring(version) .. "." .. tostring(build)
-  c:That(not forever or built == client, ("boss data from build %s, this client %s%s"):format(tostring(built), client, note))
+  c:That(built == client, ("boss data from build %s, this client %s"):format(tostring(built), client))
 end)
 
 -- The presets plan only with this game's places: in WoW Forever what Blizzard has announced (ns.FOREVER_SCHEDULE),
@@ -205,7 +202,7 @@ step("the presets: only places this game offers; Classic's own in Classic; each 
   for i = 2, #classic.chapters do if not must[i] then empty[#empty + 1] = classic.chapters[i].name end end
   c:That(#empty == 0, #empty == 0 and ("Classic: " .. (#classic.chapters - 1) .. " chapters, each with a dungeon to clear")
     or ("Classic chapters with nothing to clear: " .. table.concat(empty, ", ")))
-  if ns.IsForever() then c:Eq(#ns.BuildJourney("forever").chapters, 15, "Forever: the Prologue and 14 chapters") end
+  c:Eq(#ns.BuildJourney("forever").chapters, 15, "Forever: the Prologue and 14 chapters")
   local faction = UnitFactionGroup("player")
   local mine, theirs = faction == "Horde" and "rfc" or "hot", faction == "Horde" and "hot" or "rfc"
   local fj = ns.BuildJourney("forever")
@@ -287,8 +284,7 @@ step("create: each step on both pages, Your own journey adds Chapters", function
   c:Eq(C:StepKey(), "journey", "step 3: the journey")
   bothPages(c, pf, "journey")
   c:Eq(#pf.presets, 5, "five journeys: Forever, Classic, Short, Long and Your own")
-  c:Eq(ns.Rules.Suggest("party")[2], ns.IsForever() and "forever" or "classic",
-    "a party is offered Forever in WoW Forever, Classic in other games")
+  c:Eq(ns.Rules.Suggest("party")[2], "forever", "a party is offered the Forever journey")
   if inGame() then
     local last = pf.presets[#pf.presets]
     c:That(last:GetBottom() >= pf.prev:GetTop() - 1, "the five tiles end above Back")
@@ -509,6 +505,16 @@ step("create: review, Change goes back; nothing is created", function(c)
   C:Reset()
   W.startView = "welcome"; W:Refresh()
   c:Eq(cur(), nil, "nothing created")
+end)
+
+-- U67 (7 Nov 2026): Your characters only as tall as the list, How a journey works right under it, to the page's foot.
+step("welcome: How a journey works right under Your characters", function(c)
+  local W = ns.Window
+  W.startView = "welcome"; W:Refresh()
+  local wp = W.pageFrames.welcome
+  local _, rel = wp.how:GetPoint()
+  c:That(rel == wp.scroll, "How sits right under the list")
+  if inGame() then c:That(math.abs(wp.how:GetBottom() - wp.right:GetBottom()) < 4, "and reaches the page's foot") end
 end)
 
 step("found the Selftest fellowship", function(c)
@@ -818,6 +824,69 @@ end)
 
 shot("chapter")
 
+-- 7 Nov 2026 (the owner): the mandatory dungeons first, lowest levels first; the first not cleared is recommended next.
+step("chapter page: the mandatory dungeons first, the next one recommended", function(c)
+  local f, J = cur(), ns.Journey
+  local n
+  for i = 1, #f.journey.chapters do
+    local m = 0
+    for _, x in ipairs(J:InChapter(f, i)) do if x.role == "m" then m = m + 1 end end
+    if m >= 2 and not n then n = i end
+  end
+  if not n then return c:That(true, "no chapter with two mandatory dungeons in this journey") end
+  local list, others, ok = J:ChapterList(f, n), false, true
+  for _, x in ipairs(list) do
+    if x.role == "m" and not x.early then ok = ok and not others else others = true end
+  end
+  c:That(ok, ("chapter %d lists its mandatory dungeons first"):format(n))
+  local key = J:NextDungeon(f, n, list)
+  c:That(true, key and ("recommended next: %s"):format(ns.Dungeon(key)[2]) or "all its mandatory dungeons are cleared")
+  local pf = ns.Window.pageFrames.chapter
+  pf.sel = n; ns.Window:ShowPage("chapter")
+  if key then
+    local shown
+    for _, r in ipairs(pf.rows.items) do if r:IsShown() and r.key == key then shown = r end end
+    c:Has(shown and shown.sub:GetText() or "", L.CH_ROW_NEXT, "its row says Recommended next")
+  end
+  pf.sel = nil
+end)
+
+-- The check of 7 Nov 2026: "Bridge · Chapter III · …" was cut beside the quests' map button.
+step("chapter page: each dungeon row's line fits beside its buttons, in every chapter", function(c)
+  local f, W, cut = cur(), ns.Window, {}
+  local pf = W.pageFrames.chapter
+  W:ShowPage("chapter")
+  for n = 1, #f.journey.chapters do
+    pf.sel = n; W:Refresh()
+    for _, r in ipairs(pf.rows.items) do
+      if r:IsShown() and r.sub:GetStringWidth() > r.sub:GetWidth() + 1 then
+        cut[#cut + 1] = ("%d %s"):format(n, r.name:GetText() or "?")
+      end
+    end
+  end
+  pf.sel = nil; W:Refresh()
+  c:Eq(#cut, 0, #cut > 0 and ("cut: " .. table.concat(cut, ", ")) or "every line whole")
+end)
+
+-- U64, U66 (7 Nov 2026): a small dungeon picture shows large on hover; the Overview's list has pictures.
+step("chapter page: a dungeon's picture shows large on hover", function(c)
+  local W = ns.Window
+  W:ShowPage("chapter")
+  local row = W.pageFrames.chapter.rows.items[1]
+  if not (row and row:IsShown()) then return c:That(true, "no dungeon in this chapter") end
+  row.pic:GetScript("OnEnter")(row.pic)
+  local tip = ns.UI.pictureTip
+  local _, default = ns.SetDungeonArt(row.pic.tex, row.key, 8, 4)
+  if default then c:That(not (tip and tip:IsShown()), "only the game's default tile: nothing larger")
+  else c:That(tip and tip:IsShown() and tip.key == row.key, "the picture, large, over the row") end
+  row.pic:GetScript("OnLeave")(row.pic)
+  c:That(not (tip and tip:IsShown()), "gone when the mouse leaves")
+  W:ShowPage("overview")
+  local d = W.pageFrames.overview.dungeons.items[1]
+  c:That(not (d and d:IsShown()) or d.pic:IsShown(), "the Overview's list has a picture before each dungeon")
+  W:ShowPage("chapter")
+end)
+
 -- The Chapter page (28 Oct 2026): while someone is below the floor, the track stands at the floor and a box in the
 -- middle says who, at what level and how far.
 step("chapter page: waiting for the floor, the box in the middle", function(c)
@@ -925,6 +994,21 @@ end)
 
 shot("moments")
 
+-- 7 Nov 2026 (the owner: two Moments tabs named different Adventurers for the same first): a deed heard later, one
+-- held back in a dungeon, takes the kept Moment over. Checked on a Moment of its own, taken out again.
+step("moments: a first heard later takes the Moment over", function(c)
+  local f, Mo, id = cur(), ns.Moments, "first:selftest"
+  local other
+  for _, n in ipairs(ns.Fellowship:Members(f)) do if n ~= ns.Me() then other = n break end end
+  Mo:Add(f, { id = id, k = "first", time = time() - 60, names = { ns.Me() }, first = "fall" })
+  c:That(other and Mo:Follow(f, id, time() - 120, other) ~= nil, "an earlier fall heard after the run takes it over")
+  c:Eq(Mo:Find(f, id).names[1], other, "the Moment names who fell first")
+  c:Eq(Mo:Follow(f, id, time() - 120, other), nil, "and stays put the next time")
+  local a = Mo:Data(f)
+  for i, m in ipairs(a.list) do if m.id == id then table.remove(a.list, i) break end end
+  a.seen[id] = nil
+end)
+
 step("group photo: everyone together on the whole screen", function(c)
   local PH = ns.Photo
   c:That(PH:Open({ standIns = true }), "opens out of combat")
@@ -1031,19 +1115,30 @@ step("models: what the game offers for Adventurers near you", function(c)
   c:Eq(mine, "player", "you are always drawn")
 end)
 
+-- Models were loaded again every 10 seconds and on every mouseover, with the photo closed: the game stuttered in a
+-- group (7 Nov 2026). A loaded one stays until the photo or the page shows it.
+step("models: a loaded model is not loaded again in the background", function(c)
+  local PH, key, calls = ns.Photo, "Selftest Model-Nowhere", 0
+  local old = PH.actors[key]
+  PH.actors[key] = { loaded = true, SetModelByUnit = function() calls = calls + 1 end }
+  PH:Preload(key)
+  PH.actors[key] = old
+  c:Eq(calls, 0, "the group photo's model is kept, not loaded again")
+end)
+
 step("quests: tabs and attunements", function(c)
   dev("hero Brannic quests")
   ns.Window:ShowPage("quests")
   local pf = ns.Window.pageFrames.quests
   -- At this character's own level first (low levels see none yet), then as a level 60 sees them.
   ns.QuestLists.viewLevel = nil
-  pf.tabs.buttons[3]:Click()
+  pf.tabs.buttons[4]:Click()
   c:That(pf.alscroll:IsShown(), "Attunements tab")
   local open = #ns.QuestLists:Attunements(cur(), ns.Me())
   c:That(open > 0 and pf.aRows.items[1]:IsShown() or pf.aNone:IsShown(), ("%d open at level %d"):format(open, UnitLevel("player") or 0))
   ns.QuestLists.viewLevel = 60
   ns.Window:Refresh()
-  -- Our attunements are WoW Forever's; retail has none of them (30 Oct 2026: each game shows only its own).
+  -- Only the attunements of raids Blizzard has announced (30 Oct 2026: the addon shows what the game offers).
   if #ns.ATTUNEMENTS == 0 then
     c:That(pf.aNone:IsShown(), "none in this game: the tab says so")
   else
@@ -1064,8 +1159,8 @@ shot("quests, attunements")
 -- first (You are here), then your continent's (Nearby); quests as cards with an icon and your progress.
 step("quests tab: sections, zones by how close, quest cards", function(c)
   local pf = ns.Window.pageFrames.quests
-  pf.tabs.buttons[1]:Click()
-  c:Eq(pf.tab, "quests", "the first tab is Quests")
+  pf.tabs.buttons[2]:Click()
+  c:Eq(pf.tab, "quests", "the second tab is Quests (Dungeons first since U79)")
   c:That(pf.secs[1].title:GetText():find(L.Q_SECTION_MINE, 1, true) == 1, "Together now")
   c:That(pf.secs[2].title:GetText():find(L.Q_SECTION_OTHERS, 1, true) == 1, "Pick up and join")
   local zone = GetRealZoneText and GetRealZoneText() or GetZoneText()
@@ -1091,6 +1186,226 @@ step("quests tab: sections, zones by how close, quest cards", function(c)
 end)
 
 shot("quests")
+
+-- The Dungeons tab (U79, 7 Nov 2026): first and shown first; every dungeon of the journey with its count; the chosen
+-- one's quests in three groups, where each starts, your status, who else has it, Pin on map.
+-- The first dungeon with a quest list for this side (the Deadmines, or Ragefire Chasm for the Horde).
+local function listedDungeon()
+  for _, x in ipairs(ns.QuestDungeons.List(cur())) do
+    if ns.QuestLists:Groups(cur(), x.key) then return x.key end
+  end
+end
+
+step("dungeon quests: the Dungeons tab comes first, every dungeon in order with its count", function(c)
+  ns.Window:ShowPage("quests")
+  local pf = ns.Window.pageFrames.quests
+  pf.tabs.buttons[1]:Click()
+  c:Eq(pf.tab, "dungeons", "the first tab is Dungeons")
+  c:That(pf.dlscroll:IsShown() and not pf.lscroll:IsShown(), "its pages show, the Quests tab's do not")
+  local n, empty = 0, 0
+  for _, r in ipairs(pf.dRows.items) do
+    if r:IsShown() then
+      n = n + 1
+      if (r.count:GetText() or "") == "" then empty = empty + 1 end
+    end
+  end
+  c:Eq(n, #ns.QuestDungeons.List(cur()), "every dungeon of the journey once")
+  c:Eq(empty, 0, "each with its count, all done, or No quest list yet")
+end)
+
+step("dungeon quests: the chosen dungeon's three groups, where each starts, Pin on map", function(c)
+  local QL, pf = ns.QuestLists, ns.Window.pageFrames.quests
+  local key = listedDungeon()
+  if not key then return c:That(true, "no dungeon with a quest list in this journey") end
+  pf.dSel = key; ns.Window:Refresh()
+  local g = QL:Groups(cur(), key)
+  c:Eq(pf.dSecs[1]:IsShown(), #g.pick > 0, "Pick up before you go, when it has quests")
+  c:Eq(pf.dSecs[2]:IsShown(), #g.earlier > 0, "Start earlier, when it has quests")
+  c:Eq(pf.dSecs[3]:IsShown(), #g.inside > 0, "Starts inside, when it has quests")
+  local n, bad, codes = 0, 0, 0
+  for _, p in ipairs(pf.dQuests.items) do
+    if p:IsShown() then
+      n = n + 1
+      if (p.where:GetText() or "") == "" or (p.status:GetText() or "") == "" then bad = bad + 1 end
+      if p.pin:IsShown() ~= QL:CanPin(QL:Start(p.id) or {}) then bad = bad + 1 end
+      for code in (p.status:GetText() or ""):gmatch("|c(........)") do
+        if not code:find("^%x+$") then codes = codes + 1 end
+      end
+    end
+  end
+  c:Eq(n, #g.pick + #g.earlier + #g.inside, "every quest of the dungeon for your side")
+  c:Eq(bad, 0, "each says where it starts and your status; a pin where the place is known")
+  c:Eq(codes, 0, "every colour in a status is a real one, not a theme's name")
+  c:Eq(QL.WhereText({ by = "Scout Riell", zone = "Westfall", x = 56.7, y = 47.4 }), "Scout Riell, Westfall 56.7, 47.4", "where, in words")
+  -- In the game: is a zone's map found by its name, and does the game allow a waypoint there? (Unknown in Forever
+  -- until this ran: DungeonJournal's notes say the user waypoint may not work there.)
+  local map = QL:MapOf({ zone = UnitFactionGroup("player") == "Horde" and "Orgrimmar" or "Westfall" })
+  local can = map and C_Map and C_Map.CanSetUserWaypointOnMap and C_Map.CanSetUserWaypointOnMap(map)
+  report().dungeonPin = { map = map, waypoint = can and true or false }
+  c:That(true, "the zone's map: " .. tostring(map) .. "; waypoints there: " .. tostring(can and true or false))
+end)
+
+step("dungeon quests: the Chapter page's map button opens the dungeon on the Dungeons tab", function(c)
+  ns.Window:ShowPage("chapter")
+  local row
+  for _, r in ipairs(ns.Window.pageFrames.chapter.rows.items) do if not row and r:IsShown() and r.quests:IsShown() then row = r end end
+  if not row then return c:That(true, "no dungeon with quests to pick up in this chapter") end
+  c:Eq(row.questLine, (ns.QuestLists:CountLine(cur(), row.key)), "its line on hover")
+  row.quests:Click()
+  c:Eq(ns.Window.current, "quests", "the Quests page")
+  c:Eq(ns.Window.pageFrames.quests.tab, "dungeons", "on the Dungeons tab")
+  c:Eq(ns.Window.pageFrames.quests.dSel, row.key, "at that dungeon")
+end)
+
+step("dungeon quests: the reminder toast, once per dungeon, never in combat", function(c)
+  local QL = ns.QuestLists
+  -- (Kept aside and put back: the self-test must not use up the real reminders of this character.)
+  local was = ns.char.dqToasted
+  ns.char.dqToasted = {}
+  ns.Combat:SetSimulated(true)
+  local before = #report().toasts
+  QL:Remind(ns.LevelCap())
+  c:Eq(#report().toasts, before, "none in combat")
+  ns.Combat:SetSimulated(false)
+  local any = next(ns.char.dqToasted) ~= nil
+  c:That(not any or toastSeen("dquest", nil), "after combat: a toast for each dungeon with quests to pick up")
+  c:Eq(ns.Window.questDungeon, nil, "the Quests page is left as it is until a click on the toast")
+  local after = #report().toasts
+  QL:Remind(ns.LevelCap())
+  c:Eq(#report().toasts, after, "never twice")
+  ns.char.dqToasted = was
+end)
+
+step("dungeon quests: what another Adventurer sends is checked before it is kept", function(c)
+  local clean = ns.QuestLists.CleanStart
+  c:Eq(clean({ by = "Ebru", map = 1413, x = 500, y = 40 }).x, nil, "a position off the map is left out")
+  c:Eq(clean({ by = string.rep("x", 80) }), nil, "a name that long is not kept")
+  c:Eq(clean({ inside = true }).inside, true, "inside a dungeon")
+  c:That(ns.QuestLists:IsDungeonQuest(166) and not ns.QuestLists:IsDungeonQuest(1), "only the dungeons' quests are learned")
+  -- A quest's XP: the most anyone was given (a hand-in far above the quest's level gives less). Put back afterwards.
+  local QL, id = ns.QuestLists, 166
+  ns.db.questXP = ns.db.questXP or {}
+  local was = ns.db.questXP[id]
+  c.undo = function() ns.db.questXP[id] = was end
+  ns.db.questXP[id] = nil
+  QL:Keep(id, nil, 300)
+  QL:Keep(id, nil, 1450)
+  QL:Keep(id, nil, 600)
+  c:Eq(ns.db.questXP[id], 1450, "a quest's XP: the most anyone was given")
+end)
+
+shot("quests-dungeons")
+
+-- Room for the dungeon quests (U78). A made-up chapter stands in for this character's (whose dungeon quests' XP may
+-- not be known yet), and is put back after the step, also after an error.
+local function fakeRoom(c)
+  local R, ch = ns.Room, ns.Journey:Current(cur())
+  local cap = ch and ch.cap or 20
+  local fake, real = { now = cap - 2, levels = 2.4, to = cap + 0.4, cap = cap, tol = 0, limit = cap, stop = cap - 2.4,
+    quests = 2.1, mobs = 0.3, unknown = 1, unrun = 0, n = ch and ch.n or 0 }, R.Chapter
+  R.Chapter = function() return fake end
+  c.undo = function() R.Chapter = real end
+  return fake
+end
+
+step("room: the dungeon quests' levels in words, where to stop, the mobs", function(c)
+  local R = ns.Room
+  local main, stop, notes = R.Lines({ levels = 1.44, to = 27.44, cap = 28, tol = 1, stop = 26.56, unrun = 0, mobs = 0.3, unknown = 2 })
+  c:Eq(main, L.ROOM_LINE:format(1.4, 27.4, L.ROOM_CAP_TOL:format(28, 1)), "the level they take you to, with the cap's allowance")
+  c:Eq(stop, L.ROOM_STOP:format(26.6), "where to stop questing")
+  local mobs = ns.Settings:Get("roomMobs") ~= false and L.ROOM_MOBS:format(0.3) or L.ROOM_MOBS_OFF
+  c:Eq(notes, mobs .. "  " .. L.ROOM_UNKNOWN_N:format(2), "the mobs and the quests whose XP is not known yet")
+  c:Eq(R:Keep("nowhere", 20, 100), false, "a run in a place that is not a dungeon is not kept")
+  c:Eq(R:Keep("dm", 20, 5000000), false, "XP that high is not kept")
+  local r = R:Chapter(cur(), ns.Me())
+  c:That(true, r and ("this chapter: %.1f levels, %d quests' XP not known, %d dungeons not run yet"):format(r.levels, r.unknown, r.unrun)
+    or "nothing to count in this chapter")
+end)
+
+-- The check of 7 Nov 2026: "about 0.0 levels, to 1.0 of the cap 25" with a pretend level of 22.
+step("room: counted from the level the book shows for you, and no card with nothing known", function(c)
+  local r = ns.Room:Chapter(cur(), ns.Me())
+  if not r then return c:That(true, "no XP known to count in this chapter: no card") end
+  c:That(r.levels > 0, ("something to count: %.1f levels"):format(r.levels))
+  c:Eq(math.floor(r.now), (ns.Dev and ns.Dev.myLevel) or UnitLevel("player"), "from the level every page shows for you")
+end)
+
+step("room: two warnings, half a level before the stop point and at it, once each", function(c)
+  local R = ns.Room
+  if not ns.Settings:ToastOn("room") then return c:That(true, "the room toasts are off in Settings") end
+  local was, fake = ns.char.roomToasted, fakeRoom(c)
+  ns.char.roomToasted = {}
+  local undo = c.undo
+  c.undo = function() undo(); ns.char.roomToasted = was end
+  local before = #report().toasts
+  fake.now = fake.stop - 0.3
+  R:Check()
+  c:Eq(#report().toasts, before + 1, "half a level before: the first warning")
+  c:That(toastSeen("room", L.TOAST_ROOM_SOON:format(R.One(fake.stop))), "it says where to stop")
+  R:Check()
+  c:Eq(#report().toasts, before + 1, "only once")
+  fake.now = fake.stop + 0.1
+  R:Check()
+  c:That(toastSeen("room", L.TOAST_ROOM_NOW), "at the stop point: Leave room for the dungeons")
+  R:Check()
+  c:Eq(#report().toasts, before + 2, "only once")
+end)
+
+step("room: the Overview card, the Chapter page's total, the Dungeons tab with Show everyone", function(c)
+  local R, W = ns.Room, ns.Window
+  local fake = fakeRoom(c)
+  local undo = c.undo
+  c.undo = function() undo(); W:Refresh() end
+  W:ShowPage("overview")
+  local card = W.pageFrames.overview.room
+  c:That(card:IsShown(), "the Overview card")
+  c:Eq(card.main:GetText(), (R.Lines(fake)), "its line")
+  c:That(card.stop:IsShown(), "where to stop, in red")
+  W:ShowPage("chapter")
+  W.pageFrames.chapter.sel = nil; W:Refresh()
+  c:That(W.pageFrames.chapter.room:IsShown(), "the Chapter page: the total under where the Adventurers stand")
+  W:ShowPage("quests")
+  local pf = W.pageFrames.quests
+  pf.tabs.buttons[1]:Click()
+  pf.dEveryone = nil; W:Refresh()
+  c:That(pf.dRoomHead:IsShown() and pf.dRoomText:IsShown(), "the Dungeons tab: your room under the dungeon's quests")
+  c:That(not pf.dRoomHeroes:IsShown(), "yours only, until Show everyone")
+  pf.dRoomAll.box:Click()
+  c:That(pf.dEveryone and pf.dRoomHeroes:IsShown(), "Show everyone: the other Adventurers' too")
+  pf.dRoomAll.box:Click()
+end)
+
+-- Levels are walked one by one with the game's XP table (audit, 7 Nov 2026): each level is bigger than the last.
+step("room: levels walked one by one with the game's XP table", function(c)
+  local Pa = ns.Pace
+  local sum = 0
+  for _, v in ipairs(Pa.LEVEL_XP) do sum = sum + v end
+  c:Eq(sum, 4084700, "the table: 4,084,700 XP to 60")
+  c:Eq(Pa.Reach(19, 0, 21300, 21300 + 11600), 20.5, "a level and a half from 19: level 20 is 23,200, not 21,300")
+  c:Eq(Pa.Back(20.5, 21300 + 11600, 19, 21300), 19, "and back from 20.5")
+  c:Eq(Pa.Reach(59, 0, 209800, 500000), 60, "it stops at the level cap")
+  c:Eq((Pa.ToLevel(15, 4400, 14400, 17)), 10000 + 16000, "XP to a level, level by level")
+  -- In the game: the size the game gives at this level, against the table (WoW Forever keeps the Classic curve).
+  local level, max = UnitLevel("player"), UnitXPMax("player")
+  if inGame() and level < ns.LevelCap() and not ns.Secret(max) then
+    c:Eq(max, Pa.LEVEL_XP[level], ("the game's level %d is the table's size"):format(level))
+  end
+end)
+
+-- A run in an instance several dungeons share (Scarlet Monastery's wings, Dire Maul) goes to the wing of its first
+-- boss; without one it is not kept. (A made-up run, put back after the step.)
+step("room: a run in Scarlet Monastery goes to the wing of its first boss", function(c)
+  local R, C = ns.Room, ns.Clears
+  local was = R.run
+  c.undo = function() R.run = was end
+  local keys = C:KeysHere(189, nil)
+  local cath = C:DataBosses("smcath")
+  if #keys < 2 or not cath then return c:That(true, "no boss data for Scarlet Monastery in this game") end
+  R.run = { key = keys[1], keys = keys, start = 1, l = 1, x = 0, m = 1, rest = 0, rested = 0, gain = 0, quests = 0 }
+  R:OnBoss(cath[#cath].id, nil)
+  c:Eq(R.run.key, "smcath", "the Cathedral's last boss: the Cathedral")
+  c:Eq(R.run.keys, nil, "the wing is known")
+end)
 
 step("heroes and inspect", function(c)
   ns.Window:ShowPage("heroes")
@@ -1299,6 +1614,22 @@ step("invite: names filled in as in the mail box", function(c)
   pf.invite:SetText(""); eb:ClearFocus(); pf.suggest:Hide()
 end)
 
+-- U65 (7 Nov 2026): an online name in the list has its class icon before it (the class reads without the colour).
+step("invite: a class icon before each online name in the list", function(c)
+  ns.Window:ShowPage("manage")
+  local pf = ns.Window.pageFrames.manage
+  local eb, FR = pf.invite.edit, ns.Friends
+  local real = FR.Suggest
+  FR.Suggest = function() return { { name = full("Selftest Iconic"), online = true, class = "MAGE", source = "friend", level = 20 } } end
+  eb:SetFocus()
+  pf.invite:SetText("selftest i"); eb:GetScript("OnTextChanged")(eb, true)
+  FR.Suggest = real
+  local text = pf.suggest.rows[1]:IsShown() and pf.suggest.rows[1].name:GetText() or ""
+  c:Has(text, "Iconic", "the online name in the list")
+  if inGame() then c:Has(text, "|T", "with its class icon first") end
+  pf.invite:SetText(""); eb:ClearFocus(); pf.suggest:Hide()
+end)
+
 -- The ponytail audit of 6 Nov 2026: one invite box (UI.InviteBox) for the Adventurers page and Manage.
 step("invite: the same box on the Adventurers page", function(c)
   ns.Window:ShowPage("heroes")
@@ -1347,25 +1678,21 @@ step("invite: names as the game has them (WoW Forever: First Surname)", function
   c:Eq(ns.CleanName("arielas fireson"), "Arielas Fireson", "each part of a name gets its capital")
   c:That(cur().members[ns.Me()] ~= nil, "you are in your fellowship under your own name (" .. tostring(ns.Me()) .. ")")
   local _, second = UnitName("player")
-  if ns.IsForever() then
-    c:Eq(ns.FullName(ns.CleanName("arielas-fireson")), "Arielas Fireson-" .. ns.Realm(), "a hyphen is the space")
-    c:Eq(ns.WhisperTarget(full("Arielas Fireson")), "Arielas Fireson", "whispers go to the name alone")
-    -- (5 Nov 2026: a ruleset is several numbered realms; keys end with the ruleset, the same for everyone on it.)
-    if C_GameRules and C_GameRules.IsGameRuleActive then
-      c:That(not ns.Realm():find("%d"), "keys end with your ruleset, not your numbered realm: " .. ns.Realm()
-        .. " (the game's realm: " .. tostring(ns.GameRealm()) .. ")")
-      c:Eq(ns.FullName("Arielas Fireson-" .. ns.GameRealm()), "Arielas Fireson-" .. ns.Realm(), "a sender's realm becomes the ruleset")
-    end
-    if type(second) == "string" and second ~= "" then
-      c:That(ns.Self():find(" " .. second, 1, true) ~= nil, "your key has your surname: " .. ns.Self())
-    end
-    -- In a group: a first name alone finds the one in it who has it.
-    local other = ns.UnitFull("party1")
-    if other and ns.Short(other):find(" ", 1, true) then
-      c:Eq(ns.Friends:Resolve(full(ns.Short(other):match("^(%S+)"))), other, "a first name finds " .. ns.Short(other))
-    end
-  else
-    c:Eq(ns.WhisperTarget("Bob-OtherRealm"), "Bob-OtherRealm", "retail whispers keep the realm")
+  c:Eq(ns.FullName(ns.CleanName("arielas-fireson")), "Arielas Fireson-" .. ns.Realm(), "a hyphen is the space")
+  c:Eq(ns.WhisperTarget(full("Arielas Fireson")), "Arielas Fireson", "whispers go to the name alone")
+  -- (5 Nov 2026: a ruleset is several numbered realms; keys end with the ruleset, the same for everyone on it.)
+  if C_GameRules and C_GameRules.IsGameRuleActive then
+    c:That(not ns.Realm():find("%d"), "keys end with your ruleset, not your numbered realm: " .. ns.Realm()
+      .. " (the game's realm: " .. tostring(ns.GameRealm()) .. ")")
+    c:Eq(ns.FullName("Arielas Fireson-" .. ns.GameRealm()), "Arielas Fireson-" .. ns.Realm(), "a sender's realm becomes the ruleset")
+  end
+  if type(second) == "string" and second ~= "" then
+    c:That(ns.Self():find(" " .. second, 1, true) ~= nil, "your key has your surname: " .. ns.Self())
+  end
+  -- In a group: a first name alone finds the one in it who has it.
+  local other = ns.UnitFull("party1")
+  if other and ns.Short(other):find(" ", 1, true) then
+    c:Eq(ns.Friends:Resolve(full(ns.Short(other):match("^(%S+)"))), other, "a first name finds " .. ns.Short(other))
   end
 end)
 
@@ -1675,7 +2002,7 @@ step("Journey Admin: each dungeon of the chapter with its picture", function(c)
   c:That(first and first.name:GetLeft() and first.pic:GetRight() and first.name:GetLeft() > first.pic:GetRight() or not inGame(),
     "the name beside the picture, not over it")
   -- A place without a boss list: a short label that stays inside its card, the reason on hover (check of 6 Nov 2026).
-  -- (WoW Forever: Shaper's Terrace in the last chapter; retail has none of these places.)
+  -- (WoW Forever: Shaper's Terrace in the last chapter.)
   local j, unknown, ch = A:Journey(cur())
   for key in pairs(ns.DUNGEON_TILE) do
     local at = ns.Dungeon(key) and #ns.Clears:Bosses(key) == 0 and ns.JourneyEdit.ChaptersOf(j, key)[1]
@@ -1807,7 +2134,7 @@ step("quests: Show all brings in far-off quests", function(c)
       d = {}, ln = {}, t = time() })
     ns.Window:ShowPage("quests")
     local pf = ns.Window.pageFrames.quests
-    pf.tabs.buttons[1]:Click()
+    pf.tabs.buttons[2]:Click()
     c:That(pf.showAll:IsShown(), "Show all is offered")
     local function count() local n = 0 for _, r in ipairs(pf.rows.items) do if r:IsShown() then n = n + 1 end end return n end
     local n = count()
@@ -1819,7 +2146,7 @@ step("quests: Show all brings in far-off quests", function(c)
   local horde = UnitFactionGroup("player") == "Horde"
   local key = horde and "rfc" or "dm"
   local d = ns.Dungeon(key)
-  -- Our dungeon quest lists are WoW Forever's: retail shows none.
+  -- (Only dungeons Blizzard has announced have their quest lists.)
   if next(ns.DUNGEON_QUESTS) == nil then
     c:That(ns.QuestLists:DungeonLine(f, key) == nil, "no quest lists in this game: no quest line on the Chapter page")
   else
@@ -2540,11 +2867,10 @@ step("friends without the addon: the share window", function(c)
   c:That(o and o:IsShown(), "the window opens in the open book")
   c:Has(o and o.title:GetText(), "Kim", "it names Kim")
   c:Eq(o and o.url:GetText(), ns.Share.URL, "the addon's page to copy")
-  -- (6 Nov 2026) The usual causes, not only "no addon": the version, a trial account; in Forever the full name and
-  -- the ruleset too.
+  -- (6 Nov 2026) The usual causes, not only "no addon": the version, a trial account, the full name and the ruleset.
   c:Has(ns.Sync:NoAnswerText(), "latest version", "no answer: the chat line names the version")
   c:Has(o and o.hint:GetText(), "latest version", "and the window's hint")
-  if ns.IsForever() then c:Has(o and o.hint:GetText(), "ruleset", "in WoW Forever: the ruleset and the full name") end
+  c:Has(o and o.hint:GetText(), "ruleset", "the ruleset and the full name")
   c:Has(ns.Share:WhisperText("Kim"), ns.Share.URL, "Whisper the link puts the page in the whisper")
 end)
 
@@ -2577,6 +2903,9 @@ end)
 
 step("other addons: DungeonJournal, Attune, Questie, Lore Forever and Spoken", function(c)
   local dj = ns.Window:JournalCommand() ~= nil
+  -- /dj takes its own short words, not names (7 Nov 2026: the link only toggled its window).
+  c:Eq(ns.Window:JournalWord("smlib"), "smlib", "the Dungeon Journal link sends /dj its word for the dungeon")
+  c:Eq(ns.Window:JournalWord("exc"), "exca", "and its own word where ours differs")
   local at = ns.QuestLists:AttuneCommand() ~= nil
   local qs = ns.Quests:QuestieState()
   local lore, spoken = ns.OtherAddons:HasLore(), ns.OtherAddons:HasSpoken()
@@ -2657,7 +2986,7 @@ end, 1)
 step("attunements: start levels and the toast when one opens", function(c)
   local QL = ns.QuestLists
   local side = UnitFactionGroup("player") == "Horde" and "H" or "A"
-  -- Retail has none of our attunements (they are WoW Forever's): none opens there.
+  -- (Only the attunements of raids Blizzard has announced.)
   if #ns.ATTUNEMENTS == 0 then
     c:Eq(#QL:NewlyAvailable(side, 1, ns.LevelCap()), 0, "none in this game")
     return
@@ -2667,7 +2996,10 @@ step("attunements: start levels and the toast when one opens", function(c)
   for _, a in ipairs(open) do names[#names + 1] = a.name end
   -- Upper Blackrock Spire's key, in both games' lists (Molten Core waits for Blizzard's word in WoW Forever).
   c:Has(table.concat(names, ", "), "Upper Blackrock Spire", "opening at 55")
+  local dqWas = ns.char.dqToasted -- (a level-up also reminds of dungeon quests, U79: put back after)
+  ns.char.dqToasted = {}
   QL:OnLevelUp(55)
+  ns.char.dqToasted = dqWas
   c:That(toastSeen("attune", nil), "a toast for each one")
   QL.viewLevel = 30
   -- Only the ones not started: a high character has started or done some, and those stay open whatever the level
@@ -2946,7 +3278,7 @@ step("the Endgame: raids open after the journey", function(c)
   c:That(ns.Pages:InNav("raids", ns.Pages:Context()), "Raids in the sidebar")
   for _, n in ipairs(PRETEND) do dev("group " .. n) end
   local before = f.rules.minHeroes
-  -- The raid of this game with the most bosses in its data (WoW Forever: Onyxia's Lair; retail: one of its own),
+  -- The raid of this game with the most bosses in its data (WoW Forever: Onyxia's Lair),
   -- opened for the test when its day has not come (WoW Forever's raids open on 9 December 2026).
   local raid, most = nil, -1
   for _, r in ipairs(ns.RAIDS) do
@@ -2990,6 +3322,19 @@ step("the Endgame: raids open after the journey", function(c)
 end, 1)
 
 shot("raids")
+
+-- U63 (7 Nov 2026): a raid not open yet shows its picture large and a countdown on the right page.
+step("the Endgame: a raid not open yet shows its picture and the countdown", function(c)
+  local key
+  for _, r in ipairs(ns.RAIDS) do if ns.Opens(r[1]) and not ns.IsOpen(r[1], cur()) then key = r[1] break end end
+  if not key then return c:That(true, "every raid of this game is open: nothing to count down") end
+  ns.Window:ShowPage("raids")
+  local pf = ns.Window.pageFrames.raids
+  pf.raid = key; ns.Window:Refresh()
+  c:That(pf.soon:IsShown(), ns.Raid(key)[2] .. ": its picture, large")
+  c:Has(pf.soon.text:GetText() or "", ns.OpensText(key), "the countdown names the day")
+  pf.raid = nil
+end)
 
 step("the Endgame closes again (the journey is not done)", function(c)
   local f = cur()
@@ -3222,6 +3567,14 @@ step("toasts: the Leader's new rules and journey, and a click opens the page", f
   c:Eq(f.leader, ns.Me(), "you lead again")
 end)
 
+-- The game's HDR output dimmed the check of 7 Nov 2026: the tour turns it off for its screenshots (Dev/Tour.lua).
+-- Here only read, not switched: the tour's own record says whether it was off for them.
+step("screenshots: the game's HDR output, and nothing left to put back from a tour", function(c)
+  local v = C_CVar and C_CVar.GetCVar and C_CVar.GetCVar("HDROutput")
+  c:That(true, v and ("HDR output: %s (the tour turns it off for its screenshots)"):format(v) or "no HDR setting in this client")
+  c:Eq(ns.db.hdrWas, nil, "no HDR value waiting to be put back")
+end)
+
 -- A protected (secure) frame anywhere in the book makes the whole book protected: it then cannot open during combat
 -- ("Interface action failed because of an AddOn"; the Tournament's hand-over button did it, 28 Oct 2026).
 step("the book in combat: nothing in it is protected", function(c)
@@ -3295,6 +3648,20 @@ step("watch: live and read-only", function(c)
   dev("watch level")
 end, 2)
 
+-- U68 (7 Nov 2026): an alt made since the main last logged in shows the account's mark and is answered at once.
+step("watch: an alt made since the main last played shows the account's mark", function(c)
+  local W, f = ns.Watch, cur()
+  local mark = W:Mark()
+  c:That(type(mark) == "string" and #mark == 16, "this account has a mark")
+  c:Eq(ns.Hero:MyState().mark, mark, "shared with the state")
+  local mine = ns.Hero:Get(f, ns.Me())
+  local was = mine and mine.mark
+  if mine then mine.mark = mark end
+  local stranger = full("Selftest Newalt")
+  c:That(W.Allowed(f, stranger, mark) and not W.Allowed(f, stranger, "someoneelse00000"), "Your character with the mark may follow; others not")
+  if mine then mine.mark = was end
+end)
+
 step("watch: news arrives, Back returns to your own", function(c)
   local W, D = ns.Watch, ns.Dev
   local f = ns.Fellowship:Get(D.WATCH_ID)
@@ -3357,6 +3724,31 @@ step("walkthrough: every step of both tours", function(c)
   end
   c:Eq(ns.Watch.demo, nil, "the sample is gone")
   c:Eq(cur() and cur().name, "Selftest", "your own fellowship again")
+end)
+
+-- About this page (the owner, 7 Nov 2026): the header's ? on every page this character can open now.
+step("page help: the header's ? walks each page, its left page then its right page, and stays there", function(c)
+  local WK, Win = ns.Walkthrough, ns.Window
+  local walk, done, framed = ns.char.walk, 0, 0
+  for id in pairs(WK.PAGES) do
+    Win:ShowPage(id)
+    if Win.current == id then
+      c:That(Win.frame.header.help:IsShown(), id .. ": the ? in the header")
+      c:That(WK:StartPage(), id .. ": started")
+      if WK.glow:IsShown() then framed = framed + 1 end
+      c:Eq(WK.card.title:GetText(), L["WALK_PG_" .. id:upper() .. "_T"], id .. ": what the page is for")
+      WK:Next()
+      c:Eq(WK.card.title:GetText(), L["WALK_PG_" .. id:upper() .. "_R_T"], id .. ": its right page")
+      WK:Next()
+      c:That(not WK.on and Win.current == id, id .. ": closed, still on the page")
+      done = done + 1
+    end
+    c:Yield()
+  end
+  c:That(done >= 10, done .. " pages walked")
+  c:That(framed > 0, framed .. " with their left page framed")
+  c:Eq(ns.char.walk, walk, "the tour is offered as before")
+  Win:ShowPage("overview")
 end)
 
 step("settings and themes", function(c)
@@ -3453,23 +3845,12 @@ step("catching up: a newcomer far below the floor does not hold the fellowship",
   f.reached = saved
 end)
 
-step("realms: an invite to a realm that is not connected is refused", function(c)
-  local list = GetAutoCompleteRealms and GetAutoCompleteRealms()
-  report().realms = list
-  local name = "Jtfnobody-Jtfnorealm"
-  local r = ns.Fellowship:Invite(name)
-  if ns.IsForever() then
-    -- WoW Forever: a whole name is one in the region and the game reads the hyphen as the space, so there is no other
-    -- realm to refuse (check of 6 Nov 2026: 0 connected realms there, and the invite was sent).
-    c:Eq(r, "sent", "WoW Forever: no realms to refuse, the name is the whole name")
-    for key in pairs(cur().invites or {}) do if key:find("^Jtfnobody") then ns.Fellowship:CancelInvite(key) end end
-  elseif type(list) == "table" then
-    c:Eq(r, "realm", ("refused (%d connected realms)"):format(#list))
-    c:That(toastSeen(nil, "Only your realm"), "with the reason")
-  else
-    c:Eq(r, "sent", "no list from the game: allowed")
-    ns.Fellowship:CancelInvite(full(name))
-  end
+-- WoW Forever: a whole name is one in the region and the game reads the hyphen as the space, so there is no other
+-- realm to refuse (check of 6 Nov 2026: 0 connected realms there, and the invite was sent).
+step("realms: no realm is refused, a hyphen is part of the name", function(c)
+  report().realms = GetAutoCompleteRealms and GetAutoCompleteRealms()
+  c:Eq(ns.Fellowship:Invite("Jtfnobody-Jtfnorealm"), "sent", "no realms to refuse, the name is the whole name")
+  for key in pairs(cur().invites or {}) do if key:find("^Jtfnobody") then ns.Fellowship:CancelInvite(key) end end
 end)
 
 step("trial account: the warning bar across the book", function(c)
@@ -3515,6 +3896,68 @@ step("sync: the sync line prints (a large fingerprint)", function(c)
   c:That(true, "/jtf debug sync printed")
 end)
 
+-- Lighter in game (U71, U75, U76; 7 Nov 2026): a message for many is packed once; the lighter packer writes the same
+-- text as before; quests and gear wait for those the game said are offline. Checked on a queue of its own.
+step("sync: packed once for many, the same text, nothing to those offline", function(c)
+  local C, S = ns.Comm, ns.Serialize
+  c:Eq(S.Encode({ 1, "a;b|c", x = true, [2.5] = { n = -3 } }), "{d1;d1;d2;sa\\sb\\pc;d2.5;{sn;d-3;}sx;t}", "the packer's text is unchanged")
+  local odd = S.Decode(S.Encode({ "a\28", "b" }))
+  c:That(odd and odd[1] == "a\28" and odd[2] == "b", "a text ending in control byte 28 reads back whole")
+  local encode, n, q = S.Encode, 0, C.queue
+  S.Encode = function(...) n = n + 1; return encode(...) end
+  C.queue = {}
+  C:SendAll({ full("Selftest One"), full("Selftest Two"), full("Selftest Three") }, "SELFTEST", { n = 1 })
+  S.Encode = encode
+  c:Eq(n, 1, "three players, packed once")
+  c:Eq(#C.queue, 3, "and queued for each")
+  C.queue = q
+  local f = cur()
+  local name = f and next(f.members)
+  if name and name ~= ns.Me() then
+    f.heroes[name] = f.heroes[name] or {}
+    local was = f.heroes[name].offline
+    f.heroes[name].offline = true
+    local listed = false
+    for _, x in ipairs(ns.Hero:Reachable(f)) do if x == name then listed = true end end
+    f.heroes[name].offline = was
+    c:That(not listed, "an Adventurer the game said is offline gets no quests or gear")
+  end
+end)
+
+-- U70 (7 Nov 2026): /jtf perf times JTF's busiest jobs and reads the game's profiler for it.
+step("sync: the performance report times JTF's jobs", function(c)
+  c:That((ns.Dev.perfWrapped or 0) >= 8, ("%d of %d jobs timed"):format(ns.Dev.perfWrapped or 0, #ns.Dev.PERF_JOBS))
+  local before = ns.db.perf and ns.db.perf.jobs and ns.db.perf.jobs.page and ns.db.perf.jobs.page.n or 0
+  ns.Window:Refresh()
+  c:Eq(ns.db.perf.jobs.page.n, before + 1, "a page drawn is counted")
+  local m = ns.Dev:PerfMetrics()
+  c:That(true, m and ("the game's profiler: worst %.1f ms"):format(m.PeakTime or 0) or "this client has no addon profiler")
+  ns.Dev:Perf()
+end)
+
+-- U73 (7 Nov 2026): a level-up's jobs each wait their own moment, the state first, all within two seconds.
+step("sync: a level-up's jobs run one after another, not all at once", function(c)
+  local t, seen, last = ns.LEVEL_UP, {}, 0
+  for _, k in ipairs({ "state", "characters", "race", "attune" }) do
+    c:That(t[k] and t[k] > last and not seen[t[k]], k .. " waits " .. tostring(t[k]) .. " s, after the one before")
+    seen[t[k] or 0], last = true, t[k] or last
+  end
+  c:That(last <= 2, "all within two seconds")
+end)
+
+-- U74 (7 Nov 2026): news from others redraws at most once a second, and a quest list only a page that shows it.
+step("sync: a quest list does not redraw the Overview; other news waits up to a second", function(c)
+  local W = ns.Window
+  c:Eq(W.SOON, 1, "news redraws once a second at most")
+  if W.soon then return c:That(true, "a redraw was already on its way; nothing to check now") end
+  W.page = "overview"; W:Open(); W:Refresh()
+  W:RefreshSoon("quests")
+  c:That(not W.soon, "a quest list arriving waits for no redraw on the Overview")
+  c:That(ns.Pages:Get("quests").news.quests and ns.Pages:Get("chapter").news.quests, "the Quests and Chapter pages show quest lists")
+  W:RefreshSoon()
+  c:That(W.soon, "a level arriving redraws, once")
+end)
+
 -- U60 (6 Nov 2026): three lanes for long messages, short ones first. Checked on a queue of its own (nothing is sent).
 step("sync: three lanes, and a change goes before a long copy to someone else", function(c)
   local C = ns.Comm
@@ -3548,14 +3991,14 @@ step("sync: only the newest quest list waits for each Adventurer; links only whe
   c:Eq(C.queue[1] and C.queue[1].msg, "SELFTESTQ:" .. ns.Serialize.Encode({ n = 3 }), "the newest one")
   c:That(C:Waiting(a, "SELFTESTQ") and not C:Waiting(a, "QUESTS"), "what waits, by its tag")
   C.queue = q
-  local sent, send = {}, C.Send
-  C.Send = function(_, _, tag, data, _, replace) if tag == "QUESTS" then sent[#sent + 1] = { data = data, replace = replace } end end
+  local sent, send = {}, C.SendAll
+  C.SendAll = function(_, _, tag, data, _, replace) if tag == "QUESTS" then sent[#sent + 1] = { data = data, replace = replace } end end
   Q.lastKey, Q.lastLinks = nil, nil
   Q:Send()
   local first = sent[1]
   sent, Q.lastKey = {}, nil
   Q:Send()
-  C.Send = send
+  C.SendAll = send
   c:That(first ~= nil and first.replace == true, "a quest list takes the place of the one still waiting")
   c:That(first ~= nil and first.data.ln ~= nil, "the first one carries the links")
   c:That(sent[1] ~= nil and sent[1].data.ln == nil, "the next one, links unchanged, does not")
@@ -4059,6 +4502,9 @@ function ST:Run(arg, opts)
         c.bad = true; c.lines[#c.lines + 1] = "ERROR: " .. err; ns:LogError("selftest", s.name, err)
       end
       if coroutine.status(c.co) ~= "dead" then return C_Timer.After(0, part) end
+      -- What a step stood in for is put back, also after an error (c.undo).
+      local okUndo, eUndo = pcall(c.undo or function() end)
+      if not okUndo then c.bad = true; c.lines[#c.lines + 1] = "ERROR: " .. tostring(eUndo) end
       add(s.name, not c.bad, table.concat(c.lines, "\n"), slowest > 0 and math.floor(slowest + 0.5) or nil)
       if c.stop then return ST:Finish(keep) end
       C_Timer.After(s.wait or ST.WAIT, nextStep)

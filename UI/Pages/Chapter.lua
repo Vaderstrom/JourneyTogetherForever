@@ -134,6 +134,7 @@ local function build(pf)
     phl:SetColorTexture(1, 0.9, 0.6, 0.15)
     UI.FramePicture(c.pic, c.pic.tex, phl)
     c.pic:SetScript("OnClick", function() W:DungeonJournal(c.key) end)
+    UI.PictureTip(c.pic, function() return c.key end) -- larger on hover (U64)
     c.mark = UI.Mark(c.pic, 14)
     c.mark:SetPoint("BOTTOMLEFT", 4, 4)
     c.name = UI.Text(c, 14, "ink", "title")
@@ -147,6 +148,14 @@ local function build(pf)
     c.brief = UI.Text(c, 11, "ink2")
     c.brief:SetPoint("TOPLEFT", c.sub, "BOTTOMLEFT", 0, -2)
     c.brief:SetWordWrap(false)
+    -- Its quests you still have to pick up or start (U79): a map with their number beside the Dungeon Journal (five
+    -- rows fill the page to the pixel, so no third line), "4 quests to pick up · 2 to start earlier" on hover; a
+    -- click opens them on the Quests page's Dungeons tab.
+    c.quests = UI.RoundButton(c, 26, "quests", function() if c.key then ns.QuestLists:Open(c.key) end end)
+    c.quests.n = UI.Text(c.quests, 11, "white", "title", "CENTER")
+    c.quests.n:SetPoint("BOTTOMRIGHT", 3, -2)
+    c.quests.n:SetShadowOffset(1, -1); c.quests.n:SetShadowColor(0, 0, 0, 1)
+    UI.Tooltip(c.quests, function() return (c.questLine or "") .. "\n" .. L.DQ_CHAPTER_TIP end)
     c.state = UI.Text(c, 12, nil, "body", "RIGHT")
     -- Everything else about the dungeon on hover: who ran it, what is missing, quests picked up.
     c:SetScript("OnEnter", function()
@@ -229,6 +238,8 @@ local function build(pf)
   -- The level track above the list (U5, 31 Oct 2026): the chapter's floor and cap with everyone on one line.
   pf.levelTrack = UI.LevelTrack(R, width)
   pf.stand = UI.Standings(R, width)
+  -- Room for the dungeon quests (U78): the chapter's total for you, under where everyone stands.
+  pf.room = UI.WrapText(R, 12, "ink", width, "book")
 
   -- Dungeon clears: a card with a header row (Hero, dungeons) and one row per Hero.
   pf.mTitle = UI.SectionHeader(R, width)
@@ -583,6 +594,7 @@ local function refresh(pf, ctx)
   -- Dungeons, one row each.
   local counted = J:Counted(f)
   local list = ch and J:ChapterList(f, view) or {}
+  local nextKey = J:NextDungeon(f, view, list)
   pf.dHead:SetShown(#list > 0)
   if #list > 0 then
     pf.dHead:SetText(waiting and L.CH_DUNGEONS_WAIT:format(J:FloorLevel(f, ch))
@@ -603,12 +615,21 @@ local function refresh(pf, ctx)
     c.stripe:SetColorTexture(ns.Hex(color[1]))
     c.borderRole = color[1]; c:Paint()
     local brief, tip = rowTexts(f, x, st, roleText, counted)
+    -- The suggested order's next mandatory dungeon (the owner, 7 Nov 2026): "Recommended next" in place of
+    -- "Mandatory", in its colour (no extra line: five rows still fit on the page).
+    local label = x.key == nextKey and L.CH_ROW_NEXT or roleText
+    if x.key == nextKey then table.insert(tip, #tip, L.CH_ROW_NEXT_TIP) end
     c.tip, c.roleText = tip, roleText
     -- The kind in its colour, then the levels; how far it is below them.
-    local function sub(levels) return ("|cff%s%s|r  ·  %s"):format(Theme:HexFor(color[1]), roleText, levels) end
+    local function sub(levels) return ("|cff%s%s|r  ·  %s"):format(Theme:HexFor(color[1]), label, levels) end
     c.sub:SetText(sub(L.CH_LEVELS:format(x.d[3], x.d[4])))
     c.brief:SetText(brief or "")
     c.brief:SetShown(brief ~= nil)
+    local ql, pick, earlier
+    if st ~= "cleared" then ql, pick, earlier = ns.QuestLists:CountLine(f, x.key) end
+    c.questLine = ql
+    c.quests:SetShown(ql ~= nil and not ctx.watching)
+    if ql then c.quests.n:SetText(pick + earlier) end
     -- At the right: Find group when it is open (the main action), else its state; the Dungeon Journal; and for the
     -- leader a "⋯" menu with Mark cleared and Undo clear.
     c.key = x.key
@@ -619,7 +640,7 @@ local function refresh(pf, ctx)
     c.state:SetText(st == "cleared" and L.STATE_CLEARED or L.STATE_LOCKED)
     c.state:SetTextColor(Theme:RGBA(st == "cleared" and "3E7A3A" or "ink2"))
     local rx = width - 8
-    for _, w in ipairs({ c.menu, c.group, c.state, c.dj, c.lore }) do
+    for _, w in ipairs({ c.menu, c.group, c.state, c.dj, c.lore, c.quests }) do
       if w:IsShown() then
         local ww = w.GetStringWidth and w:GetStringWidth() or w:GetWidth()
         w:ClearAllPoints(); w:SetPoint("RIGHT", c, "LEFT", rx, 0)
@@ -631,6 +652,12 @@ local function refresh(pf, ctx)
     -- Next to Find group the line can be too long ("Bridge · Chapter III · Level 19-22", seen in the check of 30 Oct
     -- 2026): the levels without "Level" then.
     if c.sub:GetStringWidth() > textW then c.sub:SetText(sub(L.CH_LEVELS_SHORT:format(x.d[3], x.d[4]))) end
+    -- With the quests' map button as well, "Bridge · Chapter III · 19-22" was still cut (the check of 7 Nov 2026):
+    -- Bridge alone then; the tooltip says which chapter.
+    if x.early and c.sub:GetStringWidth() > textW then
+      label = L.ROLE_BRIDGE
+      c.sub:SetText(sub(L.CH_LEVELS_SHORT:format(x.d[3], x.d[4])))
+    end
     local ok, default = ns.SetDungeonArt(c.pic.tex, x.key, THUMB_W - 2 * UI.PIC_INSET, THUMB_H - 2 * UI.PIC_INSET)
     -- No picture of its own (only the game's blurry default tile): the chapter's illustration instead.
     if default then ns.Pages:SetChapterArt(c.pic.tex, ns.Pages:ArtOf(f, view), THUMB_W - 2 * UI.PIC_INSET, THUMB_H - 2 * UI.PIC_INSET, 0.6); ok = true end
@@ -682,11 +709,19 @@ local function refresh(pf, ctx)
   local th = pf.levelTrack:Set(f, view, 6)
   if th > 0 then r:Place(pf.levelTrack, th, 12) end
   pf.stand:Set(f, view, r)
+  local room = view == cur and not ctx.watching and ns.Room:Chapter(f, ns.Me()) or nil
+  pf.room:SetShown(room ~= nil)
+  if room then
+    local main, stop = ns.Room.Lines(room)
+    pf.room:SetText(main .. (stop and ("  |cffB0321E" .. stop .. "|r") or ""))
+    r:Place(pf.room, pf.room:GetStringHeight(), 12)
+  end
   refreshMatrix(pf, ctx, list, r, width)
   pf.rscroll:SetContentHeight(r.y + 8)
 end
 
 ns.Pages:Register({ id = "chapter", label = L.NAV_CHAPTER, header = "none", build = build, refresh = refresh,
+  news = { quests = true }, -- the dungeons' "Quests picked up" lines
   title = function(ctx)
     local ch = ctx.chapter
     if ch then return L.TITLE_CHAPTER:format(J.Roman(ch.n)), ch.name or "" end

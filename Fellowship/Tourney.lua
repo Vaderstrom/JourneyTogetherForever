@@ -220,7 +220,7 @@ function Tn:Tick()
     f.heroes[me].ton = x
     self.tonCount = (self.tonCount or 0) + 1
     if self.tonCount % 10 == 0 then
-      for name in pairs(f.members) do if name ~= me then Comm:Send(name, "TON", { fid = f.id, id = t.id, slot = t.slot, min = x.min }) end end
+      Comm:SendAll(ns.Others(f), "TON", { fid = f.id, id = t.id, slot = t.slot, min = x.min })
     end
   end
 end

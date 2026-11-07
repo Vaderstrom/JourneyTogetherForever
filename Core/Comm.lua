@@ -104,20 +104,39 @@ end
 -- replace: an older message with this tag to the same player that has not started going out is dropped (a newer
 -- whole-fellowship copy makes the queued one useless).
 function C:Send(target, tag, data, urgent, replace)
-  if not target then return end
-  if ns.Dev and ns.Dev:Intercept(target, tag, data) then return end
-  if replace then self:DropTag(target, tag) end
-  if HINT[tag] and type(data) == "table" then data.ln, data.z = #LANES, C.Z end
-  local body = tag .. ":" .. ns.Serialize.Encode(data)
-  local now = GetTime()
-  -- A long message packed, for an addon that reads packed ones (when packing makes it shorter).
-  if #body > MAX and self.packs[target] then
-    local packed = self:Pack(body)
-    if packed and #packed < #body then
-      self.packed, self.saved = (self.packed or 0) + 1, (self.saved or 0) + #body - #packed
-      body = packed
+  if target then self:SendAll({ target }, tag, data, urgent, replace) end
+end
+
+-- The same message to several players, packed once (U71, 7 Nov 2026: a state to nine Adventurers was packed nine
+-- times). What goes out to each is what Send would send.
+function C:SendAll(targets, tag, data, urgent, replace)
+  local body, packed
+  for _, target in ipairs(targets) do
+    if not (ns.Dev and ns.Dev:Intercept(target, tag, data)) then
+      if not body then
+        if HINT[tag] and type(data) == "table" then data.ln, data.z = #LANES, C.Z end
+        body = tag .. ":" .. ns.Serialize.Encode(data)
+      end
+      local msg = body
+      -- A long message packed, for an addon that reads packed ones (when packing makes it shorter).
+      if #body > MAX and self.packs[target] then
+        if packed == nil then
+          packed = self:Pack(body) or false
+          if packed and #packed >= #body then packed = false end
+        end
+        if packed then
+          self.packed, self.saved = (self.packed or 0) + 1, (self.saved or 0) + #body - #packed
+          msg = packed
+        end
+      end
+      if replace then self:DropTag(target, tag) end
+      self:Queue(target, tag, msg, urgent)
     end
   end
+end
+
+function C:Queue(target, tag, body, urgent)
+  local now = GetTime()
   self:Kick()
   if #body <= MAX then
     local item = { target = target, msg = body, tries = 0, tag = tag, at = now, last = true, urgent = urgent or nil }

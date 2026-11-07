@@ -27,12 +27,54 @@ function Pa:PerHour()
   return math.floor(d.xp / d.sec * 3600 + 0.5)
 end
 
--- XP from (level, xp) to the start of level target, and the seconds of play that takes at pace (nil without a
--- pace). Later levels are counted at this level's size, so it is an estimate.
+-- XP from one level to the next: the Classic curve WoW Forever keeps (4,084,700 to 60). /jtf check compares the
+-- game's size at your level with it.
+Pa.LEVEL_XP = { 400, 900, 1400, 2100, 2800, 3600, 4500, 5400, 6500, 7600, 8800, 10100, 11400, 12900, 14400, 16000,
+  17700, 19400, 21300, 23200, 25200, 27300, 29400, 31700, 34000, 36400, 38900, 41400, 44300, 47400, 50800, 54500,
+  58600, 62800, 67100, 71600, 76100, 80800, 85700, 90700, 95800, 101000, 106300, 111800, 117500, 123200, 129100,
+  135100, 141200, 147500, 153900, 160400, 167100, 173900, 180800, 187900, 195000, 202300, 209800 }
+
+-- A level's size: the game's own for the level the numbers come from, else the table; nil at the level cap.
+local function size(l, level, max)
+  if l == level and max and max > 0 then return max end
+  return Pa.LEVEL_XP[l]
+end
+
+-- Where gain more XP takes someone at level with xp of max, walked level by level: a level with its fraction (15.4).
+-- It stops at the level cap.
+function Pa.Reach(level, xp, max, gain)
+  local l, into = level, (xp or 0) + gain
+  local s = size(l, level, max)
+  while s and into >= s do into, l = into - s, l + 1; s = size(l, level, max) end
+  return s and l + into / s or l
+end
+
+-- The point (a level with its fraction) from which gain XP ends exactly at to, walked back level by level; level and
+-- max are where the numbers come from (the game's size there).
+function Pa.Back(to, gain, level, max)
+  local l = math.floor(to)
+  local s = size(l, level, max)
+  local below = s and (to - l) * s or 0
+  if s and gain <= below then return l + (below - gain) / s end
+  gain = gain - below
+  while l > 1 do
+    l = l - 1
+    s = size(l, level, max)
+    if s then
+      if gain <= s then return l + (s - gain) / s end
+      gain = gain - s
+    end
+  end
+  return 1
+end
+
+-- XP from (level, xp) to the start of level target, level by level, and the seconds of play that takes at pace (nil
+-- without a pace).
 function Pa.ToLevel(level, xp, xpMax, target, pace)
   if not level or level >= target then return 0, 0 end
   if not xpMax or xpMax <= 0 then return nil, nil end
-  local need = (xpMax - (xp or 0)) + (target - level - 1) * xpMax
+  local need = xpMax - (xp or 0)
+  for l = level + 1, target - 1 do need = need + (size(l, level, xpMax) or 0) end
   return need, (pace and pace > 0) and need / pace * 3600 or nil
 end
 

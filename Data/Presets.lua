@@ -57,11 +57,10 @@ end
 
 -- Chapters and dungeon places for a preset, for a fellowship of a faction (default: this character's). Dungeons go
 -- to the chapter that matches their best level; outside the Forever and Classic presets bridges become mandatory. The presets plan with the catalog's levels and chapters
--- (ns.PLAN_DUNGEONS, Data/Dungeons.lua), so they are the same in every game: in Forever the dungeons Blizzard has
--- announced (ns.FOREVER_SCHEDULE; "Build the classic preset only with the dungeons and raids blizzard has announced",
--- the owner, 4 Nov 2026), so a place only in the game's files stays out; on retail the ones its Adventure Guide has,
--- and its own Classic versions (ns.GUIDE_PLAN). A journey keeps a placement the game later drops (its chapter then
--- finishes on level until the place is back).
+-- (Data/Dungeons.lua), with the dungeons Blizzard has announced for WoW Forever (ns.FOREVER_SCHEDULE; "Build the
+-- classic preset only with the dungeons and raids blizzard has announced", the owner, 4 Nov 2026), so a place only in
+-- the game's files stays out. A journey keeps a placement the game later drops (its chapter then finishes on level
+-- until the place is back).
 -- Every preset but Start from scratch begins with the Prologue (27 Oct 2026): levels 1-15, no dungeons, done when
 -- everyone reaches 15. Each chapter keeps its picture (art: the preset chapter's number, or "prologue"), so the
 -- pictures do not move when chapters are added in front.
@@ -93,7 +92,7 @@ function ns.BuildJourney(key, faction)
     chapters[i + off] = { name = name, floor = b[1], cap = b[2], color = ns.PALETTE[color], art = art }
   end
   local place = {}
-  for _, d in ipairs(ns.PLAN_DUNGEONS or ns.DUNGEONS) do
+  for _, d in ipairs(ns.DUNGEONS) do
     local k, min, max, ch, role = d[1], d[3], d[4], d[5], d[6]
     local skip = ch == 0 or P == "scratch" or not ns.ForFaction(k, faction) or (P == "classic" and ns.FOREVER_OWN[k])
     if not skip then

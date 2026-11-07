@@ -33,21 +33,42 @@ function M:Data(f)
   return a, true
 end
 
+-- Puts moment m in the list at its time (newest first), with the levels of that time when it is recent.
+local function place(f, list, m)
+  if m.names and not m.levels and math.abs(time() - m.time) <= M.RECENT then
+    m.levels = {}
+    for _, n in ipairs(m.names) do m.levels[n] = ns.Hero:Level(f, n) end
+  end
+  local pos = #list + 1
+  for i, x in ipairs(list) do if x.time <= m.time then pos = i break end end
+  table.insert(list, pos, m)
+end
+
 -- Keeps moment m (unless its id is already kept). Returns it when new.
 function M:Add(f, m)
   local a = self:Data(f)
   if a.seen[m.id] then return nil end
   a.seen[m.id] = true
   m.ch = m.ch or math.min(J:CurrentIndex(f), #f.journey.chapters)
-  if m.names and not m.levels and math.abs(time() - m.time) <= self.RECENT then
-    m.levels = {}
-    for _, n in ipairs(m.names) do m.levels[n] = ns.Hero:Level(f, n) end
-  end
-  local pos = #a.list + 1
-  for i, x in ipairs(a.list) do if x.time <= m.time then pos = i break end end
-  table.insert(a.list, pos, m)
+  place(f, a.list, m)
   while #a.list > self.MAX do table.remove(a.list) end
   return m
+end
+
+-- A kept first that someone else took over: a deed heard later was earlier (one held back in a dungeon, where addon
+-- messages wait until the run is over). The moment follows it, so every Adventurer's Moments name the same one.
+function M:Follow(f, id, t, name)
+  local list = self:Data(f).list
+  for i, m in ipairs(list) do
+    if m.id == id then
+      if m.time == t and m.names and m.names[1] == name then return nil end
+      table.remove(list, i)
+      m.time, m.names, m.levels = t, { name }, nil
+      place(f, list, m)
+      return m
+    end
+  end
+  return nil
 end
 
 local function recent(t) return time() - t <= M.RECENT end
@@ -118,8 +139,9 @@ function M:Check(f)
   -- The fellowship's firsts (Fellowship/Firsts.lua, SPEC §8).
   -- (Not a level brought in when joining: nothing happened then, U62.)
   for _, x in ipairs(ns.Firsts and ns.Firsts:List(f) or {}) do
-    if not ns.Firsts:BroughtIn(f, x) then
-      self:Add(f, { id = "first:" .. x.key, k = "first", time = x.time, names = { x.name }, first = x.key })
+    if not ns.Firsts:BroughtIn(f, x)
+      and not self:Add(f, { id = "first:" .. x.key, k = "first", time = x.time, names = { x.name }, first = x.key }) then
+      self:Follow(f, "first:" .. x.key, x.time, x.name)
     end
   end
   -- The Guild Master tournament's champion (the chronicle's line).

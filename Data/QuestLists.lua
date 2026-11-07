@@ -72,7 +72,8 @@ ns.DUNGEON_QUESTS = {
   rfc = { { 5723, "Testing an Enemy's Strength", "H" }, { 5725, "The Power to Destroy...", "H" },
     { 5728, "Hidden Enemies", "H" }, { 5761, "Slaying the Beast", "H" } },
   dm = { { 166, "The Defias Brotherhood", "A" }, { 2040, "Underground Assault", "A" }, { 214, "Red Silk Bandanas", "A" },
-    { 168, "Collecting Memories", "A" }, { 167, "Oh Brother. . .", "A" }, { 373, "The Unsent Letter", "A" } },
+    { 168, "Collecting Memories", "A" }, { 167, "Oh Brother. . .", "A" }, { 373, "The Unsent Letter", "A" },
+    { 92753, "Destruction in Deadmines", "A" } },
   wc = { { 914, "Leaders of the Fang" }, { 1486, "Deviate Hides" }, { 959, "Trouble at the Docks" },
     { 1487, "Deviate Eradication" }, { 1491, "Smart Drinks" }, { 6981, "The Glowing Shard" } },
   sfk = { { 1013, "The Book of Ur", "H" }, { 1014, "Arugal Must Die", "H" }, { 1098, "Deathstalkers in Shadowfang", "H" } },
@@ -126,6 +127,74 @@ ns.DUNGEON_QUESTS = {
     { 5466, "The Lich, Ras Frostwhisper" }, { 5529, "Plagued Hatchlings" },
     { 5515, "Krastinov's Bag of Horrors" }, { 5343, "Barov Family Fortune", "A" }, { 5341, "Barov Family Fortune", "H" },
     { 4771, "Dawn's Gambit" } },
+}
+
+-- Where each dungeon quest starts (U79, 7 Nov 2026), from public sources (docs/QUEST-SOURCES.md): by (the quest
+-- giver), zone (its map's name), x, y (the position on that map, 0 to 100), lvl (the quest's level), min (the level it
+-- can be taken from), item (it starts from this item), inside (it starts in the dungeon), after = { { id, name, level }
+-- } (a chain to start earlier, first step first). Only what the sources show: the rest is learned in game (QL:Learn).
+ns.QUEST_STARTS = {
+  -- Ragefire Chasm
+  [5723] = { by = "Rahauro", zone = "Thunder Bluff", x = 70.8, y = 31.6, lvl = 15 },
+  [5725] = { by = "Varimathras", zone = "Undercity", x = 56.4, y = 92.6, lvl = 16 },
+  [5728] = { by = "Thrall", zone = "Orgrimmar", x = 31.7, y = 38.0, lvl = 16, after = { { 5727, "Hidden Enemies" } } },
+  [5761] = { by = "Neeru Fireblade", zone = "Orgrimmar", x = 49.5, y = 50.4, lvl = 16 },
+  -- The Deadmines
+  [214] = { by = "Scout Riell", zone = "Westfall", x = 56.7, y = 47.4, lvl = 17, min = 14,
+    after = { { 155, "The Defias Brotherhood" } } },
+  [168] = { by = "Wilder Thistlenettle", zone = "Stormwind City", x = 70.2, y = 40.9, lvl = 18, min = 14 },
+  [92753] = { item = "Extra-Destructive Explosives", lvl = 18, min = 9 },
+  [167] = { by = "Wilder Thistlenettle", zone = "Stormwind City", x = 70.2, y = 40.9, lvl = 20, min = 15 },
+  [2040] = { by = "Shoni the Shilent", zone = "Stormwind City", x = 62.6, y = 34.2, lvl = 20, min = 15,
+    after = { { 2041, "Speak with Shoni" } } },
+  [166] = { by = "Gryan Stoutmantle", zone = "Westfall", x = 56.3, y = 47.6, lvl = 22, min = 14,
+    after = { { 155, "The Defias Brotherhood" } } },
+  [373] = { item = "An Unsent Letter", inside = true, lvl = 22 },
+  -- Wailing Caverns
+  [1486] = { by = "Nalpak", zone = "The Barrens", lvl = 17 },
+  [1491] = { by = "Mebok Mizzyrix", zone = "The Barrens", x = 62.4, y = 37.6, lvl = 18 },
+  [959] = { by = "Crane Operator Bigglefuzz", zone = "The Barrens", lvl = 18 },
+  [1487] = { by = "Ebru", zone = "The Barrens", lvl = 21 },
+  [914] = { lvl = 22, after = { { 1489, "Hamuul Runetotem", 16 }, { 1490, "Nara Wildmane", 16 } } },
+  [6981] = { item = "Glowing Shard", inside = true, lvl = 26 },
+  -- Shadowfang Keep
+  [1098] = { lvl = 25 }, [1013] = { lvl = 26 }, [1014] = { lvl = 27 },
+  -- Blackfathom Deeps
+  [6563] = { zone = "Ashenvale", lvl = 22, after = { { 6562, "Trouble in the Deeps", 22 } } },
+  [1198] = { lvl = 24 },
+  [1275] = { by = "Gershala Nightwhisper", zone = "Darkshore", x = 38.3, y = 43.0, lvl = 24,
+    after = { { 3765, "The Corruption Abroad" } } },
+  [1199] = { zone = "Darnassus", lvl = 25 },
+  [6565] = { item = "Damp Note", inside = true, lvl = 26 },
+  [1200] = { lvl = 27, after = { { 1198, "In Search of Thaelrid", 24 } } },
+  [6921] = { zone = "Ashenvale", lvl = 27 },
+  [6922] = { item = "Strange Water Globe", inside = true, lvl = 30 },
+  -- The Stockade
+  [386] = { by = "Guard Berton", zone = "Redridge Mountains", x = 21.3, y = 46.6, lvl = 25 },
+  [377] = { by = "Councilman Millstipe", zone = "Duskwood", x = 72.0, y = 47.7, lvl = 26 },
+  [387] = { by = "Warden Thelwater", zone = "Stormwind City", x = 51.5, y = 69.2, lvl = 26 },
+  [388] = { by = "Nikova Raskol", zone = "Stormwind City", x = 76.3, y = 63.6, lvl = 26 },
+  [378] = { by = "Motley Garmason", lvl = 27 },
+  [391] = { lvl = 29, after = { { 389, "Bazil Thredd" } } },
+  -- Razorfen Kraul
+  [1221] = { by = "Mebok Mizzyrix", zone = "The Barrens", x = 62.4, y = 37.6, lvl = 26 },
+  [1142] = { lvl = 30 }, [1144] = { lvl = 30 }, [1109] = { lvl = 33 }, [1102] = { lvl = 34 },
+  [1101] = { lvl = 34, after = { { 1100, "Lonebrow's Journal" } } },
+  -- Gnomeregan
+  [2922] = { lvl = 26, after = { { 2923, "Tinkmaster Overspark", 26 } } },
+  [2926] = { item = "Empty Leaden Collection Phial", lvl = 27 },
+  [2927] = { lvl = 27 }, [2904] = { lvl = 30 }, [2928] = { lvl = 30 }, [2841] = { lvl = 35 },
+  [2930] = { by = "Master Mechanic Castpipe", zone = "Ironforge", x = 69.9, y = 48.5, lvl = 30,
+    after = { { 2931, "Castpipe's Task", 28 } } },
+  [2945] = { item = "Grime-Encrusted Ring", inside = true, lvl = 34 },
+  [2929] = { by = "High Tinker Mekkatorque", zone = "Ironforge", x = 68.7, y = 49.1, lvl = 35 },
+  -- Scarlet Monastery
+  [1050] = { by = "Librarian Mae Paledust", zone = "Ironforge", x = 74.9, y = 12.2, lvl = 38 },
+  [1049] = { zone = "Tirisfal Glades", lvl = 38 },
+  -- Razorfen Downs, Uldaman
+  [3523] = { item = "Belnistrasz's Oathstone", lvl = 37 },
+  [2418] = { lvl = 36 }, [709] = { lvl = 40 },
+  [704] = { lvl = 38, after = { { 739, "Murdaloc" } } },
 }
 
 -- Both lists are WoW Forever's: ns.KeepThisGame (Data/Dungeons.lua) keeps them in Forever only.

@@ -88,7 +88,7 @@ end
 
 -- A title the game was asked for has arrived: show it.
 ns:RegisterEvent("QUEST_DATA_LOAD_RESULT", function(_, id, ok)
-  if ok and Q.titleAsked[id] and gameTitle(id) and ns.Window and ns.Window.RefreshSoon then ns.Window:RefreshSoon() end
+  if ok and Q.titleAsked[id] and gameTitle(id) and ns.Window and ns.Window.RefreshSoon then ns.Window:RefreshSoon("quests") end
 end)
 
 ---------------------------------------------------------------------------
@@ -275,6 +275,13 @@ local function clean(log)
   return out
 end
 
+-- True when two sets hold the same keys.
+local function sameSet(a, b)
+  for k in pairs(a or {}) do if not (b and b[k]) then return false end end
+  for k in pairs(b or {}) do if not (a and a[k]) then return false end end
+  return true
+end
+
 function Q:Store(f, name, d, t)
   if not f.members[name] then return end
   f.heroes = f.heroes or {}
@@ -283,6 +290,7 @@ function Q:Store(f, name, d, t)
   -- (A log from an older addon has no time: none is made up from this clock, so a log its owner sent later, passed on
   -- by someone else, still wins over it, and it is never passed on as newer than one that has a time; code review of
   -- 0.13.0.)
+  local wasDone, wasKeys = h.questsDone, h.keys
   h.quests, h.questsTime = clean(d.q), tonumber(t)
   h.questsDone = {}
   for _, id in ipairs(type(d.d) == "table" and d.d or {}) do if tonumber(id) then h.questsDone[tonumber(id)] = true end end
@@ -298,6 +306,8 @@ function Q:Store(f, name, d, t)
       if type(ln[4]) == "string" then links.questTitles[b] = links.questTitles[b] or ln[4] end
     end
   end
+  -- True when the quests handed in or the keys changed (milestones, attunements): more than the quest pages show.
+  return not (sameSet(wasDone, h.questsDone) and sameSet(wasKeys, h.keys))
 end
 
 ---------------------------------------------------------------------------
@@ -317,7 +327,7 @@ function Q:Send(to, force)
   local links = self:MyLinks(log, doneList)
   local data = { fid = f.id, q = log, d = doneList, ln = links, k = keys, t = time() }
   local key = ns.Serialize.Encode({ log, doneList, keys })
-  self:Store(f, ns.Me(), data, data.t)
+  local doneMoved = self:Store(f, ns.Me(), data, data.t)
   if not to and not force and key == self.lastKey then return end
   if not to then self.lastKey = key end
   local lkey = ns.Serialize.Encode(links)
@@ -328,14 +338,18 @@ function Q:Send(to, force)
     short = {}
     for k, v in pairs(data) do if k ~= "ln" then short[k] = v end end
   end
-  local me = ns.Me()
-  for name in pairs(f.members) do
-    -- (A list still waiting for them may carry links they have not had yet: the newer one takes them over.)
-    if name ~= me and (not to or name == to) then
-      Comm:Send(name, "QUESTS", (short and not Comm:Waiting(name, "QUESTS")) and short or data, false, true)
-    end
+  -- Packed once for all who get the whole list and once for those who get it without links (U71); none for those
+  -- the game said are offline (U76: their HELLO brings it). (A list still waiting for them may carry links they have
+  -- not had yet: the newer one takes them over.)
+  local whole, brief = {}, {}
+  for _, name in ipairs(to and (f.members[to] and to ~= ns.Me() and { to } or {}) or ns.Hero:Reachable(f)) do
+    local list = (short and not Comm:Waiting(name, "QUESTS")) and brief or whole
+    list[#list + 1] = name
   end
-  ns:Fire("HEROES")
+  if #whole > 0 then Comm:SendAll(whole, "QUESTS", data, false, true) end
+  if #brief > 0 then Comm:SendAll(brief, "QUESTS", short, false, true) end
+  -- A quest list redraws only the pages that show quest logs (U74); a milestone or attunement quest, every page.
+  ns:Fire("HEROES", nil, not doneMoved and "quests" or nil)
 end
 
 -- A Hero's stored quests as QUESTS sends them, to pass on (Hero:Relay, RELAYQ).
@@ -351,8 +365,8 @@ Comm:On("QUESTS", function(sender, d)
   if type(d) ~= "table" then return end
   local f = F:Get(d.fid)
   if not f or not f.members[sender] or not f.members[ns.Me()] then return end
-  Q:Store(f, sender, d, d.t)
-  ns:Fire("HEROES")
+  local doneMoved = Q:Store(f, sender, d, d.t)
+  ns:Fire("HEROES", nil, not doneMoved and "quests" or nil)
 end)
 
 ---------------------------------------------------------------------------

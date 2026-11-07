@@ -2,7 +2,7 @@
 -- Dungeon Finder listed them: optional in the last Classic chapter, at Dire Maul East's levels, as the game tunes the
 -- three wings alike; Ragefire Chasm, which the mockup left out, optional in the first chapter: "Make it so that the
 -- clients available dungeons are present", the owner, 30 Oct 2026; Shaper's Terrace, the ninth new dungeon Blizzard
--- announced, mandatory in the last chapter, the owner's choice of 30 Oct 2026). The whole catalog: each game keeps what
+-- announced, mandatory in the last chapter, the owner's choice of 30 Oct 2026). The whole catalog: the game keeps what
 -- it offers (ns.KeepThisGame below).
 -- { key, name, best level from, best level to, chapter in the Classic preset (0 = none), role }
 -- role: "m" mandatory, "b" bridge (may be run in the chapter before), "o" optional.
@@ -27,7 +27,7 @@ ns.DUNGEONS = {
 -- The raids of the Endgame (M18, SPEC §2): { key, name, level, size, attunement key (Data/QuestLists.lua) or nil }.
 -- Not part of the journey's chapters: they open for the fellowship when the journey is complete. WoW Forever's own
 -- raids (Barrow Deeps, Hyjal Summit) came in on 30 Oct 2026 from Blizzard's raid overview; the Classic ones stay in
--- the catalog for retail and for the day WoW Forever announces them (ns.FOREVER_SCHEDULE).
+-- the catalog for the day WoW Forever announces them (ns.FOREVER_SCHEDULE).
 ns.RAIDS = {
   { "zg", "Zul'Gurub", 58, 20 }, { "barrow", "Barrow Deeps", 60, 10 }, { "hyjal", "Hyjal Summit", 60, 20 },
   { "ony", "Onyxia's Lair", 60, 40, "ony" }, { "mc", "Molten Core", 60, 40, "mc" },
@@ -62,14 +62,12 @@ function ns.Dungeon(key)
   if r then return { r[1], r[2], r[3], math.max(r[3], ns.LevelCap and ns.LevelCap() or 60) } end
 end
 
--- Is key a dungeon or raid of any game: one of the catalog, or a retail Adventure Guide entry ("j" and its journal
--- ID)? Journeys keep the placements of dungeons this game lacks; the pages skip them while it lacks them (30 Oct
--- 2026, the owner: Classic chapters that lose their dungeon finish on level, and it slots back in when the game adds
--- it).
+-- Is key a dungeon or raid of the catalog? Journeys keep the placements of dungeons this game lacks; the pages skip
+-- them while it lacks them (30 Oct 2026, the owner: Classic chapters that lose their dungeon finish on level, and it
+-- slots back in when the game adds it).
 function ns.KnownKey(key)
   key = ns.BaseKey(key)
   if type(key) ~= "string" then return false end
-  if key:match("^j%d+$") then return #key <= 8 end
   for _, list in ipairs({ ns.ALL_DUNGEONS or ns.DUNGEONS, ns.ALL_RAIDS or ns.RAIDS }) do
     for _, d in ipairs(list) do if d[1] == key then return true end end
   end
@@ -103,7 +101,7 @@ function ns.PartKey(key, i) return i == 1 and key or (key .. "#" .. i) end
 
 -- Where each dungeon is: its instance ID (GetInstanceInfo) in Data/Encounters.lua. When several dungeons share one
 -- instance (the Scarlet Monastery wings, Lower and Upper Blackrock Spire, Dire Maul), the names after the ID are
--- that dungeon's bosses; when no name matches (retail's versions), all are used.
+-- that dungeon's bosses; when no name matches, all are used.
 -- Dungeons not in the game's data yet have no entry: their bosses are learned on the kill (Fellowship/Clears.lua).
 ns.DUNGEON_MAPS = {
   hot = { 3065 }, rol = { 2999 }, dm = { 36 }, wc = { 43 }, sfk = { 33 }, bfd = { 48 }, stocks = { 34 }, exc = { 2998 },
@@ -135,28 +133,6 @@ ns.FINDER_IDS = {
   lbrs = 31, dme = 33, dmw = 35, dmn = 37, strat = 39, ubrs = 43,
   zg = 41, ony = 45, mc = 47, bwl = 49,
   dal = 3271, rol = 3272, hot = 3273, exc = 3274, shaper = 3267, bmh = 3268, alcaz = 3269, drown = 3270, krol = 3275,
-}
-
--- Retail's Adventure Guide entries (ns.ENCOUNTERS.wow.guide, by journal ID) that are dungeons and raids of the
--- catalog: retail's version of the same place (reworked since, with other bosses), so journeys and the presets
--- carry over. Every other guide entry is "j" and its journal ID. (The old Scarlet Monastery wings have no single
--- match in retail's Scarlet Halls and Scarlet Monastery; its Zul'Gurub is a dungeon, not the raid.)
-ns.GUIDE_KEYS = {
-  [63] = "dm", [64] = "sfk", [226] = "rfc", [227] = "bfd", [228] = "brd", [229] = "lbrs", [231] = "gnomer",
-  [232] = "mara", [233] = "rfd", [234] = "rfk", [237] = "st", [238] = "stocks", [239] = "ulda", [240] = "wc",
-  [241] = "zf", [246] = "scholo", [559] = "ubrs",
-  [1276] = "dme", [230] = "dmw", [1277] = "dmn", -- Warpwood Quarter, Capital Gardens, Gordok Commons
-  [236] = "strat", -- Stratholme - Main Gate (the Service Entrance is a guide entry of its own)
-  [741] = "mc", [742] = "bwl", [743] = "aq20", [744] = "aq40", [754] = "naxx", [760] = "ony",
-}
-
--- Retail's own Classic dungeons that the catalog has no key for, and their place in the presets, as the catalog's
--- { best level from, best level to, Classic chapter, role }: Scarlet Halls (Houndmaster and Armsmaster: the old
--- Library and Armory) where the Library was, Scarlet Monastery (Thalnos, Whitemane: the old Graveyard and Cathedral)
--- where the Cathedral was, and Stratholme's Service Entrance beside its Main Gate (30 Oct 2026, the owner: "Make it
--- so that the clients available dungeons are present").
-ns.GUIDE_PLAN = {
-  [311] = { 33, 36, 5, "m" }, [316] = { 37, 40, 6, "m" }, [1292] = { 58, 60, 14, "m" },
 }
 
 -- Rare spawns and bosses that need a summon or an item: listed, but not needed for a clear by default
@@ -200,9 +176,8 @@ ns.DUNGEON_ART = {
 -- The dungeons' loading screens: large pictures the game has for every dungeon (LoadingScreens for the map's
 -- LoadingScreenID, from wago.tools), as file IDs. Two kinds:
 --   classic: the original loading screens (NarrowScreenFileDataID), 4:3 art stored square, the picture between
---            the logo at the top and the bar at the bottom. In Forever and retail.
---   forever: Forever's own dungeons (MainImageFileDataID), 2992 x 1684 with the picture in the middle band. Only in
---            Forever: retail knows these file IDs but draws them solid green.
+--            the logo at the top and the bar at the bottom.
+--   forever: Forever's own dungeons (MainImageFileDataID), 2992 x 1684 with the picture in the middle band.
 -- The Forever dungeons not in the game's data yet (Drowned City, Krol'dok, Alcaz, Blackmaw) have none until they are.
 ns.DUNGEON_SCREEN = {
   hot = { 7963781, "forever" }, rol = { 7963782, "forever" }, exc = { 7963777, "forever" }, dal = { 7963775, "forever" },
@@ -218,13 +193,13 @@ ns.DUNGEON_SCREEN = {
   aq20 = { 131818, "classic" }, aq40 = { 131819, "classic" }, naxx = { 131854, "classic" },
 }
 -- Our own tiles (Media\DungeonHot ...: art/incoming, A7) for Forever's own dungeons: shown where the game has no
--- picture for them (retail, and the Forever dungeons not in the game's data yet). The game's loading screen comes first.
+-- picture for them (the Forever dungeons not in the game's data yet). The game's loading screen comes first.
 -- Shaper's Terrace and Barrow Deeps (6 Nov 2026) have no game art at all: Gemini's, made from what Blizzard showed.
 ns.DUNGEON_TILE = { hot = "DungeonHot", rol = "DungeonRol", exc = "DungeonExc", drown = "DungeonDrown",
   krol = "DungeonKrol", alcaz = "DungeonAlcaz", bmh = "DungeonBmh", shaper = "DungeonShaper", barrow = "DungeonBarrow" }
 -- The game's own picture for a place whose loading screen another place shares, or that has none (the owner, 6 Nov
 -- 2026: a picture of its own for each, the game's art first): the Adventure Guide's tiles as file IDs. Scarlet Halls
--- (the Library and the Armory) and Scarlet Monastery (the Cathedral) from retail's guide, its Upper Blackrock Spire,
+-- (the Library and the Armory) and Scarlet Monastery (the Cathedral), Upper Blackrock Spire,
 -- and Hyjal Summit from the Battle for Mount Hyjal. The Graveyard and Lower Blackrock Spire keep the loading screen;
 -- Dire Maul's wings share one picture in the game too. Shown before the loading screen.
 ns.DUNGEON_GUIDE = { smlib = 643262, smarm = 643262, smcath = 608214, ubrs = 1042000, hyjal = 608198 }
@@ -253,7 +228,7 @@ local function crop(band, w, h)
 end
 
 -- Puts a dungeon's picture on tex, cropped to the shape w x h: its loading screen, or else the Adventure Guide's
--- tile (retail's guide entries: their own, by file; the default tile when the game has none for it). Returns false
+-- tile (the default tile when the game has none for it). Returns false
 -- when there is no picture at all; the second result is true when only the default tile was found (a large card
 -- shows something better then).
 function ns.SetDungeonArt(tex, key, w, h)
@@ -264,7 +239,6 @@ function ns.SetDungeonArt(tex, key, w, h)
     return true, false
   end
   local screen = ns.DUNGEON_SCREEN[key]
-  if screen and screen[2] == "forever" and not ns.IsForever() then screen = nil end
   if screen and tex:SetTexture(screen[1]) then
     tex:SetTexCoord(crop(BANDS[screen[2]], w, h))
     return true, false
@@ -272,11 +246,6 @@ function ns.SetDungeonArt(tex, key, w, h)
   local tile = ns.DUNGEON_TILE[key]
   if tile and tex:SetTexture(ns.MEDIA .. tile) then
     tex:SetTexCoord(crop(BANDS.own, w, h))
-    return true, false
-  end
-  local guide = ns.GUIDE_ART and ns.GUIDE_ART[key]
-  if guide and guide > 0 and tex:SetTexture(guide) then
-    tex:SetTexCoord(crop(BANDS.journal, w, h))
     return true, false
   end
   local base = "Interface\\EncounterJournal\\UI-EJ-DUNGEONBUTTON-"
@@ -288,39 +257,31 @@ end
 
 -- The same loading screen for pictures outside the game: WoW Addon Webhooks for Discord reads it from the game's own
 -- files (docs/SAVED-DATA.md). { game = file id, crop = { left, right, top, bottom } (the picture's part of the file),
--- aspect = the shape that part is shown at }, or nil where this client has none (Forever's own dungeons on retail).
+-- aspect = the shape that part is shown at }, or nil where the game has none.
 function ns.DungeonScreen(key)
   local screen = ns.DUNGEON_SCREEN[ns.BaseKey(key)]
-  if not screen or (screen[2] == "forever" and not ns.IsForever()) then return nil end
+  if not screen then return nil end
   local band = BANDS[screen[2]]
   return { game = screen[1], crop = { band[1], band[2], band[3], band[4] }, aspect = band.aspect }
 end
 
--- Which boss data this client uses ("wowf": Forever, "wow": retail, where we test until Forever is out) and the game
--- build it was made from.
+-- Which boss data this client uses ("wowf": WoW Forever) and the game build it was made from.
 function ns.EncounterSet()
   local key = ns.Game()
   local data = ns.ENCOUNTERS and ns.ENCOUNTERS[key]
   return key, data and data.build
 end
 
--- Each game shows what it offers (30 Oct 2026, the owner: "Only Dungeons, Raids, Quests and attunements that are
--- available should be visible in the addon depending on what client they are logged into"; then retail "All of
--- retail's", and for WoW Forever "Announcements + dates"):
---   WoW Forever: what Blizzard has announced (ns.FOREVER_SCHEDULE), with the bosses its data has; a raid announced for
---     a later date shows that date until it opens (ns.IsOpen).
---   retail: every dungeon and raid of its Adventure Guide (Data/Encounters.lua, guide), with the game's own names,
---     levels, pictures and bosses, and its expansion (ns.EXPANSION: the journey editor's shelf groups by it).
--- The lists above are the whole catalog, kept in ns.ALL_*; ns.KeepThisGame (when the addon loads) puts this game's in
--- ns.DUNGEONS, ns.RAIDS, ns.DUNGEON_MAPS and ns.DUNGEON_SCREEN, so the pages, the editor's shelf, Gatherings, clear
--- detection and the Endgame follow. The presets plan with the catalog's levels and chapters (ns.PLAN_DUNGEONS), so
--- they stay the Classic ones in both games, with every dungeon the game offers (in WoW Forever only what Blizzard has
--- announced: the owner, 4 Nov 2026): on retail also its own Scarlet
--- Halls, Scarlet Monastery and Stratholme Service Entrance (ns.GUIDE_PLAN). A journey keeps the placement of a dungeon
--- this game lacks; ns.Dungeon knows it not, so the pages skip it until the game has it.
+-- The addon shows what the game offers (30 Oct 2026, the owner: "Only Dungeons, Raids, Quests and attunements that
+-- are available should be visible in the addon depending on what client they are logged into"; for WoW Forever
+-- "Announcements + dates"): what Blizzard has announced (ns.FOREVER_SCHEDULE), with the bosses its data has; a raid
+-- announced for a later date shows that date until it opens (ns.IsOpen).
+-- The lists above are the whole catalog, kept in ns.ALL_*; ns.KeepThisGame (when the addon loads) puts what the game
+-- offers in ns.DUNGEONS and ns.RAIDS, so the pages, the editor's shelf, Gatherings, clear detection, the Endgame and
+-- the presets (the Classic levels and chapters, with only what Blizzard has announced: the owner, 4 Nov 2026) follow.
+-- A journey keeps the placement of a dungeon the game lacks; ns.Dungeon knows it not, so the pages skip it until the
+-- game has it.
 ns.ALL_DUNGEONS, ns.ALL_RAIDS = ns.DUNGEONS, ns.RAIDS
-ns.ALL_DUNGEON_MAPS, ns.ALL_DUNGEON_SCREEN = ns.DUNGEON_MAPS, ns.DUNGEON_SCREEN
-ns.PLAN_DUNGEONS, ns.EXPANSION, ns.GUIDE_ART = ns.DUNGEONS, {}, {}
 
 local function catalogRow(key)
   for _, list in ipairs({ ns.ALL_DUNGEONS, ns.ALL_RAIDS }) do
@@ -330,17 +291,6 @@ end
 
 -- A name as plain letters, to know a place by its name ("The Barrow Deeps", "Barrow Deeps").
 function ns.PlainName(s) return (s:lower():gsub("^the ", ""):gsub("[^%w]", "")) end
-
--- Retail's guide entries by key (Data/Encounters.lua is generated, so this is worked out once per data table).
-local byKey = setmetatable({}, { __mode = "k" })
-local function guideEntries(data)
-  if not byKey[data] then
-    local out = {}
-    for _, g in ipairs(data.guide) do out[ns.GUIDE_KEYS[g[1]] or ("j" .. g[1])] = g end
-    byKey[data] = out
-  end
-  return byKey[data]
-end
 
 -- What WoW Forever offers, as Blizzard has announced it (30 Oct 2026, the owner: "Announcements + dates"). The game's
 -- own files are no guide to it: unreleased content is encrypted there until it opens (five days before launch the
@@ -361,20 +311,13 @@ ns.FOREVER_SCHEDULE = {
   barrow = DEC_9, hyjal = DEC_9, ony = DEC_9,
 }
 
--- Is the dungeon or raid in game ("wowf" or "wow"; default: this one)? Retail: its Adventure Guide lists it. Forever:
--- Blizzard has announced it.
-function ns.InGame(key, game)
-  game = game or ns.Game()
-  key = ns.BaseKey(key)
-  local data = ns.ENCOUNTERS and ns.ENCOUNTERS[game]
-  if data and data.guide then return guideEntries(data)[key] ~= nil end
-  if game == "wowf" then return ns.FOREVER_SCHEDULE[key] ~= nil end
-  return false
+-- Is the dungeon or raid in the game? Blizzard has announced it for WoW Forever.
+function ns.InGame(key)
+  return ns.FOREVER_SCHEDULE[ns.BaseKey(key)] ~= nil
 end
 
--- When an announced place opens (a time), or nil when it is open from the start (and always on retail).
+-- When an announced place opens (a time), or nil when it is open from the start.
 function ns.Opens(key)
-  if ns.Game() ~= "wowf" then return nil end
   local at = ns.FOREVER_SCHEDULE[ns.BaseKey(key)]
   return type(at) == "number" and at or nil
 end
@@ -404,72 +347,24 @@ function ns.OpensText(key)
   return at and (date("%d %B", at):gsub("^0", "")) or nil
 end
 
--- Lowest expansion, then level, then name.
-local function byExpansion(a, b)
-  local ea, eb = ns.EXPANSION[a[1]] or 0, ns.EXPANSION[b[1]] or 0
-  if ea ~= eb then return ea < eb end
-  if a[3] ~= b[3] then return a[3] < b[3] end
-  return a[2] < b[2]
-end
-
--- Retail: its Adventure Guide as this game's dungeons and raids. A catalog dungeon keeps its key (journeys and the
--- presets carry over) and its preset chapter, as retail's own Classic versions take theirs from ns.GUIDE_PLAN; the
--- name, levels, picture and bosses are the game's. A wing of a shared
--- instance (Dire Maul, Stratholme) has its bosses by name, as the catalog's wings do.
-local function fromGuide(data)
-  local dungeons, raids, maps, screens, plan = {}, {}, {}, {}, {}
-  ns.EXPANSION, ns.GUIDE_ART = {}, {}
-  for key, g in pairs(guideEntries(data)) do
-    local own = catalogRow(key)
-    local p = not own and ns.GUIDE_PLAN[g[1]]
-    if p then own = { key, g[3], p[1], p[2], p[3], p[4] } end
-    if g[5] == "r" then
-      raids[#raids + 1] = { key, g[3], g[6], g[8] }
-    else
-      dungeons[#dungeons + 1] = { key, g[3], g[6], g[7], own and own[5] or 0, own and own[6] or "o" }
-      if own then plan[#plan + 1] = own end
-    end
-    local m = { g[2] }
-    for i = 10, #g do m[#m + 1] = g[i] end
-    maps[key] = m
-    ns.EXPANSION[key], ns.GUIDE_ART[key] = g[4], g[9]
-    -- The catalog's loading screen where retail's instance is the same one (not its new Scholomance).
-    local where = ns.ALL_DUNGEON_MAPS[key]
-    if where and where[1] == g[2] then screens[key] = ns.ALL_DUNGEON_SCREEN[key] end
-  end
-  table.sort(dungeons, byExpansion)
-  table.sort(raids, byExpansion)
-  table.sort(plan, function(a, b) return a[1] < b[1] end)
-  return dungeons, raids, maps, screens, plan
-end
-
--- Keeps this game's dungeons, raids, attunements and dungeon quests (Core/Init.lua, when the addon loads). Our quest
--- lists are WoW Forever's (Data/QuestLists.lua, every ID checked against its quest table): retail has none of these
--- attunements and keys, and other quests for its versions of the dungeons. In Forever, an attunement or quest list
--- hides with its raid or dungeon.
+-- Keeps the dungeons, raids, attunements and dungeon quests the game offers (Core/Init.lua, when the addon loads).
+-- Our quest lists are WoW Forever's (Data/QuestLists.lua, every ID checked against its quest table); an attunement
+-- or quest list hides with its raid or dungeon.
 function ns.KeepThisGame()
-  local data = ns.ENCOUNTERS and ns.ENCOUNTERS[ns.Game()]
-  if data and data.guide then
-    ns.DUNGEONS, ns.RAIDS, ns.DUNGEON_MAPS, ns.DUNGEON_SCREEN, ns.PLAN_DUNGEONS = fromGuide(data)
-  else
-    local function keep(list)
-      local out = {}
-      for _, d in ipairs(list) do if ns.InGame(d[1]) then out[#out + 1] = d end end
-      return out
-    end
-    ns.DUNGEONS, ns.RAIDS = keep(ns.ALL_DUNGEONS), keep(ns.ALL_RAIDS)
-    ns.DUNGEON_MAPS, ns.DUNGEON_SCREEN, ns.PLAN_DUNGEONS = ns.ALL_DUNGEON_MAPS, ns.ALL_DUNGEON_SCREEN, ns.DUNGEONS
-    ns.EXPANSION, ns.GUIDE_ART = {}, {}
+  local function keep(list)
+    local out = {}
+    for _, d in ipairs(list) do if ns.InGame(d[1]) then out[#out + 1] = d end end
+    return out
   end
-  local forever = ns.IsForever()
+  ns.DUNGEONS, ns.RAIDS = keep(ns.ALL_DUNGEONS), keep(ns.ALL_RAIDS)
   ns.ATTUNEMENTS, ns.DUNGEON_QUESTS = {}, {}
-  for _, a in ipairs(forever and ns.ALL_ATTUNEMENTS or {}) do
+  for _, a in ipairs(ns.ALL_ATTUNEMENTS or {}) do
     local place = catalogRow(a.key)
     if (not a.from or ns.Dungeon(a.from)) and (not place or ns.Dungeon(a.key)) and (not a.raid or ns.Raid(a.raid)) then
       ns.ATTUNEMENTS[#ns.ATTUNEMENTS + 1] = a
     end
   end
-  for key, list in pairs(forever and ns.ALL_DUNGEON_QUESTS or {}) do
+  for key, list in pairs(ns.ALL_DUNGEON_QUESTS or {}) do
     if ns.Dungeon(key) then ns.DUNGEON_QUESTS[key] = list end
   end
 end

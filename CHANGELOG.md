@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.2.0 (7 November 2026)
+- What's New shows this update's news once: the Dungeons tab, room for the dungeon quests, and Recommended next.
+- The Dungeon Journal button opens the DungeonJournal addon at the dungeon (it only opened or closed its window).
+- A smaller download: the addon is made for WoW Forever only, and the retail client's dungeon data is gone.
+- Less stutter near your fellowship: Adventurers' 3D models load once, not every 10 seconds and on every mouseover.
+- Lighter sync: a message for the whole fellowship is packed once for everyone, with far less throwaway data, and quest lists and gear wait for Adventurers the game says are offline (they get them when they log in).
+- Smoother level-ups: what JTF does after a level-up runs over two seconds instead of all in the same moment, and the book redraws for others' news at most once a second, and only when the page shows it (a quest list arriving no longer redraws the Overview).
+- Moments: a first now names the same Adventurer for everyone. A fall (or another deed) heard after a dungeon run, earlier than the one your addon saw, takes the Moment over; Moments already kept are put right the next time the book opens.
+- The Chapter page lists the dungeons in a suggested order: the mandatory ones first, lowest levels first, then the bridges and optional ones. With several mandatory dungeons, the first one not cleared says "Recommended next".
+- Following another character's fellowship works at once on a brand-new alt: your account's characters show the Adventurers a shared mark, so your main no longer has to log in first to introduce it.
+- Raids not open yet show their picture large with a countdown ("Opens in 33 days · 9 December"). Dungeon pictures show large when you point at them (Chapter, Overview, Journey Admin), the Overview's dungeon list has a small picture before each name, the invite list shows a class icon before each online name, and the Welcome page puts How a journey works right under Your characters.
+- A new Dungeons tab, first on the Quests page: every dungeon of the journey with its quests for your side, in three groups (pick up before you go, start earlier, starts inside), each with its level, where it starts, whether you have done it or carry it, and who else has it. Pin on map sets a waypoint to the quest giver (or opens the map with Questie). The Chapter page shows a map button with the number of quests to pick up, and a toast tells you when a dungeon's first quest opens to you (Settings can turn it off). Where a quest starts is learned when anyone in the fellowship picks it up.
+- Room for the dungeon quests: the Overview shows how far the current chapter's dungeon quests (and the dungeons' mobs, once your fellowship has run them) will take you (each level counted at its own size), and where to stop questing so they still fit under the cap. The Chapter page shows the total, the Dungeons tab each dungeon's share (with Show everyone for the others'), and two toasts warn you half a level before the stop point and at it (Settings can turn them off).
+- A "?" in the header on every page: a short walk through the page you are on, what it is for and what each side shows, without starting the whole tour.
+- The catch-up estimate ("about 2 hours at your pace") counts each level at its own size (each is bigger than the last), so it is longer and closer to the truth.
+
 ## 1.1.1 (7 November 2026)
 - Game data from WoW Forever 1.60.1.70862: The Drowned City, Krol'dok Stronghold, Alcaz Prison, Blackmaw Hold and
   The Shaper's Terrace now know their bosses and their Dungeon Finder entries, so their clears count from the first

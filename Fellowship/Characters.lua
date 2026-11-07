@@ -111,5 +111,5 @@ function C:Summary(key)
 end
 
 ns:On("LOGIN", function() C:Update() end)
-ns:RegisterEvent("PLAYER_LEVEL_UP", function() C_Timer.After(1, function() C:Update() end) end)
+ns:RegisterEvent("PLAYER_LEVEL_UP", function() C_Timer.After(ns.LEVEL_UP.characters, function() C:Update() end) end)
 ns:RegisterEvent("PLAYER_LOGOUT", function() C:Update() end)

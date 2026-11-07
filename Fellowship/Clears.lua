@@ -6,7 +6,7 @@
 --   f.runs[key]   = { heroName = time }                   who has cleared the dungeon
 --   f.undone[key] = { ["*"] = time, heroName = time }     when clears were undone: earlier kill reports are ignored
 --   f.history     = { entry, ... }, newest first. Run entries: one per dungeon visit, { key, names, killed, ... }.
--- Boss lists come from the game's own data (Data/Encounters.lua, built from wago.tools for Forever and retail),
+-- Boss lists come from the game's own data (Data/Encounters.lua, built from wago.tools for Forever),
 -- else bosses learned on the kill. A boss token is "e<encounter ID>" (the ID ENCOUNTER_END gives), or "n<name>".
 -- Every Hero's addon in the group records each kill at once (so toasts are immediate) and sends RUN to the other
 -- Heroes (held until the group leaves the instance). RUN is not a versioned op: reports of one kill are the same
@@ -546,9 +546,7 @@ function C:Kill(f, key, b)
   local names = self:GroupHeroes(f)
   local e, newly, done = self:Record(f, key, now, names, b.tok)
   local me = ns.Me()
-  for name in pairs(f.members) do
-    if name ~= me then Comm:Send(name, "RUN", { fid = f.id, key = key, t = now, names = names, b = b.tok, bn = b.name }) end
-  end
+  Comm:SendAll(ns.Others(f), "RUN", { fid = f.id, key = key, t = now, names = names, b = b.tok, bn = b.name })
   if e then
     if e.ok then
       local n, of = self:Progress(f, key, me)
