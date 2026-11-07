@@ -3887,6 +3887,18 @@ step("screen: the book lies on this screen, in a window and in full screen", fun
   S:Set("fullscreen", was)
 end)
 
+-- 1.2.1 left the dimmed screen over the game after a login in full screen, the book closed (hotfix 1.2.2): dark, and
+-- every click caught. Only an open book in full screen dims the screen.
+step("screen: the screen is dimmed only behind an open book in full screen", function(c)
+  local W = ns.Window
+  c:Eq(W.frame.backdrop:IsShown(), W:IsOpen() and W:IsFullscreen(), "dimmed now: only with the book open in full screen")
+  -- (Closing the book here would end the walkthrough and a watch: sized again only when it is closed already.)
+  if not W:IsOpen() then
+    W:ApplyScale()
+    c:Eq(W.frame.backdrop:IsShown(), false, "the book closed and sized again: nothing dimmed")
+  end
+end)
+
 ---------------------------------------------------------------------------
 -- The journey from level 1, newcomers, realms, trial accounts, pruning (27 Oct 2026)
 ---------------------------------------------------------------------------

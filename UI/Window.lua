@@ -688,8 +688,10 @@ function W:Build()
   for key, def in pairs(self.panelDefs) do self.panels[key] = buildPanel(f.area, key, def) end
   self:BuildConfirm(f.area)
   placeFrame(f)
-  self:ApplyScale()
+  -- Hidden first: ApplyScale shows the dimmed screen with a shown book, and this build at login left it over the game
+  -- in full screen with the book closed, dark and catching every click, until the book opened (1.2.1, 7 Nov 2026).
   f:Hide()
+  self:ApplyScale()
   f:SetScript("OnShow", function()
     f.backdrop:SetShown(W:IsFullscreen())
     if not ns.Settings:Get("reduce") then f.openAnim:Stop(); f.openAnim:Play() end

@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.2.2 (7 November 2026)
+- Full screen: after logging in or a /reload with the book in full screen, the screen stayed dark and caught every click (you could not move or click the world) until the book was opened and closed once. It is clear now.
+
 ## 1.2.1 (7 November 2026)
 - Room for the dungeon quests: the Overview's card updates as soon as you pick up one of the chapter's dungeon quests (it waited for something else to redraw the page).
 - Room for the dungeon quests: the dungeons' mobs count from the middle of your fellowship's last three runs at your level, so one odd run (a duo, which shares the kills among fewer, or a run cut short) no longer sets the estimate for good. A run counts once, however many in the group share their figure.
