@@ -68,7 +68,7 @@ A.LIST = {
   { key = "quests", title = "Shared quests and chains",
     checks = { "quests tab", "quests: Show all", "quests: Together", "other addons" },
     shots = { "leader-quests-empty", "quests", "quests-join", "quests-showall", "quests-chains" } },
-  { key = "dquests", title = "Dungeon quests (Dungeons tab)", checks = { "dungeon quests:" }, shots = { "quests-dungeons", "toast-dquest" } },
+  { key = "dquests", title = "Dungeon quests (Dungeons tab)", checks = { "dungeon quests:" }, shots = { "quests-dungeons", "quests-dungeons-new", "toast-dquest" } },
   { key = "room", title = "Room for the dungeon quests", checks = { "room:" },
     shots = { "overview-room", "chapter-room", "quests-dungeons-room", "toast-room" } },
   { key = "attune", title = "Attunements", checks = { "quests: tabs and attunements", "attunements:" },

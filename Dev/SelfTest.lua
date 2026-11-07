@@ -1202,15 +1202,19 @@ step("dungeon quests: the Dungeons tab comes first, every dungeon in order with 
   pf.tabs.buttons[1]:Click()
   c:Eq(pf.tab, "dungeons", "the first tab is Dungeons")
   c:That(pf.dlscroll:IsShown() and not pf.lscroll:IsShown(), "its pages show, the Quests tab's do not")
-  local n, empty = 0, 0
+  local n, empty, notDone = 0, 0, {}
   for _, r in ipairs(pf.dRows.items) do
     if r:IsShown() then
       n = n + 1
       if (r.count:GetText() or "") == "" then empty = empty + 1 end
+      -- (The check of 7 Nov 2026: Ruins of Lordaeron said "All its quests done" while its quests all start inside.)
+      local p, e, i = ns.QuestLists:Counts(cur(), r.key)
+      if r.count:GetText() == L.DQ_ALL_DONE and p and p + e + i > 0 then notDone[#notDone + 1] = r.name:GetText() end
     end
   end
   c:Eq(n, #ns.QuestDungeons.List(cur()), "every dungeon of the journey once")
   c:Eq(empty, 0, "each with its count, all done, or No quest list yet")
+  c:Eq(#notDone, 0, #notDone > 0 and ("all done, but not: " .. table.concat(notDone, ", ")) or "All its quests done only where none is left")
 end)
 
 step("dungeon quests: the chosen dungeon's three groups, where each starts, Pin on map", function(c)
@@ -1243,6 +1247,31 @@ step("dungeon quests: the chosen dungeon's three groups, where each starts, Pin 
   local can = map and C_Map and C_Map.CanSetUserWaypointOnMap and C_Map.CanSetUserWaypointOnMap(map)
   report().dungeonPin = { map = map, waypoint = can and true or false }
   c:That(true, "the zone's map: " .. tostring(map) .. "; waypoints there: " .. tostring(can and true or false))
+end)
+
+-- The list's counts are counted without building the groups, and each dungeon's quest list is made once (code review
+-- of 1.2.0: both were made again for every dungeon at each redraw).
+step("dungeon quests: the counts agree with the groups; each list made once", function(c)
+  local QL, f = ns.QuestLists, cur()
+  local key = listedDungeon()
+  if not key then return c:That(true, "no dungeon with a quest list in this journey") end
+  local g = QL:Groups(f, key)
+  local function open(list)
+    local n = 0
+    for _, x in ipairs(list) do if x.status ~= "done" then n = n + 1 end end
+    return n
+  end
+  local p, e, i = QL:Counts(f, key)
+  c:Eq(("%d %d %d"):format(p, e, i), ("%d %d %d"):format(open(g.pick), open(g.earlier), open(g.inside)), "the counts agree with the groups")
+  c:That(QL:DungeonQuests(f, key) == QL:DungeonQuests(f, key), "the dungeon's list is made once")
+end)
+
+-- The dungeons new in WoW Forever have their lists, each side its own (the owner, 7 Nov 2026).
+step("dungeon quests: the dungeons new in WoW Forever have their lists", function(c)
+  local g = ns.QuestLists:Groups(cur(), "hot")
+  local horde = UnitFactionGroup("player") == "Horde"
+  c:That(g ~= nil and #g.inside > 0, "Hall of Thanes: An Ancient Grudge starts inside, for both sides")
+  c:Eq(g and #g.pick, horde and 0 or 2, "Hall of Thanes: quests to pick up in Ironforge (none for the Horde)")
 end)
 
 step("dungeon quests: the Chapter page's map button opens the dungeon on the Dungeons tab", function(c)
@@ -1317,6 +1346,28 @@ step("room: the dungeon quests' levels in words, where to stop, the mobs", funct
   c:Eq(notes, mobs .. "  " .. L.ROOM_UNKNOWN_N:format(2), "the mobs and the quests whose XP is not known yet")
   c:Eq(R:Keep("nowhere", 20, 100), false, "a run in a place that is not a dungeon is not kept")
   c:Eq(R:Keep("dm", 20, 5000000), false, "XP that high is not kept")
+  -- One odd run neither sticks nor rules: the middle of the last three (the best run stayed forever: code review of
+  -- 1.2.0). On a list of its own, put back after the step.
+  local saved = ns.db.mobXP
+  c.undo = function() ns.db.mobXP = saved end
+  ns.db.mobXP = {}
+  -- (Each run kept as if half an hour after the one before; one run's figures count once: code review of 1.2.1.)
+  local function run(xp)
+    for _, e in ipairs(ns.db.mobXP.dm and ns.db.mobXP.dm[20] or {}) do e.t = e.t - R.SAME_RUN end
+    return R:Keep("dm", 20, xp)
+  end
+  run(9000)
+  for _, xp in ipairs({ 9100, 9300, 8900, 9200 }) do
+    c:Eq(R:Keep("dm", 20, xp), false, "the other four figures of a five-person run take no slot")
+  end
+  run(30000)
+  c:Eq(R:Keep("dm", 20, 29000), false, "nor the other figure of a duo's run")
+  run(8000)
+  c:Eq(#ns.db.mobXP.dm[20], 3, "three slots, three runs")
+  c:Eq(R.MobXP("dm", 20), 9000, "an inflated run does not rule")
+  run(8500); run(8200)
+  c:Eq(R.MobXP("dm", 20), 8200, "and is gone after three newer runs")
+  ns.db.mobXP = saved
   local r = R:Chapter(cur(), ns.Me())
   c:That(true, r and ("this chapter: %.1f levels, %d quests' XP not known, %d dungeons not run yet"):format(r.levels, r.unknown, r.unrun)
     or "nothing to count in this chapter")
@@ -1328,6 +1379,23 @@ step("room: counted from the level the book shows for you, and no card with noth
   if not r then return c:That(true, "no XP known to count in this chapter: no card") end
   c:That(r.levels > 0, ("something to count: %.1f levels"):format(r.levels))
   c:Eq(math.floor(r.now), (ns.Dev and ns.Dev.myLevel) or UnitLevel("player"), "from the level every page shows for you")
+end)
+
+-- Code review of 1.2.0: picking up a dungeon quest left the Overview's room card as it was (a quest list redrew only
+-- the quest pages). A dungeon quest picked up or dropped redraws every page; any other quest still does not.
+step("room: a dungeon quest picked up redraws every page, another quest only the quest pages", function(c)
+  local name = full("Elyra")
+  local f, Q = { members = { [name] = {} }, heroes = {} }, ns.Quests
+  local function log(ids)
+    local q = {}
+    for _, id in ipairs(ids) do q[id] = { t = "Quest " .. id, z = "", l = 1, h = 0, g = 1 } end
+    return { q = q }
+  end
+  Q:Store(f, name, log({ 783 }))
+  c:Eq(Q:Store(f, name, log({ 783, 1 })), false, "another quest: the quest pages only")
+  c:Eq(Q:Store(f, name, log({ 783, 1, 166 })), true, "a dungeon quest picked up: every page")
+  c:Eq(Q:Store(f, name, log({ 783, 1, 166 })), false, "the same log again: the quest pages only")
+  c:Eq(Q:Store(f, name, log({ 783, 1 })), true, "a dungeon quest dropped: every page")
 end)
 
 step("room: two warnings, half a level before the stop point and at it, once each", function(c)
@@ -2244,8 +2312,12 @@ step("Chronicle: the fellowship's firsts and tallies", function(c)
   if podium and q then c:Has(podium.places[1].name:GetText(), ns.Short(q.top[1].name), "first place: " .. ns.Short(q.top[1].name)) end
   ns.Moments:Check(f)
   c:That(ns.Moments:Find(f, "first:fall") ~= nil, "a Moments card for the first to fall")
+  -- (Settled at once here: waiting for the others has its own step, "board: a first goes to Discord only once ...".)
+  local settle = ns.Board.SETTLE
+  ns.Board.SETTLE = 0
   local news = 0
   for _, n in ipairs(ns.Board:News(f)) do if n.kind == "first" then news = news + 1 end end
+  ns.Board.SETTLE = settle
   c:That(news >= 3, news .. " firsts in the Discord outbox")
   pf.filter = "all"
   b.deeds, b.tally, e.deeds, e.tally = keep[1], keep[2], keep[3], keep[4]
@@ -2882,6 +2954,26 @@ step("friends without the addon: closed", function(c)
   c:That(not (o and o:IsShown()), "closed")
 end)
 
+-- Code review of 1.2.0: a first heard later took its Moment over, but Discord already had the first name. A first goes
+-- out only once every other Adventurer has been heard from after it, or a day later. On a made-up fellowship.
+step("board: a first goes to Discord only once nobody can take it over", function(c)
+  -- (Deed times are the server's clock, heard this PC's own: right whatever this PC's clock says; code review of 1.2.1.)
+  local B, me, other, now, S = ns.Board, ns.Me(), full("Elyra"), time(), ns.Firsts.Now()
+  local f = { members = { [me] = {}, [other] = {} }, heroes = { [other] = { heard = now - 600 } } }
+  c:Eq(B:Settled(f, { name = me, time = S - 300 }), false, "someone not heard from since may still bring an earlier one")
+  f.heroes[other].heard = now - 10
+  c:Eq(B:Settled(f, { name = me, time = S - 300 }), true, "heard from after it: it goes out")
+  f.heroes[other].heard = nil
+  c:Eq(B:Settled(f, { name = me, time = S - B.SETTLE }), true, "a day later it goes out anyway")
+  -- A first that waited a day keeps its place past the twenty newest clears.
+  f.id, f.history = "selftest-board", {}
+  for i = 1, B.NEWS + 5 do f.history[i] = { id = "run" .. i, type = "run", key = "dm", time = S - i, cleared = { other } } end
+  f.heroes[other] = { deeds = { fall = S - B.SETTLE - 60 } }
+  local firsts = 0
+  for _, n in ipairs(B:News(f)) do if n.kind == "first" then firsts = firsts + 1 end end
+  c:Eq(firsts, 1, "a first that waited is not cut with the older news")
+end)
+
 -- What WoW Addon Webhooks for Discord posts (Fellowship/Board.lua, docs/SAVED-DATA.md): written at logout; here only
 -- built, so the Selftest fellowship never reaches the saved data.
 step("board: what WoW Addon Webhooks for Discord gets (built, not saved)", function(c)
@@ -3248,6 +3340,43 @@ step("the tracker under the game's quest tracker", function(c)
   TK:SetFolded(wasFolded)
 end)
 
+-- Ctrl and drag (the owner, 7 Nov 2026, "like Questie"). Ctrl cannot be pressed from here: a drag without it moves
+-- nothing, and a drop (as after a drag with Ctrl) is made by hand. Your settings and the tracker's place are put back.
+step("the tracker: Ctrl and drag moves it; dropped while docked, it is its own panel there", function(c)
+  local TK, S = ns.Tracker, ns.Settings
+  local fr = TK.frame
+  local was = { tracker = S:Get("tracker"), trackerHover = S:Get("trackerHover"), trackerDock = S:Get("trackerDock") }
+  local pos = ns.char.trackerPos
+  local function putBack()
+    ns.char.trackerPos = pos
+    for k, v in pairs(was) do S:Set(k, v) end
+    TK:Place()
+  end
+  S:Set("tracker", true); S:Set("trackerHover", false); S:Set("trackerDock", true)
+  if not fr:IsShown() then putBack() return c:That(true, "the tracker is folded away with the game's: nothing to drag") end
+  local line = fr.lines[2]
+  if not IsControlKeyDown() then
+    -- (Code review of 1.3.0: a click that moved a little starts a drag and the game sends no OnClick; let go over
+    -- the line it is the click. The line's own click is swapped for a count here, so no page opens.)
+    local onClick, clicked = line:GetScript("OnClick"), 0
+    line:SetScript("OnClick", function() clicked = clicked + 1 end)
+    line.IsMouseOver = function() return true end
+    line:GetScript("OnDragStart")(line)
+    c:That(not TK.moving, "a drag on a line without Ctrl moves nothing")
+    line:GetScript("OnDragStop")(line)
+    c:Eq(clicked, 1, "let go over the line, it is a click")
+    line.IsMouseOver = nil
+    line:SetScript("OnClick", onClick)
+  end
+  local docked = TK:Docked()
+  TK.moving = true
+  TK:StopMove()
+  local p = ns.char.trackerPos
+  c:That(p ~= nil and p.point == "TOPLEFT" and p.x ~= nil and p.y ~= nil, "dropped: its place is kept")
+  if docked then c:That(not TK:Docked() and fr.bar:IsShown(), "dropped from under the game's tracker: its own panel, with its title bar") end
+  putBack()
+end)
+
 step("minimap button and toast position", function(c)
   local S = ns.Settings
   S:Set("minimap", false)
@@ -3268,6 +3397,40 @@ step("minimap button and toast position", function(c)
   ns.Toasts:ResetPosition()
   c:That(not ns.Toasts.moving, "done; position reset")
 end)
+
+-- Ctrl and drag a toast (the owner, 7 Nov 2026). As for the tracker: no Ctrl from here, the drop made by hand, your
+-- toast place put back.
+step("toasts: Ctrl and drag moves one while it shows; it fades where it was dropped", function(c)
+  local T = ns.Toasts
+  local pos = ns.char.toastPos
+  T:Example()
+  local f = T.frame
+  if not IsControlKeyDown() then
+    f:GetScript("OnDragStart")(f)
+    c:That(not T.dragging, "a drag without Ctrl moves nothing (a click opens what it is about)")
+  end
+  T.dragging = true
+  f:GetScript("OnDragStop")(f)
+  c:That(not T.dragging and ns.char.toastPos ~= nil and ns.char.toastPos.point ~= nil, "dropped: its place is kept")
+  c:Eq(f.fadeIn:GetDuration(), 0, "it shows its time again without fading in once more")
+  -- (Reduce effects, or that example's kind turned off: no next toast to look at.)
+  if T:Example() == "shown" then c:That(f.fadeIn:GetDuration() > 0, "the next toast fades in as usual") end
+  -- Code review of 1.3.0: a toast that came during a drag shows at the drop; hidden while dragged, the drag is let go;
+  -- a drag the game never ended (the button is up now) does not stop the next toast.
+  local ex = T.EXAMPLES[1]
+  T.dragging, T.waiting = true, { kind = ex[1], title = ex[2], text = ex[3] }
+  f:GetScript("OnDragStop")(f)
+  c:That(not T.waiting and f.title:GetText() == ex[2], "a toast that came during the drag shows when it is dropped")
+  f:Show(); T.dragging = true
+  f:Hide()
+  c:That(not T.dragging, "hidden while dragged: the drag is let go")
+  T.dragging = true
+  if IsMouseButtonDown and T:Example() == "shown" then c:That(not T.dragging and f:IsShown(), "a drag the game never ended does not stop the next toast") end
+  T.dragging = nil
+  ns.char.toastPos = pos
+  T:Place()
+  f.anim:Stop(); f:Hide()
+end, 1)
 
 step("the Endgame: raids open after the journey", function(c)
   local f = cur()
@@ -3805,6 +3968,18 @@ step("screen: the book lies on this screen, in a window and in full screen", fun
     end
   end
   S:Set("fullscreen", was)
+end)
+
+-- 1.2.1 left the dimmed screen over the game after a login in full screen, the book closed (hotfix 1.2.2): dark, and
+-- every click caught. Only an open book in full screen dims the screen.
+step("screen: the screen is dimmed only behind an open book in full screen", function(c)
+  local W = ns.Window
+  c:Eq(W.frame.backdrop:IsShown(), W:IsOpen() and W:IsFullscreen(), "dimmed now: only with the book open in full screen")
+  -- (Closing the book here would end the walkthrough and a watch: sized again only when it is closed already.)
+  if not W:IsOpen() then
+    W:ApplyScale()
+    c:Eq(W.frame.backdrop:IsShown(), false, "the book closed and sized again: nothing dimmed")
+  end
 end)
 
 ---------------------------------------------------------------------------

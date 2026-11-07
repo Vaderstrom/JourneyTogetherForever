@@ -1,8 +1,8 @@
 -- The tracker (M22, SPEC §5): a small panel on the screen, outside the book, like the game's quest tracker. It shows
 -- the chapter, its status, where you stand, the next step, who is online and the next Gathering, so the book need
--- not be opened to know what to do. Drag it by its title; click the title to fold it to one line; click a line to
--- open the book there. Settings → Tracker turns it off. Built at login, out of combat (it is not a secure frame,
--- so it shows and updates during combat too).
+-- not be opened to know what to do. Drag it by its title, or by any line with Ctrl held; click the title to fold it to
+-- one line; click a line to open the book there. Settings → Tracker turns it off. Built at login, out of combat (it is
+-- not a secure frame, so it shows and updates during combat too).
 -- Under the game's quest tracker (Settings, on by default; the owner, 2 Nov 2026): one more section under the
 -- game's quest list, with the game's own section header and fold button, its fonts and its background. A real
 -- section of the game's tracker would taint it (its quest item buttons then fail in combat), so this is our own
@@ -49,13 +49,7 @@ function TK:Build()
   -- The title bar: crest, chapter, fold mark. Drag to move, click to fold.
   local bar = CreateFrame("Button", nil, f)
   bar:SetPoint("TOPLEFT"); bar:SetPoint("TOPRIGHT"); bar:SetHeight(30)
-  bar:RegisterForDrag("LeftButton")
-  bar:SetScript("OnDragStart", function() f:StartMoving() end)
-  bar:SetScript("OnDragStop", function()
-    f:StopMovingOrSizing()
-    local point, _, rel, x, y = f:GetPoint()
-    ns.char.trackerPos = { point = point, rel = rel, x = x, y = y }
-  end)
+  TK:Draggable(bar, true) -- (the title: no Ctrl needed)
   bar:SetScript("OnClick", function() TK:SetFolded(not ns.char.trackerFolded) end)
   local shade = UI.GradientTex(bar, "BACKGROUND", "VERTICAL", { "band2", 0.9 }, { "band1", 0.9 })
   shade:SetPoint("TOPLEFT", 1, -1); shade:SetPoint("BOTTOMRIGHT", -1, 0)
@@ -98,6 +92,7 @@ function TK:Build()
     b:SetScript("OnClick", function()
       if b.page == "inbox" then ns.Window:OpenPanel("inbox") else ns.Window:Open(b.page) end
     end)
+    TK:Draggable(b)
     f.lines[i] = b
   end
   -- Under "you": a little bar to the floor (below it, red) or from the floor to the cap (U13).
@@ -115,6 +110,7 @@ function TK:Build()
     local over = f:IsMouseOver() and true or false
     if over ~= f.over then f.over = over; TK:Refresh() end
   end)
+  f:SetScript("OnHide", function() TK:DragCut() end)
   f:Hide()
   self.frame = f
   place(f)
@@ -122,6 +118,52 @@ function TK:Build()
   Theme:Register(function() TK:PaintDocked() end)
   if Settings:Get("trackerDock") then self:BuildDock() end
   return f
+end
+
+-- Moving it (the owner, 7 Nov 2026: "by holding down CTRL", as Questie's tracker): the panel by its title; with Ctrl
+-- held, by any line or the docked header too. Dragged away from under the game's tracker, it becomes its own panel
+-- where it is dropped (Settings → Under the game's quest tracker docks it again).
+function TK:Draggable(w, noCtrl)
+  w:RegisterForDrag("LeftButton")
+  w:SetScript("OnDragStart", function()
+    -- (Set at every start: one left over from a drag the game never ended must not turn a Ctrl drag into a click.)
+    w.pressed = not (noCtrl or IsControlKeyDown()) or nil
+    if w.pressed then return end
+    TK.moving = true
+    -- Docked, it hangs from the game's tracker: it is let go of that first, where it is.
+    local fr = TK.frame
+    local x, y = fr:GetLeft(), fr:GetTop()
+    fr:ClearAllPoints(); fr:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", x, y)
+    fr:StartMoving()
+  end)
+  -- A click that moves a little starts a drag, and after one the game sends no OnClick: without Ctrl it was a click,
+  -- so let go over the line it is one (code review of 1.3.0: such a click opened nothing).
+  w:SetScript("OnDragStop", function()
+    if not w.pressed then return TK:StopMove() end
+    w.pressed = nil
+    local click = w:GetScript("OnClick")
+    if click and w:IsMouseOver() then click(w, "LeftButton") end
+  end)
+end
+
+function TK:StopMove()
+  if not self.moving then return end
+  self.moving = nil
+  local fr = self.frame
+  fr:StopMovingOrSizing()
+  ns.char.trackerPos = { point = "TOPLEFT", rel = "BOTTOMLEFT", x = fr:GetLeft(), y = fr:GetTop() }
+  if not self:Docked() then return self:Place() end
+  Settings:Set("trackerDock", false)
+  -- (An open Settings page shows the box turned off.)
+  ns.Window:Refresh()
+end
+
+-- Hidden while dragged (combat with "Hide in combat", the game's tracker folded): the drag is let go, back in its place.
+function TK:DragCut()
+  if not self.moving then return end
+  self.moving = nil
+  self.frame:StopMovingOrSizing()
+  self:Place()
 end
 
 -- The game's quest tracker (Blizzard_ObjectiveTracker, the same in Forever), when it has the parts we sit under: its
@@ -149,6 +191,7 @@ function TK:BuildDock()
   head.click = CreateFrame("Button", nil, head)
   head.click:SetPoint("TOPLEFT"); head.click:SetPoint("BOTTOMRIGHT", -24, 0)
   head.click:SetScript("OnClick", fold)
+  self:Draggable(head.click)
   fr.dock = head
   -- The game's tracker shown or hidden: ours fades in at its new place instead of jumping (the owner, 6 Nov 2026).
   fr.fadeIn = fr:CreateAnimationGroup()
@@ -193,7 +236,8 @@ end
 -- the game's tracker, so it follows it as it grows, shrinks and moves.
 function TK:Place()
   local fr = self.frame
-  if not fr then return end
+  -- (Not while it is dragged: anchored again to the game's tracker, it jumped from under the mouse.)
+  if not fr or self.moving then return end
   if not self:Docked() then place(fr) return end
   local ot = self:GameTracker()
   fr:ClearAllPoints()

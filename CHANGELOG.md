@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.3.0 (7 November 2026)
+- Hold Ctrl and drag to move the tracker or a toast while you play, as in Questie. The tracker moves by any line; under the game's quest tracker, dragging it out makes it its own panel where you drop it (Settings → Under the game's quest tracker puts it back). A toast stays while you drag it, then fades where you dropped it; one that comes meanwhile shows when you drop it.
+- Dungeon quests: the dungeons new in WoW Forever have their quests on the Dungeons tab: Hall of Thanes, Ruins of Lordaeron, Excavation Site, City of Dalaran and The Drowned City, each side its own, with where they start and the chains to start earlier. Krol'dok Stronghold, Alcaz Prison, Blackmaw Hold and Shaper's Terrace still have none: no source shows quests for them yet. A dungeon whose quests are all for the other faction says so, and one whose quests all start inside counts them ("4 quests start inside"). On the Chapter page, a dungeon row with the quests' map button shows "Recommended next" without its levels where both do not fit (the levels are in its tooltip).
+
+## 1.2.2 (7 November 2026)
+- Full screen: after logging in or a /reload with the book in full screen, the screen stayed dark and caught every click (you could not move or click the world) until the book was opened and closed once. It is clear now.
+
+## 1.2.1 (7 November 2026)
+- Room for the dungeon quests: the Overview's card updates as soon as you pick up one of the chapter's dungeon quests (it waited for something else to redraw the page).
+- Room for the dungeon quests: the dungeons' mobs count from the middle of your fellowship's last three runs at your level, so one odd run (a duo, which shares the kills among fewer, or a run cut short) no longer sets the estimate for good. A run counts once, however many in the group share their figure.
+- The Dungeons tab and the Chapter page do less work at each redraw.
+- Discord: a first ("Brannic is the first to fall") is posted only once nobody can take it over any more: when every other Adventurer has been heard from after it, or a day later. A fall held back in a dungeon could put the wrong name on Discord. A first that waited keeps its place among the news, and a PC clock that runs fast cannot let one out early.
+
 ## 1.2.0 (7 November 2026)
 - What's New shows this update's news once: the Dungeons tab, room for the dungeon quests, and Recommended next.
 - The Dungeon Journal button opens the DungeonJournal addon at the dungeon (it only opened or closed its window).

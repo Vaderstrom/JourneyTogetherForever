@@ -275,12 +275,13 @@ local function clean(log)
   return out
 end
 
--- True when two sets hold the same keys.
-local function sameSet(a, b)
-  for k in pairs(a or {}) do if not (b and b[k]) then return false end end
-  for k in pairs(b or {}) do if not (a and a[k]) then return false end end
+-- True when two sets hold the same keys (only the keys `only` accepts, when given).
+local function sameSet(a, b, only)
+  for k in pairs(a or {}) do if not (b and b[k]) and (not only or only(k)) then return false end end
+  for k in pairs(b or {}) do if not (a and a[k]) and (not only or only(k)) then return false end end
   return true
 end
+local function isDungeonQuest(id) return ns.QuestLists:IsDungeonQuest(id) end
 
 function Q:Store(f, name, d, t)
   if not f.members[name] then return end
@@ -290,7 +291,7 @@ function Q:Store(f, name, d, t)
   -- (A log from an older addon has no time: none is made up from this clock, so a log its owner sent later, passed on
   -- by someone else, still wins over it, and it is never passed on as newer than one that has a time; code review of
   -- 0.13.0.)
-  local wasDone, wasKeys = h.questsDone, h.keys
+  local wasDone, wasKeys, wasLog = h.questsDone, h.keys, h.quests
   h.quests, h.questsTime = clean(d.q), tonumber(t)
   h.questsDone = {}
   for _, id in ipairs(type(d.d) == "table" and d.d or {}) do if tonumber(id) then h.questsDone[tonumber(id)] = true end end
@@ -306,8 +307,10 @@ function Q:Store(f, name, d, t)
       if type(ln[4]) == "string" then links.questTitles[b] = links.questTitles[b] or ln[4] end
     end
   end
-  -- True when the quests handed in or the keys changed (milestones, attunements): more than the quest pages show.
-  return not (sameSet(wasDone, h.questsDone) and sameSet(wasKeys, h.keys))
+  -- True when the quests handed in or the keys changed (milestones, attunements), or a dungeon quest was picked up or
+  -- dropped (the room for the dungeon quests on the Overview counts one in your log at the game's XP; picking one up
+  -- left that card as it was: code review of 1.2.0): more than the quest pages show.
+  return not (sameSet(wasDone, h.questsDone) and sameSet(wasKeys, h.keys) and sameSet(wasLog, h.quests, isDungeonQuest))
 end
 
 ---------------------------------------------------------------------------
@@ -348,7 +351,7 @@ function Q:Send(to, force)
   end
   if #whole > 0 then Comm:SendAll(whole, "QUESTS", data, false, true) end
   if #brief > 0 then Comm:SendAll(brief, "QUESTS", short, false, true) end
-  -- A quest list redraws only the pages that show quest logs (U74); a milestone or attunement quest, every page.
+  -- A quest list redraws only the pages that show quest logs (U74); a milestone, attunement or dungeon quest, every page.
   ns:Fire("HEROES", nil, not doneMoved and "quests" or nil)
 end
 

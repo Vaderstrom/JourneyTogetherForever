@@ -98,6 +98,25 @@ local function shorts(list)
   return out
 end
 
+-- A first x can still be taken over while another counted Adventurer may bring an earlier deed: one done in a dungeon
+-- waits there with their other messages until the run is over (Moments:Follow then moves it, but Discord already had
+-- the first name; code review of 1.2.0). Settled once every other one has been heard from after it, or SETTLE later.
+-- A deed's time is the game's server time, heard this PC's clock (or a relayer's): GetServerTime() - time() turns
+-- one into the other, so a clock that runs ahead does not settle a first early (code review of 1.2.1).
+B.SETTLE = 86400
+function B:Settled(f, x)
+  local now = ns.Firsts.Now()
+  if now - x.time >= self.SETTLE then return true end
+  local skew = now - time()
+  for name, m in pairs(f.members) do
+    local h = f.heroes and f.heroes[name]
+    if name ~= x.name and name ~= ns.Me() and not m.friend and not (h and h.heard and h.heard + skew > x.time) then
+      return false
+    end
+  end
+  return true
+end
+
 -- The news, newest first: chapter complete (a "chapter" History entry: Chapter N unlocked, so N - 1 is complete) and
 -- dungeon cleared (a run entry with Heroes who cleared it), and pictures. Older chapter entries without their number
 -- are left out.
@@ -134,14 +153,22 @@ function B:News(f)
         or (p.photo and L.BOARD_EV_PHOTO_0 or L.BOARD_EV_PICTURE_0):format(names),
       fields = { dungeon = d and d[2] or nil, who = shorts(who) } }
   end
-  -- The fellowship's firsts (SPEC §8): posted only where the player draws "Firsts" to (default off).
+  -- The fellowship's firsts (SPEC §8): posted only where the player draws "Firsts" to (default off). Only a settled
+  -- one: what is posted stays posted.
   for _, x in ipairs(ns.Firsts:List(f)) do
-    list[#list + 1] = { id = ("first:%s:%s"):format(x.key, x.name), kind = "first", time = x.time,
-      name = ns.Short(x.name), text = L.BOARD_EV_FIRST:format(ns.Firsts.Text(x)), fields = { who = shorts({ x.name }) } }
+    if self:Settled(f, x) then
+      list[#list + 1] = { id = ("first:%s:%s"):format(x.key, x.name), kind = "first", time = x.time,
+        name = ns.Short(x.name), text = L.BOARD_EV_FIRST:format(ns.Firsts.Text(x)), fields = { who = shorts({ x.name }) } }
+    end
   end
   table.sort(list, function(a, b) return a.time > b.time end)
-  while #list > self.NEWS do table.remove(list) end
-  return list
+  -- The NEWS newest; a first kept back until it settled (up to SETTLE) has its own, older time, so it keeps its place
+  -- past them while it is new, else it could be cut before the app ever saw it (code review of 1.2.1).
+  local now, out = ns.Firsts.Now(), {}
+  for i, n in ipairs(list) do
+    if i <= self.NEWS or (n.kind == "first" and now - n.time < 2 * self.SETTLE) then out[#out + 1] = n end
+  end
+  return out
 end
 
 -- The board of fellowship f (docs/SAVED-DATA.md): the data Webhooks/card.html draws.

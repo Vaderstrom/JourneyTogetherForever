@@ -658,6 +658,9 @@ local function refresh(pf, ctx)
       label = L.ROLE_BRIDGE
       c.sub:SetText(sub(L.CH_LEVELS_SHORT:format(x.d[3], x.d[4])))
     end
+    -- "Recommended next · 14-17" beside the map button was cut too (the check of 7 Nov 2026, 20:46): the kind
+    -- alone then; the tooltip has the levels.
+    if c.sub:GetStringWidth() > textW then c.sub:SetText(("|cff%s%s|r"):format(Theme:HexFor(color[1]), label)) end
     local ok, default = ns.SetDungeonArt(c.pic.tex, x.key, THUMB_W - 2 * UI.PIC_INSET, THUMB_H - 2 * UI.PIC_INSET)
     -- No picture of its own (only the game's blurry default tile): the chapter's illustration instead.
     if default then ns.Pages:SetChapterArt(c.pic.tex, ns.Pages:ArtOf(f, view), THUMB_W - 2 * UI.PIC_INSET, THUMB_H - 2 * UI.PIC_INSET, 0.6); ok = true end

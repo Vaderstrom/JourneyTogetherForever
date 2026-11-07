@@ -7,7 +7,7 @@
 local _, ns = ...
 local L = ns.L
 local F, Hr, QL = ns.Fellowship, ns.Hero, ns.QuestLists
-local R = { SOON = 0.5 }
+local R = { SOON = 0.5, RUNS = 3, SAME_RUN = 1800 }
 ns.Room = R
 
 -- A quest's XP: from the game for one in my log, else learned, harvested or shipped (U79's data); nil when unknown.
@@ -21,17 +21,35 @@ function R.QuestXP(id, inMyLog)
   return ns.db.questXP and ns.db.questXP[id] or harvested or ship
 end
 
--- A dungeon's mob XP at a level: the run nearest that level (ns.db.mobXP[base][level] = xp), or nil before any run.
+-- A level's runs, oldest first: ns.db.mobXP[base][level] = { { x = xp, t = when kept }, ... }. 1.2.0 kept one number
+-- there, the best run; it counts as one run with no time.
+local function entries(v)
+  if type(v) == "table" then return v end
+  return v and { { x = v } } or {}
+end
+local function xpOf(e) return type(e) == "table" and e.x or e end
+
+-- The middle of a level's last runs: one odd run, a duo's bigger share of the kills or one cut short, neither sticks
+-- nor rules.
+local function middle(v)
+  local s = {}
+  for _, e in ipairs(entries(v)) do s[#s + 1] = xpOf(e) end
+  if #s == 0 then return nil end
+  table.sort(s)
+  return s[math.ceil(#s / 2)]
+end
+
+-- A dungeon's mob XP at a level: the runs nearest that level, or nil before any run.
 -- shortcut: not scaled between levels (kill XP grows with the mobs' level and shrinks for grey ones); fine within the
 -- few levels a chapter spans.
 function R.MobXP(key, level)
   local runs = ns.db.mobXP and ns.db.mobXP[ns.BaseKey(key)]
   local best, gap
-  for l, xp in pairs(runs or {}) do
+  for l, list in pairs(runs or {}) do
     local d = math.abs(l - level)
-    if not gap or d < gap then best, gap = xp, d end
+    if not gap or d < gap then best, gap = list, d end
   end
-  return best
+  return middle(best)
 end
 
 -- An Adventurer's level, XP and level size as the book shows them: live for the character I play (so the warnings
@@ -138,10 +156,12 @@ end
 ---------------------------------------------------------------------------
 -- Mob XP from the fellowship's runs: in a dungeon of the journey, the XP gained there minus quest hand-ins and the
 -- rested bonus (rested doubles kill XP; the rested XP used is that bonus), kept for the dungeon and the level the run
--- began at when the player leaves (the best run at that level), and shared.
+-- began at when the player leaves (the last RUNS runs at that level), and shared. Keeping only the best run let one
+-- inflated run count forever (code review of 1.2.0).
 -- In an instance several dungeons share (Scarlet Monastery's wings, Dire Maul), the first boss down says which one
 -- it was; a run there with no boss down is not kept.
--- shortcut: a /reload inside the dungeon starts the count again; the run then counts less, and the best run stays.
+-- shortcut: a /reload inside the dungeon starts the count again; the run then counts less, and the middle of the last
+-- runs keeps it from ruling.
 ---------------------------------------------------------------------------
 local function xpNow()
   local l, x, m = UnitLevel("player"), UnitXP("player"), UnitXPMax("player")
@@ -159,8 +179,18 @@ function R:Keep(key, level, xp)
   local runs = ns.db.mobXP[key] or {}
   ns.db.mobXP[key] = runs
   level, xp = math.floor(level), math.floor(xp)
-  if (runs[level] or 0) >= xp then return false end
-  runs[level] = xp
+  local list, now = entries(runs[level]), time()
+  -- One run, many figures: every Adventurer in it keeps their own when they leave and gets the others' (MOBXP), so
+  -- figures kept within SAME_RUN of each other are one run, which keeps the first. Else one run with the fellowship
+  -- filled every slot, and a duo's run still ruled (code review of 1.2.1).
+  -- shortcut: a second run of the same dungeon ending within half an hour of the first counts as the same run; a
+  -- whole run takes longer than that.
+  for _, e in ipairs(list) do
+    if type(e) == "table" and e.t and math.abs(now - e.t) < R.SAME_RUN then return false end
+  end
+  list[#list + 1] = { x = xp, t = now }
+  while #list > R.RUNS do table.remove(list, 1) end
+  runs[level] = list
   return true
 end
 

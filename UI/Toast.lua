@@ -169,12 +169,23 @@ function T:Build()
   f:EnableMouse(true)
   f:RegisterForDrag("LeftButton")
   -- A click hides a toast and opens what it is about (it only hid; seen in game); while moving, dragging places it.
-  f:SetScript("OnMouseDown", function() if not T.moving then T:Click() end end)
-  f:SetScript("OnDragStart", function() if T.moving then f:StartMoving() end end)
-  f:SetScript("OnDragStop", function()
+  -- With Ctrl held any toast is dragged instead, like the tracker (the owner, 7 Nov 2026): it stays while it is
+  -- dragged, then shows its time again where it was dropped and fades.
+  f:SetScript("OnMouseDown", function() if not (T.moving or IsControlKeyDown()) then T:Click() end end)
+  f:SetScript("OnDragStart", function()
+    if not (T.moving or IsControlKeyDown()) then return end
+    T.dragging = true
+    if not T.moving then f.anim:Stop(); f:SetAlpha(1) end
+    f:StartMoving()
+  end)
+  f:SetScript("OnDragStop", function() T:Drop() end)
+  -- Hidden while dragged there is no OnDragStop: the drag is let go and it goes back to its place (code review of
+  -- 1.3.0: until a /reload no toast showed any more).
+  f:SetScript("OnHide", function()
+    if not T.dragging then return end
+    T.dragging, T.waiting = nil, nil
     f:StopMovingOrSizing()
-    local point, _, rel, x, y = f:GetPoint()
-    ns.char.toastPos = { point = point, rel = rel, x = x, y = y }
+    T:Place()
   end)
   f:Hide()
   self.frame = f
@@ -308,9 +319,30 @@ function T:Click()
   if type(t.page) == "function" then t.page() else ns.Window:Open(t.page) end
 end
 
+-- The end of a drag: the place is kept, then the toast shows its time again, or the one that came meanwhile shows.
+function T:Drop()
+  if not self.dragging then return end
+  self.dragging = nil
+  local f = self.frame
+  f:StopMovingOrSizing()
+  local point, _, rel, x, y = f:GetPoint()
+  ns.char.toastPos = { point = point, rel = rel, x = x, y = y }
+  if self.moving then return end
+  local t = self.waiting
+  self.waiting = nil
+  if t then return self:Show(t) end
+  -- (Fill sets the fade-in again for the next toast.)
+  f.fadeIn:SetDuration(0); f.anim:Play()
+end
+
 function T:Show(t)
   local f = self:Build()
   if self.moving then return end
+  -- A drag the game never ended (the button let go where the game did not see it) is a drop now (code review of 1.3.0).
+  if self.dragging and IsMouseButtonDown and not IsMouseButtonDown("LeftButton") then self.waiting = nil; self:Drop() end
+  -- While one is dragged a new toast would fade and hide it under the mouse: the newest waits for the drop (as
+  -- toasts replace each other, only the newest).
+  if self.dragging then self.waiting = t return end
   self:Fill(t)
   self.current = t
   self.shownCount = self.shownCount + 1

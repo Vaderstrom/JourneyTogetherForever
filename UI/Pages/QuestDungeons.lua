@@ -12,6 +12,8 @@ local ROW_H = 52
 -- Not yet: in the line's own colour (a theme role is no hex: "|cffink2Not yet" showed in the check of 7 Nov 2026).
 local STATUS = { done = { L.DQ_DONE, "3E7A3A" }, log = { L.DQ_IN_LOG, "B8742A" }, no = { L.DQ_NOT_YET } }
 local GROUPS = { { "pick", L.DQ_PICK_HEAD }, { "earlier", L.DQ_EARLIER_HEAD }, { "inside", L.DQ_INSIDE_HEAD } }
+-- A list that holds only the other faction's quests (The Drowned City is the Horde's): said so, not "no list yet".
+local function otherSide(key) return ns.DUNGEON_QUESTS[ns.BaseKey(key)] ~= nil end
 
 function QD.Build(pf, width)
   local W = ns.Window
@@ -158,8 +160,10 @@ function QD.Refresh(pf, f, me)
     r.key = x.key
     r.name:SetText(x.d[2])
     r.sub:SetText(L.DQ_ROW_SUB:format(J.Roman(x.n), L.CH_LEVELS:format(x.d[3], x.d[4])))
-    local line, listed = QL:CountLine(f, x.key)
-    r.count:SetText(line or (listed and L.DQ_ALL_DONE or L.DQ_NO_LIST))
+    local line, listed, _, inside = QL:CountLine(f, x.key)
+    -- Ruins of Lordaeron's Alliance quests all start inside: "All its quests done" was wrong (the check of 7 Nov 2026).
+    if not line and inside and inside > 0 then line = inside == 1 and L.DQ_INSIDE_1 or L.DQ_INSIDE_N:format(inside) end
+    r.count:SetText(line or (listed and L.DQ_ALL_DONE or (otherSide(x.key) and L.DQ_OTHER_SIDE or L.DQ_NO_LIST)))
     r.count:SetTextColor(Theme:RGBA(line and "B8742A" or "ink2"))
     r.stripe:SetShown(i % 2 == 0)
     r.sel:SetShown(x.key == pf.dSel)
@@ -183,7 +187,7 @@ function QD.Refresh(pf, f, me)
   r:Place(pf.dTitle, pf.dTitle:GetHeight(), 10)
   pf.dNone:SetShown(g == nil)
   if not g then
-    pf.dNone:SetText(L.DQ_NO_LIST_LONG)
+    pf.dNone:SetText(pick and otherSide(pick.key) and L.DQ_OTHER_SIDE_LONG or L.DQ_NO_LIST_LONG)
     r:Place(pf.dNone, pf.dNone.h, 8)
   end
   local nq = 0

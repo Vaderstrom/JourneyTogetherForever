@@ -67,8 +67,15 @@ table.sort(ns.ATTUNEMENTS, function(a, b)
 end)
 
 -- The quests of each dungeon of the journey (Data/Dungeons.lua keys): { id, name, side }.
--- Dungeons that are new in WoW Forever have no list yet.
+-- No list yet for Krol'dok Stronghold, Alcaz Prison, Blackmaw Hold and Shaper's Terrace (new in Forever): the sources
+-- showed none on 7 Nov 2026 (docs/QUEST-SOURCES.md). Dire Maul West and North (Classic) have none yet either.
 ns.DUNGEON_QUESTS = {
+  hot = { { 96395, "An Ancient Grudge" }, { 96403, "Important Heirlooms", "A" }, { 96394, "The Restless Dead", "A" },
+    { 96393, "Old Ironforge Incursion", "A" }, { 98423, "The Treaty of Understanding", "A" } },
+  rol = { { 95250, "Abominable Creatures", "A" }, { 95195, "Bloodied Insignia", "A" }, { 95189, "Crest of Lordaeron", "A" },
+    { 92415, "Remember That I Love You", "A" }, { 92401, "A Frightened Request", "H" }, { 92421, "Light's Justice", "H" },
+    { 95216, "The New Plague", "H" }, { 92422, "The Wrath of Rath'mael", "H" }, { 97288, "Unending Torment", "H" },
+    { 95204, "Crest of Lordaeron", "H" } },
   rfc = { { 5723, "Testing an Enemy's Strength", "H" }, { 5725, "The Power to Destroy...", "H" },
     { 5728, "Hidden Enemies", "H" }, { 5761, "Slaying the Beast", "H" } },
   dm = { { 166, "The Defias Brotherhood", "A" }, { 2040, "Underground Assault", "A" }, { 214, "Red Silk Bandanas", "A" },
@@ -82,12 +89,20 @@ ns.DUNGEON_QUESTS = {
     { 6565, "Allegiance to the Old Gods", "H" }, { 6921, "Amongst the Ruins", "H" }, { 6922, "Baron Aquanis", "H" } },
   stocks = { { 386, "What Comes Around...", "A" }, { 377, "Crime and Punishment", "A" }, { 387, "Quell The Uprising", "A" },
     { 388, "The Color of Blood", "A" }, { 378, "The Fury Runs Deep", "A" }, { 391, "The Stockade Riots", "A" } },
+  exc = { { 98815, "Highland Hides", "A" }, { 95646, "Horrors in the Highland", "A" },
+    { 95647, "Lost in the Thicket Things", "A" }, { 95772, "Songblade Search", "A" }, { 95810, "Lost Relic Carry", "A" },
+    { 95697, "Changing Tastes", "H" }, { 95682, "Open the Maw", "H" }, { 95664, "Elder Knowledge", "H" } },
+  dal = { { 92456, "A Green Sample", "A" }, { 92489, "Power Overwhelming", "A" }, { 92458, "Heart of Disruption", "A" },
+    { 92457, "Starving Arcane", "A" }, { 96984, "Heart of Disruption", "H" }, { 96987, "Opportunistic Education", "H" },
+    { 96988, "Source of Power", "H" }, { 96986, "The Grave Knight", "H" } },
   rfk = { { 1221, "Blueleaf Tubers" }, { 1144, "Willix the Importer" }, { 1101, "The Crone of the Kraul", "A" },
     { 1142, "Mortality Wanes", "A" }, { 1109, "Going, Going, Guano!", "H" }, { 1102, "A Vengeful Fate", "H" } },
   gnomer = { { 2904, "A Fine Mess", "A" }, { 2922, "Save Techbot's Brain!", "A" }, { 2926, "Gnogaine", "A" },
     { 2927, "The Day After", "A" }, { 2929, "The Grand Betrayal", "A" }, { 2930, "Data Rescue", "A" },
     { 2928, "Gyrodrillmatic Excavationators", "H" }, { 2841, "Rig Wars" }, { 2945, "Grime-Encrusted Ring" } },
   smgy = { { 1048, "Into The Scarlet Monastery", "H" } },
+  drown = { { 95776, "The Only Good Brinescale...", "H" }, { 96774, "Ancient Gurubashi Idol", "H" },
+    { 95775, "The Drowned City", "H" } },
   smlib = { { 1053, "In the Name of the Light", "A" }, { 1050, "Mythology of the Titans", "A" },
     { 1049, "Compendium of the Fallen", "H" }, { 1048, "Into The Scarlet Monastery", "H" } },
   smarm = { { 1053, "In the Name of the Light", "A" }, { 1048, "Into The Scarlet Monastery", "H" } },
@@ -195,6 +210,51 @@ ns.QUEST_STARTS = {
   [3523] = { item = "Belnistrasz's Oathstone", lvl = 37 },
   [2418] = { lvl = 36 }, [709] = { lvl = 40 },
   [704] = { lvl = 38, after = { { 739, "Murdaloc" } } },
+  -- The dungeons new in WoW Forever (7 Nov 2026): wowforevertalents.com and wowf.io; the steps before from
+  -- warcraft.wiki.gg (docs/QUEST-SOURCES.md).
+  -- The Hall of Thanes
+  [96395] = { by = "Ghostly Attendant", inside = true, lvl = 15, min = 10 },
+  [96403] = { by = "Thom Filch", zone = "Ironforge", x = 32.0, y = 45.0, lvl = 15, min = 10 },
+  [96394] = { by = "Afadra Dunwall", zone = "Ironforge", x = 33.9, y = 48.1, lvl = 15, min = 10 },
+  [96393] = { by = "Earthseer Farsen", zone = "Dun Morogh", x = 64.8, y = 58.5, lvl = 16, min = 9,
+    after = { { 96391, "Underground Map", 15 } } },
+  [98423] = { item = "Treaty of Understanding", inside = true, lvl = 16, min = 9 },
+  -- Ruins of Lordaeron
+  [95250] = { by = "Captain Truman", inside = true, lvl = 21, min = 16 },
+  [95195] = { item = "Bloodied Insignia", inside = true, lvl = 22, min = 16 },
+  [95189] = { item = "Crest of Lordaeron", inside = true, lvl = 22, min = 16 },
+  [92415] = { item = "Blood-Stained Letter", inside = true, lvl = 22, min = 15 },
+  [92401] = { by = "Tabitha Heartweaver", zone = "Silverpine Forest", x = 44.5, y = 43.0, lvl = 22, min = 15 },
+  [92421] = { by = "Morbin Lightbane", zone = "Undercity", lvl = 22, min = 15 },
+  [95216] = { by = "Theodore Griffs", zone = "Undercity", lvl = 22, min = 16 },
+  [92422] = { by = "Deathguard Kristof", zone = "Tirisfal Glades", lvl = 22, min = 15 },
+  [97288] = { item = "Abominable Head", inside = true, lvl = 21, min = 16 },
+  [95204] = { item = "Crest of Lordaeron", inside = true, lvl = 22, min = 16 },
+  -- Excavation Site
+  [98815] = { by = "James Halloran", zone = "Wetlands", x = 8.6, y = 55.8, lvl = 28, min = 24 },
+  [95646] = { by = "Rethiel the Greenwarden", zone = "Wetlands", x = 56.3, y = 40.5, lvl = 31, min = 24 },
+  [95647] = { by = "Caitlin Grassman", zone = "Wetlands", x = 11.9, y = 58.8, lvl = 31, min = 24,
+    after = { { 95737, "Seeking Caitlin", 31 } } },
+  [95772] = { by = "Dorin Songblade", zone = "Redridge Mountains", x = 25.7, y = 46.5, lvl = 31, min = 24 },
+  [95810] = { item = "Titan Relic", inside = true, lvl = 31, min = 24 },
+  [95697] = { by = "Borstan", zone = "Orgrimmar", lvl = 31, min = 24 },
+  [95682] = { by = "Deathstalker Agent", zone = "Wetlands", lvl = 31, min = 24, after = { { 95663, "Dragonmaw Rumors", 31 } } },
+  [95664] = { item = "Titan Relic", inside = true, lvl = 31, min = 24 },
+  -- City of Dalaran
+  [92456] = { by = "Shylamiir", zone = "Stormwind City", x = 31.3, y = 62.9, lvl = 33, min = 24 },
+  [92489] = { by = "High Sorcerer Andromath", zone = "Stormwind City", x = 48.8, y = 87.6, lvl = 33, min = 24 },
+  [92458] = { by = "Image of Archmage Modera", zone = "Silverpine Forest", x = 68.7, y = 45.2, lvl = 33, min = 24,
+    after = { { 92432, "An Alarming Request", 33 } } },
+  [92457] = { by = "Image of Archmage Modera", zone = "Silverpine Forest", x = 68.7, y = 45.2, lvl = 33, min = 24 },
+  [96984] = { by = "Image of Archmage Modera", zone = "Silverpine Forest", lvl = 33, min = 24,
+    after = { { 92434, "Blood in the Streets", 34 } } },
+  [96987] = { by = "Rexxie Copperclutch", zone = "Alterac Mountains", lvl = 33, min = 24 },
+  [96988] = { by = "Doctor Martin Felben", zone = "Undercity", lvl = 33, min = 24 },
+  [96986] = { by = "Melisara", zone = "Hillsbrad Foothills", lvl = 33, min = 24 },
+  -- The Drowned City (where they start: not known yet)
+  [95776] = { lvl = 38, min = 30 },
+  [96774] = { lvl = 40, min = 30 },
+  [95775] = { lvl = 40, min = 30 },
 }
 
 -- Both lists are WoW Forever's: ns.KeepThisGame (Data/Dungeons.lua) keeps them in Forever only.

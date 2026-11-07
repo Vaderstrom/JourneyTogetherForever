@@ -39,6 +39,11 @@ local function hideOverlays()
   if w.confirm then w.confirm:Hide() end
   if w.emblemPicker then w.emblemPicker:Hide() end
   if GameTooltip then GameTooltip:Hide() end
+  -- The minimap shot points at the button. LibDBIcon (from another addon) has a tooltip of its own that only the
+  -- button's OnLeave hides: it stayed on every shot after it (check of 7 Nov 2026, 17:25).
+  local b = ns.MinimapButton.button
+  local leave = b and b:GetScript("OnLeave")
+  if leave then leave(b) end
 end
 
 ---------------------------------------------------------------------------
@@ -372,6 +377,11 @@ end, 0.5)
 shot("quests-dungeons", "Quests (Dungeons tab)", "The first tab: every dungeon of the journey with how many of its quests you still have to pick up or start earlier; the Deadmines' quests (Ragefire Chasm for the Horde) in three groups (Pick up before you go, Start earlier, Starts inside), each with its level, where it starts, your status, who else has it, and a map pin where the place is known (U79)", function()
   page("quests"); local p = pf("quests"); p.tabs.buttons[1]:Click()
   p.dSel = UnitFactionGroup("player") == "Horde" and "rfc" or "dm"; W():Refresh()
+end)
+-- The dungeons new in WoW Forever (the owner, 7 Nov 2026): City of Dalaran has quests for both sides.
+shot("quests-dungeons-new", "Quests (Dungeons tab, a dungeon new in WoW Forever)", "City of Dalaran's quests for your side: Pick up before you go (Stormwind City or the Horde's givers, some with only the zone), Start earlier with its chain step (An Alarming Request, or Blood in the Streets for the Horde), each with its level", function()
+  page("quests"); local p = pf("quests"); p.tabs.buttons[1]:Click()
+  p.dSel = "dal"; W():Refresh()
 end)
 -- Room for the dungeon quests (U78): a made-up chapter total stands in for this character's (its quests' XP may not
 -- be known yet), put back after the three shots.

@@ -23,6 +23,7 @@ local GOLD100 = 100 * 10000 -- in copper
 local PROF_TOPS = { 150, 225, 300 }
 
 local function now() return GetServerTime and GetServerTime() or time() end
+FS.Now = now -- (the deeds' clock, for the Discord board)
 
 ---------------------------------------------------------------------------
 -- My own deeds and tallies
