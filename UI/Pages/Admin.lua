@@ -367,6 +367,7 @@ local function refresh(pf, ctx)
 end
 
 -- A tool, not a page to read: the flat sheet, its title across the top (29 Oct 2026).
-ns.Pages:Register({ id = "admin", label = L.NAV_ADMIN, build = build, refresh = refresh, flat = true, header = "both",
+-- wide: in full screen the chapter list and the ruler take the whole width (U94; it sat in a narrow middle column).
+ns.Pages:Register({ id = "admin", label = L.NAV_ADMIN, build = build, refresh = refresh, flat = true, wide = true, header = "both",
   news = { quests = true }, -- the milestone form picks from the shared quest logs
   title = function() return L.TITLE_ADMIN, L.SUB_ADMIN end })

@@ -286,10 +286,11 @@ local function build(pf)
   local W = ns.Window
   local width = W.PAGE_W - 8
 
-  -- Tabs: Dungeons · Quests · Quest chains · Attunements & keys (the one shown first comes first; 6 Nov 2026; Dungeons
-  -- first since U79, 7 Nov 2026).
+  -- Tabs: Dungeon quests · Shared quests · Quest chains · Attunements & keys (the one shown first comes first; 6 Nov
+  -- 2026; Dungeon quests first since U79, 7 Nov 2026; named so since U101), the game's tabs with icons (U102).
   pf.tab = "dungeons"
-  pf.tabs = UI.Tabs(pf.left, { { L.TAB_DUNGEONS, "dungeons" }, { L.TAB_QUESTS, "quests" }, { L.TAB_CHAINS, "chains" }, { L.TAB_ATTUNE, "attune" } },
+  pf.tabs = UI.Tabs(pf.left, { { L.TAB_DUNGEONS, "dungeons", "toast_dquest" }, { L.TAB_QUESTS, "quests", "quests" },
+    { L.TAB_CHAINS, "chains", "chapter" }, { L.TAB_ATTUNE, "attune", "toast_attune" } },
     function() return pf.tab end, function(v) pf.tab = v; pf.sel = nil; W:Refresh() end, width,
     function(v)
       local f = ns.Fellowship:Current()
@@ -470,9 +471,6 @@ local function refresh(pf, ctx)
   if not f then return end
   local width = ns.Window.PAGE_W - 8
   local me = ctx.me
-  -- A dungeon to show (the Chapter page's quest line, the reminder toast): the Dungeons tab at it.
-  local W = ns.Window
-  if W.questDungeon then pf.tab, pf.dSel, W.questDungeon = "dungeons", W.questDungeon, nil end
   pf.tabs:Refresh()
   local attune, dungeons = pf.tab == "attune", pf.tab == "dungeons"
   pf.lscroll:SetShown(not (attune or dungeons)); pf.rscroll:SetShown(not (attune or dungeons))
@@ -716,4 +714,9 @@ local function refresh(pf, ctx)
 end
 
 ns.Pages:Register({ id = "quests", label = L.NAV_QUESTS, build = build, refresh = refresh, news = { quests = true },
-  title = function() return L.TITLE_QUESTS, L.SUB_QUESTS end })
+  -- The title fits every tab; the line under it says what the chosen one is for ("Shared Quests" stood over the
+  -- Dungeon quests tab; the check of 8 Nov 2026).
+  title = function()
+    local pf = ns.Window.pageFrames and ns.Window.pageFrames.quests
+    return L.TITLE_QUESTS, L["SUB_QUESTS_" .. (pf and pf.tab or "quests"):upper()]
+  end })

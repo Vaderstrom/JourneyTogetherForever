@@ -33,6 +33,9 @@ local function build(o)
   locked(o.cf.edit, function() return Cw.CURSEFORGE end)
   o.reportLabel = UI.Text(o.box, 12, "ink2")
   o.reportLabel:SetText(L.CONFLICT_REPORT)
+  -- U59 (the check of 4 Nov 2026): one click selects the whole report and says what to press.
+  o.select = UI.TextButton(o.box, L.CONFLICT_SELECT, function() Cw:SelectReport() end)
+  o.selected = UI.Text(o.box, 12, "accent")
   o.holder = UI.Card(o.box)
   o.holder:SetSize(W, 104)
   o.scroll = CreateFrame("ScrollFrame", nil, o.holder)
@@ -102,7 +105,10 @@ function Cw:Open(c)
     y = y + 26 + 8
   end
   o.reportLabel:ClearAllPoints(); o.reportLabel:SetPoint("TOPLEFT", 16, -y)
-  y = y + 18
+  o.select:ClearAllPoints(); o.select:SetPoint("TOPRIGHT", o.box, "TOPLEFT", 16 + W, -(y - 8))
+  o.selected:ClearAllPoints(); o.selected:SetPoint("RIGHT", o.select, "LEFT", -8, 0)
+  o.selected:SetText("")
+  y = y + 26
   o.holder:ClearAllPoints(); o.holder:SetPoint("TOPLEFT", 16, -y)
   o.report:SetText(o.reportText)
   y = y + o.holder:GetHeight() + 16
@@ -111,4 +117,13 @@ function Cw:Open(c)
   o.report:SetFocus()
   o.report:HighlightText()
   return o
+end
+
+-- Selects the whole report for Ctrl+C and says so (U59).
+function Cw:SelectReport()
+  local o = ns.Window.overlays and ns.Window.overlays.conflict
+  if not (o and o.report) then return end
+  o.report:SetFocus()
+  o.report:HighlightText()
+  o.selected:SetText(L.CONFLICT_SELECTED)
 end

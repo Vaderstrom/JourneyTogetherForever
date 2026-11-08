@@ -84,7 +84,9 @@ function Hr:MyState()
     -- My deeds and tallies, for the fellowship's firsts (Fellowship/Firsts.lua).
     deeds = ns.Firsts and (ns.Firsts:State()) or nil, tally = ns.Firsts and select(2, ns.Firsts:State()) or nil,
     -- My online minutes in this tournament round, for the referee's walkovers (Fellowship/Tourney.lua).
-    ton = f and f.heroes and f.heroes[ns.Me()] and f.heroes[ns.Me()].ton or nil }
+    ton = f and f.heroes and f.heroes[ns.Me()] and f.heroes[ns.Me()].ton or nil,
+    -- Reminders turned off (Settings, U100): whoever would remind me is told.
+    noRemind = not ns.Settings:ToastOn("dremind") or nil }
 end
 
 -- The other characters on this account the addon has seen: they may watch this fellowship while you play them.
@@ -133,6 +135,7 @@ function Hr:Store(f, name, s, heardAt, relayed)
   h.level, h.xp, h.xpMax, h.rested = num(s.level) or h.level, num(s.xp), num(s.xpMax), num(s.rested)
   h.zone, h.class, h.className, h.guild, h.gm = str(s.zone), str(s.class) or h.class, str(s.className) or h.className, str(s.guild), s.gm == true or nil
   h.run = s.run == true or nil
+  h.noRemind = s.noRemind == true or nil
   h.race = str(s.race) or h.race
   h.pace = num(s.pace) -- XP per hour of play (Fellowship/Pace.lua)
   h.ver = str(s.ver) or h.ver -- the Hero's addon version

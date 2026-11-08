@@ -176,15 +176,144 @@ end
 ---------------------------------------------------------------------------
 -- The Dungeons tab (U79): where each dungeon quest starts, in three groups
 ---------------------------------------------------------------------------
+-- Where Questie (another addon, GPL) says a quest starts, when the player runs it (the owner, 8 Nov 2026): its giver
+-- friendly to my side and where it stands, or the item, and the levels. Read for this session only, never saved,
+-- sent or harvested (like its chains, Quests.lua), so nothing of Questie's ends up in this addon. nil without Questie
+-- or when it does not know the quest.
+QL.questie = {}
+local function ask(get, id, field)
+  local ok, v = pcall(get, id, field)
+  if ok then return v end
+end
+local function str(v) return type(v) == "string" and v ~= "" and #v <= 60 and v or nil end
+local function coord(v) v = tonumber(v); return v and v >= 0 and v <= 100 and v or nil end
+local function lvlOf(v) v = tonumber(v); return v and v >= 1 and v <= 70 and v or nil end
+function QL:Questie(id)
+  if self.questie[id] ~= nil then return self.questie[id] or nil end
+  local qdb = ns.Quests.QuestieDB()
+  -- Not cached without its name: Questie may load, or set up its database, after this addon.
+  if not (qdb and str(ask(qdb.QueryQuestSingle, id, "name"))) then return nil end
+  local out = { lvl = lvlOf(ask(qdb.QueryQuestSingle, id, "questLevel")),
+    min = lvlOf(ask(qdb.QueryQuestSingle, id, "requiredLevel")) }
+  local by = ask(qdb.QueryQuestSingle, id, "startedBy")
+  local mine = (UnitFactionGroup("player") or ""):sub(1, 1)
+  local npc
+  for _, n in ipairs(type(by) == "table" and type(by[1]) == "table" and by[1] or {}) do
+    local friend = qdb.QueryNPCSingle and ask(qdb.QueryNPCSingle, n, "friendlyToFaction")
+    if type(friend) ~= "string" or friend:find(mine, 1, true) then npc = n break end
+  end
+  if npc then
+    out.by = str(ask(qdb.QueryNPCSingle, npc, "name"))
+    local spawns = ask(qdb.QueryNPCSingle, npc, "spawns")
+    spawns = type(spawns) == "table" and spawns or {}
+    local area = ask(qdb.QueryNPCSingle, npc, "zoneID")
+    if not spawns[area] then area = next(spawns) end
+    local zdb = ns.Quests.QuestieModule("ZoneDB") or {}
+    if area and zdb.IsDungeonZone and ask(zdb.IsDungeonZone, area) == true then
+      out.inside = true
+    elseif area and type(spawns[area]) == "table" and type(spawns[area][1]) == "table" then
+      local map = zdb.GetUiMapIdByAreaId and tonumber((select(2, pcall(zdb.GetUiMapIdByAreaId, zdb, area))))
+      local info = map and C_Map and C_Map.GetMapInfo and C_Map.GetMapInfo(map)
+      out.zone = str(info and info.name) or (C_Map and C_Map.GetAreaInfo and str((C_Map.GetAreaInfo(area))))
+      if out.zone then out.map, out.x, out.y = map, coord(spawns[area][1][1]), coord(spawns[area][1][2]) end
+    end
+  elseif type(by) == "table" and type(by[3]) == "table" and by[3][1] and qdb.QueryItemSingle then
+    out.item = str(ask(qdb.QueryItemSingle, by[3][1], "name"))
+  end
+  self.questie[id] = next(out) and out or false
+  return self.questie[id] or nil
+end
+
+-- The chain to do before a quest our data gives none for (U123, the owner, 8 Nov 2026: the book guides ahead of
+-- time): back along the chain links the addon knows (learned in game and shared, harvested from play, Questie's when
+-- it runs, Fellowship/Quests.lua), first step first, at most 30 parts, same-named parts in a row as one step (as our
+-- data ships them), each step with its level and where it starts as ours
+-- or Questie knows it (never "inside": that would be another dungeon's): { { id, name, lvl, by, zone, item } }, or
+-- nil. Questie's previous quest is asked here for any quest (Quests reads Questie's links only for the quests in the
+-- log). The book asks for every quest of every dungeon of the journey at each redraw, so each chain is kept while the
+-- links and Questie stay the same (looked at every two seconds), one with a title still loading two seconds; a chain
+-- walked again at every call made the Dungeon page's turns take seconds (check of 8 Nov 2026: script ran too long).
+-- shortcut: one path only (Questie's previous quest when it names one; a learned link another). And a learned link
+-- can join two quests one giver hands out that are no chain (hand in Collecting Memories, take Oh Brother...): Who is
+-- ready then waits for the first. Fine while chains are one line and such links are rare; ours always wins.
+-- (Questie's answers kept for the session: every quest send asks for every dungeon quest's chain, Quests:MyDone.)
+QL.questiePrev = {}
+local function questiePrev(id)
+  if QL.questiePrev[id] == nil then
+    local qdb = ns.Quests.QuestieDB()
+    if not qdb then return nil end
+    -- preQuestSingle: any one of them will do (often one per side, or a breadcrumb), so only when it names one;
+    -- preQuestGroup: all of them, so its first is needed anyway.
+    local one, all = ask(qdb.QueryQuestSingle, id, "preQuestSingle"), ask(qdb.QueryQuestSingle, id, "preQuestGroup")
+    local pre = type(one) == "table" and (#one == 1 and one[1] or nil) or one
+    if not pre then pre = type(all) == "table" and all[1] or all end
+    pre = tonumber(pre)
+    QL.questiePrev[id] = pre and pre > 0 and pre or false
+  end
+  return QL.questiePrev[id] or nil
+end
+local function same(a, b)
+  for k, v in pairs(a) do if b[k] ~= v then return false end end
+  for k in pairs(b) do if a[k] == nil then return false end end
+  return true
+end
+function QL:Before(id)
+  local now = GetTime()
+  if not self.prevOf or now - self.prevAt > 2 then
+    local prevOf, questie = {}, ns.Quests.QuestieDB() ~= nil
+    for a, b in pairs((ns.Quests:Links())) do prevOf[b] = prevOf[b] or a end
+    if self.prevOf and questie == self.prevQuestie and same(prevOf, self.prevOf) then
+      for k in pairs(self.loading) do self.chainOf[k] = nil end
+    else
+      self.chainOf = {}
+    end
+    self.prevOf, self.prevAt, self.prevQuestie, self.loading = prevOf, now, questie, {}
+  end
+  if self.chainOf[id] ~= nil then return self.chainOf[id] or nil end
+  local steps, seen, cur, named = {}, { [id] = true }, id, true
+  -- (30: Onyxia's attunement before Drakefire Amulet is about 15 parts; 12 cut its start, check of 8 Nov 2026.)
+  while #steps < 30 do
+    local prev = self.prevOf[cur] or questiePrev(cur)
+    if not prev or seen[prev] then break end
+    seen[prev] = true
+    local name = ns.Quests.Title(prev)
+    named = named and name ~= nil
+    local st = self:Start(prev, true)
+    if not (st and (st.by or st.item)) then st = self:Questie(prev) or st or {} end
+    table.insert(steps, 1, { prev, name or ("#" .. prev), lvl = st.lvl, by = st.by, zone = st.zone, item = st.item })
+    cur = prev
+  end
+  -- Same-named parts in a row are one step, as in our data: the first part's giver and level, the last part's ID.
+  for k = #steps, 2, -1 do
+    if steps[k][2] == steps[k - 1][2] then steps[k - 1][1] = steps[k][1]; table.remove(steps, k) end
+  end
+  local out = #steps > 0 and steps or false
+  self.chainOf[id] = out
+  if not named then self.loading[id] = true end
+  return out or nil
+end
+
 -- Where a quest starts: the shipped data (Data/QuestLists.lua) wins, then the starts harvested from play
--- (Data/QuestChains.lua), then what this account learned (ns.db.questStarts). nil when none knows it.
-function QL:Start(id)
+-- (Data/QuestChains.lua), then what this account learned (ns.db.questStarts). nil when none knows it. Questie (when
+-- the player runs it) only fills in what none of ours knows: the place when ours has no giver, item or inside, the
+-- levels. A chain (after) only ours ships, else QL:Before's. ours: without Questie and QL:Before (what is learned and
+-- shared must not lean on them).
+function QL:Start(id, ours)
   local ship = ns.QUEST_STARTS[id]
   local harvested = ns.QUEST_CHAINS and ns.QUEST_CHAINS.starts and ns.QUEST_CHAINS.starts[id]
   local learned = ns.db.questStarts and ns.db.questStarts[id]
-  if not (harvested or learned) then return ship end
-  local out = {}
+  local questie = not ours and self:Questie(id)
+  local before = not ours and not (ship and ship.after) and self:Before(id)
+  if not (harvested or learned or questie or before) then return ship end
+  local out = { after = before or nil }
   for _, src in ipairs({ learned or {}, harvested or {}, ship or {} }) do for k, v in pairs(src) do out[k] = v end end
+  if questie then
+    -- A zone alone (a giver for each side, a poster, a drop) is no place to go: Questie's giver fills it in.
+    if not (out.by or out.item or out.inside) and (questie.by or questie.item or questie.inside) then
+      for _, k in ipairs({ "by", "zone", "map", "x", "y", "item", "inside" }) do out[k] = questie[k] end
+    end
+    out.lvl, out.min = out.lvl or questie.lvl, out.min or questie.min
+  end
   return out
 end
 
@@ -193,17 +322,25 @@ local function statusOf(h, id)
   return h.quests and h.quests[id] and "log" or "no"
 end
 
--- The group a quest belongs to by where it starts: inside, earlier (a chain) or pick.
-local function groupOf(st) return st.inside and "inside" or (st.after and "earlier" or "pick") end
+-- How many steps of a quest's chain come before the run: those before the first that starts in the dungeon (that one
+-- is done in the run). Uldaman's necklace chains go through it.
+local function leadIn(st)
+  local n = 0
+  for _, s in ipairs(st.after or {}) do if s.inside then break end n = n + 1 end
+  return n
+end
+-- The group a quest belongs to: earlier when its chain has steps to do before the run (also when the quest itself
+-- starts inside, as The Hidden Chamber does), else inside or pick by where it starts.
+local function groupOf(st) return leadIn(st) > 0 and "earlier" or (st.inside and "inside" or "pick") end
 
 -- A dungeon's quests for this fellowship's side in three groups (SPEC §4.6): pick (pick up before you go), earlier
 -- (a chain to start earlier) and inside (starts in the dungeon), each lowest level first. A quest: { id, name, start,
--- status (yours: "done", "log" or "no"), others (other Adventurers with it in their log), steps = { { id, name, lvl,
--- status } } }. nil when the dungeon has no list.
-function QL:Groups(f, key)
+-- status (yours, or who's: "done", "log" or "no"), others (other Adventurers with it in their log), steps = { { id,
+-- name, lvl, start (where it starts, as a quest start), status } } }. nil when the dungeon has no list.
+function QL:Groups(f, key, who)
   local quests = self:DungeonQuests(f, key)
   if #quests == 0 then return nil end
-  local me = ns.Me()
+  local me = who or ns.Me()
   local mine = Hr:Get(f, me) or {}
   local g = { pick = {}, earlier = {}, inside = {} }
   for _, q in ipairs(quests) do
@@ -215,7 +352,9 @@ function QL:Groups(f, key)
     end
     if st.after then
       x.steps = {}
-      for _, s in ipairs(st.after) do x.steps[#x.steps + 1] = { id = s[1], name = s[2], lvl = s[3], status = statusOf(mine, s[1]) } end
+      for _, s in ipairs(st.after) do
+        x.steps[#x.steps + 1] = { id = s[1], name = s[2], lvl = s.lvl, start = s, status = statusOf(mine, s[1]) }
+      end
     end
     local list = g[groupOf(st)]
     list[#list + 1] = x
@@ -230,32 +369,76 @@ function QL:Groups(f, key)
   return g
 end
 
--- How many quests of each group you have not done: pick, earlier, inside (nil when the dungeon has no list).
--- Only counted: the Dungeons tab asks this for every dungeon of the journey at each redraw, and building their groups
--- (every Adventurer's log, the chain steps, the sorting) each time was too much (code review of 1.2.0).
+-- Who is ready for a dungeon (U98, the owner, 8 Nov 2026): every Start-early chain done up to the dungeon quest, or up
+-- to its first step inside (or the quest itself in the log or done), and every Pick-up quest in the log or done, by
+-- name's shared quest log.
+-- { early, earlyOf, pick, pickOf, ready }; nil when there is nothing to get ready (no list, or only quests inside).
+-- shortcut: Questie can put a quest under "inside" or give it a chain (QL:Before) on one PC only, so Who is ready may
+-- differ between Adventurers with and without it; a reminder's toast follows the receiver's own view (Ready.lua). Fine
+-- while Questie fills only what no source gives (docs/QUEST-SOURCES.md).
+function QL:Ready(f, key, name)
+  local h = Hr:Get(f, name) or {}
+  local r = { early = 0, earlyOf = 0, pick = 0, pickOf = 0 }
+  for _, q in ipairs(self:DungeonQuests(f, key)) do
+    local st = self:Start(q.id) or {}
+    local g = groupOf(st)
+    if g ~= "inside" then
+      local ok = statusOf(h, q.id) ~= "no"
+      if g == "earlier" and not ok then
+        ok = true
+        for k = 1, leadIn(st) do if statusOf(h, st.after[k][1]) ~= "done" then ok = false break end end
+      end
+      local n = g == "earlier" and "early" or "pick"
+      r[n .. "Of"] = r[n .. "Of"] + 1
+      if ok then r[n] = r[n] + 1 end
+    end
+  end
+  if r.earlyOf + r.pickOf == 0 then return nil end
+  r.ready = r.early == r.earlyOf and r.pick == r.pickOf
+  return r
+end
+
+-- A quest's status as an icon and a coloured word (U101): Done in green, In your log in gold, Not yet in grey.
+QL.STATUS = {
+  done = { "Interface\\RaidFrame\\ReadyCheck-Ready", "3E7A3A", "DQ_DONE" },
+  log = { "Interface\\Icons\\INV_Scroll_03", "B8742A", "DQ_IN_LOG" },
+  no = { "Interface\\COMMON\\Indicator-Gray", nil, "DQ_NOT_YET" }, -- (in the line's own colour: a role is no hex)
+}
+function QL.StatusText(status, word)
+  local s = QL.STATUS[status] or QL.STATUS.no
+  local text = word or L[s[3]]
+  if s[2] then text = ("|cff%s%s|r"):format(ns.Theme:HexFor(s[2]), text) end
+  return ("|T%s:13:13|t %s"):format(s[1], text)
+end
+
+-- How many quests of each group you still have to pick up or start, neither in your log nor done (U98: one in your
+-- log is picked up): pick, earlier, inside; then how many of its quests start outside at all, and how many you have
+-- not done (nil when the dungeon has no list). Only counted: the Dungeon quests list asks this for every dungeon of
+-- the journey at each redraw, and building their groups each time was too much (code review of 1.2.0).
 function QL:Counts(f, key)
   local quests = self:DungeonQuests(f, key)
   if #quests == 0 then return nil end
   local mine = Hr:Get(f, ns.Me()) or {}
   local n = { pick = 0, earlier = 0, inside = 0 }
+  local outside, open = 0, 0
   for _, q in ipairs(quests) do
-    if statusOf(mine, q.id) ~= "done" then
-      local g = groupOf(self:Start(q.id) or {})
-      n[g] = n[g] + 1
-    end
+    local g, st = groupOf(self:Start(q.id) or {}), statusOf(mine, q.id)
+    if g ~= "inside" then outside = outside + 1 end
+    if st ~= "done" then open = open + 1 end
+    if st == "no" then n[g] = n[g] + 1 end
   end
-  return n.pick, n.earlier, n.inside
+  return n.pick, n.earlier, n.inside, outside, open
 end
 
--- "4 quests to pick up  ·  2 to start earlier" (only quests you have not done), or nil; then the three counts (nil
--- without a quest list).
+-- "4 quests to pick up  ·  2 to start early" (only quests neither in your log nor done), or nil; then the counts of
+-- QL:Counts (nil without a quest list).
 function QL:CountLine(f, key)
-  local pick, earlier, inside = self:Counts(f, key)
-  if not pick or pick + earlier == 0 then return nil, pick, earlier, inside end
+  local pick, earlier, inside, outside, open = self:Counts(f, key)
+  if not pick or pick + earlier == 0 then return nil, pick, earlier, inside, outside, open end
   local parts = {}
   if pick > 0 then parts[1] = pick == 1 and L.DQ_PICK_1 or L.DQ_PICK_N:format(pick) end
   if earlier > 0 then parts[#parts + 1] = L.DQ_EARLIER_N:format(earlier) end
-  return table.concat(parts, "  ·  "), pick, earlier, inside
+  return table.concat(parts, "  ·  "), pick, earlier, inside, outside, open
 end
 
 -- Where a quest starts, in words: "Scout Riell, Westfall 56.7, 47.4", an item, inside, or not known yet.
@@ -267,11 +450,8 @@ function QL.WhereText(st)
   return st.by or place or L.DQ_WHERE_UNKNOWN
 end
 
--- Opens the Quests page on the Dungeons tab at this dungeon.
-function QL:Open(key)
-  ns.Window.questDungeon = key
-  ns.Window:Open("quests")
-end
+-- Opens the dungeon's own page, where its quests are (U96).
+function QL:Open(key) ns.DungeonPage:Open(key) end
 
 -- A zone's map by its name (the data names zones, so it holds in any client); learned starts carry their map.
 QL.maps = {}
@@ -359,7 +539,8 @@ function QL:Remind(level)
         end
         for _, q in ipairs(g.earlier) do
           if not chain and q.status == "no" then
-            for _, s in ipairs(q.steps) do
+            for k, s in ipairs(q.steps) do
+              if k > leadIn(q.start) then break end -- (a step inside is done in the run)
               if s.status ~= "done" then
                 if level >= (s.lvl and s.lvl - QL.TAKE_BELOW or opensAt(q.start, x.d[3])) then chain = s.name end
                 break
@@ -410,8 +591,11 @@ QL.CleanStart = cleanStart
 function QL:Keep(id, s, xp)
   ns.db.questStarts, ns.db.questXP = ns.db.questStarts or {}, ns.db.questXP or {}
   local changed = false
-  local known = self:Start(id)
-  if s and not (known and (known.x or known.inside or known.item)) then ns.db.questStarts[id] = s; changed = true end
+  local known = self:Start(id, true)
+  if s and not (known and (known.x or known.inside or known.item)) then
+    ns.db.questStarts[id] = s; changed = true
+    self.prevOf = nil -- (a chain's step may start there: QL:Before walks again)
+  end
   -- The most anyone was given: a hand-in far above the quest's level gives less.
   xp = tonumber(xp) and math.floor(xp)
   if xp and xp > 0 and xp < 100000 and xp > (ns.db.questXP[id] or 0) then ns.db.questXP[id] = xp; changed = true end

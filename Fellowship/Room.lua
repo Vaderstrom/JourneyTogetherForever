@@ -10,16 +10,32 @@ local F, Hr, QL = ns.Fellowship, ns.Hero, ns.QuestLists
 local R = { SOON = 0.5, RUNS = 3, SAME_RUN = 1800 }
 ns.Room = R
 
--- A quest's XP: from the game for one in my log, else learned, harvested or shipped (U79's data); nil when unknown.
-function R.QuestXP(id, inMyLog)
-  if inMyLog and GetQuestLogRewardXP then
+-- A quest's XP. First the game's own (WoW Forever's, at my level; the owner, 8 Nov 2026: from the game, not from
+-- other sites): for a quest in my log, or for any quest once the game has loaded it, asked once per session (the
+-- book redraws when it arrives). Else learned at hand-ins, harvested or shipped (U79's data); nil when unknown.
+-- shortcut: the game's number is for my level, also on another Adventurer's card; within a chapter's few levels it
+-- is the same (quest XP only drops for a player far above the quest).
+R.asked = {}
+function R.QuestXP(id)
+  if GetQuestLogRewardXP then
     local ok, xp = pcall(GetQuestLogRewardXP, id)
     if ok and not ns.Secret(xp) and tonumber(xp) and xp > 0 then return xp end
+    if not R.asked[id] and C_QuestLog and C_QuestLog.RequestLoadQuestByID then
+      R.asked[id] = true
+      pcall(C_QuestLog.RequestLoadQuestByID, id)
+      if C_TaskQuest and C_TaskQuest.RequestPreloadRewardData then pcall(C_TaskQuest.RequestPreloadRewardData, id) end
+    end
   end
   local harvested = ns.QUEST_CHAINS and ns.QUEST_CHAINS.xp and ns.QUEST_CHAINS.xp[id]
   local ship = ns.QUEST_STARTS[id] and ns.QUEST_STARTS[id].xp
   return ns.db.questXP and ns.db.questXP[id] or harvested or ship
 end
+
+ns:RegisterEvent("QUEST_DATA_LOAD_RESULT", function(_, id, ok)
+  if not (ok and R.asked[id]) then return end
+  if ns.Window and ns.Window.RefreshSoon then ns.Window:RefreshSoon() end
+  if ns.Tracker then ns.Tracker:RefreshSoon() end -- its room line; the book's RefreshSoon skips while it is closed
+end)
 
 -- A level's runs, oldest first: ns.db.mobXP[base][level] = { { x = xp, t = when kept }, ... }. 1.2.0 kept one number
 -- there, the best run; it counts as one run with no time.
@@ -73,14 +89,15 @@ function R:Levels(f, name, gain)
 end
 
 -- One dungeon's share for an Adventurer: { quests (XP of the quests not done), unknown (quests whose XP nobody knows),
--- mobs (XP; nil before the fellowship has run it, 0 once cleared or with the mobs left out) }.
-function R:Share(f, key, name)
+-- mobs (XP; nil before the fellowship has run it, 0 once cleared or with the mobs left out) }. seen: quests counted
+-- already, for a chapter whose dungeons share one (Scarlet Monastery's wings), so it counts once.
+function R:Share(f, key, name, seen)
   local h = Hr:Get(f, name) or {}
-  local me = name == ns.Self()
   local out = { quests = 0, unknown = 0, mobs = 0 }
   for _, q in ipairs(QL:DungeonQuests(f, key)) do
-    if not (h.questsDone and h.questsDone[q.id]) then
-      local xp = R.QuestXP(q.id, me and h.quests and h.quests[q.id] ~= nil)
+    if not (h.questsDone and h.questsDone[q.id] or seen and seen[q.id]) then
+      if seen then seen[q.id] = true end
+      local xp = R.QuestXP(q.id)
       if xp then out.quests = out.quests + xp else out.unknown = out.unknown + 1 end
     end
   end
@@ -99,10 +116,10 @@ function R:Chapter(f, name)
   local ch = f and J:Current(f)
   local level, xp, max = standing(f, name)
   if not (ch and level) then return nil end
-  local quests, mobs, unknown, unrun = 0, 0, 0, 0
+  local quests, mobs, unknown, unrun, seen = 0, 0, 0, 0, {}
   for _, x in ipairs(J:ChapterList(f, ch.n)) do
     if not x.early then
-      local s = self:Share(f, x.key, name)
+      local s = self:Share(f, x.key, name, seen)
       quests, unknown = quests + s.quests, unknown + s.unknown
       if s.mobs then mobs = mobs + s.mobs else unrun = unrun + 1 end
     end
@@ -120,10 +137,22 @@ end
 -- In words: "The dungeon quests here: about 1.4 levels, to 27.4 of the cap 28." and, when they would not fit, "Stop
 -- questing at 26.6 to leave room for them."; then the notes (mobs, quests whose XP is not known yet).
 local function one(v) return math.floor(v * 10 + 0.5) / 10 end
+
+-- A stop level as the game's XP bar shows it (U85): level and percent, "level 26, 60% into it", not 26.6. short:
+-- the level track's tick, "stop 26 (60%)".
+function R.StopAt(v, short)
+  v = math.max(v, 1)
+  local lvl = math.floor(v)
+  local pct = math.floor((v - lvl) * 100 + 0.5)
+  if pct >= 100 then lvl, pct = lvl + 1, 0 end
+  if short then return pct > 0 and L.ROOM_TICK:format(lvl, pct) or L.ROOM_TICK_0:format(lvl) end
+  return pct > 0 and L.ROOM_AT:format(lvl, pct) or L.ROOM_AT_0:format(lvl)
+end
+
 function R.Lines(r)
   local cap = r.tol > 0 and L.ROOM_CAP_TOL:format(r.cap, r.tol) or L.ROOM_CAP:format(r.cap)
   local main = L.ROOM_LINE:format(one(r.levels), one(r.to), cap)
-  local stop = r.stop and L.ROOM_STOP:format(one(math.max(r.stop, 1))) or nil
+  local stop = r.stop and L.ROOM_STOP:format(R.StopAt(r.stop)) or nil
   local notes = {}
   if ns.Settings:Get("roomMobs") == false then notes[1] = L.ROOM_MOBS_OFF
   elseif r.unrun > 0 then notes[1] = L.ROOM_MOBS_UNKNOWN
@@ -149,7 +178,7 @@ function R:Check()
     ns:Toast("room", L.TOAST_ROOM_NOW_TITLE, L.TOAST_ROOM_NOW, "overview")
   elseif r.now >= stop - self.SOON and stage < 1 then
     ns.char.roomToasted[key] = 1
-    ns:Toast("room", L.TOAST_ROOM_SOON_TITLE, L.TOAST_ROOM_SOON:format(one(math.max(stop, 1))), "overview")
+    ns:Toast("room", L.TOAST_ROOM_SOON_TITLE, L.TOAST_ROOM_SOON:format(R.StopAt(stop)), "overview")
   end
 end
 

@@ -74,14 +74,18 @@ end
 -- The chronicle as the pages show it: the same line in a row once, with a count ("× 4"). (Seen in the UI tour.)
 -- { { text, time, n, k } }, newest first, at most max; group: only the lines of that History filter.
 function F:ChronicleView(f, max, group)
-  local out = {}
+  local out, seen = {}, {}
   for _, e in ipairs(f.chronicle) do
     if not group or self.LOG_GROUP[e.k] == group then
-      local last = out[#out]
-      if last and last.text == e.text then last.n = last.n + 1
+      -- The same line on the same day is one line with "× 2", even with other lines between (U90: a Leader who
+      -- publishes the rules a few times in an evening).
+      local key = tostring(e.text) .. "\0" .. date("%Y-%m-%d", tonumber(e.time) or 0)
+      local same = seen[key]
+      if same then same.n = same.n + 1
       else
         if #out >= max then break end
         out[#out + 1] = { text = e.text, time = e.time, n = 1, k = e.k }
+        seen[key] = out[#out]
       end
     end
   end
@@ -166,6 +170,9 @@ function F:Sanitize(f)
   ns.Journey.MigrateKeys(f)
   -- Challenges chosen at founding, turned off since, the falls, broken rules, the Ring and the race (Fellowship/Challenges.lua).
   ns.Challenges:Sanitize(f)
+  -- Reminders of the last two days (Fellowship/Ready.lua) and the entrances seen (Fellowship/Entrances.lua).
+  ns.Ready:Sanitize(f)
+  ns.Entrances:Sanitize(f)
   for name, m in pairs(f.members) do
     if type(m) ~= "table" then f.members[name] = { role = "DPS" }
     elseif m.friend ~= nil then m.friend = (m.friend and name ~= f.leader) or nil end
@@ -413,6 +420,15 @@ function F:ApplyChange(f, op, by, t)
   elseif k == "fell" then
     -- An Adventurer's own death, under a survival challenge (Fellowship/Challenges.lua): only they record it.
     if not P.Rank(f, by) or not ns.Challenges:ApplyFall(f, by, op, t) then return false end
+  elseif k == "candle" then
+    -- A candle lit on a Fallen's memorial (U41): any Adventurer, once.
+    if not P.Rank(f, by) or not ns.Challenges:ApplyCandle(f, by, op, t) then return false end
+  elseif k == "remind" then
+    -- Remind an Adventurer of a dungeon's quests (U100): any member, once per Adventurer, dungeon and day.
+    if not ns.Ready:Apply(f, by, op, t) then return false end
+  elseif k == "entrance" then
+    -- Where a dungeon's entrance is, seen by an Adventurer walking in (U97): the first one seen stays.
+    if not P.Rank(f, by) or not ns.Entrances:Apply(f, op) then return false end
   elseif k == "broke" then
     -- An Adventurer broke one of the challenges' rules (Fellowship/ChallengeWatch.lua): only they record it.
     if not P.Rank(f, by) or not ns.Challenges:ApplyBreak(f, by, op, t) then return false end

@@ -20,11 +20,12 @@ end
 ns.ManageTexts = { takeoverText = takeoverText }
 
 -- The tab strip at the top of each tab's left page. Returns the height it takes.
-local TABS = { { "MG_TAB_ADVENTURERS", "manage" }, { "MG_TAB_FELLOWSHIP", "managefellowship" }, { "MG_TAB_RULES", "rulesadmin" } }
+local TABS = { { "MG_TAB_ADVENTURERS", "manage", "heroes" }, { "MG_TAB_FELLOWSHIP", "managefellowship", "manage" },
+  { "MG_TAB_RULES", "rulesadmin", "rulesadmin" } }
 function ns.ManageTabs(pf)
   local W = ns.Window
   local opts = {}
-  for i, t in ipairs(TABS) do opts[i] = { L[t[1]], t[2] } end
+  for i, t in ipairs(TABS) do opts[i] = { L[t[1]], t[2], t[3] } end
   pf.tabs = UI.Tabs(pf.left, opts, function() return W.current end, function(id) W:ShowPage(id) end, W.PAGE_W - 8)
   pf.tabs:SetPoint("TOPLEFT", 0, 0)
   return 40
@@ -52,6 +53,11 @@ local function build(pf)
     l.icon:SetPoint("TOPLEFT", 0, 0)
     l.text = UI.WrapText(l, 13, "ink", width - 26, "book")
     l.text:SetPoint("TOPLEFT", 24, -1)
+    -- Where it is handled, and Seen (U106): the Inbox's small buttons, not grey links (U113).
+    l.go = UI.TextButton(l, "", function(b) if b.fn then b.fn() end end, "primary", 12)
+    l.go:SetPoint("TOPLEFT", l.text, "BOTTOMLEFT", 0, -4)
+    l.seen = UI.TextButton(l, L.NOTICE_SEEN, function(b) if b.key then ns.Attention:See(ns.Fellowship:Current(), b.key) end end, "plain", 12)
+    l.seen:SetPoint("LEFT", l.go, "RIGHT", 8, 0)
     return l
   end)
   pf.attNone = UI.Text(L1, 12, "ink2")
@@ -114,8 +120,9 @@ local function build(pf)
     r.cancel:SetPoint("RIGHT")
     -- Wraps before Cancel ("· 23 hours left" ran under it; the check of 4 Nov 2026, 20:33).
     r.wait = UI.Text(r, 12, "ink2")
+    -- (Its width is set in refresh: anchored at both ends its height was read as one line before the layout, and two
+    -- lines ran into the bar below; the check of 8 Nov 2026.)
     r.wait:SetPoint("LEFT", r.name, "RIGHT", 6, 0)
-    r.wait:SetPoint("RIGHT", r.cancel, "LEFT", -8, 0)
     r.wait:SetWordWrap(true); r.wait:SetJustifyH("LEFT")
     r.wait:SetText(L.WAITING_ANSWER)
     -- The time an offline invite still waits, as a thin bar that empties over its day (U57).
@@ -145,10 +152,14 @@ local function refresh(pf, ctx)
     if not l then break end
     nAtt = i
     UI.SetIcon(l.icon, ns.ICONS["bn_" .. item.icon] or ns.ICONS.bn_done)
+    l.icon:SetAlpha(item.seen and 0.5 or 1)
     l.text:SetText(item.text)
-    local h = math.max(18, l.text:GetStringHeight() + 2)
+    l.text:SetTextColor(Theme:RGBA(item.seen and "ink2" or "ink"))
+    l.go:SetLabel(item.act[1]); l.go.fn = item.act[2]
+    l.seen:SetShown(not item.seen); l.seen.key = item.key
+    local h = math.max(18, l.text:GetStringHeight() + 2) + 4 + l.go:GetHeight()
     l:SetHeight(h)
-    s:Place(l, h, 5)
+    s:Place(l, h, 8)
   end
   pf.attLines:HideFrom(nAtt + 1)
   pf.attNone:SetShown(ctx.isLeader and #items == 0)
@@ -217,6 +228,7 @@ local function refresh(pf, ctx)
     r.wait:SetText(text)
     r.wait:SetTextColor(Theme:RGBA(color))
     r.cancel:SetShown(P.Can(f, me, "uninvite", name))
+    r.wait:SetWidth(math.max(60, width - r.name:GetStringWidth() - 6 - (r.cancel:IsShown() and r.cancel:GetWidth() + 8 or 0)))
     local left = st == "offline" and ns.Sync:InviteLeft(f, name)
     r.left:SetShown(left ~= nil and left ~= false)
     local h = math.max(32, math.ceil(r.wait:GetStringHeight() or 0) + 12) + (left and 6 or 0)

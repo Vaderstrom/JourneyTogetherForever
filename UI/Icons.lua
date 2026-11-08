@@ -44,6 +44,9 @@ ns.ICONS = {
   toast_gathering = I .. "INV_Misc_GroupNeedMore",
   toast_attune = I .. "INV_Misc_Key_03",
   toast_dquest = I .. "INV_Misc_Map_01",
+  toast_dready = I .. "INV_Scroll_03", toast_dallready = I .. "Ability_Warrior_BattleShout",
+  toast_dremind = I .. "INV_Letter_15",
+  toast_invite = I .. "INV_Letter_18",
   toast_ahead = I .. "INV_Misc_GroupNeedMore",
   toast_session = I .. "INV_Misc_GroupNeedMore",
   -- Status banner and "What's next" (the mockup's 🔒 ⏳ ⚔ ⚑ ✓ ✋)
@@ -72,6 +75,7 @@ ns.ICONS = {
   -- Challenges (SPEC §9): a memorial for the Fallen, a life lost, a challenge turned off, a broken rule, the Ring,
   -- Race to 60 done.
   hist_fallen = I .. "INV_Misc_Bone_HumanSkull_01",
+  hist_candle = I .. "Spell_Holy_SealOfSacrifice", -- the shared lives' flame (U41)
   hist_life = I .. "Spell_Holy_SealOfSacrifice",
   hist_challenge = I .. "Ability_Warrior_Challange",
   hist_broke = I .. "Spell_Shadow_CurseOfTounges",
@@ -89,6 +93,7 @@ ns.ICONS = {
   chal_race = I .. "Ability_Rogue_Sprint",
   chal_fellowfound = I .. "INV_Misc_Bag_10",
   chal_white = I .. "INV_Shirt_White_01",
+  chal_crafted = I .. "Trade_BlackSmithing",
   chal_pauper = I .. "INV_Misc_Coin_05",
   chal_ironman = I .. "INV_Ingot_Iron",
   chal_oneclass = I .. "INV_Banner_02",
@@ -303,6 +308,16 @@ ns.PAPER = {
   { file = "Interface\\QuestFrame\\QuestBG", coords = { 0, 0.586, 0, 0.65 } },
   { file = "Interface\\Spellbook\\Spellbook-Page-1", coords = { 0, 1, 0, 0.83 } },
 }
+
+-- Two props from Guild Together (U48): Media\Props holds its memorial stone with a candle and its gold trophy cup side
+-- by side (tools/convert-art.ps1, part "props", says where they came from). Puts one on tex; false when the file is
+-- missing (then the caller hides tex).
+ns.PROPS = { stone = { 0, 0.5, 0, 1 }, cup = { 0.5, 1, 0, 1 } }
+function ns.SetProp(tex, key)
+  if tex:SetTexture(ns.MEDIA .. "Props") == false then return false end
+  tex:SetTexCoord(unpack(ns.PROPS[key]))
+  return true
+end
 
 -- Puts the first parchment the game has on tex. Returns true when one was found.
 function ns.SetPaper(tex)

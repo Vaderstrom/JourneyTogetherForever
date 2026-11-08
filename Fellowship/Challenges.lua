@@ -20,6 +20,9 @@
 -- Gear, Gold & More (X3, X5)
 --   fellowfound  Fellowship-found: no trade or mail with anyone outside the fellowship, no auction house
 --   white        White gear only (shirt and tabard aside)
+--   crafted      Fellowship-crafted (X7, decided 8 Nov 2026): only gear someone in the fellowship made (a Friend of
+--                the fellowship too); the gear you start with and slots no profession makes are free. Not with
+--                Ironman Fellowship (no professions); with White gear only, the crafted gear is white too
 --   pauper       never more gold than the Leader set (value: the gold, 10 suggested)
 --   ironman      Ironman Fellowship: Hardcore Fellowship and White gear only, and no talents, no professions, no
 --                potions or food buffs
@@ -46,7 +49,7 @@ ns.Challenges = C
 C.GROUPS = {
   { key = "survival", list = { "hardcore", "shared" } },
   { key = "story", list = { "ring", "walk", "questless", "race" } },
-  { key = "more", list = { "fellowfound", "white", "pauper", "ironman", "oneclass", "nohealers", "dungeons" } },
+  { key = "more", list = { "fellowfound", "white", "crafted", "pauper", "ironman", "oneclass", "nohealers", "dungeons" } },
 }
 C.LIST, C.GROUP_OF = {}, {}
 for _, g in ipairs(C.GROUPS) do
@@ -58,8 +61,10 @@ for _, k in ipairs(C.LIST) do KNOWN[k] = true end
 C.SHARED_SUGGEST = { duo = 4, trio = 6, party = 10, large = 15 }
 -- Ironman Fellowship takes these on with it: chosen with it, and not turned off while it is on.
 C.INCLUDES = { ironman = { "hardcore", "white" } }
+-- Never chosen together: Ironman Fellowship allows no professions, so nobody could craft (X7).
+C.APART = { crafted = "ironman", ironman = "crafted" }
 -- What an Adventurer did, and the challenge it breaks (op "broke"; Fellowship/ChallengeWatch.lua notices them).
-C.WHAT = { trade = "fellowfound", mail = "fellowfound", mailto = "fellowfound", ah = "fellowfound", gear = "white",
+C.WHAT = { trade = "fellowfound", mail = "fellowfound", mailto = "fellowfound", ah = "fellowfound", gear = "white", craft = "crafted",
   gold = "pauper", taxi = "walk", hearth = "walk", quest = "questless", xp = "dungeons", talent = "ironman",
   prof = "ironman", potion = "ironman", food = "ironman" }
 
@@ -68,6 +73,16 @@ local function str(v) return type(v) == "string" and v ~= "" and #v <= 64 and v 
 local function plain(v) return v ~= nil and not (issecretvalue and issecretvalue(v)) end
 local function nameOk(v) return plain(v) and type(v) == "string" and v ~= "" and #v <= 64 end
 C.plain, C.nameOk = plain, nameOk
+-- U41: who lit a candle on a Fallen's memorial, { [name] = time }; at most CANDLES_MAX (more than a fellowship holds).
+C.CANDLES_MAX = 60
+local function cleanCandles(c)
+  if type(c) ~= "table" then return nil end
+  local out, n = {}, 0
+  for who, t in pairs(c) do
+    if n < C.CANDLES_MAX and nameOk(who) and tonumber(t) then out[who], n = tonumber(t), n + 1 end
+  end
+  return n > 0 and out or nil
+end
 
 ---------------------------------------------------------------------------
 -- What the fellowship keeps (f.challenges, f.challengesOff, f.falls, f.broken, f.ring, f.race; they go with copies
@@ -96,6 +111,7 @@ function C.Clean(ch)
   for k, list in pairs(C.INCLUDES) do
     if out[k] then for _, inc in ipairs(list) do out[inc] = out[inc] or true end end
   end
+  if out.ironman then out.crafted = nil end -- (C.APART: Ironman Fellowship wins)
   return any and out or nil
 end
 
@@ -117,7 +133,7 @@ function C:Sanitize(f)
     if type(e) == "table" and type(e.who) == "string" and tonumber(e.t) then
       falls[#falls + 1] = { who = e.who, t = tonumber(e.t), n = tonumber(e.n), lvl = tonumber(e.lvl), zone = str(e.zone),
         foe = str(e.foe), foeP = e.foeP == true or nil, fatal = e.fatal == true or nil, life = e.life == true or nil,
-        out = e.out == true or nil, pool = tonumber(e.pool) }
+        out = e.out == true or nil, pool = tonumber(e.pool), candles = cleanCandles(e.candles) }
     end
   end
   f.falls = #falls > 0 and falls or nil
@@ -264,6 +280,37 @@ function C:ApplyFall(f, by, op, t)
   ns:Fire("CHALLENGES")
   return true
 end
+
+-- U41 (the check of 1 Nov 2026): by lights a candle on name's memorial (op "candle"), once each and never for
+-- themselves; kept on the fall that ended name's journey. (A copy from an older addon drops them, as it drops any field
+-- it does not know.)
+function C:ApplyCandle(f, by, op, t)
+  local n = op.name
+  local e = nameOk(n) and self:Fallen(f, n)
+  if not e or by == n or (e.candles and e.candles[by]) then return false end
+  e.candles = e.candles or {}
+  e.candles[by] = t
+  ns:Fire("CHALLENGES")
+  return true
+end
+
+-- Who lit a candle for name: { { who, t } }, the first first.
+function C:Candles(f, name)
+  local e = self:Fallen(f, name)
+  local out = {}
+  for who, t in pairs(e and e.candles or {}) do out[#out + 1] = { who = who, t = t } end
+  table.sort(out, function(a, b) if a.t ~= b.t then return a.t < b.t end return a.who < b.who end)
+  return out
+end
+
+-- May you light one for name now?
+function C:CanLight(f, name)
+  local me = ns.Me()
+  local e = self:Fallen(f, name)
+  return e ~= nil and name ~= me and f.members[me] ~= nil and not (e.candles and e.candles[me])
+end
+
+function C:LightCandle(name) return F:Do({ k = "candle", name = name }) end
 
 -- A broken rule of by's (op "broke": what they did, x: who or what it was), the first of its challenge only.
 function C:ApplyBreak(f, by, op, t)
@@ -528,7 +575,19 @@ function C:FallToast(f, e)
   -- the Ring"; check of 1 Nov 2026, 15:23); the skull stays.
   -- A fall for good names Hardcore, even when it spent the last shared life: Hardcore ended that journey.
   local kicker = e.fatal and self:Name("hardcore", f.challenges and f.challenges.hardcore) or self:Name("shared")
-  return title, text, "chronicle", { solemn = (e.fatal or e.out) and true or nil, kicker = kicker }
+  -- U43 (the check of 4 Nov 2026): a fall for good is a big moment, in violet: the large banner, and a click opens
+  -- their memorial.
+  if e.fatal then
+    local name = e.who
+    local function memorial()
+      local W = ns.Window
+      W:Open("heroes")
+      local pf = W.pageFrames.heroes
+      if pf then pf.sel = name; W:Refresh() end
+    end
+    return title, text, memorial, { solemn = true, big = true, go = L.T_FALLEN_GO, kicker = kicker }
+  end
+  return title, text, "chronicle", { solemn = e.out and true or nil, kicker = kicker }
 end
 
 -- A challenge's toast (a broken rule, the Ring, the race, turned off): the challenge's own icon and its name as the
@@ -542,7 +601,8 @@ end
 
 -- What a broken rule's x stands for when the addon did not get it (a name the game hid).
 local NONE = { trade = "BREAK_SOMEONE", mail = "BREAK_SOMEONE", mailto = "BREAK_SOMEONE", gear = "BREAK_A_GREEN",
-  potion = "BREAK_A_POTION", quest = "BREAK_A_QUEST", xp = "BREAK_OUTSIDE", prof = "BREAK_A_PROFESSION", gold = "BREAK_MORE" }
+  craft = "BREAK_A_PIECE", potion = "BREAK_A_POTION", quest = "BREAK_A_QUEST", xp = "BREAK_OUTSIDE",
+  prof = "BREAK_A_PROFESSION", gold = "BREAK_MORE" }
 -- "Brannic took a flight path, breaking Walk everywhere."
 function C:BreakText(e)
   local did = L["BREAK_" .. e.what:upper()]:format(e.x or (NONE[e.what] and L[NONE[e.what]]) or "")
@@ -663,6 +723,10 @@ function C:Entries(f)
     local chip, color = L.ST_LIFE, "B8742A"
     if e.fatal then chip, color = L.ST_FALLEN, "5E4B6E" elseif e.out then chip, color = L.ST_LIVES_OUT, "B0321E" end
     add({ icon = e.fatal and "fallen" or "life", time = e.t, text = self:FallText(f, e), chip = chip, chipColor = color, who = e.who })
+    for who, t in pairs(e.candles or {}) do
+      add({ icon = "candle", time = t, text = L.CH_CANDLE:format(ns.Short(who), ns.Short(e.who)), chip = L.ST_CANDLE,
+        chipColor = "5E4B6E", who = who })
+    end
   end
   for _, e in ipairs(f.broken or {}) do
     add({ icon = "broke", time = e.t, text = self:BreakText(e), chip = L.ST_BROKE, chipColor = "9A5B2E", who = e.who })

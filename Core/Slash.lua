@@ -15,12 +15,18 @@ local PAGES = { chapter = "chapter", heroes = "heroes", companions = "heroes", a
 -- The copy that stays off (Core/Init.lua) leaves /jtf to the one that runs.
 if ns.off then return end
 SLASH_JOURNEYTOGETHERFOREVER1 = "/jtf"
+-- The key binding's texts in Key Bindings (Bindings.xml, U107): the game reads them as globals by these names.
+BINDING_HEADER_JOURNEYTOGETHERFOREVER = L.BIND_HEADER
+BINDING_NAME_JOURNEYTOGETHERFOREVER_OPEN = L.BIND_OPEN
 SlashCmdList.JOURNEYTOGETHERFOREVER = function(msg)
   local cmd, rest = (msg or ""):match("^%s*(%S*)%s*(.-)%s*$")
   cmd = cmd:lower()
   if cmd == "" then W:Toggle()
   elseif PAGES[cmd] then W:Open(PAGES[cmd]) -- shows the start page when that page is not yours
   elseif cmd == "settings" then W:OpenSettings()
+  -- The key binding: the book at the page Settings chose, or closed when it is open; not in the help.
+  elseif cmd == "key" then
+    if W:IsOpen() then W:Toggle() else W:Open(ns.Settings:Get("keyPage")) end
   elseif cmd == "photo" then ns.Photo:Open()
   elseif cmd == "news" then ns.News:Open()
   elseif cmd == "debug" and ns.Dev then ns.Dev:Command(rest)

@@ -227,7 +227,8 @@ local function buildList(pf, width)
   pf.oldNote:SetWidth(width - 8)
   pf.oldNote.text = UI.WrapText(pf.oldNote, 12, "ink", width - 32)
   pf.oldNote.text:SetPoint("TOPLEFT", 12, -9)
-  pf.invHead = UI.SectionHeader(R, width - 8)
+  -- Folded at first (U108): a click on the heading opens the name box; open invites show either way.
+  pf.invHead = UI.FoldHeader(R, width - 8, function() pf.invOpen = not pf.invOpen; ns.Window:Refresh() end)
   pf.invHead:SetText(L.INVITE_HEROES)
   UI.InviteBox(pf, R, width - 118, width - 8)
   pf.invRows = UI.Pool(function()
@@ -239,11 +240,23 @@ local function buildList(pf, width)
     r.cancel:SetPoint("RIGHT")
     -- Wraps before Cancel (the time left of an offline invite ran under it; the check of 4 Nov 2026, 20:33).
     r.wait = UI.Text(r, 12, "ink2")
+    -- (Its width set in refresh, as on Manage: two lines were read as one; the check of 8 Nov 2026.)
     r.wait:SetPoint("LEFT", r.name, "RIGHT", 6, 0)
-    r.wait:SetPoint("RIGHT", r.cancel, "LEFT", -8, 0)
     r.wait:SetWordWrap(true); r.wait:SetJustifyH("LEFT")
     return r
   end)
+  -- The Friends of the fellowship and the Fallen under headings of their own, closed at first (U108: a fellowship
+  -- with many Friends scrolled a long way); what you open is kept for the character.
+  pf.folds = {}
+  for g, x in ipairs({ { "friends", L.FOLD_FRIENDS }, { "fallen", L.FOLD_FALLEN } }) do
+    local id = x[1]
+    pf.folds[g] = UI.FoldHeader(R, width - 8, function()
+      ns.char.heroesOpen = ns.char.heroesOpen or {}
+      ns.char.heroesOpen[id] = not ns.char.heroesOpen[id] or nil
+      ns.Window:Refresh()
+    end)
+    pf.folds[g].id, pf.folds[g].label = id, x[2]
+  end
 end
 
 -- Recent history: the fellowship's log and its falls, newest first (the check of 1 Nov 2026, 14:32: Brannic's fall
@@ -255,7 +268,7 @@ function ns.RecentHistory(f, max)
     out[#out + 1] = { text = e.text, time = e.time or 0, seq = i, icon = FEED_ICON[F.LOG_GROUP[e.k]] or "hist_chapter" }
   end
   for _, e in ipairs(ns.Challenges:Entries(f)) do
-    if e.icon == "fallen" or e.icon == "life" then
+    if e.icon == "fallen" or e.icon == "life" or e.icon == "candle" then
       out[#out + 1] = { text = e.text, time = e.time or 0, seq = 0, icon = "hist_" .. e.icon, fall = true }
     end
   end
@@ -382,16 +395,22 @@ local function refreshList(pf, ctx, width)
   -- Invite an Adventurer, on top (28 Oct 2026; it was under the cards). Not while following another character's
   -- fellowship; the walkthrough's veil keeps the sample's box from being used.
   local canInvite = not ctx.watching and P.Can(f, ctx.me, "invite")
-  for _, w in ipairs({ pf.invHead, pf.invite, pf.send, pf.asFriend, pf.share }) do w:SetShown(canInvite) end
+  local boxOpen = canInvite and pf.invOpen == true
+  pf.invHead:SetShown(canInvite)
+  for _, w in ipairs({ pf.invite, pf.send, pf.asFriend, pf.share }) do w:SetShown(boxOpen) end
+  if not boxOpen then pf.suggest:Hide() end
   local nInv = 0
   if canInvite then
+    pf.invHead:SetOpen(boxOpen)
     stack:Place(pf.invHead, 29, 6)
-    local iy = stack.y
-    stack:Place(pf.invite, 28, 4)
-    pf.send:ClearAllPoints(); pf.send:SetPoint("TOPRIGHT", pf.scroll.child, "TOPRIGHT", -8, -iy + 3)
-    pf.asFriend:Refresh()
-    stack:Place(pf.asFriend, 24, 2)
-    stack:Place(pf.share, pf.share:GetHeight(), 6)
+    if boxOpen then
+      local iy = stack.y
+      stack:Place(pf.invite, 28, 4)
+      pf.send:ClearAllPoints(); pf.send:SetPoint("TOPRIGHT", pf.scroll.child, "TOPRIGHT", -8, -iy + 3)
+      pf.asFriend:Refresh()
+      stack:Place(pf.asFriend, 24, 2)
+      stack:Place(pf.share, pf.share:GetHeight(), 6)
+    end
     local open = {}
     for name in pairs(f.invites) do open[#open + 1] = name end
     table.sort(open)
@@ -407,6 +426,7 @@ local function refreshList(pf, ctx, width)
       r.wait:SetTextColor(Theme:RGBA(st == "received" and "3E7A3A" or "ink2"))
       r.cancel:SetShown(P.Can(f, ctx.me, "uninvite", name))
       r:SetWidth(width - 8)
+      r.wait:SetWidth(math.max(60, width - 8 - r.name:GetStringWidth() - 6 - (r.cancel:IsShown() and r.cancel:GetWidth() + 8 or 0)))
       local h = math.max(28, math.ceil(r.wait:GetStringHeight() or 0) + 10)
       r:SetHeight(h)
       stack:Place(r, h, 2)
@@ -414,12 +434,12 @@ local function refreshList(pf, ctx, width)
     stack:Skip(10)
   end
   pf.invRows:HideFrom(nInv + 1)
-  -- The cards.
+  -- The cards: the Adventurers, then the Friends of the fellowship and the Fallen, each under its folding heading.
   local shown = 0
-  for i, name in ipairs(names) do
-    local c = pf.cards:Get(i)
-    if not c then break end
-    shown = i
+  local function place(name)
+    local c = pf.cards:Get(shown + 1)
+    if not c then return end
+    shown = shown + 1
     local m = f.members[name]
     c.who = name
     UI.SetRole(c.role, m.role)
@@ -473,6 +493,21 @@ local function refreshList(pf, ctx, width)
     c:SetAlpha(fallen and 1 or (kind == "away" and 0.6 or (kind == "offline" and 0.8 or 1)))
     c:SetWidth(width - 8)
     stack:Place(c, 72, 6)
+  end
+  local groups = { [0] = {}, {}, {} }
+  for _, name in ipairs(names) do local g = groups[group(name)]; g[#g + 1] = name end
+  for _, name in ipairs(groups[0]) do place(name) end
+  local opened = ns.char and ns.char.heroesOpen or {}
+  for g = 1, 2 do
+    local h, list = pf.folds[g], groups[g]
+    h:SetShown(#list > 0)
+    if #list > 0 then
+      h:SetText(h.label:format(#list))
+      h:SetOpen(opened[h.id])
+      stack:Skip(4)
+      stack:Place(h, 29, 6)
+      if opened[h.id] then for _, name in ipairs(list) do place(name) end end
+    end
   end
   pf.cards:HideFrom(shown + 1)
   pf.scroll:SetContentHeight(stack.y + 4)
@@ -580,26 +615,61 @@ local function buildInspect(pf, width)
     g:SetScript("OnEvent", function() if GameTooltip:IsOwned(g) then tip() end end)
     pf.gear[n] = g
   end
-  -- The model between the slot columns and above the weapons; without one yet, the class crest and why.
+  -- The model between the slot columns and above the weapons.
   pf.modelBox = CreateFrame("Frame", nil, pf.stage)
   pf.modelBox:SetPoint("TOPLEFT", PAD + SLOT + 6, -PAD)
   pf.modelBox:SetPoint("BOTTOMRIGHT", -(PAD + SLOT + 6), PAD + SLOT + 4)
   pf.modelBox:SetFrameLevel(pf.stage:GetFrameLevel() + 1)
-  pf.stageCrest = UI.ClassCrest(pf.modelBox, 120)
-  pf.stageCrest:SetPoint("CENTER", 0, 24)
-  pf.stageNote = UI.WrapText(pf.modelBox, 12, "chipText", width - 2 * (PAD + SLOT + 6) - 24)
-  pf.stageNote:SetJustifyH("CENTER")
-  pf.stageNote:SetPoint("TOP", pf.stageCrest, "BOTTOM", 0, -10)
+  -- U3 (the checks of 29 Oct and 1 Nov 2026): someone not near cannot be drawn (the shared looks probe, 31 Oct 2026),
+  -- so in place of an empty model box and slots, a card: their class crest, class and role, item level, their gear
+  -- as a list in quality colours, and when they were last near.
+  local card = CreateFrame("Frame", nil, pf.stage)
+  card:SetPoint("TOPLEFT", 22, -20); card:SetPoint("BOTTOMRIGHT", -22, 18)
+  card:SetFrameLevel(pf.stage:GetFrameLevel() + 3)
+  local cw = width - 12 - 44
+  card.crest = UI.ClassCrest(card, 76)
+  card.crest:SetPoint("TOPLEFT", -6, 4)
+  card.role = UI.RoleIcon(card, 20)
+  card.role:SetPoint("TOPLEFT", 82, -10)
+  card.who = UI.Text(card, 16, "goldText", "title")
+  card.who:SetPoint("LEFT", card.role, "RIGHT", 6, 0)
+  card.ilvl = UI.Text(card, 13, "chipText")
+  card.ilvl:SetPoint("TOPLEFT", 82, -40)
+  card.note = UI.WrapText(card, 11, "chipText", cw)
+  card.note:SetPoint("BOTTOMLEFT", 0, 0)
+  card.rows = {}
+  for n = 1, #Hr.SLOTS do
+    local r = CreateFrame("Button", nil, card)
+    r:SetSize(cw, 18)
+    r.icon = r:CreateTexture(nil, "ARTWORK")
+    r.icon:SetSize(16, 16); r.icon:SetPoint("LEFT")
+    r.name = UI.Text(r, 12, nil, "body")
+    r.name:SetPoint("LEFT", 22, 0); r.name:SetWidth(cw - 22 - 96)
+    r.slot = UI.Text(r, 11, "chipText", "body", "RIGHT")
+    r.slot:SetPoint("RIGHT")
+    r:SetScript("OnEnter", function()
+      if not (r.id and GameTooltip.SetItemByID) then return end
+      GameTooltip:SetOwner(r, "ANCHOR_RIGHT"); GameTooltip:SetItemByID(r.id); GameTooltip:Show()
+    end)
+    r:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    card.rows[n] = r
+  end
+  card.none = UI.Text(card, 12, "chipText")
+  card.none:SetPoint("TOPLEFT", 0, -92)
+  card.none:SetText(L.GEAR_NONE)
+  card:Hide()
+  pf.card = card
   -- A Fallen Adventurer (SPEC §9): a memorial in place of the gear and the model, over the picture greyed and dimmed.
   -- Their class crest greyed with the skull on its rim, "In memory of", where and when they fell, and the Chronicle.
   local mem = CreateFrame("Frame", nil, pf.stage)
   mem:SetAllPoints()
   mem:SetFrameLevel(pf.stage:GetFrameLevel() + 2)
-  mem.crest = UI.ClassCrest(mem, 120)
-  mem.crest:SetPoint("TOP", 0, -60)
+  -- (Smaller and higher since U41, to leave room for the stone and its candles at the foot.)
+  mem.crest = UI.ClassCrest(mem, 100)
+  mem.crest:SetPoint("TOP", 0, -30)
   mem.mark = CreateFrame("Frame", nil, mem)
   mem.mark:SetSize(36, 36)
-  mem.mark:SetPoint("CENTER", mem.crest, "BOTTOMRIGHT", -20, 20)
+  mem.mark:SetPoint("CENTER", mem.crest, "BOTTOMRIGHT", -16, 16)
   mem.mark:SetFrameLevel(mem:GetFrameLevel() + 4)
   local ring = UI.Round(mem.mark, "ARTWORK", 36)
   ring:SetPoint("CENTER"); Theme:Fill(ring, Hr.FALLEN, 1)
@@ -616,6 +686,16 @@ local function buildInspect(pf, width)
   mem.honour = UI.Text(mem, 12, "B9A6CF", "body", "CENTER") -- the Fallen's violet, light enough for the dark stage
   mem.honour:SetPoint("TOP", mem.line, "BOTTOM", 0, -12)
   mem.honour:SetText(L.T_FALLEN_HONOURED)
+  -- U41 (the check of 1 Nov 2026): Guild Together's memorial stone with its candle (U48), who lit a candle for them,
+  -- and Light a candle (each Adventurer once).
+  mem.light = UI.TextButton(mem, L.CANDLE_LIGHT, function() if pf.sel then ns.Challenges:LightCandle(pf.sel) end end, "primary", 12)
+  mem.light:SetPoint("BOTTOM", 0, 16)
+  mem.lit = UI.WrapText(mem, 12, "chipText", inner)
+  mem.lit:SetJustifyH("CENTER")
+  mem.stone = mem:CreateTexture(nil, "ARTWORK")
+  mem.stone:SetSize(88, 88)
+  mem.stone:SetPoint("BOTTOM", mem.lit, "TOP", 0, 4)
+  mem.stone:SetShown(ns.SetProp(mem.stone, "stone"))
   mem:Hide()
   pf.memorial = mem
   -- The slots above the model (it turns when dragged between them).
@@ -743,9 +823,6 @@ local function refreshInspect(pf, ctx, width)
     or (ns.ParseVersion(h.ver) and L.INSPECT_VERSION:format(h.ver)) or ""
   if fallen then pf.iLine:SetText(L.INSPECT_LINE:format(level, Hr:ClassName(f, name), L.STATUS_FALLEN))
   else pf.iLine:SetText(L.INSPECT_LINE:format(level, Hr:ClassName(f, name), L[UI.PRESENCE_LC[kind]]) .. ver) end
-  pf.ilvlBox:SetShown(not fallen)
-  for _, g in ipairs(pf.gear) do g:SetShown(not fallen) end
-  pf.modelBox:SetShown(not fallen)
   pf.gearAsOf:SetShown(not fallen)
   pf.memorial:SetShown(fallen)
   local gear = h.gear or {}
@@ -788,14 +865,49 @@ local function refreshInspect(pf, ctx, width)
     mem.crest.icon:SetDesaturated(true); mem.crest.ring:SetDesaturated(true)
     mem.title:SetText(L.MEMORIAL_TITLE:format(ns.Short(name)))
     mem.line:SetText(memorial.line)
+    local who = {}
+    for _, c in ipairs(ns.Challenges:Candles(f, name)) do who[#who + 1] = c.who == ns.Me() and L.YOU_LABEL or ns.Short(c.who) end
+    mem.lit:SetText(#who > 0 and L.CANDLES_LIT:format(table.concat(who, ", ")) or L.CANDLES_NONE)
+    local can = not ctx.watching and ns.Challenges:CanLight(f, name)
+    mem.light:SetShown(can)
+    mem.lit:ClearAllPoints(); mem.lit:SetPoint("BOTTOM", 0, can and 50 or 18)
   end
   local drawn = not fallen and ns.Models:Place(name, "body", pf.modelBox)
-  pf.stageCrest:SetShown(not drawn); pf.stageNote:SetShown(not drawn)
-  if not drawn then
-    pf.stageCrest:Set(select(2, Hr:ClassName(f, name)))
+  -- Not near (U3): the card in place of the model, the slots and the item level box.
+  local card = not fallen and not drawn
+  pf.card:SetShown(card)
+  pf.modelBox:SetShown(drawn)
+  pf.ilvlBox:SetShown(drawn)
+  for _, g in ipairs(pf.gear) do g:SetShown(drawn) end
+  if card then
+    local cd = pf.card
+    local className, token = Hr:ClassName(f, name)
+    cd.crest:Set(token)
+    UI.SetRole(cd.role, m.role)
+    cd.who:SetText(L.INSPECT_CARD_WHO:format(className or "", L["ROLE_" .. (m.role or "DPS"):upper()] or m.role or ""))
+    cd.ilvl:SetText(L.INSPECT_CARD_ILVL:format(pf.iIlvl:GetText()))
     local last = ns.Models:LastNear(name)
-    pf.stageNote:SetText(L.MODEL_NOT_MET:format(ns.Short(name)) .. "\n\n"
+    cd.note:SetText(L.MODEL_NOT_MET:format(ns.Short(name)) .. " "
       .. (last and L.MODEL_LAST_NEAR:format(ns.TimeAgo(last)) or L.MODEL_NEVER_NEAR))
+    -- Only the worn items, as close as the card's height lets them sit (at most 18 apart).
+    local worn = {}
+    for n = 1, #Hr.SLOTS do if gear[n] then worn[#worn + 1] = n end end
+    local room = cd:GetHeight() - 92 - cd.note:GetStringHeight() - 10
+    local step = math.max(13, math.min(18, room / math.max(1, #worn)))
+    for i, r in ipairs(cd.rows) do
+      local n = worn[i]
+      local item = n and gear[n]
+      r:SetShown(item ~= nil)
+      if item then
+        r.id = item.id
+        r.icon:SetTexture(Hr.ItemIcon(item.id) or Hr.SlotPicture(Hr.SLOTS[n][2]))
+        r.name:SetText(item.name or "")
+        r.name:SetTextColor(ns.Hex(ns.QualityHex(item.q or 1, false)))
+        r.slot:SetText(L[Hr.SLOTS[n][1]] .. (item.ilvl and item.ilvl > 0 and ("  ·  " .. item.ilvl) or ""))
+        r:ClearAllPoints(); r:SetPoint("TOPLEFT", cd, "TOPLEFT", 0, -92 - (i - 1) * step)
+      end
+    end
+    cd.none:SetShown(#worn == 0)
   end
   if not h.gear then pf.gearAsOf:SetText(L.GEAR_NONE)
   elseif online then pf.gearAsOf:SetText(L.GEAR_NOW:format(ns.Short(name)))
@@ -933,6 +1045,8 @@ local function refreshInspect(pf, ctx, width)
       pf.friendButton:SetLabel(friend and L.FRIEND_BACK or L.FRIEND_BECOME)
       pf.friendButton:SetEnabled(why == nil)
       pf.friendButton:SetAlpha(why == nil and 1 or 0.5)
+      -- U47: the Leader keeps the sentence, without a greyed button.
+      pf.friendButton:SetShown(why ~= "leader")
       local fy = s.y
       s:Place(pf.friendHead, 20, 6)
       pf.friendButton:ClearAllPoints(); pf.friendButton:SetPoint("TOPRIGHT", R, "TOPRIGHT", 0, -(fy - 4))

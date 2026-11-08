@@ -73,10 +73,12 @@ local TABS = { "chapter", "shelf", "journey" }
 local TABS_H = 28 + 10 -- the tabs and the room under them
 
 -- The tabs at the right page's top (under the plate across both pages), the scrolling tab under them.
+-- (On a page wider than the right pane was laid out for, Journey Admin in full screen, the pane sits in its middle.)
 local function placeRight(ed)
-  ed.tabs:ClearAllPoints(); ed.tabs:SetPoint("TOPLEFT", ed.rightPage, "TOPLEFT", 0, -ed.drop)
+  local x = ed.rightX or 0
+  ed.tabs:ClearAllPoints(); ed.tabs:SetPoint("TOPLEFT", ed.rightPage, "TOPLEFT", x, -ed.drop)
   ed.rscroll:ClearAllPoints()
-  ed.rscroll:SetPoint("TOPLEFT", 0, -(ed.drop + TABS_H)); ed.rscroll:SetPoint("BOTTOMRIGHT")
+  ed.rscroll:SetPoint("TOPLEFT", x, -(ed.drop + TABS_H)); ed.rscroll:SetPoint("BOTTOMRIGHT", -x, 0)
 end
 
 -- The ruler's look (29 Oct 2026; Create's journey views use it too). It lies on one of the book's cards (UI.Card,
@@ -329,6 +331,8 @@ function JED.New(left, right, lw, rw, src)
     c.picHit = CreateFrame("Frame", nil, c)
     c.picHit:SetAllPoints(c.pic); c.picHit:EnableMouse(true)
     UI.PictureTip(c.picHit, function() return c.key end)
+    -- A click on the picture opens the Dungeon page (U96; the row itself is dragged).
+    c.picHit:SetScript("OnMouseUp", function() if c.key then ns.DungeonPage:Open(c.key) end end)
     c.name = UI.Text(c, 14, "ink")
     c.name:SetPoint("TOPLEFT", 60, -8)
     c.levels = UI.Text(c, 12, "ink2")
@@ -607,8 +611,9 @@ function JED:Refresh()
     self.rulerW = self.plate:Fit((l and r and r - l > lw) and (r - l) or (lw + rw + SPINE))
     local top, bottom = self.rightPage:GetTop(), self.plate:GetBottom()
     local drop = (top and bottom and top - bottom > 0) and math.floor(top - bottom + GAP) or (PLATE_H + GAP)
-    if drop ~= self.drop then
-      self.drop = drop
+    local x = math.max(0, math.floor(((self.rightPage:GetWidth() or rw) - rw) / 2))
+    if drop ~= self.drop or x ~= (self.rightX or 0) then
+      self.drop, self.rightX = drop, x
       placeRight(self)
     end
     local pl, lr, rl = self.plate:GetLeft(), self.leftPage:GetRight(), self.rightPage:GetLeft()
@@ -701,11 +706,14 @@ function JED:Refresh()
 
   -- The chapters, each with its dungeons as chips (in the colour of their role).
   local s = UI.Stack(self.list.child)
-  local rowW = lw - 10
+  -- As wide as the left page is now (Journey Admin in full screen is wider than it was laid out for, U94).
+  local lwNow = math.max(lw, math.floor(self.leftPage:GetWidth() or lw))
+  local rowW = lwNow - 10
   for i, c in ipairs(j.chapters) do
     local row = self.rows:Get(i)
     if not row then break end
     row.i = i
+    row:SetWidth(rowW); row.name:SetWidth(lwNow - 150)
     row.sw:SetVertexColor(ns.Hex(c.color or "E2B857"))
     row.n:SetText(ns.Journey.Roman(i))
     row.name:SetText(c.name)

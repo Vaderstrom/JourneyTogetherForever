@@ -10,11 +10,13 @@ local OA = ns.OtherAddons
 local PIC_H = 96
 local SOON_H = 200 -- U63: a raid not open yet, its picture large on the right page
 
--- "Opens in 33 days  ·  9 December" (U63); nil when it is open or has no date.
-local function countdown(key, f)
+-- "Opens in 33 days  ·  9 December" (U63); nil when it is open or has no date. short: the card's ribbon, "Opens in 33
+-- days" (U89: the date once, on the right page).
+local function countdown(key, f, short)
   local at = ns.Opens(key)
   if not at or ns.IsOpen(key, f) then return nil end
   local days = math.max(1, math.ceil((at - time()) / 86400))
+  if short then return days == 1 and L.RAID_OPENS_TOMORROW or L.RAID_OPENS_IN:format(days) end
   if days == 1 then return L.RAID_COUNTDOWN_1:format(ns.OpensText(key)) end
   return L.RAID_COUNTDOWN:format(days, ns.OpensText(key))
 end
@@ -79,6 +81,9 @@ local function build(pf)
     c.lore = UI.RoundButton(c, 28, "lore", function() OA:Lore(c.key) end)
     UI.Tooltip(c.lore, function() return OA:StoryTip(c.key) end)
     c.lore:SetPoint("LEFT", c.dj, "RIGHT", 6, 0)
+    -- The raid's own page (U96): its story, bosses with the kills, who cleared it, and the entrance.
+    c.page = UI.TextButton(c, L.DG_OPEN, function() if c.key then ns.DungeonPage:Open(c.key) end end, "link", 12)
+    c.page:SetPoint("LEFT", c.lore, "RIGHT", 10, 0)
     return c
   end)
 
@@ -147,14 +152,15 @@ local function refresh(pf, ctx)
     -- Not open yet (a date Blizzard announced): the date instead of progress, and no Find group.
     local open = ns.IsOpen(key, f)
     c.mark:SetMark(not open and "locked" or (done and "cleared" or "open"))
-    c.state:SetText(open and L.RAID_CLEARED_BY:format(cleared, #counted) or L.RAID_OPENS:format(ns.OpensText(key)))
+    c.state:SetText(open and L.RAID_CLEARED_BY:format(cleared, #counted)
+      or countdown(key, f, true) or L.RAID_OPENS:format(ns.OpensText(key)))
     c.sel:SetShown(key == pf.raid)
     local st = E:AttuneStatus(f, r)
     local att = not r[5] and L.RAID_NO_ATTUNE
       or (#st.attuned > 0 and L.RAID_ATTUNED:format(names(st.attuned, me)) or L.RAID_NOBODY_ATTUNED)
     local n, of = ns.Clears:Progress(f, key, me)
-    c.info:SetText(att .. "\n" .. (open and (of == 1 and L.RAID_YOU_BOSS or L.RAID_YOU_BOSSES):format(n, of)
-      or L.RAID_NOT_OPEN:format(ns.OpensText(key))))
+    -- (Not open yet: the ribbon says when; the right page has the date.)
+    c.info:SetText(open and (att .. "\n" .. (of == 1 and L.RAID_YOU_BOSS or L.RAID_YOU_BOSSES):format(n, of)) or att)
     local h = PIC_H + 10 + c.info:GetStringHeight() + 8
     c.group:ClearAllPoints(); c.group:SetPoint("TOPLEFT", 12, -h)
     -- Watching an alt's fellowship (Fellowship/Watch.lua): no Find group, it would form your own.

@@ -7,7 +7,6 @@ local _, ns = ...
 local L = ns.L
 local UI, Theme = ns.UI, ns.Theme
 local J, Hr, P, Cl = ns.Journey, ns.Hero, ns.Permissions, ns.Clears
-local OA = ns.OtherAddons
 
 local CELL_W, NAME_W, HEAD_H = 34, 110, 32
 -- A dungeon row and its picture: five rows fit on the page without scrolling (28 Oct 2026).
@@ -126,14 +125,14 @@ local function build(pf)
     -- The role's colour down the row's left edge (and its border): mandatory, bridge, optional at a glance.
     c.stripe = c:CreateTexture(nil, "ARTWORK", nil, 3)
     c.stripe:SetPoint("TOPLEFT", 1, -1); c.stripe:SetPoint("BOTTOMLEFT", 1, 1); c.stripe:SetWidth(4)
-    -- The dungeon's picture (its loading screen); a click opens the DungeonJournal addon.
+    -- The dungeon's picture (its loading screen); a click on it or the row opens the Dungeon page (U96).
     c.pic = CreateFrame("Button", nil, c)
     c.pic:SetSize(THUMB_W, THUMB_H); c.pic:SetPoint("LEFT", 9, 0)
     c.pic.tex = c.pic:CreateTexture(nil, "ARTWORK")
     local phl = c.pic:CreateTexture(nil, "HIGHLIGHT")
     phl:SetColorTexture(1, 0.9, 0.6, 0.15)
     UI.FramePicture(c.pic, c.pic.tex, phl)
-    c.pic:SetScript("OnClick", function() W:DungeonJournal(c.key) end)
+    c.pic:SetScript("OnClick", function() if c.key then ns.DungeonPage:Open(c.key) end end)
     UI.PictureTip(c.pic, function() return c.key end) -- larger on hover (U64)
     c.mark = UI.Mark(c.pic, 14)
     c.mark:SetPoint("BOTTOMLEFT", 4, 4)
@@ -149,8 +148,8 @@ local function build(pf)
     c.brief:SetPoint("TOPLEFT", c.sub, "BOTTOMLEFT", 0, -2)
     c.brief:SetWordWrap(false)
     -- Its quests you still have to pick up or start (U79): a map with their number beside the Dungeon Journal (five
-    -- rows fill the page to the pixel, so no third line), "4 quests to pick up · 2 to start earlier" on hover; a
-    -- click opens them on the Quests page's Dungeons tab.
+    -- rows fill the page to the pixel, so no third line), "4 quests to pick up · 2 to start early" on hover; a
+    -- click opens the Dungeon page, where they are.
     c.quests = UI.RoundButton(c, 26, "quests", function() if c.key then ns.QuestLists:Open(c.key) end end)
     c.quests.n = UI.Text(c.quests, 11, "white", "title", "CENTER")
     c.quests.n:SetPoint("BOTTOMRIGHT", 3, -2)
@@ -158,20 +157,22 @@ local function build(pf)
     UI.Tooltip(c.quests, function() return (c.questLine or "") .. "\n" .. L.DQ_CHAPTER_TIP end)
     c.state = UI.Text(c, 12, nil, "body", "RIGHT")
     -- Everything else about the dungeon on hover: who ran it, what is missing, quests picked up.
+    c.hl = c:CreateTexture(nil, "ARTWORK", nil, 1)
+    c.hl:SetAllPoints(); c.hl:SetColorTexture(1, 0.9, 0.6, 0.08); c.hl:Hide()
     c:SetScript("OnEnter", function()
+      c.hl:Show()
       GameTooltip:SetOwner(c, "ANCHOR_RIGHT")
       for i, line in ipairs(c.tip or {}) do
         if i == 1 then GameTooltip:SetText(line) else GameTooltip:AddLine(line, 0.9, 0.85, 0.7, true) end
       end
       GameTooltip:Show()
     end)
-    c:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    -- The Dungeon Journal as a book icon (a symbol, as in the first mockup; the text button was wide).
-    c.dj = UI.RoundButton(c, 26, "journal", function() W:DungeonJournal(c.key) end)
-    UI.Tooltip(c.dj, L.DUNGEON_JOURNAL)
-    -- The dungeon's story in Spoken or Lore Forever; with neither, a click says to install one (UI/OtherAddons.lua).
-    c.lore = UI.RoundButton(c, 26, "lore", function() OA:Lore(c.key) end)
-    UI.Tooltip(c.lore, function() return OA:StoryTip(c.key) end)
+    c:SetScript("OnLeave", function() c.hl:Hide(); GameTooltip:Hide() end)
+    -- The row opens the Dungeon page (U96), with the story, the Dungeon Journal and the quests (the row's book and
+    -- story buttons went there).
+    c:SetScript("OnMouseUp", function(_, button)
+      if button == "LeftButton" and c.key and c:IsMouseOver() then ns.DungeonPage:Open(c.key) end
+    end)
     c.group = UI.TextButton(c, L.FIND_GROUP, function()
       local f = ns.Fellowship:Current()
       if f and c.key then ns.Together:FindGroup(f, c.key) end
@@ -630,7 +631,7 @@ local function refresh(pf, ctx)
     c.questLine = ql
     c.quests:SetShown(ql ~= nil and not ctx.watching)
     if ql then c.quests.n:SetText(pick + earlier) end
-    -- At the right: Find group when it is open (the main action), else its state; the Dungeon Journal; and for the
+    -- At the right: Find group when it is open (the main action), else its state; the quests to get; and for the
     -- leader a "⋯" menu with Mark cleared and Undo clear.
     c.key = x.key
     c.group:SetShown(st == "open" and not ctx.watching)
@@ -640,7 +641,7 @@ local function refresh(pf, ctx)
     c.state:SetText(st == "cleared" and L.STATE_CLEARED or L.STATE_LOCKED)
     c.state:SetTextColor(Theme:RGBA(st == "cleared" and "3E7A3A" or "ink2"))
     local rx = width - 8
-    for _, w in ipairs({ c.menu, c.group, c.state, c.dj, c.lore, c.quests }) do
+    for _, w in ipairs({ c.menu, c.group, c.state, c.quests }) do
       if w:IsShown() then
         local ww = w.GetStringWidth and w:GetStringWidth() or w:GetWidth()
         w:ClearAllPoints(); w:SetPoint("RIGHT", c, "LEFT", rx, 0)
@@ -709,10 +710,10 @@ local function refresh(pf, ctx)
   -- Where the Heroes stand.
   local r = UI.Stack(pf.rscroll.child)
   r:Place(pf.head, pf.head:GetHeight(), 4)
-  local th = pf.levelTrack:Set(f, view, 6)
+  local room = view == cur and not ctx.watching and ns.Room:Chapter(f, ns.Me()) or nil
+  local th = pf.levelTrack:Set(f, view, 6, room and room.stop)
   if th > 0 then r:Place(pf.levelTrack, th, 12) end
   pf.stand:Set(f, view, r)
-  local room = view == cur and not ctx.watching and ns.Room:Chapter(f, ns.Me()) or nil
   pf.room:SetShown(room ~= nil)
   if room then
     local main, stop = ns.Room.Lines(room)

@@ -40,6 +40,8 @@ Fellowship\ChallengeWatch.lua
 Fellowship\Quests.lua
 Fellowship\QuestLists.lua
 Fellowship\Room.lua
+Fellowship\Ready.lua
+Fellowship\Entrances.lua
 Fellowship\Progress.lua
 Fellowship\Together.lua
 Fellowship\Session.lua
@@ -82,6 +84,7 @@ UI\Pages\Chronicle.lua
 UI\Pages\Moments.lua
 UI\Pages\History.lua
 UI\Pages\QuestDungeons.lua
+UI\Pages\Dungeon.lua
 UI\Pages\Quests.lua
 UI\Pages\Tourney.lua
 UI\Pages\Admin.lua

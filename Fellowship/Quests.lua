@@ -85,10 +85,13 @@ local function knownTitle(id)
     if ok and type(name) == "string" and name ~= "" then return name end
   end
 end
+Q.Title = knownTitle -- (the chain before a dungeon quest, QuestLists.lua)
 
 -- A title the game was asked for has arrived: show it.
 ns:RegisterEvent("QUEST_DATA_LOAD_RESULT", function(_, id, ok)
-  if ok and Q.titleAsked[id] and gameTitle(id) and ns.Window and ns.Window.RefreshSoon then ns.Window:RefreshSoon("quests") end
+  if not (ok and Q.titleAsked[id] and gameTitle(id)) then return end
+  if ns.QuestLists then ns.QuestLists.prevAt = -math.huge end -- (the chains still waiting for a title walk again)
+  if ns.Window and ns.Window.RefreshSoon then ns.Window:RefreshSoon("quests") end
 end)
 
 ---------------------------------------------------------------------------
@@ -113,19 +116,25 @@ function Q:FromQuestLines(ids)
   end
 end
 
+-- One of Questie's modules (QuestieDB, ZoneDB), nil without Questie.
+function Q.QuestieModule(name)
+  local loader = QuestieLoader
+  if type(loader) ~= "table" or not loader.ImportModule then return nil end
+  local ok, m = pcall(loader.ImportModule, loader, name)
+  return ok and type(m) == "table" and m or nil
+end
+
 -- Questie (another addon, GPL) when the player has it: its next and previous quest of each quest in the log. Kept
 -- for this session only (self.questie), never saved, sent or harvested, so nothing of Questie's database ends up in
 -- this addon or its data (which stay MIT).
 -- Asked again until found: Questie may load after this addon.
 local function questieDB()
   if Q.qdb then return Q.qdb end
-  local loader = QuestieLoader
-  if type(loader) == "table" and loader.ImportModule then
-    local ok, m = pcall(loader.ImportModule, loader, "QuestieDB")
-    if ok and type(m) == "table" and m.QueryQuestSingle then Q.qdb = m end
-  end
+  local m = Q.QuestieModule("QuestieDB")
+  if m and m.QueryQuestSingle then Q.qdb = m end
   return Q.qdb
 end
+Q.QuestieDB = questieDB
 
 -- Questie is the recommended companion addon for the quest features (decided 27 Oct 2026): "on" (its quest data
 -- answers), "off" (installed, but not running here: disabled, or not made for this game version) or "none".
@@ -238,6 +247,14 @@ function Q:MyDone()
   local links = self:Links()
   for a, b in pairs(links) do check(a); check(b) end
   for _, id in ipairs(ns.QuestLists and ns.QuestLists:AllIDs() or {}) do check(id) end
+  -- And the chain steps Questie gives before a dungeon quest (QuestLists:Before): its links reach Links only for the
+  -- quests in the log, so a step handed in earlier would show Not yet and Who is ready would wait for it. (What is sent
+  -- is the game's own word that I handed it in, as for Questie's links above; nothing of Questie's database.)
+  if ns.QuestLists and questieDB() then
+    for _, list in pairs(ns.DUNGEON_QUESTS) do
+      for _, q in ipairs(list) do for _, s in ipairs((ns.QuestLists:Start(q[1]) or {}).after or {}) do check(s[1]) end end
+    end
+  end
   -- And the quests of the journey's milestones.
   for _, id in ipairs(ns.Milestones:QuestIDs(F:Current())) do check(id) end
   table.sort(out)
@@ -516,6 +533,8 @@ function Q:Classify(x)
   else
     local id = tonumber(tostring(x.id):match("^q:(%d+)$"))
     local lvl = UnitLevel("player") or 0
+    -- A dungeon's quest is done in the run (U110): Play now and the tracker never suggest it to quest together.
+    x.dungeon = id ~= nil and ns.QuestLists:IsDungeonQuest(id)
     x.together = x.mine and others
     x.join = not x.mine and others and id ~= nil and not done(id) and (not x.level or x.level == 0 or lvl >= x.level - self.JOIN_BELOW)
   end

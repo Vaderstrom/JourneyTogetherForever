@@ -51,6 +51,8 @@ function TK:Build()
   bar:SetPoint("TOPLEFT"); bar:SetPoint("TOPRIGHT"); bar:SetHeight(30)
   TK:Draggable(bar, true) -- (the title: no Ctrl needed)
   bar:SetScript("OnClick", function() TK:SetFolded(not ns.char.trackerFolded) end)
+  -- How to move it, for players who look for it as in Questie (U92).
+  UI.Tooltip(bar, L.TRACKER_MOVE_TIP)
   local shade = UI.GradientTex(bar, "BACKGROUND", "VERTICAL", { "band2", 0.9 }, { "band1", 0.9 })
   shade:SetPoint("TOPLEFT", 1, -1); shade:SetPoint("BOTTOMRIGHT", -1, 0)
   f.crest = UI.Crest(bar, 20, 24)
@@ -192,6 +194,7 @@ function TK:BuildDock()
   head.click:SetPoint("TOPLEFT"); head.click:SetPoint("BOTTOMRIGHT", -24, 0)
   head.click:SetScript("OnClick", fold)
   self:Draggable(head.click)
+  UI.Tooltip(head.click, L.TRACKER_MOVE_TIP_DOCK)
   fr.dock = head
   -- The game's tracker shown or hidden: ours fades in at its new place instead of jumping (the owner, 6 Nov 2026).
   fr.fadeIn = fr:CreateAnimationGroup()
@@ -329,6 +332,10 @@ function TK:Content(f)
   if play then nextText = play.text end
   if not ch then status, nextText = L.TOAST_ENDGAME, nil end
   local me = ns.Me()
+  -- Where to stop questing for the dungeon quests (U85), under you in red.
+  local room = ch and ns.Room:Chapter(f, me)
+  local youText = you.head
+  if youText and room and room.stop then youText = youText .. "\n|cffFF6A50" .. L.TRACK_STOP:format(ns.Room.StopAt(room.stop)) .. "|r" end
   -- The chapter's required dungeons cleared.
   local clears
   if ch then
@@ -353,7 +360,7 @@ function TK:Content(f)
   end
   -- Quests you share with others now.
   local together = {}
-  for _, x in ipairs(ns.Quests:Items(f)) do if x.together and not x.chain then together[#together + 1] = x.name end end
+  for _, x in ipairs(ns.Quests:Items(f)) do if x.together and not x.chain and not x.dungeon then together[#together + 1] = x.name end end
   local quests = #together > 0 and L.TRACK_QUESTS:format(#together, together[1]) or nil
   -- The tournament: your next duel.
   local duel
@@ -380,7 +387,7 @@ function TK:Content(f)
   return {
     title = ch and L.TRACKER_TITLE:format(ns.Journey.Roman(cur), ch.name) or L.BN_JOURNEY_DONE,
     status = status, statusColor = banner.color, stage = banner.stage,
-    you = you.head, next = nextText, clears = clears, run = run, quests = quests,
+    you = youText, next = nextText, clears = clears, run = run, quests = quests,
     online = #online > 0 and L.TRACK_ONLINE:format(#online, table.concat(online, ", ")) or L.TRACK_NOBODY,
     gather = gather, duel = duel, inbox = waiting > 0 and (waiting == 1 and L.TRACK_INBOX_1 or L.TRACK_INBOX_N:format(waiting)) or nil,
     xp = pct, color = f.color, emblem = f.emblem, bar = bar,

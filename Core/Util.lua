@@ -266,3 +266,24 @@ function ns.SlashCommand(...)
   end
   return nil
 end
+
+-- Notices marked Seen (U105 Inbox, U106 Needs attention): ns.char[list][key] = true. A notice's key holds what it
+-- says (a chapter, a level, a day count), so a changed notice counts again. Marking keeps only the keys still shown,
+-- so the list never grows.
+function ns.Seen(list, key) return key ~= nil and ns.char ~= nil and ns.char[list] ~= nil and ns.char[list][key] == true end
+-- shown: the notices shown now ({ key, ... } items).
+function ns.MarkSeen(list, key, shown)
+  local old, keep = ns.char[list] or {}, { [key] = true }
+  for _, item in ipairs(shown) do if item.key and old[item.key] then keep[item.key] = true end end
+  ns.char[list] = keep
+end
+-- The notices with .seen set, the seen ones moved last (in their order).
+function ns.SeenLast(list, items)
+  local fresh, seen = {}, {}
+  for _, item in ipairs(items) do
+    item.seen = ns.Seen(list, item.key)
+    if item.seen then seen[#seen + 1] = item else fresh[#fresh + 1] = item end
+  end
+  for _, item in ipairs(seen) do fresh[#fresh + 1] = item end
+  return fresh
+end

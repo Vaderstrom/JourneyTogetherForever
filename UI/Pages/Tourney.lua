@@ -123,6 +123,14 @@ local function build(pf)
   pf.champ.head:SetText(L.T_CHAMPION_HEAD:upper())
   pf.champ.name = UI.Text(pf.champ, 19, "ink", "title", "CENTER")
   pf.champ.name:SetPoint("TOP", pf.champ.head, "BOTTOM", 0, -5)
+  -- Guild Together's gold trophy cup at both ends (U48).
+  pf.champ.cups = {}
+  for i, side in ipairs({ "LEFT", "RIGHT" }) do
+    local cup = pf.champ:CreateTexture(nil, "ARTWORK")
+    cup:SetSize(64, 64); cup:SetPoint(side, i == 1 and 4 or -4, 0)
+    cup:SetShown(ns.SetProp(cup, "cup"))
+    pf.champ.cups[i] = cup
+  end
   pf.champ:Hide()
   pf.rows = UI.Pool(function()
     local r = CreateFrame("Frame", nil, Rc)

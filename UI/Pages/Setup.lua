@@ -23,14 +23,14 @@ function G:Finish()
   local after = self.after or "overview"
   self.after = nil
   ns.Window:ShowPage(after)
-  -- Then, once: Show me around? (UI/Walkthrough.lua)
-  if ns.Walkthrough then C_Timer.After(0.4, function() ns.Walkthrough:OfferOnce() end) end
+  -- Then, once: Show me around? (UI/Walkthrough.lua); else What's New, which waited for the guide (UI/News.lua).
+  C_Timer.After(0.4, function() if not ns.Walkthrough:OfferOnce() then ns.News:ShowIfDue() end end)
 end
 
 -- The settings the guide offers, back to their defaults.
 function G:Defaults()
   local D = Settings.DEFAULTS
-  for _, key in ipairs({ "theme", "chat", "sounds", "warnCap", "picture", "minimap" }) do Settings:Set(key, D[key]) end
+  for _, key in ipairs({ "theme", "chat", "sounds", "warnCap", "picture", "minimap", "trackerDock" }) do Settings:Set(key, D[key]) end
   Settings:SetTrackerMode("always")
   Settings:SetToastMode("all")
 end
@@ -108,6 +108,12 @@ local function build(pf)
   pf.tracker = choiceRow(L.SETUP_TRACKER, L.SETUP_TRACKER_HINT,
     { { L.SETUP_ALWAYS, "always" }, { L.SETUP_HOVER, "hover" }, { L.SETUP_OFF, "off" } },
     function() return Settings:TrackerMode() end, function(v) Settings:SetTrackerMode(v) end)
+  -- Where it sits, under the mode: its own panel (the default) or under the game's quest tracker (the owner, 8 Nov 2026).
+  pf.dock = UI.Choice(b2, { { L.SETUP_DOCK_OWN, false }, { L.TRACKER_DOCK, true } },
+    function() return Settings:Get("trackerDock") == true end, function(v) Settings:Set("trackerDock", v) end)
+  pf.dock:SetPoint("TOPLEFT", pf.tracker, "BOTTOMLEFT", 0, -4)
+  pf.controls[#pf.controls + 1] = pf.dock
+  y = y + 30
   pf.toasts, pf.toastsHint = choiceRow(L.SETUP_TOASTS, L.SETUP_TOASTS_HINT,
     { { L.SETUP_ALL, "all" }, { L.SETUP_BIG, "big" }, { L.SETUP_OFF, "off" } },
     function() return Settings:ToastMode() end, function(v) Settings:SetToastMode(v) end)

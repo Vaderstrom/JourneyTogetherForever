@@ -8,6 +8,8 @@ local UI, Theme = ns.UI, ns.Theme
 local G = ns.Gatherings
 
 local PIC_H = 112
+-- U4: the week's day cards, four to a row.
+local DAY_H, DAY_GAP, DAY_COLS = 96, 6, 4
 
 -- "Brannic, You, Elyra" or "Nobody".
 local function names(list, me)
@@ -114,24 +116,35 @@ local function build(pf)
     row.key = key
     pf.who[i] = row
   end
-  -- The week ahead (M25; the right page was bare with no Gatherings): each day with its Gatherings, or Schedule.
+  -- The week ahead (M25; the right page was bare with no Gatherings). U4 (the checks of 29 Oct and 1 Nov 2026):
+  -- seven day cards like the game's calendar, each with the day, the first Gathering's dungeon picture behind it, its
+  -- time and what, and the class icons of who is coming; an empty day has Schedule. A click chooses its Gathering.
   pf.weekHead = UI.SectionHeader(R, width)
   pf.weekHead:SetText(L.G_WEEK_HEAD)
   pf.week = {}
+  local dw = math.floor((width - (DAY_COLS - 1) * DAY_GAP) / DAY_COLS)
+  pf.dayW = dw
   for i = 1, ns.GatherForm.DAYS_SHOWN do
-    local row = CreateFrame("Frame", nil, R)
-    row:SetSize(width, 28)
-    row.n = i - 1
-    row.day = UI.Text(row, 13, "ink", "title")
-    row.day:SetPoint("LEFT", 2, 0)
-    row.what = UI.Text(row, 13, "ink")
-    row.what:SetPoint("LEFT", 110, 0)
-    row.what:SetWidth(width - 112); row.what:SetWordWrap(false)
-    row.add = UI.TextButton(row, L.G_SCHEDULE, function() ns.GatherForm:Open(row.n) end, "link", 12)
-    row.add:SetPoint("LEFT", 104, 0)
-    row.line = UI.Solid(row, "BACKGROUND", "line", 0.5)
-    row.line:SetHeight(1); row.line:SetPoint("BOTTOMLEFT"); row.line:SetPoint("BOTTOMRIGHT")
-    pf.week[i] = row
+    local d = UI.Card(R, "bookEdge", "Button")
+    d:SetSize(dw, DAY_H)
+    d.n = i - 1
+    d.art = d:CreateTexture(nil, "BACKGROUND", nil, 1)
+    d.art:SetPoint("TOPLEFT", 3, -3); d.art:SetPoint("BOTTOMRIGHT", -3, 3)
+    d.fade = d:CreateTexture(nil, "BACKGROUND", nil, 2)
+    d.fade:SetAllPoints(d.art)
+    UI.SetGradient(d.fade, "VERTICAL", { 0.04, 0.025, 0.01, 0.92 }, { 0.04, 0.025, 0.01, 0.55 })
+    d.day = UI.Text(d, 12, "ink", "title")
+    d.day:SetPoint("TOPLEFT", 8, -7); d.day:SetWidth(dw - 14)
+    d.what = UI.WrapText(d, 11, "ink", dw - 14)
+    d.what:SetPoint("TOPLEFT", 8, -25); if d.what.SetMaxLines then d.what:SetMaxLines(3) end
+    d.who = UI.Text(d, 12, "ink")
+    d.who:SetPoint("BOTTOMLEFT", 7, 7); d.who:SetWidth(dw - 12); d.who:SetWordWrap(false)
+    d.add = UI.TextButton(d, L.G_SCHEDULE, function() ns.GatherForm:Open(d.n) end, "link", 11)
+    d.add:SetPoint("CENTER", 0, -8)
+    local hl = d:CreateTexture(nil, "HIGHLIGHT")
+    hl:SetAllPoints(d.art); hl:SetColorTexture(1, 0.9, 0.6, 0.08)
+    d:SetScript("OnClick", function() if d.g then pf.gid = d.g.id; W:Refresh() end end)
+    pf.week[i] = d
   end
   pf.howHead = UI.SectionHeader(R, width)
   pf.howHead:SetText(L.G_HOW_HEAD)
@@ -215,22 +228,48 @@ local function refresh(pf, ctx)
     end
     r:Skip(8)
   end
-  -- The week ahead.
-  r:Place(pf.weekHead, 29, 4)
+  -- The week ahead: the day cards.
+  r:Place(pf.weekHead, 29, 6)
   local GF = ns.GatherForm
   local byDay = {}
   for _, g in ipairs(list) do
     local d = GF.DayOf(g.at)
-    if d then byDay[d] = byDay[d] or {}; table.insert(byDay[d], L.G_WEEK_ITEM:format(date("%H:%M", g.at), G.What(g))) end
+    if d then byDay[d] = byDay[d] or {}; table.insert(byDay[d], g) end
   end
-  for _, row in ipairs(pf.week) do
-    row.day:SetText(GF.DayText(row.n))
-    local items = byDay[row.n]
-    row.what:SetShown(items ~= nil); row.add:SetShown(items == nil)
-    if items then row.what:SetText(table.concat(items, ";  ")) end
-    r:Place(row, 28, 0)
+  local y0 = r.y
+  for i, d in ipairs(pf.week) do
+    local items = byDay[d.n]
+    local g = items and items[1]
+    d.g = g
+    d.day:SetText(GF.DayText(d.n))
+    d.what:SetShown(g ~= nil); d.who:SetShown(g ~= nil); d.add:SetShown(g == nil)
+    d.art:SetShown(g ~= nil); d.fade:SetShown(g ~= nil)
+    if g then
+      -- Its dungeon's picture, else the chapter's (something else, a campfire), with light words over it.
+      local pw, ph = pf.dayW - 6, DAY_H - 6
+      if not (g.key and ns.SetDungeonArt(d.art, g.key, pw, ph)) then
+        ns.Pages:SetChapterArt(d.art, ns.Pages:ArtOf(f, ns.Journey:CurrentIndex(f)), pw, ph, 0.5)
+      end
+      local text = {}
+      for _, x in ipairs(items) do text[#text + 1] = L.G_WEEK_ITEM:format(date("%H:%M", x.at), G.What(x)) end
+      d.what:SetText(table.concat(text, ";  "))
+      local icons = {}
+      -- (Their name where the game has no icon for their class.)
+      for _, who in ipairs(answers(f, g).yes) do
+        local icon = ns.ClassIconMarkup(select(2, ns.Hero:ClassName(f, who)), 14)
+        icons[#icons + 1] = icon ~= "" and icon or ns.Short(who)
+      end
+      d.who:SetText(#icons > 0 and table.concat(icons, " ") or L.G_DAY_NOBODY)
+      d.day:SetTextColor(Theme:RGBA("E8C878")); d.what:SetTextColor(1, 1, 1); d.who:SetTextColor(Theme:RGBA("chipText"))
+    else
+      d.day:SetTextColor(Theme:RGBA("ink2"))
+    end
+    d:SetSelected(g ~= nil and g == chosen)
+    local col, row = (i - 1) % DAY_COLS, math.floor((i - 1) / DAY_COLS)
+    d:ClearAllPoints(); d:SetPoint("TOPLEFT", pf.rscroll.child, "TOPLEFT", col * (pf.dayW + DAY_GAP), -(y0 + row * (DAY_H + DAY_GAP)))
+    d:Show()
   end
-  r:Skip(14)
+  r:Skip(math.ceil(#pf.week / DAY_COLS) * (DAY_H + DAY_GAP) + 8)
   r:Place(pf.howHead, 29, 6)
   local host = has and G:Host(f, chosen)
   local how = L.G_HOW_NONE

@@ -253,7 +253,7 @@ end
 
 C.ICON = { first = "hist_first", run = "hist_run", mark = "hist_mark", undo = "hist_undo", chapter = "hist_chapter", cap = "hist_cap",
   session = "hist_session", fallen = "hist_fallen", life = "hist_life", challenge = "hist_challenge", broke = "hist_broke",
-  ring = "hist_ring", race = "hist_race" }
+  ring = "hist_ring", race = "hist_race", candle = "hist_candle" }
 
 -- History entries for a filter ("all", "run", "leader", "cap").
 function C:Entries(f, filter)

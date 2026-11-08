@@ -1,4 +1,4 @@
--- Noticing my own broken rules (SPEC §9, decided with the owner 1 Nov 2026). Each Adventurer's addon watches only its
+-- Noticing my own broken rules (SPEC §9, decided with the owner 1 Nov 2026; Fellowship-crafted 8 Nov 2026). Each Adventurer's addon watches only its
 -- own character and records what it saw in the fellowship (op "broke", Fellowship/Challenges.lua), so every copy
 -- knows. The addon cannot stop anything: it notices, best it can, and marks. Only the first break of each challenge
 -- is kept, so each watch stops once its challenge is broken (C:Holds).
@@ -9,7 +9,7 @@
 local _, ns = ...
 local F = ns.Fellowship
 local C = ns.Challenges
-local CW = { RING_WAIT = 2, QUEST_SLACK = 3, TAXI_WAIT = 1, XP_WAIT = 0.5 }
+local CW = { RING_WAIT = 2, QUEST_SLACK = 3, TAXI_WAIT = 1, XP_WAIT = 0.5, CRAFT_WAIT = 2 }
 ns.ChallengeWatch = CW
 
 local plain = C.plain
@@ -97,6 +97,72 @@ function CW:CheckGear()
       local link = GetInventoryItemLink("player", s[2])
       local _, name = ns.Hero.ParseLink(link)
       return broke("gear", name)
+    end
+  end
+end
+
+---------------------------------------------------------------------------
+-- Fellowship-crafted (X7): only gear someone in the fellowship made
+---------------------------------------------------------------------------
+-- Slots no profession makes: neck, rings, trinkets (shirt, tabard and bags are not in Hero.SLOTS).
+CW.CRAFT_FREE = { [2] = true, [11] = true, [12] = true, [13] = true, [14] = true }
+local function bare(s) return (s:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")) end
+local madeBy
+-- Who made it, from a tooltip line ("<Made by Brannic>", the game's ITEM_CREATED_BY), or nil.
+function CW.MadeBy(text)
+  if not plain(text) or type(text) ~= "string" then return nil end
+  madeBy = madeBy or bare(ITEM_CREATED_BY or "<Made by %s>"):gsub("[%^%$%(%)%.%[%]%*%+%-%?]", "%%%0"):gsub("%%s", "(.+)")
+  local name = bare(text):match(madeBy)
+  return name and strtrim(name) ~= "" and strtrim(name) or nil
+end
+-- The maker in an item's tooltip (C_TooltipInfo's data): the name; nil when no line says; false when the tooltip
+-- can't be read (not there, or a value the game hides): nothing is marked then.
+function CW.Maker(data)
+  if type(data) ~= "table" or type(data.lines) ~= "table" or #data.lines == 0 then return false end
+  for _, line in ipairs(data.lines) do
+    if not plain(line.leftText) then return false end
+    local name = CW.MadeBy(line.leftText)
+    if name then return name end
+  end
+  return nil
+end
+-- The gear you start with: white or grey, for level 1. nil when the game has not loaded the item yet (can't tell:
+-- nothing is marked then; the review of 8 Nov 2026).
+function CW.StartGear(link)
+  local _, _, q = ns.Hero.ParseLink(link)
+  if q > 1 or not (C_Item and C_Item.GetItemInfo) then return false end
+  local need = select(5, C_Item.GetItemInfo(link))
+  if not plain(need) or tonumber(need) == nil then return nil end
+  return tonumber(need) <= 1
+end
+-- Made in the fellowship (a Friend of it too). In WoW Forever the tooltip may give the first name alone: then any
+-- member with that first name.
+function CW.CraftedIn(f, name)
+  if inFellowship(f, name) then return true end
+  if name:find("[%s%-]") then return false end
+  for m in pairs(f.members) do
+    if ns.Short(m):match("^(%S+)") == name then return true end
+  end
+  return false
+end
+-- Tooltips are read outside combat only (after it, when it ends). A piece without a maker is looked at again in a
+-- moment before it is marked: the game may still be fetching the maker's name.
+function CW:CheckCrafted(again)
+  local f = binding("crafted")
+  if not f or not (C_TooltipInfo and C_TooltipInfo.GetInventoryItem) then return end
+  if InCombatLockdown() then self.craftLater = true return end
+  for _, s in ipairs(ns.Hero.SLOTS) do
+    local link = not self.CRAFT_FREE[s[2]] and GetInventoryItemLink("player", s[2])
+    if link and self.StartGear(link) == false then
+      local by = self.Maker(C_TooltipInfo.GetInventoryItem("player", s[2]))
+      if by ~= false and not (by and self.CraftedIn(f, by)) then
+        if not again then
+          C_Timer.After(self.CRAFT_WAIT, function() CW:CheckCrafted(true) end)
+          return
+        end
+        local _, name = ns.Hero.ParseLink(link)
+        return broke("craft", name)
+      end
     end
   end
 end
@@ -338,7 +404,7 @@ end
 -- Everything at once (after logging in, joining, a copy)
 ---------------------------------------------------------------------------
 function CW:CheckAll()
-  self:CheckGear(); self:CheckGold(); self:CheckTaxi(); self:CheckTalents(); self:CheckProfessions(); self:CheckFood()
+  self:CheckGear(); self:CheckCrafted(); self:CheckGold(); self:CheckTaxi(); self:CheckTalents(); self:CheckProfessions(); self:CheckFood()
   self:CheckRace()
 end
 
@@ -380,7 +446,8 @@ ns:On("CHALLENGES", function()
 end)
 ns:RegisterEvent("TRADE_SHOW", function() CW:TradeShow() end)
 ns:RegisterEvent("UI_INFO_MESSAGE", function(_, _, text) if text == ERR_TRADE_COMPLETE then CW:TradeDone() end end)
-ns:RegisterEvent("PLAYER_EQUIPMENT_CHANGED", function() CW:CheckGear() end)
+ns:RegisterEvent("PLAYER_EQUIPMENT_CHANGED", function() CW:CheckGear(); CW:CheckCrafted() end)
+ns:RegisterEvent("PLAYER_REGEN_ENABLED", function() if CW.craftLater then CW.craftLater = nil; CW:CheckCrafted() end end)
 ns:RegisterEvent("PLAYER_MONEY", function() CW:CheckGold() end)
 ns:RegisterEvent("PLAYER_CONTROL_LOST", function() C_Timer.After(CW.TAXI_WAIT, function() CW:CheckTaxi() end) end)
 ns:RegisterUnitEvent("UNIT_SPELLCAST_SUCCEEDED", "player", function(_, unit, _, spell) CW:Cast(unit, spell) end)

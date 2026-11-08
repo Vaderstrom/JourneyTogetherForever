@@ -2,8 +2,10 @@
 -- part is for, with Back, Next and Skip; that part has a gold frame with sparks (UI/Glow.lua) and the rest of the book
 -- is dimmed and cannot be clicked. The book shows a sample fellowship meanwhile (Fellowship/Sample.lua), drawn as
 -- you with the tour's rank (Watch.demo), so every page has something to show and nothing real changes.
--- Two tours: Leader and Adventurer (two ranks since 27 Oct 2026). Offered once after the setup guide; Settings runs it again; a promotion
--- offers a short tour of only what is new for you.
+-- Two tours: Leader and Adventurer (two ranks since 27 Oct 2026). Offered once after the setup guide as a short first
+-- tour (the Overview and what you see first; the owner, 8 Nov 2026: the whole book at once was too long), then each
+-- page shows you around the first time you open it (About this page's two steps). Settings runs the whole tour; a
+-- promotion offers a short tour of only what is new for you.
 local _, ns = ...
 local L = ns.L
 local UI = ns.UI
@@ -32,7 +34,7 @@ WK.STEPS = {
   { id = "YOURSELF", ranks = ALL, page = "heroes", before = function() pf("heroes").sel = ns.Me() end,
     target = function() return pf("heroes").insR end },
   { id = "GATHERINGS", ranks = ALL, page = "gatherings", target = function() return pf("gatherings").left end },
-  { id = "INVITE", ranks = ALL, page = "heroes", target = function() return pf("heroes").invHead, pf("heroes").send end },
+  { id = "INVITE", ranks = ALL, page = "heroes", before = function() pf("heroes").invOpen = true end, target = function() return pf("heroes").invHead, pf("heroes").send end },
   -- The rulebook, then the Leader's Manage with its Rules tab, one after the other; Journey Admin last before the
   -- end (the tour went Manage, Rules, Journey Admin, Rules tab: back and forth; 28 Oct 2026).
   { id = "RULES", ranks = ALL, page = "rules", target = function() return pf("rules").left end },
@@ -56,7 +58,14 @@ WK.STEPS = {
 -- WALK_PG_<PAGE>_R.
 WK.PAGES = { welcome = true, create = true, join = true, overview = true, chapter = true, quests = true,
   chronicle = true, moments = true, raids = true, heroes = true, gatherings = true, rules = true, history = true,
-  tourney = true, since = true, settings = true, manage = true, managefellowship = true, rulesadmin = true, admin = true }
+  tourney = true, since = true, settings = true, manage = true, managefellowship = true, rulesadmin = true, admin = true,
+  dungeon = true }
+
+-- The first tour: these steps of the whole tour, then its own end (WALK_FIRSTDONE).
+WK.FIRST = { INTRO = true, NAV = true, STAND = true, STANDINGS = true, HEADER = true, TRACKER = true }
+-- Pages that never show you around by themselves: outside a fellowship, Since you were last here (it opens by itself
+-- at login), and the Overview (the first tour's).
+WK.NO_VISIT = { welcome = true, create = true, join = true, since = true, overview = true }
 
 -- Your rank in your own fellowship: "leader" or "member" (nil outside one).
 function WK:MyRank()
@@ -64,19 +73,21 @@ function WK:MyRank()
   return f and ns.Permissions.Rank(f, ns.Me()) or nil
 end
 
--- The steps of a tour: every step of that rank, or (since = an earlier rank) only what is new since that rank.
-function WK:Steps(rank, since)
+-- The steps of a tour: every step of that rank, or (since = an earlier rank) only what is new since that rank, or
+-- (first) the first tour's.
+function WK:Steps(rank, since, first)
   local out = {}
   for _, s in ipairs(self.STEPS) do
     local new = not since or not s.ranks[since] or s.id == "DONE"
-    if s.ranks[rank] and new then out[#out + 1] = s end
+    if s.ranks[rank] and new and (not first or self.FIRST[s.id]) then out[#out + 1] = s end
   end
+  if first then out[#out + 1] = { id = "DONE", key = "FIRSTDONE", ranks = ALL } end
   if since then table.insert(out, 1, { id = "NEW", ranks = ALL, page = "overview" }) end
   return out
 end
 
 local function text(step, rank, part)
-  local key = "WALK_" .. step.id .. (part or "")
+  local key = "WALK_" .. (step.key or step.id) .. (part or "")
   return L[key .. "_" .. rank:upper()] ~= key .. "_" .. rank:upper() and L[key .. "_" .. rank:upper()] or L[key]
 end
 WK.Text = text
@@ -89,6 +100,7 @@ local function build()
   -- On the book (its scale, so the text is the book's size; it was on the screen and small; seen in the tour).
   local c = UI.Box(W().frame, 2, nil, nil, "gold", 1)
   c.layoutCover = true -- hides the page under it (Dev/Layout.lua)
+  c.layoutBeside = true -- and may sit beside the book (the offer, U88)
   c:SetSize(CARD_W, 150)
   c:SetFrameStrata("FULLSCREEN_DIALOG")
   c:SetFrameLevel(W().frame:GetFrameLevel() + 500)
@@ -115,7 +127,7 @@ local function build()
   c.text:SetPoint("TOPLEFT", c.title, "BOTTOMLEFT", 0, -6)
   c.next = UI.TextButton(c, L.WALK_NEXT, function() WK:Next() end, "primary", 13)
   c.back = UI.TextButton(c, L.WALK_BACK, function() WK:Back() end, "plain", 13)
-  c.skip = UI.TextButton(c, L.WALK_SKIP, function() WK:Stop() end, "link", 12)
+  c.skip = UI.TextButton(c, L.WALK_SKIP, function() WK:Stop(false) end, "link", 12)
   c:Hide()
   WK.card = c
   WK.glow = UI.Highlight(UIParent)
@@ -184,6 +196,18 @@ local function place()
   local h = WK.glow:IsShown() and WK.glow or nil
   c:ClearAllPoints()
   if c.arrow and not c.arrow.none then c.arrow:Hide() end
+  -- The offer: beside the book, right of it where the screen has room, else left of it, else in the book's lower
+  -- right corner; never over the You card and Play now, the first things a new Leader looks at (U88).
+  if WK.offer then
+    local ui, ws = UIParent:GetEffectiveScale() or 1, win:GetEffectiveScale() or 1
+    local need = (CARD_W + GAP + 8) * ws / ui
+    local right = (UIParent:GetRight() or 0) - (win:GetRight() or 0) * ws / ui
+    local left = (win:GetLeft() or 0) * ws / ui
+    if right >= need then c:SetPoint("TOPLEFT", win, "TOPRIGHT", GAP, -60)
+    elseif left >= need then c:SetPoint("TOPRIGHT", win, "TOPLEFT", -GAP, -60)
+    else c:SetPoint("BOTTOMRIGHT", win, "BOTTOMRIGHT", -28, 28) end
+    return
+  end
   if not h or WK.steps[WK.i] and WK.steps[WK.i].outside then
     c:SetPoint("CENTER", win, "CENTER", 0, 20)
     return
@@ -239,14 +263,15 @@ local function later(fn)
   return true
 end
 
--- rank: the tour's rank (default: yours); since: only what is new since that rank (after a promotion).
-function WK:Start(rank, since)
+-- rank: the tour's rank (default: yours); since: only what is new since that rank (after a promotion); first: the
+-- first tour.
+function WK:Start(rank, since, first)
   if not ns.Fellowship:Current() then return false end
-  if later(function() WK:Start(rank, since) end) then return false end
+  if later(function() WK:Start(rank, since, first) end) then return false end
   rank = rank or self:MyRank() or "member"
   build()
-  self.rank, self.since = rank, since
-  self.steps = self:Steps(rank, since)
+  self.rank, self.since, self.first = rank, since, first
+  self.steps = self:Steps(rank, since, first)
   self.page = nil
   self.i, self.on, self.offer = 1, true, nil
   self.card.back:SetLabel(L.WALK_BACK)
@@ -269,7 +294,7 @@ function WK:StartPage(id)
   if later(function() if W().frame:IsShown() then WK:StartPage() end end) then return false end
   build()
   local key = "PG_" .. id:upper()
-  self.rank, self.since, self.page = self:MyRank() or "member", nil, id
+  self.rank, self.since, self.first, self.page = self:MyRank() or "member", nil, nil, id
   self.steps = {
     { id = key, target = function() return pf(id) and pf(id).left end },
     { id = key .. "_R", target = function() return pf(id) and pf(id).right end },
@@ -317,14 +342,18 @@ function WK:Go(i)
   C_Timer.After(0, function() if WK.on then place() end end)
 end
 
-function WK:Next() if self.offer then return self:Start(self.offer.rank, self.offer.since) end self:Go(self.i + 1) end
+function WK:Next() if self.offer then return self:Start(self.offer.rank, self.offer.since, self.offer.first) end self:Go(self.i + 1) end
 function WK:Back() if self.offer then return self:Later() end self:Go(math.max(1, self.i - 1)) end
 
--- Ends the tour (done = it went to the end); your own fellowship shows again.
+-- Ends the tour (done = it went to the end; false = Skip); your own fellowship shows again. After the first tour each
+-- page shows you around the first time it opens, unless it was skipped; after the whole tour, none does (all seen).
 function WK:Stop(done)
   local was = self.on
   local page = self.page
   self.page = nil
+  if was and ns.char and not page and not self.since then
+    if self.first and done ~= false then ns.char.walkPages = ns.char.walkPages or {} else ns.char.walkPages = nil end
+  end
   self.on, self.offer = false, nil
   if self.card then self.card:Hide() end
   if self.glow then self.glow:Off() end
@@ -338,19 +367,37 @@ function WK:Stop(done)
   if was and page and W():IsOpen() then W():Refresh() end
   if was and not page and W():IsOpen() then
     local hp = pf("heroes")
-    if hp then hp.sel = nil end
+    if hp then hp.sel, hp.invOpen = nil, nil end -- (the Invite step opened its box)
     W():ShowPage("overview")
   end
+  -- What's New waited for the tour (UI/News.lua).
+  if was and W():IsOpen() then ns.News:ShowIfDue() end
+end
+
+-- A page opened (Window:Draw): its own short tour the first time, after the first tour, once the page is drawn.
+function WK:Visited(id)
+  local seen = ns.char and ns.char.walkPages
+  if not seen or seen[id] or self.on or self.offer or self.NO_VISIT[id] or not self:HasHelp(id) or ns.News.Dev() then return end
+  C_Timer.After(0.3, function() WK:FirstVisit(id) end)
+end
+
+-- Its tour, if it is still the page shown and nothing else is over the book. Never in combat (the next visit, then).
+function WK:FirstVisit(id)
+  local seen, win = ns.char and ns.char.walkPages, W()
+  if not seen or seen[id] or self.on or self.offer or win.current ~= id or not win:IsOpen() or ns.News:Showing()
+    or ns.Combat:InCombat() then return false end
+  seen[id] = true
+  return self:StartPage(id)
 end
 
 ---------------------------------------------------------------------------
 -- Offers
 ---------------------------------------------------------------------------
 -- The card alone: "Show me around?" with Show me around / Later.
-function WK:Offer(rank, since)
+function WK:Offer(rank, since, first)
   if self.on or not ns.Fellowship:Current() or not W():IsOpen() then return false end
   build()
-  self.offer = { rank = rank, since = since }
+  self.offer = { rank = rank, since = since, first = first }
   local step = { id = since and "OFFER_NEW" or "OFFER" }
   fill(step, nil, 1, rank)
   local c = self.card
@@ -363,21 +410,27 @@ function WK:Offer(rank, since)
   return true
 end
 
+-- Later: the pages still show you around, each the first time it opens; What's New may come now.
 function WK:Later()
+  local first = self.offer and self.offer.first
   self.offer = nil
   if self.card then self.card:Hide() end
   self.card.back:SetLabel(L.WALK_BACK)
   if ns.char then
     ns.char.walk = ns.char.walk or {}
     ns.char.walk[self:MyRank() or "member"] = ns.char.walk[self:MyRank() or "member"] or "later"
+    if first then ns.char.walkPages = ns.char.walkPages or {} end
   end
+  if W():IsOpen() then ns.News:ShowIfDue() end
 end
 
--- After the setup guide: once per character and rank.
+-- After the setup guide: the first tour, once per character and rank. Until it is answered (Show me around, Later),
+-- the book asks again each time it opens (walkOffer; it was lost when the book closed or the game reloaded first).
 function WK:OfferOnce()
   local rank = self:MyRank()
-  if not rank or (ns.char.walk and ns.char.walk[rank]) then return false end
-  return self:Offer(rank)
+  if not rank or (ns.char.walk and ns.char.walk[rank]) then ns.char.walkOffer = nil return false end
+  ns.char.walkOffer = self:Offer(rank, nil, true) or ns.char.walkOffer
+  return ns.char.walkOffer == true and self.offer ~= nil
 end
 
 -- A promotion (an Adventurer becomes the Leader): a short tour of what is new, when an earlier tour was seen.

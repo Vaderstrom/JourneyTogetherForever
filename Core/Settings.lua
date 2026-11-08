@@ -3,8 +3,14 @@ local _, ns = ...
 local S = {}
 ns.Settings = S
 
-S.TOAST_EVENTS = { "chapter", "floor", "clear", "heroFloor", "heroCap", "overCap", "ahead", "session", "gathering", "attune", "dquest", "room", "version", "first",
+S.TOAST_EVENTS = { "chapter", "floor", "clear", "heroFloor", "heroCap", "overCap", "ahead", "session", "gathering", "attune", "dquest", "dready", "dallready", "dremind", "room", "version", "first", "invite",
   "challenge" }
+-- Settings shows them under three headings (U86); every event is in one group (tests/test_aaa_batch5.lua).
+S.TOAST_GROUPS = {
+  { "TOAST_GROUP_JOURNEY", { "chapter", "floor", "ahead", "room", "session", "version" } },
+  { "TOAST_GROUP_FELLOWSHIP", { "invite", "heroFloor", "heroCap", "overCap", "gathering", "first", "challenge" } },
+  { "TOAST_GROUP_DUNGEONS", { "clear", "dquest", "dready", "dallready", "dremind", "attune" } },
+}
 
 S.DEFAULTS = {
   theme = "journal", size = 1, fullscreen = false, chat = "all", warnCap = true, warnPct = 75, reduce = false, minimap = true, lang = "en",
@@ -17,8 +23,9 @@ S.DEFAULTS = {
   trackerPeek = true, -- hidden mode: it shows for a few seconds when something in it changes
   trackerHideCombat = false, -- not shown in combat
   trackerHideInstance = false, -- not shown in dungeons, raids, battlegrounds and arenas
-  trackerDock = true, -- under the game's quest tracker, as one more section of it (off: its own panel; on from the
-  -- start, the owner, 2 Nov 2026)
+  keyPage = "chapter", -- the page the key binding opens (U107)
+  trackerDock = false, -- under the game's quest tracker, as one more section of it (off: its own panel, the default
+  -- since the owner's word of 8 Nov 2026; the setup guide offers both)
   trackerLines = { status = true, you = true, bar = true, next = true, clears = true, run = true, quests = false,
     online = true, gather = true, duel = true, inbox = true },
   toasts = { chapter = true, floor = true, clear = true, heroFloor = true, heroCap = true, overCap = true, gathering = true,

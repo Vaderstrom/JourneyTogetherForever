@@ -178,9 +178,11 @@ ns.DUNGEON_ART = {
 --   classic: the original loading screens (NarrowScreenFileDataID), 4:3 art stored square, the picture between
 --            the logo at the top and the bar at the bottom.
 --   forever: Forever's own dungeons (MainImageFileDataID), 2992 x 1684 with the picture in the middle band.
--- The Forever dungeons not in the game's data yet (Drowned City, Krol'dok, Alcaz, Blackmaw) have none until they are.
+-- Every Forever dungeon has one since build 1.60.1.70862 (8 Nov 2026); Barrow Deeps and Hyjal Summit not yet.
 ns.DUNGEON_SCREEN = {
   hot = { 7963781, "forever" }, rol = { 7963782, "forever" }, exc = { 7963777, "forever" }, dal = { 7963775, "forever" },
+  drown = { 7963741, "forever" }, krol = { 7963780, "forever" }, alcaz = { 7963734, "forever" },
+  bmh = { 7963784, "forever" }, shaper = { 7963783, "forever" },
   dm = { 131833, "classic" }, wc = { 131882, "classic" }, sfk = { 131869, "classic" }, bfd = { 131823, "classic" },
   stocks = { 131870, "classic" }, rfk = { 131865, "classic" }, gnomer = { 131841, "classic" },
   smgy = { 131852, "classic" }, smlib = { 131852, "classic" }, smarm = { 131852, "classic" },
@@ -193,8 +195,8 @@ ns.DUNGEON_SCREEN = {
   aq20 = { 131818, "classic" }, aq40 = { 131819, "classic" }, naxx = { 131854, "classic" },
 }
 -- Our own tiles (Media\DungeonHot ...: art/incoming, A7) for Forever's own dungeons: shown where the game has no
--- picture for them (the Forever dungeons not in the game's data yet). The game's loading screen comes first.
--- Shaper's Terrace and Barrow Deeps (6 Nov 2026) have no game art at all: Gemini's, made from what Blizzard showed.
+-- picture for them (a client without the loading screen). The game's loading screen comes first.
+-- Shaper's Terrace and Barrow Deeps (6 Nov 2026) had no game art: Gemini's, made from what Blizzard showed.
 ns.DUNGEON_TILE = { hot = "DungeonHot", rol = "DungeonRol", exc = "DungeonExc", drown = "DungeonDrown",
   krol = "DungeonKrol", alcaz = "DungeonAlcaz", bmh = "DungeonBmh", shaper = "DungeonShaper", barrow = "DungeonBarrow" }
 -- The game's own picture for a place whose loading screen another place shares, or that has none (the owner, 6 Nov

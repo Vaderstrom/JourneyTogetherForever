@@ -15,7 +15,7 @@ local ROW, GRID, GAP = 28, 22, 10
 -- heading says in a few words what is set ("10 of 12 on"). Sections of one group (the right page's toasts and
 -- tracker) take turns: opening one folds the other, so a page never needs scrolling. What is open is kept for the
 -- character (ns.char.setFold).
-local FOLD_ICON = { [true] = "Interface\\Buttons\\UI-PlusButton-Up", [false] = "Interface\\Buttons\\UI-MinusButton-Up" }
+local FOLD_ICON = UI.FOLD_ICON
 local function column(pf, parent, width)
   local c = { sections = {} }
   -- A heading with its fold button; the section's body follows. sum() gives the folded line, foldedAtFirst the start.
@@ -101,6 +101,20 @@ local function column(pf, parent, width)
     return f
   end
   function c:Skip(n) self.cur.y = self.cur.y + n end
+  -- A small heading inside a section (the toasts' three groups, U86). With get and set, a tick before it that turns
+  -- the whole group on or off (U116), in line with the ticks under it.
+  function c:Sub(text, get, set)
+    local sec = self.cur
+    local t = UI.Text(sec.body, 11, "accent", "title")
+    t:SetPoint("TOPLEFT", get and 21 or 0, -(sec.y + 6)); t:SetText(text:upper())
+    if get then
+      t.box = UI.Checkbox(sec.body, get, set)
+      t.box:SetSize(22, 22); t.box:SetPoint("RIGHT", t, "LEFT", -2, 0)
+      pf.controls[#pf.controls + 1] = t.box
+    end
+    sec.y = sec.y + 22
+    return t
+  end
 
   local function folded(sec)
     local st = ns.char and ns.char.setFold
@@ -201,11 +215,14 @@ local function build(pf)
   left:Row(L.WALK_SETTING, pf.walkAgain, L.WALK_AGAIN_HINT)
   pf.minimapBox = UI.Checkbox(Lp, check("minimap"))
   left:Row(L.MINIMAP_BUTTON, pf.minimapBox, L.MINIMAP_HINT)
+  left:Row(L.KEY_PAGE, dropdown(Lp, { { L.NAV_CHAPTER, "chapter" }, { L.NAV_OVERVIEW, "overview" }, { L.NAV_HEROES, "heroes" },
+    { L.NAV_QUESTS, "quests" }, { L.NAV_GATHERINGS, "gatherings" }, { L.NAV_CHRONICLE, "chronicle" }, { L.NAV_RAIDS, "raids" } },
+    "keyPage"), L.KEY_PAGE_HINT)
   -- The commands, two to a line: the command in the accent colour, what it does after it.
-  left:Skip(6)
+  left:Skip(4)
   local helpSec = left.cur
   for i, cmd in ipairs(ns.COMMANDS) do
-    local x, y = ((i - 1) % 2) * width / 2, -(helpSec.y + math.floor((i - 1) / 2) * 18)
+    local x, y = ((i - 1) % 2) * width / 2, -(helpSec.y + math.floor((i - 1) / 2) * 15)
     local code = UI.Text(helpSec.body, 12, "accent")
     code:SetPoint("TOPLEFT", x, y)
     code:SetText(cmd[1])
@@ -213,7 +230,7 @@ local function build(pf)
     what:SetPoint("LEFT", code, "RIGHT", 8, 0)
     what:SetText(cmd[2])
   end
-  left:Skip(math.ceil(#ns.COMMANDS / 2) * 18)
+  left:Skip(math.ceil(#ns.COMMANDS / 2) * 15)
 
   -- Right: the progress toasts and the tracker.
   local Rp = pf.right
@@ -229,13 +246,24 @@ local function build(pf)
   end })
   pf.example = UI.TextButton(Rp, L.EXAMPLE_TOAST, function() ns.Toasts:Example() end, "link", 12)
   pf.example:SetPoint("BOTTOMRIGHT", toasts, "BOTTOMRIGHT", 0, 7)
-  local items = {}
-  for _, kind in ipairs(Settings.TOAST_EVENTS) do
-    items[#items + 1] = { L["TOAST_" .. kind:upper()], function() return Settings:ToastOn(kind) end,
-      function(v) Settings:SetToast(kind, v) end, key = kind }
+  -- Under three short headings (U86): your journey, the fellowship, dungeons and raids.
+  pf.toastRows, pf.toastHeads = {}, {}
+  for _, g in ipairs(Settings.TOAST_GROUPS) do
+    pf.toastHeads[#pf.toastHeads + 1] = right:Sub(L[g[1]], function()
+      for _, kind in ipairs(g[2]) do if not Settings:ToastOn(kind) then return false end end
+      return true
+    end, function(v)
+      for _, kind in ipairs(g[2]) do Settings:SetToast(kind, v) end
+      ns.Window:Refresh()
+    end)
+    local items = {}
+    for _, kind in ipairs(g[2]) do
+      -- (Redrawn, so the group's tick and the count in the heading follow.)
+      items[#items + 1] = { L["TOAST_" .. kind:upper()], function() return Settings:ToastOn(kind) end,
+        function(v) Settings:SetToast(kind, v); ns.Window:Refresh() end, key = kind }
+    end
+    for kind, f in pairs(right:Grid(items)) do pf.toastRows[kind] = f.box end
   end
-  pf.toastRows = {}
-  for kind, f in pairs(right:Grid(items)) do pf.toastRows[kind] = f.box end
   right:Skip(2)
   -- Toast position: Move shows a banner to drag; Done ends it; Reset puts it back at the top.
   local place = CreateFrame("Frame", nil, Rp)

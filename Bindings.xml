@@ -1,0 +1,7 @@
+<!-- Key Bindings → AddOns → Journey Together Forever (U107): opens the book at the page Settings chose (the Chapter
+     page by default) and closes it when it is open. Through /jtf, the one global the addon has for commands. -->
+<Bindings>
+  <Binding name="JOURNEYTOGETHERFOREVER_OPEN" header="JOURNEYTOGETHERFOREVER" category="ADDONS">
+    SlashCmdList.JOURNEYTOGETHERFOREVER("key")
+  </Binding>
+</Bindings>

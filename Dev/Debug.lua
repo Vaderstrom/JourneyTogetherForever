@@ -183,7 +183,7 @@ end
 D.op = op
 
 -- What a pretend broken rule names (/jtf break <what>): the outsider, the green item, the quest, the place.
-local BREAK_X = { trade = "DEV_BREAK_X", mail = "DEV_BREAK_X", mailto = "DEV_BREAK_X", gear = "DEV_BREAK_GEAR",
+local BREAK_X = { trade = "DEV_BREAK_X", mail = "DEV_BREAK_X", mailto = "DEV_BREAK_X", gear = "DEV_BREAK_GEAR", craft = "DEV_BREAK_GEAR",
   quest = "DEV_BREAK_QUEST", xp = "DEV_BREAK_ZONE", prof = "DEV_BREAK_PROF", potion = "DEV_BREAK_POTION" }
 function D.BreakX(what)
   if what == "gold" then

@@ -62,9 +62,14 @@ function C:ChoosePreset(key) self.own, self.preset = false, key end
 
 -- Challenges: each on or off; Shared lives' number starts at what the size suggests, and the Leader may change it.
 -- One Ironman Fellowship takes on (Hardcore Fellowship, White gear only) stays ticked with it; No healers is not for a
--- Leader who heals.
+-- Leader who heals; Ironman Fellowship and Fellowship-crafted never go together (ns.Challenges.APART).
 function C:Included(key) return self.challenges.ironman and ns.Challenges:IncludedBy({ challenges = { ironman = true } }, key) ~= nil end
-function C:Blocked(key) return key == "nohealers" and self.role == "Healer" end
+-- Why key can't be ticked now: its row's line and the note on the right page; nil when it can.
+function C:Blocked(key)
+  if key == "nohealers" and self.role == "Healer" then return L.CHAL_HEALER_YOU, L.CHAL_HEALER_LEADER end
+  local other = ns.Challenges.APART[key]
+  if other and self.challenges[other] then return L.CHAL_NOT_WITH:format(L["CHAL_" .. other:upper()]), L.CHAL_APART end
+end
 function C:ToggleChallenge(key)
   if self:Included(key) or self:Blocked(key) then return end
   self.challenges[key] = not self.challenges[key] or nil
@@ -100,7 +105,7 @@ end
 -- The challenge banners (the owner, 1 Nov 2026: three vertical banners, every challenge in sight at once). Each hangs
 -- from its group's picture: dark cloth with a gold edge and a pointed tail, drawn here. Its rows are placed by Refresh,
 -- each as tall as its words and what it asks.
-local BANNER_HEAD, BANNER_TAIL, BANNER_PAD, ROW_MIN = 36, 18, 6, 22
+local BANNER_HEAD, BANNER_TAIL, BANNER_PAD, ROW_MIN, CHOSEN_H = 36, 18, 6, 22, 30
 local CLOTH_TOP, CLOTH_BOTTOM = { 0.17, 0.11, 0.06, 0.97 }, { 0.09, 0.06, 0.035, 0.97 }
 -- Each banner's picture (the dungeons' loading screens): Stratholme's dead for Survival, Blackrock Depths (where the
 -- Ring ends) for Story and Travel, the Deadmines' gold for Gear, Gold & More.
@@ -646,7 +651,7 @@ local function build(pf)
   -- 1 Nov 2026), so every challenge is in sight at once. Each lists its challenges to tick (they combine; none is
   -- fine); hovering one tells its rule. Under a chosen row, what it asks: Hardcore Fellowship whether it's a PvP realm
   -- (the game doesn't tell an addon the kind of realm, so the Leader says it), Shared lives how many, Pauper how much
-  -- gold. Right: what the fellowship takes on, in plain sentences.
+  -- gold. Right: what the fellowship takes on, a row for each challenge with its rule on hover (U114).
   local s5 = pf.body.challenges
   local cp = UI.Text(s5, 15, "ink", "title")
   cp:SetPoint("TOPLEFT"); cp:SetText(L.CHAL_PICK)
@@ -687,6 +692,23 @@ local function build(pf)
   pf.chalName:SetPoint("TOPLEFT", 0, -48)
   pf.chalText = UI.WrapText(r5, 14, "ink", width, "book")
   pf.chalText:SetPoint("TOPLEFT", pf.chalName, "BOTTOMLEFT", 0, -12)
+  -- (Shown only while nothing is chosen.)
+  pf.chalName:SetText(L.CHAL_NONE); pf.chalText:SetText(L.CHAL_NONE_TEXT)
+  -- Each chosen challenge one row: its icon and its name; the whole rule on hover (U114: with many chosen the rules
+  -- made a wall of text).
+  pf.chalList = CreateFrame("Frame", nil, r5)
+  pf.chalList:SetPoint("TOPLEFT", 0, -48); pf.chalList:SetSize(width, 1)
+  pf.chalItems = UI.Pool(function()
+    local it = CreateFrame("Frame", nil, pf.chalList)
+    it:SetSize(width, CHOSEN_H)
+    it.icon = UI.Round(it, "ARTWORK", 24)
+    it.icon:SetPoint("LEFT", 0, 0)
+    it.name = UI.Text(it, 14, "ink", "title")
+    it.name:SetPoint("LEFT", 34, 0); it.name:SetWidth(width - 34); it.name:SetWordWrap(false)
+    it:EnableMouse(true)
+    UI.Tooltip(it, function() return it.tip end)
+    return it
+  end)
   -- Shared lives chosen: the lives as candles under the words, all lit (UI.Lives; placed by Refresh).
   pf.chalLives = UI.Lives(r5, width)
   pf.chalNote = UI.WrapText(r5, 12, "ink2", width, "book")
@@ -711,13 +733,15 @@ local function build(pf)
   pk.name:SetPoint("TOPLEFT", 64, -22)
   pk.rule = UI.WrapText(pk, 15, "ink", width, "book")
   pk.note = UI.WrapText(pk, 13, "B0321E", width, "book")
+  -- U45: what you have chosen stays in view under the hovered rule.
+  pk.chosen = UI.WrapText(pk, 13, "ink2", width, "book")
   pk:Hide()
   pf.peek = pk
   function pf:Peek()
     local row = self.peeking
     local on = row ~= nil
     self.peek:SetShown(on)
-    for _, w in ipairs({ self.chalName, self.chalText, self.chalLives, self.chalNote, self.chalLater }) do w:SetAlpha(on and 0 or 1) end
+    for _, w in ipairs({ self.chalName, self.chalText, self.chalList, self.chalLives, self.chalNote, self.chalLater }) do w:SetAlpha(on and 0 or 1) end
     if not on then return end
     local p = self.peek
     if not UI.SetIcon(p.icon, Ch:Icon(row.key)) then UI.SetIcon(p.icon, ns.ICONS.hist_challenge) end
@@ -729,6 +753,9 @@ local function build(pf)
     p.note:SetShown(row.tipNote ~= nil)
     p.note:SetText(row.tipNote or "")
     p.note:ClearAllPoints(); p.note:SetPoint("TOPLEFT", p.rule, "BOTTOMLEFT", 0, -12)
+    p.chosen:SetShown(self.chosenLine ~= nil)
+    p.chosen:SetText(self.chosenLine and L.CHAL_CHOSEN:format(self.chosenLine) or "")
+    p.chosen:ClearAllPoints(); p.chosen:SetPoint("TOPLEFT", row.tipNote and p.note or p.rule, "BOTTOMLEFT", 0, -12)
   end
 
   -- Step 4, left: the fellowship (banner, name, who leads it) and the rules as rows, each part with Change.
@@ -870,10 +897,11 @@ local function refresh(pf)
     local Ch = ns.Challenges
     local chosen = C:Challenges()
     for _, b in ipairs(pf.banners) do
-      local y = BANNER_HEAD + BANNER_PAD
-      for _, r in ipairs(b.rows) do
+      local hs, sum = {}, 0
+      for i, r in ipairs(b.rows) do
         local k = r.key
-        local included, blocked = C:Included(k), C:Blocked(k)
+        local included = C:Included(k)
+        local blocked, why = C:Blocked(k)
         local on = C:Chosen(k) and not blocked
         r.chosen = on
         r.check:SetShown(on)
@@ -883,14 +911,14 @@ local function refresh(pf)
         local name = k == "hardcore" and Ch:Name("hardcore", C.pvp and "pvp") or L["CHAL_" .. k:upper()]
         r.name:SetText(name)
         r.name:SetTextColor(Theme:RGBA(on and "goldText" or "chipText"))
-        local sub = (included and L.CHAL_WITH_IRONMAN) or (blocked and L.CHAL_HEALER_YOU)
+        local sub = (included and L.CHAL_WITH_IRONMAN) or blocked
           or (k == "oneclass" and on and chosen and L.CHAL_CLASS_YOURS:format(Ch.ClassName(chosen.oneclass))) or nil
         r.sub:SetText(sub or ""); r.sub:SetShown(sub ~= nil)
         -- The tooltip: the rule as it would be now (the lives, the gold, your class).
         local v = (k == "hardcore" and C.pvp and "pvp") or (k == "shared" and C:Lives()) or (k == "pauper" and C:Gold())
           or (k == "oneclass" and ns.Fellowship:MyInfo().class) or true
         r.tipTitle, r.tipText = Ch:Name(k, v), Ch:Rule(k, v)
-        r.tipNote = (included and L.CHAL_INCLUDED) or (blocked and L.CHAL_HEALER_LEADER) or nil
+        r.tipNote = (included and L.CHAL_INCLUDED) or why or nil
         local h = math.max(ROW_MIN, 4 + r.name:GetStringHeight() + (sub and 2 + r.sub:GetStringHeight() or 0) + 4)
         if r.extra then
           r.extra:SetShown(on)
@@ -900,29 +928,57 @@ local function refresh(pf)
             h = h + r.extra:GetHeight() + 4
           end
         end
+        hs[i], sum = h, sum + h + 2
+      end
+      -- Many chosen (Gear, Gold & More with all it asks; the check of 8 Nov 2026): the rows close up rather than
+      -- run past the cloth.
+      local room = (b:GetHeight() or 0) - BANNER_HEAD - BANNER_PAD - BANNER_TAIL
+      local tight = room > 0 and sum > room
+      local y = BANNER_HEAD + BANNER_PAD
+      for i, r in ipairs(b.rows) do
+        local h = tight and hs[i] - 2 or hs[i]
         r:SetHeight(h)
         r:ClearAllPoints(); r:SetPoint("TOPLEFT", b, "TOPLEFT", BANNER_PAD, -y)
-        y = y + h + 2
+        y = y + h + (tight and 0 or 2)
       end
     end
     local shared = C:Chosen("shared")
-    pf.chalName:SetText(Ch:Line(chosen) or L.CHAL_NONE)
-    local lines = {}
-    for _, k in ipairs(Ch.LIST) do if chosen and chosen[k] then lines[#lines + 1] = Ch:Rule(k, chosen[k]) end end
-    -- (Many chosen: one line between them, so the page holds them all.)
-    pf.chalText:SetText(#lines > 0 and table.concat(lines, #lines > 3 and "\n" or "\n\n") or L.CHAL_NONE_TEXT)
+    pf.chosenLine = Ch:Line(chosen)
+    pf.chalName:SetShown(not chosen); pf.chalText:SetShown(not chosen)
+    -- Many chosen (13 can go together): the rows close up, as the banners' do, so the notes stay above Next.
+    local count = 0
+    for _, k in ipairs(Ch.LIST) do if chosen and chosen[k] then count = count + 1 end end
+    local rh, rgap = count > 8 and 22 or CHOSEN_H, count > 8 and 0 or 2
+    local n = 0
+    for _, k in ipairs(Ch.LIST) do
+      local it = chosen and chosen[k] and pf.chalItems:Get(n + 1)
+      if it then
+        n = n + 1
+        it.key = k
+        it:SetHeight(rh); it.icon:SetSize(rh - 4, rh - 4)
+        -- (A missing icon file: the challenges' own, as the hover panel does; no blank square.)
+        if not UI.SetIcon(it.icon, Ch:Icon(k)) then UI.SetIcon(it.icon, ns.ICONS.hist_challenge) end
+        local name = Ch:Name(k, chosen[k])
+        it.name:SetText(name)
+        it.tip = name .. "\n" .. Ch:Rule(k, chosen[k])
+        it:ClearAllPoints(); it:SetPoint("TOPLEFT", 0, -(n - 1) * (rh + rgap)); it:Show()
+      end
+    end
+    pf.chalItems:HideFrom(n + 1)
+    pf.chalList:SetHeight(math.max(1, n * (rh + rgap)))
+    local above = chosen and pf.chalList or pf.chalText
     local held = chosen and (chosen.oneclass or chosen.nohealers)
     pf.chalNote:SetText(held and (L.CHAL_NOTE .. " " .. L.CHAL_NOTE_HELD) or L.CHAL_NOTE)
     pf.chalNote:SetShown(chosen ~= nil)
     pf.chalLives:SetShown(shared)
     pf.chalNote:ClearAllPoints()
     if shared then
-      pf.chalLives:ClearAllPoints(); pf.chalLives:SetPoint("TOPLEFT", pf.chalText, "BOTTOMLEFT", 0, -14)
+      pf.chalLives:ClearAllPoints(); pf.chalLives:SetPoint("TOPLEFT", above, "BOTTOMLEFT", 0, -14)
       pf.chalLives:Set(C:Lives(), C:Lives())
       pf.chalLives:SetTip(L.LIVES_LEFT:format(C:Lives(), C:Lives()))
       pf.chalNote:SetPoint("TOPLEFT", pf.chalLives, "BOTTOMLEFT", 0, -16)
     else
-      pf.chalNote:SetPoint("TOPLEFT", pf.chalText, "BOTTOMLEFT", 0, -16)
+      pf.chalNote:SetPoint("TOPLEFT", above, "BOTTOMLEFT", 0, -16)
     end
     -- (Still pointing at a row: its rule as it is now, the lives or the gold just changed.)
     pf:Peek()

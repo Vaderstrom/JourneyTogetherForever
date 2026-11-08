@@ -21,7 +21,8 @@ P.PAGE_ART = { chronicle = "board", moments = "board", history = "hall", gatheri
 
 -- Pages register themselves: { id, label, icon, title = function(ctx) return title, sub end, build, refresh }.
 -- build(page) gets the page frame with .left and .right; refresh(page, ctx) runs when it is shown.
--- parent: a tab of another page (Manage's tabs): in the sidebar as that page, which stays marked.
+-- parent: a tab of another page (Manage's tabs): in the sidebar as that page, which stays marked. A function gives it
+-- when the page is drawn (the Dungeon page: the page it was opened from).
 function P:Register(def)
   def.icon = def.icon or def.id
   self.pages[def.id] = def
@@ -80,7 +81,9 @@ end
 -- The sidebar entry a page is under: its own, or its parent's for a tab.
 function P:NavItem(id)
   local def = self.pages[id]
-  return def and def.parent or id
+  local parent = def and def.parent
+  if type(parent) == "function" then parent = parent() end
+  return parent and parent ~= id and self:NavItem(parent) or id
 end
 
 function P:InNav(id, ctx)

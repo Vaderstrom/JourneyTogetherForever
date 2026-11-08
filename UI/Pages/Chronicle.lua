@@ -60,11 +60,11 @@ function ns.ChronicleGroups(list, open)
 end
 
 -- The tab strip at the top of each tab's left page (as Manage's, UI/Pages/Manage.lua). Returns the height it takes.
-local TABS = { { "CH_TAB_LOG", "chronicle" }, { "CH_TAB_MOMENTS", "moments" } }
+local TABS = { { "CH_TAB_LOG", "chronicle", "chronicle" }, { "CH_TAB_MOMENTS", "moments", "history" } }
 function ns.ChronicleTabs(pf)
   local W = ns.Window
   local opts = {}
-  for i, t in ipairs(TABS) do opts[i] = { L[t[1]], t[2] } end
+  for i, t in ipairs(TABS) do opts[i] = { L[t[1]], t[2], t[3] } end
   pf.tabs = UI.Tabs(pf.left, opts, function() return W.current end, function(id) W:ShowPage(id) end, W.PAGE_W - 8)
   pf.tabs:SetPoint("TOPLEFT", 0, 0)
   return 40
@@ -73,6 +73,8 @@ end
 -- The Firsts filter as medals (SPEC §8, from the check of 1 Nov 2026): a cabinet in the order of the firsts, the
 -- earned ones with who and when, then the ones nobody has yet, greyed ("Still open": something to race for).
 local MEDAL_COLS, MEDAL_H, MEDAL_GAP, MEDAL_RING = 4, 100, 8, 46
+-- U42: the progress ring round the next open level, as dots (lit from the top, clockwise).
+local DOTS, DOT = 24, 4
 
 local function medalIcon(tex, key)
   if not UI.SetIcon(tex, ns.ICONS["first_" .. key]) then UI.SetIcon(tex, ns.ICONS.hist_first) end
@@ -97,6 +99,21 @@ local function buildMedal(parent, w)
   Theme:Register(function() paintRing(m) end)
   m.icon = UI.Round(m, "OVERLAY", MEDAL_RING - 6)
   m.icon:SetPoint("CENTER", m.ring)
+  m.dotRing = UI.DotRing(m, MEDAL_RING + 10 + DOT, DOTS, DOT)
+  m.dotRing:SetPoint("CENTER", m.ring)
+  m.dots = m.dotRing.dots
+  for _, d in ipairs(m.dots) do d:Hide() end
+  -- The newest earned medal glints once when the cabinet opens (U42): the game's cooldown star turning over its ring.
+  m.star = m:CreateTexture(nil, "OVERLAY", nil, 2)
+  m.star:SetSize(MEDAL_RING + 40, MEDAL_RING + 40); m.star:SetPoint("CENTER", m.ring)
+  m.hasStar = m.star:SetTexture(UI.GLOW_PROBE.star) ~= false
+  m.star:SetBlendMode("ADD"); m.star:SetVertexColor(1, 0.85, 0.45); m.star:SetAlpha(0)
+  local ag = m.star:CreateAnimationGroup()
+  local a1 = ag:CreateAnimation("Alpha"); a1:SetFromAlpha(0); a1:SetToAlpha(1); a1:SetDuration(0.25); a1:SetOrder(1)
+  local turn = ag:CreateAnimation("Rotation"); turn:SetDegrees(-90); turn:SetDuration(0.9); turn:SetOrder(1)
+  local a2 = ag:CreateAnimation("Alpha"); a2:SetFromAlpha(1); a2:SetToAlpha(0); a2:SetDuration(0.65); a2:SetStartDelay(0.25); a2:SetOrder(1)
+  ag:SetScript("OnFinished", function() m.star:SetAlpha(0) end)
+  m.glint = ag
   m.title = UI.Text(m, 12, "ink", "title", "CENTER")
   m.title:SetPoint("TOP", m.ring, "BOTTOM", 0, -5); m.title:SetWidth(w)
   m.who = UI.Text(m, 12, "ink", "body", "CENTER")
@@ -136,6 +153,7 @@ local function fillMedal(m, f, key, x, near)
   m.title:SetText(L["FIRSTN_" .. key:upper()] or key)
   m.title:SetTextColor(Theme:RGBA(m.open and "ink2" or "ink"))
   m.closest = nil
+  for _, d in ipairs(m.dots) do d:Hide() end
   if x then
     m.who:SetText(ns.Short(x.name))
     whoColor(m.who, f, x.name, 1)
@@ -150,8 +168,11 @@ local function fillMedal(m, f, key, x, near)
     m.closest = who
     m.who:SetText(ns.Short(who))
     whoColor(m.who, f, who, 0.8)
-    m.when:SetText(L.FIRST_CLOSEST:format(lvl))
+    -- U42: "20 of 30" and the ring of dots, lit as far as their level goes towards it.
+    local target = tonumber(key:match("^lvl(%d+)$")) or lvl
+    m.when:SetText(L.FIRST_PROGRESS:format(lvl, target))
     m.tip[3] = L.FIRST_CLOSEST_TIP:format(ns.Short(who), lvl)
+    m.dotRing:Set(lvl / target, "gold")
   else
     m.who:SetText(L.FIRST_NOBODY)
     m.who:SetTextColor(Theme:RGBA("ink2"))
@@ -191,6 +212,17 @@ local function placeMedals(pf, f, s)
   end
   pf.earnedHead:SetShown(#earned > 0)
   if #earned > 0 then s:Place(pf.earnedHead, 29, 8); grid(earned) end
+  -- U42: the newest earned medal glints once each time the cabinet opens (pf.glinted goes with the page or the
+  -- filter); Reduce effects keeps it still.
+  local newest
+  for i, key in ipairs(earned) do
+    local m = pf.medals.items[i]
+    if m and (not newest or byKey[key].time > byKey[newest.key].time) then newest = m end
+  end
+  if newest and not pf.glinted then
+    pf.glinted = newest.key
+    if newest.hasStar and not ns.Settings:Get("reduce") then newest.glint:Stop(); newest.glint:Play() end
+  end
   pf.openHead:SetShown(#open > 0)
   if #open > 0 then s:Skip(6); s:Place(pf.openHead, 29, 8); grid(open) end
   return n
@@ -241,6 +273,9 @@ local function build(pf)
   pf.openHead = UI.SectionHeader(Lc, width)
   pf.openHead:SetText(L.FIRSTS_OPEN)
   pf.medals = UI.Pool(function() return buildMedal(Lc, pf.medalW) end)
+  -- (Hidden with the page: the newest medal glints again when it opens.)
+  local watch = CreateFrame("Frame", nil, Lc)
+  watch:SetScript("OnHide", function() pf.glinted = nil end)
 
   pf.rscroll = UI.Scroll(pf.right)
   pf.rscroll:SetAllPoints()
@@ -360,7 +395,7 @@ local function refresh(pf, ctx)
   pf.rows:HideFrom(shown + 1)
   local medals = 0
   pf.earnedHead:SetShown(false); pf.openHead:SetShown(false)
-  if gallery then medals = placeMedals(pf, f, s) end
+  if gallery then medals = placeMedals(pf, f, s) else pf.glinted = nil end
   pf.medals:HideFrom(medals + 1)
   pf.empty:SetShown(#list == 0 and not gallery)
   if #list == 0 and not gallery then

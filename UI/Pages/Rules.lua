@@ -180,7 +180,7 @@ local function chalBlock(parent, width)
   return b
 end
 
--- The challenges' tiles on the right page (UI.NumberTile), two to a row.
+-- The challenges' tiles on the right page (UI.NumberTile), two to a row; an odd last one fills its row (U46).
 local TILE_H, TILE_GAP = 58, 8
 
 local function buildBook(pf)
@@ -253,8 +253,8 @@ local function buildBook(pf)
   pf.tilesHead = UI.SectionHeader(Rc, width)
   pf.tilesHead:SetText(L.CHAL_TILES)
   pf.tiles = {}
-  local tw = math.floor((width - TILE_GAP) / 2)
-  for i = 1, 4 do pf.tiles[i] = UI.NumberTile(Rc, tw, TILE_H) end
+  pf.tileW, pf.tileFull = math.floor((width - TILE_GAP) / 2), width
+  for i = 1, 4 do pf.tiles[i] = UI.NumberTile(Rc, pf.tileW, TILE_H) end
 end
 
 local function refreshBook(pf, ctx)
@@ -403,9 +403,10 @@ local function refreshBook(pf, ctx)
       tile:SetShown(x ~= nil)
       if x then
         tile.key = x.key
+        tile:SetWidth(i == #tiles and i % 2 == 1 and pf.tileFull or pf.tileW)
         tile:Set(x.value); tile:SetLabel(x.label); tile:SetIcon(x.icon)
         tile:ClearAllPoints()
-        tile:SetPoint("TOPLEFT", pf.rscroll.child, "TOPLEFT", ((i - 1) % 2) * (tile:GetWidth() + TILE_GAP),
+        tile:SetPoint("TOPLEFT", pf.rscroll.child, "TOPLEFT", ((i - 1) % 2) * (pf.tileW + TILE_GAP),
           -(t.y + math.floor((i - 1) / 2) * (TILE_H + TILE_GAP)))
       end
     end
@@ -432,43 +433,111 @@ end
 ---------------------------------------------------------------------------
 -- The Rules tab of Manage (rulesadmin)
 ---------------------------------------------------------------------------
--- The rules in the draft that differ from the fellowship's: { key, ... } in a fixed order.
-local function changed(f, draft)
+-- The draft is the Leader's picks, { key = value } (pf.picks), laid over the rules as they are now: a vote passed
+-- meanwhile shows in the form, and Publish sends what the form shows. A size or a play style is one pick of all its
+-- keys (pf.linked[key] = "size" / "style"): they go out together, as a vote could otherwise leave a mix no size
+-- gives, and a new size replaces the last one's keys. A pick that the rules already hold drops out: a single rule
+-- at once, a size's or style's keys only all together. Picks belong to one fellowship and one time as its Leader
+-- (pf.pickKey). (8 Nov 2026, the release review of 329160e: a frozen copy hid votes and kept a size's keys apart.)
+local function pickKey(f) return f.id .. "#" .. (f.lv or 0) end
+
+-- The picks for this fellowship, or nil (dropped when they were made for another, or before a change of Leader).
+local function picksFor(pf, f)
+  if pf.picks and pf.pickKey ~= pickKey(f) then pf.picks = nil end
+  return pf.picks
+end
+
+local function addPicks(pf, f, set, group)
+  local p = picksFor(pf, f)
+  if not p then p, pf.linked, pf.pickKey = {}, {}, pickKey(f); pf.picks = p end
+  if group then
+    for k, g in pairs(pf.linked) do if g == group then p[k], pf.linked[k] = nil, nil end end
+  end
+  for k, v in pairs(set) do p[k], pf.linked[k] = v, group end
+end
+
+-- Drops the picks the rules already hold (see above).
+local function prune(pf, f)
+  local p = picksFor(pf, f)
+  if not p then return end
+  local held = {}
+  for k, v in pairs(p) do
+    local g = pf.linked[k]
+    if g then held[g] = held[g] ~= false and f.rules[k] == v end
+  end
+  for k, v in pairs(p) do
+    local g = pf.linked[k]
+    if (g and held[g]) or (not g and f.rules[k] == v) then p[k], pf.linked[k] = nil, nil end
+  end
+  if next(p) == nil then pf.picks = nil end
+end
+
+-- The rules as the form shows them.
+local function shown(pf, f)
+  local out = copy(f.rules)
+  for k, v in pairs(picksFor(pf, f) or {}) do out[k] = v end
+  return out
+end
+
+-- The picks that differ from the rules now: { key, ... } in a fixed order.
+local function changed(pf, f)
   local keys = {}
-  if not draft then return keys end
-  for k, v in pairs(draft) do if f.rules[k] ~= v then keys[#keys + 1] = k end end
+  for k, v in pairs(picksFor(pf, f) or {}) do if f.rules[k] ~= v then keys[#keys + 1] = k end end
   table.sort(keys)
   return keys
 end
+
+-- The bar with Publish at the foot of the left page, never scrolled (7 Nov 2026: the owner found no Publish for the
+-- rules; it lay at the top of the scroll, out of sight while changing a rule further down or on the right page).
+local BAR_H = 46
 
 local function buildAdmin(pf)
   local W = ns.Window
   local width = W.PAGE_W - 10
   local top = ns.ManageTabs(pf)
   pf.lscroll = UI.Scroll(pf.left)
-  pf.lscroll:SetPoint("TOPLEFT", 0, -top); pf.lscroll:SetPoint("BOTTOMRIGHT")
+  pf.lscroll:SetPoint("TOPLEFT", 0, -top); pf.lscroll:SetPoint("BOTTOMRIGHT", 0, BAR_H + 10)
   pf.rscroll = UI.Scroll(pf.right)
   pf.rscroll:SetAllPoints()
   local Lc = pf.lscroll.child
+  -- The rules as the form shows them.
+  function pf.rules()
+    local f = F:Current()
+    return f and shown(pf, f) or R.New()
+  end
 
   pf.yourPart = UI.Card(Lc, "gold")
   pf.yourPart:SetWidth(width)
   pf.yourPart.text = UI.WrapText(pf.yourPart, 13, "ink", width - 24, "book")
   pf.yourPart.text:SetPoint("TOPLEFT", 12, -9)
   pf.yourPart.text:SetText(L.RULES_YOU_ADMIN)
-  -- The draft: what changed, Publish and Discard.
+  -- The draft: what changed.
   pf.draftBox = UI.Card(Lc, "gold")
   pf.draftBox:SetWidth(width)
   pf.draftText = UI.WrapText(pf.draftBox, 13, "ink", width - 24, "book")
   pf.draftText:SetPoint("TOPLEFT", 12, -10)
-  pf.propose = UI.TextButton(pf.draftBox, L.PUBLISH, function()
-    if not F:Current() or not pf.draft then return end
+  -- The bar: how many changes wait, Discard and Publish (gold while there are some).
+  pf.bar = UI.Card(pf.left)
+  pf.bar.strong = true
+  pf.bar:SetPoint("BOTTOMLEFT"); pf.bar:SetPoint("BOTTOMRIGHT")
+  pf.bar:SetHeight(BAR_H)
+  pf.propose = UI.TextButton(pf.bar, L.PUBLISH, function()
     W:Confirm(L.RULES_PUBLISH_CONFIRM, L.PUBLISH, function()
-      if F:SetRules(pf.draft) then pf.draft = nil; ns:Toast(nil, L.RULES_PUBLISHED_T, L.RULES_PUBLISHED_YOU) end
+      local f = F:Current()
+      -- (Nothing left to send, when the rules came meanwhile.)
+      if f and #changed(pf, f) > 0 then
+        local ok = F:SetRules(shown(pf, f))
+        pf.picks = nil -- (refused: you no longer lead, so they could not be published)
+        if ok then ns:Toast(nil, L.RULES_PUBLISHED_T, L.RULES_PUBLISHED_YOU) else ns:Toast(nil, L.RULES_NOT_PUBLISHED_T, L.RULES_NOT_PUBLISHED) end
+      end
       W:Refresh()
     end)
-  end, "primary", 12)
-  pf.undo = UI.TextButton(pf.draftBox, L.DISCARD, function() pf.draft = nil; W:Refresh() end, "plain", 12)
+  end, "primary")
+  pf.propose:SetPoint("RIGHT", -9, 0)
+  pf.undo = UI.TextButton(pf.bar, L.DISCARD, function() pf.picks = nil; W:Refresh() end, "plain")
+  pf.undo:SetPoint("RIGHT", pf.propose, "LEFT", -6, 0)
+  pf.barText = UI.Text(pf.bar, 13, "ink", "book")
+  pf.barText:SetPoint("LEFT", 14, 0)
   -- The challenges chosen at founding (SPEC §9): none can be added; each can be turned off, for good (asks first).
   pf.chalHead = UI.SectionHeader(Lc, width)
   pf.chalHead:SetText(L.MG_CHAL_HEAD)
@@ -495,40 +564,28 @@ local function buildAdmin(pf)
   end)
   -- Fellowship size and play style (27 Oct 2026), each one choice above the full form: the size sets the numbers
   -- (Adventurers per run, who must clear, away time), the style the slack. Both go into the draft.
-  local function apply(fn)
+  local function apply(set, group)
     local f = F:Current()
     if not f then return end
-    pf.draft = fn(pf.draft or f.rules); W:Refresh()
+    addPicks(pf, f, set, group); W:Refresh()
   end
   pf.sizeHead = UI.SectionHeader(Lc, width)
   pf.sizeHead:SetText(L.SIZE_HEAD)
   local sizes = {}
   for i, key in ipairs(R.SIZE_ORDER) do sizes[i] = { R.SizeName(key), key } end
-  pf.size = UI.Choice(Lc, sizes, function()
-    local f = F:Current()
-    return R.SizeOf(pf.draft or (f and f.rules) or R.New())
-  end, function(key) apply(function(r) return R.WithSize(r, key) end) end)
+  pf.size = UI.Choice(Lc, sizes, function() return R.SizeOf(pf.rules()) end, function(key) apply(R.SIZES[key], "size") end)
   pf.sizeText = UI.WrapText(Lc, 12, "ink2", width, "book")
   pf.styleHead = UI.SectionHeader(Lc, width)
   pf.styleHead:SetText(L.STEP_STYLE)
   local styles = {}
   for i, key in ipairs(R.STYLE_ORDER) do styles[i] = { L["STYLE_" .. key:upper()], key } end
-  pf.style = UI.Choice(Lc, styles, function()
-    local f = F:Current()
-    return R.StyleOf(pf.draft or (f and f.rules) or R.New())
-  end, function(key) apply(function(r) return R.WithStyle(r, key) end) end)
+  pf.style = UI.Choice(Lc, styles, function() return R.StyleOf(pf.rules()) end, function(key) apply(R.STYLES[key], "style") end)
   pf.styleText = UI.WrapText(Lc, 12, "ink2", width, "book")
   pf.formTop = 0
 
   pf.form = UI.RulesForm(Lc, pf.rscroll.child, width, {
-    get = function() local f = F:Current(); return pf.draft or (f and f.rules) or ns.Rules.New() end,
-    set = function(k, v)
-      local f = F:Current()
-      if not f then return end
-      pf.draft = pf.draft or copy(f.rules)
-      pf.draft[k] = v
-      W:Refresh()
-    end,
+    get = pf.rules,
+    set = function(k, v) apply({ [k] = v }) end,
     cond = function()
       local f = F:Current()
       if not f then return false end
@@ -549,17 +606,19 @@ local function refreshAdmin(pf, ctx)
   local yh = pf.yourPart.text:GetStringHeight() + 18
   pf.yourPart:SetHeight(yh)
   s:Place(pf.yourPart, yh, 10)
-  local keys = changed(f, pf.draft)
+  prune(pf, f) -- (a late rules op brought them, or a vote chose the same)
+  local keys = changed(pf, f)
   pf.draftBox:SetShown(#keys > 0)
+  pf.propose:SetShown(#keys > 0); pf.undo:SetShown(#keys > 0)
+  pf.bar:SetSelected(#keys > 0)
+  pf.barText:SetText(#keys == 0 and L.PUBLISHED or (#keys == 1 and L.RULES_BAR_1 or L.RULES_BAR_N:format(#keys)))
   if #keys > 0 then
     local parts = {}
-    for i, k in ipairs(keys) do parts[i] = L.V_CHANGE:format(R.Name(k), R.ValueText(k, pf.draft[k])) end
+    for i, k in ipairs(keys) do parts[i] = L.V_CHANGE:format(R.Name(k), R.ValueText(k, pf.picks[k])) end
     pf.draftText:SetText(L.RULES_DRAFT:format(table.concat(parts, "; ")))
     local h = pf.draftText:GetStringHeight() + 20
-    pf.propose:ClearAllPoints(); pf.propose:SetPoint("TOPLEFT", 12, -h)
-    pf.undo:ClearAllPoints(); pf.undo:SetPoint("LEFT", pf.propose, "RIGHT", 8, 0)
-    pf.draftBox:SetHeight(h + 36)
-    s:Place(pf.draftBox, h + 36, 8)
+    pf.draftBox:SetHeight(h)
+    s:Place(pf.draftBox, h, 8)
   end
   s:Skip(8)
   -- The challenges: each one on with Turn off, the ones turned off with their day.
@@ -590,7 +649,7 @@ local function refreshAdmin(pf, ctx)
   end
   pf.chalRows:HideFrom(n + 1)
   -- The size (how many you are, and which size the rules were made for), the play style, then the full form.
-  local rules = pf.draft or f.rules
+  local rules = shown(pf, f)
   s:Place(pf.sizeHead, 29, 6)
   pf.size:Refresh()
   s:Place(pf.size, 28, 6)

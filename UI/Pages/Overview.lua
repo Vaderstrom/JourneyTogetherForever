@@ -21,7 +21,8 @@ local function buildYou(parent, width)
   local inner = width - 24
   c.label = UI.Text(c, 11, "accent", "title")
   c.label:SetPoint("TOPLEFT", 12, -10)
-  c.state = UI.WrapText(c, 16, "ink", inner, "title")
+  -- One large headline (U1, the check of 31 Oct 2026): what the chapter waits for, at a glance.
+  c.state = UI.WrapText(c, 21, "ink", inner, "title")
   c.state:SetPoint("TOPLEFT", 12, -26)
   -- The chapter's steps: reach the floor, the dungeons (or the cap), the next chapter.
   c.segs = {}
@@ -52,6 +53,17 @@ local function buildYou(parent, width)
   c.flTick:SetSize(2, BAR_H + 6)
   c.capTick = UI.Solid(c.ticks, "OVERLAY", "ink", 0.85)
   c.capTick:SetSize(2, BAR_H + 6)
+  -- The room's stop point (U82): a red pin on the bar, its words on hover; the Room card below says them (U115: the
+  -- state, the stop's words and the floor and cap crowded the bar).
+  c.stopTick = UI.Solid(c.ticks, "OVERLAY", "B0321E", 1)
+  c.stopTick:SetSize(3, BAR_H + 8)
+  c.stopHead = UI.Round(c.ticks, "OVERLAY", 8)
+  Theme:Fill(c.stopHead, "B0321E", 1)
+  c.stopHead:SetPoint("BOTTOM", c.stopTick, "TOP", 0, -2)
+  c.stopHit = CreateFrame("Frame", nil, c.ticks)
+  c.stopHit:SetSize(14, BAR_H + 14); c.stopHit:SetPoint("BOTTOM", c.stopTick, "BOTTOM")
+  c.stopHit:EnableMouse(true)
+  UI.Tooltip(c.stopHit, function() return c.stopTip end)
   c.lo = UI.Text(c, 11, "ink2")
   c.hi = UI.Text(c, 11, "ink2")
   c.say = UI.Text(c, 13, "ink", "title")
@@ -84,19 +96,9 @@ local function buildYou(parent, width)
   c.play.grouped = UI.Text(c.play, 12, "3E7A3A", "body")
   c.play.grouped:SetText(L.PLAY_GROUPED)
   c.more = UI.TextButton(c, L.MORE_IN_CHAPTER, function() ns.Window:ShowPage("chapter") end, "link", 12)
-  -- The counts: below the floor, ready, at the cap, over the cap, away.
-  c.counts = {}
-  local cw = inner / 5
-  for i = 1, 5 do
-    local k = CreateFrame("Frame", nil, c)
-    k:SetSize(cw, 36)
-    k.v = UI.Text(k, 16, nil, "title", "CENTER")
-    k.v:SetPoint("TOP", 0, 0)
-    k.k = UI.Text(k, 10, "ink2", "body", "CENTER")
-    k.k:SetPoint("TOP", k.v, "BOTTOM", 0, -2)
-    k.k:SetWidth(cw - 2)
-    c.counts[i] = k
-  end
+  -- The one main button when nobody is online to play with (U1): the chapter, where what's next is. (The five counts
+  -- went: the right page lists who stands where.)
+  c.go = UI.TextButton(c, L.YOU_GO_CHAPTER, function() ns.Window:ShowPage("chapter") end, "primary", 12)
   return c
 end
 
@@ -134,11 +136,11 @@ local function refreshYou(c, f, watching)
   c.label:SetText((ch and L.STAND_LABEL:format(J.Roman(ch.n), ch.name) or L.BN_JOURNEY_DONE):upper())
   c.state:SetText(bn.title)
   c.state:SetTextColor(Theme:RGBA(bn.color or "ink"))
-  local top = 26 + c.state:GetStringHeight() + 10
-  -- Steps, your level and the counts: only while a chapter is going on.
+  local top = 28 + c.state:GetStringHeight() + 10
+  -- Steps and your level: only while a chapter is going on.
   for _, s in ipairs(c.segs) do s:SetShown(ch ~= nil) end
   for _, w in ipairs({ c.lvl, c.lvlKey, c.bar, c.lo, c.hi, c.say }) do w:SetShown(ch ~= nil) end
-  for _, k in ipairs(c.counts) do k:SetShown(ch ~= nil) end
+  c.stopTick:Hide(); c.stopHead:Hide(); c.stopHit:Hide()
   if ch then
     local segW = (inner - 12) / 3
     for i, st in ipairs(chapterSteps(f, ch.n, count)) do
@@ -188,6 +190,13 @@ local function refreshYou(c, f, watching)
     local xf, xc = bw * at(fl), bw * at(cap)
     c.flTick:ClearAllPoints(); c.flTick:SetPoint("CENTER", c.bar, "LEFT", xf, 0)
     c.capTick:ClearAllPoints(); c.capTick:SetPoint("CENTER", c.bar, "LEFT", xc, 0)
+    -- Where to stop questing for the dungeon quests (U82): the pin at its level.
+    local room = not watching and ns.Room:Chapter(f, me) or nil
+    if room and room.stop and room.stop > lo and room.stop < hi then
+      c.stopTick:ClearAllPoints(); c.stopTick:SetPoint("CENTER", c.bar, "LEFT", bw * at(room.stop), 0)
+      c.stopTick:Show(); c.stopHead:Show(); c.stopHit:Show()
+      c.stopTip = L.TRACK_STOP:format(ns.Room.StopAt(room.stop))
+    end
     c.lo:SetText(L.TRACK_FLOOR:format(fl)); c.hi:SetText(L.TRACK_CAP:format(cap))
     local wl, wh = c.lo:GetStringWidth(), c.hi:GetStringWidth()
     local function inside(x, w) return ns.Clamp(x, 0, math.max(0, bw - w)) end
@@ -259,28 +268,20 @@ local function refreshYou(c, f, watching)
   end
   local invite = #names > 0 and not watching and not play
   c.invite:SetShown(invite)
-  c.more:SetShown(ch ~= nil)
-  -- Without Invite to group, What's next takes a short line, not a button's height (an empty row; seen in the tour).
+  -- One main button (U1): Play now's, else Invite to group, else Open the chapter; What's next beside the first two.
+  local go = ch ~= nil and not invite and not play
+  c.go:SetShown(go)
+  c.more:SetShown(ch ~= nil and not go)
   if invite then
     c.invite:ClearAllPoints(); c.invite:SetPoint("TOPLEFT", c, "TOPLEFT", 12, -(top + 8))
     c.more:ClearAllPoints(); c.more:SetPoint("TOPRIGHT", c, "TOPRIGHT", -12, -(top + 12))
     top = top + 8 + c.invite:GetHeight()
+  elseif go then
+    c.go:ClearAllPoints(); c.go:SetPoint("TOPLEFT", c, "TOPLEFT", 12, -(top + 8))
+    top = top + 8 + c.go:GetHeight()
   elseif ch then
     c.more:ClearAllPoints(); c.more:SetPoint("TOPRIGHT", c, "TOPRIGHT", -12, -(top + 4))
     top = top + 22
-  end
-  -- The counts.
-  if ch then
-    top = top + 10
-    local cw = inner / 5
-    for i, k in ipairs(c.counts) do
-      local cnt = J:Counts(f, ch.n)[i]
-      k.v:SetText(cnt[2])
-      k.v:SetTextColor(Theme:RGBA(cnt[2] > 0 and cnt[3] or "ink2"))
-      k.k:SetText(cnt[1])
-      k:ClearAllPoints(); k:SetPoint("TOPLEFT", c, "TOPLEFT", 12 + (i - 1) * cw, -top)
-    end
-    top = top + 36
   end
   c:SetHeight(top + 12)
   return top + 12
@@ -519,8 +520,12 @@ local function build(pf)
   pf.dungHead = UI.Text(R, 17, "ink", "title")
   pf.dungHead:SetText(L.OV_DUNGEONS)
   pf.dungeons = UI.Pool(function()
-    local d = CreateFrame("Frame", nil, R)
+    -- A click opens the Dungeon page (U96).
+    local d = CreateFrame("Button", nil, R)
     d:SetSize(width, 22)
+    local hl = d:CreateTexture(nil, "HIGHLIGHT")
+    hl:SetAllPoints(); hl:SetColorTexture(1, 0.9, 0.6, 0.12)
+    d:SetScript("OnClick", function() if d.key then ns.DungeonPage:Open(d.key) end end)
     d.mark = UI.Mark(d, 14)
     d.mark:SetPoint("LEFT")
     -- U66: a small square picture before the name, as on Journey Admin; larger on hover (U64).
@@ -529,6 +534,7 @@ local function build(pf)
     d.pic.tex = d.pic:CreateTexture(nil, "ARTWORK")
     d.pic.tex:SetAllPoints()
     UI.PictureTip(d.pic, function() return d.key end)
+    d.pic:SetScript("OnMouseUp", function() if d.key then ns.DungeonPage:Open(d.key) end end)
     d.name = UI.Text(d, 13, "ink")
     d.name:SetPoint("LEFT", 44, 0)
     d.note = UI.Text(d, 12, "ink2", "body", "RIGHT")
@@ -605,23 +611,33 @@ local function refresh(pf, ctx)
     s:Place(pf.tocAll, 22, 2, 4)
   end
   s:Skip(8)
-  pf.feedDiv:ClearAllPoints()
-  pf.feedDiv:SetPoint("TOPLEFT", pf.lscroll.child, "TOPLEFT", 0, -s.y); pf.feedDiv:SetPoint("TOPRIGHT", pf.lscroll.child, "TOPRIGHT", 0, -s.y)
-  s:Skip(20)
-  s:Place(pf.feedHead, 22, 6)
-  local chron = ns.Fellowship:ChronicleView(f, #pf.feed)
-  for i, e in ipairs(pf.feed) do
-    local entry = chron[i]
-    e:SetShown(entry ~= nil)
-    if entry then
-      e.text:SetText(entry.text)
-      e.when:ClearAllPoints(); e.when:SetPoint("TOPLEFT", e.text, "BOTTOMLEFT", 0, -2)
-      e.when:SetText(ns.TimeAgo(entry.time))
-      local h = e.text:GetStringHeight() + 20
-      e:SetHeight(h)
-      s:Place(e, h, 4)
+  -- Recent history: under the contents; in full screen on the right page under the chapter's dungeons, so the whole
+  -- Overview shows without scrolling (U87: the right page ended halfway down while the left ran off its foot).
+  local feedRight = ns.Window:IsFullscreen()
+  local function placeFeed(st, page)
+    for _, w in ipairs({ pf.feedDiv, pf.feedHead, unpack(pf.feed) }) do
+      if w:GetParent() ~= page then w:SetParent(page) end
+    end
+    pf.feedDiv:ClearAllPoints()
+    pf.feedDiv:SetPoint("TOPLEFT", page, "TOPLEFT", 0, -st.y); pf.feedDiv:SetPoint("TOPRIGHT", page, "TOPRIGHT", 0, -st.y)
+    st:Skip(20)
+    st:Place(pf.feedHead, 22, 6)
+    local chron = ns.Fellowship:ChronicleView(f, #pf.feed)
+    for i, e in ipairs(pf.feed) do
+      local entry = chron[i]
+      e:SetShown(entry ~= nil)
+      if entry then
+        e.text:SetText(entry.text)
+        e.when:ClearAllPoints(); e.when:SetPoint("TOPLEFT", e.text, "BOTTOMLEFT", 0, -2)
+        e.when:SetText(ns.TimeAgo(entry.time))
+        local h = e.text:GetStringHeight() + 20
+        e:SetHeight(h)
+        st:Place(e, h, 4)
+      end
     end
   end
+  if not feedRight then placeFeed(s, pf.lscroll.child) end
+  pf.feedRight = feedRight
   pf.lscroll:SetContentHeight(s.y + 8)
 
   -- The chosen chapter.
@@ -675,6 +691,7 @@ local function refresh(pf, ctx)
   pf.open:ClearAllPoints(); pf.open:SetPoint("TOPRIGHT", pf.rscroll.child, "TOPRIGHT", 0, -by)
   pf.back:ClearAllPoints(); pf.back:SetPoint("TOPLEFT", pf.rscroll.child, "TOPLEFT", 0, -by)
   r:Skip(40)
+  if feedRight then placeFeed(r, pf.rscroll.child) end
   pf.rscroll:SetContentHeight(r.y + 8)
 end
 

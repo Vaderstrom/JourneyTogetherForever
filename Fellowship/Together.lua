@@ -142,7 +142,7 @@ function T:PlayNow(f)
   local isOn = {}
   for _, n in ipairs(online) do isOn[n] = true end
   for _, x in ipairs(ns.Quests:Items(f)) do
-    if x.mine and not x.chain then
+    if x.mine and not x.chain and not x.dungeon then
       local with = {}
       for _, n in ipairs(x.others or {}) do if isOn[n] then with[#with + 1] = n end end
       if #with > 0 then return result(L.PLAY_QUEST:format(withYou(with), x.name), "invite", with) end

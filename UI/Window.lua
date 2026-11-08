@@ -1017,8 +1017,10 @@ function W:Open(page)
       if pf then UI.ScrollsToTop(pf) end
     end
     if W.frame:IsShown() then W:Refresh() else W.frame:Show() end
-    -- Once after an update: What's New over the book (UI/News.lua), not over the setup guide.
-    if page ~= "setup" and ns.News then ns.News:ShowIfDue() end
+    -- The first tour's offer, when the book closed before it was answered (UI/Walkthrough.lua); then, once after an
+    -- update, What's New over the book (UI/News.lua; it waits for the setup guide and the tour).
+    if ns.char and ns.char.walkOffer and not ns.News.Dev() then ns.Walkthrough:OfferOnce() end
+    ns.News:ShowIfDue()
     -- A fellowship found again after lost saved data (Fellowship/Sync.lua): ask now.
     if ns.Sync and ns.Sync.restore then ns.Sync:OfferRestore() end
   end)
@@ -1216,9 +1218,10 @@ function W:PlaceTitle(page, mode, ctx)
 end
 
 -- The pages' insets in the book: left page outer and at the spine, right page at the spine and outer. 26 as drawn;
--- a wider book (full screen) adds its extra width.
+-- a wider book (full screen) adds its extra width. A wide flat page (Journey Admin, U94) takes it instead.
 function W:PageInsets()
   local e = math.max(0, math.floor((self.frame:GetWidth() - WIDTH) / 2))
+  if self.frame.book.flat and self.frame.book.wide then return 26, 26, 26, 26 end
   if self.frame.book.flat then return 26 + e, 26, 26, 26 + e end
   local a, b = math.floor(e / 2), math.ceil(e / 2)
   return 26 + a, 26 + b, 26 + b, 26 + a
@@ -1315,7 +1318,8 @@ end
 function W:Draw()
   local ctx = Pages:Context()
   local page = Pages:Resolve(self.page, self.startView, ctx)
-  if self.current and self.current ~= page then self:LeavePage(self.current) end
+  local turned = self.current ~= page
+  if self.current and turned then self:LeavePage(self.current) end
   self.current = page
   if ns.Together then ns.Together:Visited(page) end
   Theme:SetAccent(Pages:Accent(page, ctx))
@@ -1326,6 +1330,7 @@ function W:Draw()
   local header = def and def.header or "left"
   if type(header) == "function" then header = header(self.pageFrames[page]) end
   self.frame.book:SetFlat(def and def.flat)
+  self.frame.book.wide = def and def.wide or nil
   self:PlaceTitle(page, header, ctx)
   for id, pf in pairs(self.pageFrames) do
     local show = id == page
@@ -1338,6 +1343,8 @@ function W:Draw()
   end
   if self.confirm then self.confirm.page = page end
   if def and def.refresh then def.refresh(self.pageFrames[page], ctx) end
+  -- The first time a page opens it shows you around (UI/Walkthrough.lua).
+  if turned and ns.Walkthrough then ns.Walkthrough:Visited(page) end
 end
 
 -- Other Heroes' news arrives in bursts (a login, a heartbeat round, a quest log): one redraw a second at most (U74).

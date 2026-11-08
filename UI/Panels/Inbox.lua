@@ -5,8 +5,30 @@ local UI, Theme = ns.UI, ns.Theme
 local Inbox = {}
 ns.Inbox = Inbox
 
--- { text, important, actions = { { label, fn, style } } } items, most important first.
+-- A button that closes the Inbox and opens a page.
+local function go(page) return function() ns.Window:HidePanels(); ns.Window:ShowPage(page) end end
+
+-- { text, important, actions = { { label, fn, style } }, key, seen } items, most important first. An item with a key
+-- is a notice (U105): it has a button to where it is handled and Seen, which takes it off the count until its key
+-- changes; seen ones come last, dimmed. Items with answers (invitations, votes) count until answered.
 function Inbox:Items()
+  local items = ns.SeenLast("inboxSeen", self:Gather())
+  for _, item in ipairs(items) do
+    if item.key and not item.seen then
+      local key = item.key
+      item.actions = item.actions or {}
+      item.actions[#item.actions + 1] = { L.NOTICE_SEEN, function() Inbox:See(key) end, "plain" }
+    end
+  end
+  return items
+end
+
+function Inbox:See(key)
+  ns.MarkSeen("inboxSeen", key, self:Gather())
+  ns.Window:Refresh()
+end
+
+function Inbox:Gather()
   local items = {}
   for _, item in ipairs(ns.Fellowship:MyInvites()) do
     -- Accept / Decline here too (the item was text only; seen in the tour). The role is the Join page's choice.
@@ -46,24 +68,38 @@ function Inbox:Items()
   local f = ns.Fellowship:Current()
   local ch = f and ns.Journey:Current(f)
   local cap = f and ns.Progress:CapState(f, ch)
-  if cap == "at" then items[#items + 1] = { text = L.WARN_AT_CAP, important = true }
-  elseif cap == "close" then items[#items + 1] = { text = L.WARN_CLOSE:format(ch.cap), important = false } end
+  if cap then
+    items[#items + 1] = { key = ("cap:%s:%s:%d"):format(cap, f.id, ch.n), important = cap == "at",
+      text = cap == "at" and L.WARN_AT_CAP or L.WARN_CLOSE:format(ch.cap), actions = { { L.OPEN_CHAPTER, go("chapter"), "primary" } } }
+  end
   -- The tournament: sign-up open, my next duel, and for the Guild Master the hand-over.
   local t = f and f.tourney
   if t then
     local me = ns.Me()
-    if t.phase == "signup" and not t.signed[me] then items[#items + 1] = { text = L.INBOX_T_SIGNUP, important = false } end
+    -- (A table each: Items adds Seen to it.)
+    local function open() return { { L.INBOX_OPEN_TOURNEY, go("tourney"), "primary" } } end
+    if t.phase == "signup" and not t.signed[me] then
+      items[#items + 1] = { key = "tsign:" .. tostring(t.id), text = L.INBOX_T_SIGNUP, important = false, actions = open() }
+    end
     local m, other = ns.Tourney:MyMatch(f, me)
-    if m then items[#items + 1] = { text = L.INBOX_T_DUEL:format(ns.Short(other)), important = true } end
+    if m then
+      items[#items + 1] = { key = ("tduel:%s:%s:%s"):format(tostring(t.id), tostring(t.slot), other),
+        text = L.INBOX_T_DUEL:format(ns.Short(other)), important = true, actions = open() }
+    end
     local _, _, rankIndex = GetGuildInfo("player")
     if t.phase == "done" and t.champion and t.champion ~= me and rankIndex == 0 then
-      items[#items + 1] = { text = L.INBOX_T_HANDOVER:format(ns.Short(t.champion)), important = true }
+      items[#items + 1] = { key = "thand:" .. tostring(t.id), text = L.INBOX_T_HANDOVER:format(ns.Short(t.champion)),
+        important = true, actions = open() }
     end
   end
   return items
 end
 
-function Inbox:Count() return #self:Items() end
+function Inbox:Count()
+  local n = 0
+  for _, item in ipairs(self:Items()) do if not item.seen then n = n + 1 end end
+  return n
+end
 
 local function build(p)
   p.rows = UI.Pool(function()
@@ -93,7 +129,8 @@ local function refresh(p)
     if not r then break end
     shown = i
     r.text:SetText(item.text)
-    r.bar:SetColorTexture(Theme:RGBA(item.important and "C0392B" or "line"))
+    r.text:SetTextColor(Theme:RGBA(item.seen and "ink2" or "ink"))
+    r.bar:SetColorTexture(Theme:RGBA(item.important and not item.seen and "C0392B" or "line"))
     local h = r.text:GetStringHeight() + 24
     local x = 14
     for j, b in ipairs(r.buttons) do

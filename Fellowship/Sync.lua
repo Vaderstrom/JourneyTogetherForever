@@ -377,7 +377,19 @@ Comm:On("INV", function(sender, d)
     heroes = tonumber(d.heroes) or 1, time = (not tonumber(d.t) and old and old.time) or made, friend = d.friend == true or nil,
     oneclass = type(d.oneclass) == "string" and d.oneclass:match("^%u+$") and #d.oneclass <= 16 and d.oneclass or nil,
     nohealers = d.nohealers == true or nil, who = who }
-  if not old then F:Changed() end
+  if not old then
+    F:Changed()
+    -- A toast with Accept and Decline (U109); the role is the Join page's choice, as in the Inbox. Never while you are
+    -- in a fellowship (Accept would ask to leave it first: the Join page does that).
+    local fid, inv = d.fid, ns.char.invites[d.fid]
+    -- (Not one past its day: a courier's copy hours late; MyInvites no longer lists it.)
+    if not cur and now - inv.time <= S.EXPIRE then
+      ns:Toast("invite", L.T_INVITE, (inv.friend and L.INBOX_INVITE_FRIEND or L.INBOX_INVITE):format(ns.Short(inv.leader or sender), inv.name),
+        nil, { icon = ns.ICONS.toast_invite, still = function() return not F:Current() and ns.char.invites[fid] ~= nil end, actions = {
+          { L.ACCEPT, function() F:AcceptInvite(fid, ns.CreateState.role) end },
+          { L.DECLINE, function() F:DeclineInvite(fid) end } } })
+    end
+  end
 end)
 
 Comm:On("INVA", function(sender, d)

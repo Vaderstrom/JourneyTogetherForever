@@ -132,6 +132,29 @@ function UI.Round(parent, layer, size, sublevel)
   return t
 end
 
+-- A ring of n round dots (U42's medal ring; U98's ready ring), lit from the top clockwise. ring:Set(share, role)
+-- lights that share of them in the role's colour and shows them all; ring.dots for callers that hide them.
+function UI.DotRing(parent, size, n, dot)
+  local ring = CreateFrame("Frame", nil, parent)
+  ring:SetSize(size, size)
+  ring.dots = {}
+  local rad = (size - dot) / 2
+  for i = 1, n do
+    local d = UI.Round(ring, "OVERLAY", dot)
+    local a = math.rad(90 - (i - 1) * 360 / n)
+    d:SetPoint("CENTER", ring, "CENTER", rad * math.cos(a), rad * math.sin(a))
+    ring.dots[i] = d
+  end
+  function ring:Set(share, role)
+    local lit = math.floor(n * math.max(0, math.min(1, share or 0)) + 0.5)
+    for i, d in ipairs(self.dots) do
+      d:SetColorTexture(Theme:RGBA(i <= lit and role or "line", i <= lit and 1 or 0.5))
+      d:Show()
+    end
+  end
+  return ring
+end
+
 -- Icon in a texture: shows the middle of a game icon (without its frame).
 -- Every icon of our set is remembered and drawn again when the theme changes (the Horde set is red).
 -- Returns false when the game does not have the file (SetTexture says so for game icons).
@@ -259,14 +282,15 @@ function UI.NumberTile(parent, w, h, label, icon)
   Theme:Fill(t.ring, "gold", 0.9)
   t.icon = UI.Round(t, "OVERLAY", ring - 4)
   t.icon:SetPoint("CENTER", t.ring)
-  local room = w - 2 * TILE_PAD
+  -- (From the tile's width as it is now: the rulebook widens an odd last tile to fill its row, U46.)
+  local function room() return t:GetWidth() - 2 * TILE_PAD end
 
   -- The label and its icon side by side in the middle of the bottom row.
   function t:Place()
     local withIcon = self.ring:IsShown()
     local shift = withIcon and (ring + TILE_GAP) or 0
     self.k:SetWidth(0)
-    if self.k:GetStringWidth() > room - shift then self.k:SetWidth(room - shift) end
+    if self.k:GetStringWidth() > room() - shift then self.k:SetWidth(room() - shift) end
     self.k:ClearAllPoints(); self.k:SetPoint("CENTER", self, "BOTTOM", shift / 2, TILE_PAD + ring / 2 - 1)
     self.ring:ClearAllPoints(); self.ring:SetPoint("RIGHT", self.k, "LEFT", -TILE_GAP, 0)
   end
@@ -281,11 +305,11 @@ function UI.NumberTile(parent, w, h, label, icon)
     self.v:SetWidth(0)
     self.v:SetFont(Theme.FONT_TITLE, size, "")
     self.v:SetText(value ~= nil and tostring(value) or "-")
-    while self.v:GetStringWidth() > room and size > 12 do
+    while self.v:GetStringWidth() > room() and size > 12 do
       size = size - 1
       self.v:SetFont(Theme.FONT_TITLE, size, "")
     end
-    if self.v:GetStringWidth() > room then self.v:SetWidth(room) end
+    if self.v:GetStringWidth() > room() then self.v:SetWidth(room()) end
   end
   t.k:SetText(label or "")
   t:SetIcon(icon)
@@ -743,9 +767,32 @@ end
 -- Tabs (Quests, History filters): words on a line; the chosen one is ink with a gold bar under it. Same interface as
 -- UI.Choice (buttons, Refresh, SetEnabled). counts(value) may return a number shown after the label. size: the words'
 -- size (14; smaller, 24 high, for a filter under a page's own tabs: the Chronicle's).
+-- A page's own tabs give each option an icon (opt[3]; U102): the book's folder tabs, the icon before the words, in
+-- the theme's colours. The chosen one is the page's own paper, taller, with a gold edge and open to the page below;
+-- the others a darker paper behind the line. (The game's character-frame tabs were black on the parchment and their
+-- words ran past them: the check of 8 Nov 2026.) Their words always fit: less room around them first, then no icons.
+local TAB_ICON, TAB_PAD, TAB_DROP = 14, 12, 4
+local function folderTab(b)
+  b.fill = b:CreateTexture(nil, "BACKGROUND")
+  b.edges = {}
+  for i = 1, 3 do b.edges[i] = b:CreateTexture(nil, "BORDER") end
+  b.edges[1]:SetPoint("TOPLEFT", b.fill); b.edges[1]:SetPoint("TOPRIGHT", b.fill); b.edges[1]:SetHeight(1)
+  b.edges[2]:SetPoint("TOPLEFT", b.fill); b.edges[2]:SetPoint("BOTTOMLEFT", b.fill); b.edges[2]:SetWidth(1)
+  b.edges[3]:SetPoint("TOPRIGHT", b.fill); b.edges[3]:SetPoint("BOTTOMRIGHT", b.fill); b.edges[3]:SetWidth(1)
+end
+local function paintTab(b, on)
+  b.fill:ClearAllPoints()
+  b.fill:SetPoint("TOPLEFT", 0, on and 0 or -TAB_DROP)
+  -- (The chosen one covers the line under it: it is open to the page.)
+  b.fill:SetPoint("BOTTOMRIGHT", 0, on and -1 or 0)
+  b.fill:SetColorTexture(Theme:RGBA(on and "page1" or "page2", 1))
+  for _, e in ipairs(b.edges) do e:SetColorTexture(Theme:RGBA(on and "gold" or "line", 1)) end
+  b.edges[1]:SetHeight(on and 2 or 1)
+end
 function UI.Tabs(parent, options, getValue, onPick, width, counts, size)
   size = size or 14
-  local rowH = size < 14 and 24 or 28
+  local game = options[1] and options[1][3] ~= nil
+  local rowH = game and 32 or (size < 14 and 24 or 28)
   local row = CreateFrame("Frame", nil, parent)
   row:SetSize(width, rowH)
   local base = UI.Solid(row, "BACKGROUND", "line", 0.9)
@@ -757,8 +804,15 @@ function UI.Tabs(parent, options, getValue, onPick, width, counts, size)
     b.text:SetPoint("CENTER", 0, 1)
     b.bar = UI.Solid(b, "ARTWORK", "gold", 1)
     b.bar:SetHeight(3); b.bar:SetPoint("BOTTOMLEFT", 4, 0); b.bar:SetPoint("BOTTOMRIGHT", -4, 0)
+    if game then
+      folderTab(b)
+      b.icon = b:CreateTexture(nil, "ARTWORK")
+      b.icon:SetSize(TAB_ICON, TAB_ICON)
+      UI.SetIcon(b.icon, ns.ICONS[opt[3]])
+      b.bar:Hide()
+    end
     local hl = b:CreateTexture(nil, "HIGHLIGHT")
-    hl:SetAllPoints(); hl:SetColorTexture(1, 0.85, 0.45, 0.1)
+    hl:SetAllPoints(b.fill or b); hl:SetColorTexture(1, 0.85, 0.45, 0.1)
     b.value, b.label = opt[2], opt[1]
     b:SetScript("OnClick", function() onPick(opt[2]); row:Refresh() end)
     row.buttons[i] = b
@@ -766,21 +820,49 @@ function UI.Tabs(parent, options, getValue, onPick, width, counts, size)
   function row:SetEnabled(on) for _, b in ipairs(self.buttons) do b:SetEnabled(on) end end
   function row:Refresh()
     local v, x, total = getValue(), 0, 0
-    for _, b in ipairs(self.buttons) do
-      local n = counts and counts(b.value)
-      b.text:SetText(n and n > 0 and (b.label .. "  " .. n) or b.label)
-      total = total + b.text:GetStringWidth() + 2
+    local n = #self.buttons
+    local function measure(sz)
+      total = 0
+      for _, b in ipairs(self.buttons) do
+        local file = b.text:GetFont()
+        b.text:SetFont(file, sz, "")
+        total = total + b.text:GetStringWidth() + 2
+      end
     end
-    -- 24 around each label; less when the row would not fit its width (History's five tabs with counts).
-    local pad = math.max(8, math.min(24, math.floor((width - total) / #self.buttons)))
     for _, b in ipairs(self.buttons) do
-      local w = b.text:GetStringWidth() + pad
+      local k = counts and counts(b.value)
+      b.text:SetText(k and k > 0 and (b.label .. "  " .. k) or b.label)
+    end
+    measure(size)
+    -- Still too long with the least room around the words: a size smaller (two-digit counts on four tabs), never under
+    -- the hint size (the Chronicle's filters are 12 already).
+    local small = math.max(UI.HINT_MIN, size - 2)
+    if total + n * 8 > width and small < size then measure(small) end
+    -- The icons only while the words fit with them (four tabs with long names on a narrow page).
+    local icons = game and total + n * (TAB_ICON + 4 + 8) <= width
+    if icons then total = total + n * (TAB_ICON + 4) end
+    -- 24 around each label; less when the row would not fit its width (History's five tabs with counts).
+    local pad = math.max(8, math.min(game and 2 * TAB_PAD or 24, math.floor((width - total) / n)))
+    for _, b in ipairs(self.buttons) do
+      local extra = icons and TAB_ICON + 4 or 0
+      local w = b.text:GetStringWidth() + extra + pad
       b:SetSize(w, rowH)
       b:ClearAllPoints(); b:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", x, 0)
       x = x + w + 2
       local on = b.value == v
-      b.bar:SetShown(on)
-      b.text:SetTextColor(Theme:RGBA(on and "ink" or "ink2"))
+      if game then
+        paintTab(b, on)
+        local dy = on and 0 or -TAB_DROP / 2
+        b.icon:SetShown(icons)
+        b.icon:ClearAllPoints(); b.icon:SetPoint("LEFT", math.floor(pad / 2), dy)
+        b.icon:SetDesaturated(not on); b.icon:SetAlpha(on and 1 or 0.75)
+        b.text:ClearAllPoints()
+        if icons then b.text:SetPoint("LEFT", b.icon, "RIGHT", 4, 0) else b.text:SetPoint("CENTER", 0, dy) end
+        b.text:SetTextColor(Theme:RGBA(on and "ink" or "ink2"))
+      else
+        b.bar:SetShown(on)
+        b.text:SetTextColor(Theme:RGBA(on and "ink" or "ink2"))
+      end
     end
   end
   Theme:Register(function() row:Refresh() end)
@@ -2090,6 +2172,22 @@ function UI.SectionHeader(parent, width)
   return f
 end
 
+-- A section header that folds what is under it (the game's plus and minus buttons before the title, as on the
+-- Settings page): a click on the icon or the title calls onClick; :SetOpen(open) shows which.
+UI.FOLD_ICON = { [true] = "Interface\\Buttons\\UI-PlusButton-Up", [false] = "Interface\\Buttons\\UI-MinusButton-Up" }
+function UI.FoldHeader(parent, width, onClick)
+  local h = UI.SectionHeader(parent, width)
+  h.text:ClearAllPoints(); h.text:SetPoint("LEFT", 20, 1)
+  h.icon = h:CreateTexture(nil, "ARTWORK")
+  h.icon:SetSize(16, 16); h.icon:SetPoint("LEFT", 0, 1)
+  h.click = CreateFrame("Button", nil, h)
+  h.click:SetAllPoints()
+  h.click:SetScript("OnClick", onClick)
+  function h:SetOpen(open) self.open = open == true; self.icon:SetTexture(UI.FOLD_ICON[not open]) end
+  h:SetOpen(false)
+  return h
+end
+
 -- A small round "?" that explains on mouse-over (long help texts read like a manual on the page; seen in the
 -- tour). :SetHelp(title, text).
 function UI.HelpIcon(parent)
@@ -2159,10 +2257,15 @@ function UI.LevelTrack(parent, width)
     d:SetScript("OnLeave", function() GameTooltip:Hide() end)
     return d
   end)
+  -- The room's stop point (U82): a red tick with its level and percent.
+  t.stop = UI.Solid(t, "OVERLAY", "B0321E", 1)
+  t.stop:SetSize(3, 18)
+  t.stopLabel = UI.Text(t, 11, "B0321E", "title", "CENTER")
   t.lines = UI.Pool(function() return UI.WrapText(t, 12, "ink", width, "book") end)
   t.more = UI.Text(t, 11, "ink2")
 
-  function t:Set(f, n, maxLines)
+  -- stopAt (optional): the level to stop questing at (ns.Room), shown as a red tick.
+  function t:Set(f, n, maxLines, stopAt)
     local J, Hr, L = ns.Journey, ns.Hero, ns.L
     local tr = J:TrackLevels(f, n)
     if not tr then self:Hide(); return 0 end
@@ -2193,6 +2296,7 @@ function UI.LevelTrack(parent, width)
     -- Floor and cap close together (a chapter far ahead, the track stretched to reach it): one label between them
     -- ("floor 54 and cap 56" overlapped in the check of 31 Oct 2026).
     local fl, cp = self.marks[1].label, self.marks[2].label
+    local labelX = { x(tr.floor), x(tr.cap) }
     if x(tr.cap) - x(tr.floor) < (fl:GetStringWidth() + cp:GetStringWidth()) / 2 + 8 then
       fl:SetText(L.TRACK_BOTH:format(tr.floor, tr.cap))
       fl:ClearAllPoints(); fl:SetPoint("TOP", self, "TOPLEFT", (x(tr.floor) + x(tr.cap)) / 2, -LT_LINE_Y - 12)
@@ -2200,6 +2304,25 @@ function UI.LevelTrack(parent, width)
       local cx = ns.Clamp((x(tr.floor) + x(tr.cap)) / 2, half, math.max(half, width - half))
       fl:ClearAllPoints(); fl:SetPoint("TOP", self, "TOPLEFT", cx, -LT_LINE_Y - 12)
       cp:Hide()
+      labelX = { cx }
+    end
+    -- The stop point: under the line with the floor and cap, or above it where it would touch one of their names.
+    local stop = stopAt and stopAt > tr.lo and stopAt < tr.hi and stopAt or nil
+    self.stop:SetShown(stop ~= nil); self.stopLabel:SetShown(stop ~= nil)
+    if stop then
+      local sx = x(stop)
+      self.stop:ClearAllPoints(); self.stop:SetPoint("CENTER", self, "TOPLEFT", sx, -LT_LINE_Y - 1)
+      self.stopLabel:SetText(ns.Room.StopAt(stop, true))
+      local w = self.stopLabel:GetStringWidth()
+      local cx = ns.Clamp(sx, w / 2, math.max(w / 2, width - w / 2))
+      local clash = false
+      for i, lx in ipairs(labelX) do
+        local lw = self.marks[i].label:GetStringWidth()
+        if math.abs(cx - lx) < (w + lw) / 2 + 6 then clash = true end
+      end
+      self.stopLabel:ClearAllPoints()
+      if clash then self.stopLabel:SetPoint("BOTTOM", self, "TOPLEFT", cx, -LT_LINE_Y + 11)
+      else self.stopLabel:SetPoint("TOP", self, "TOPLEFT", cx, -LT_LINE_Y - 11) end
     end
     -- One marker per level, lowest first, so a level number that would touch the one before it is left out (the
     -- lines under the track give every level anyway).

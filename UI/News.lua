@@ -3,7 +3,8 @@
 -- picture in the Adventure Guide's gold ring, and two picture cards with dungeons' loading screens. (The game's own
 -- splash is painted anew for every patch and shows retail's places, so it is not used.)
 -- It shows once after each update (a new N.ID), the first time the book opens with a fellowship, or when one is
--- founded; never while the self-test, the tour or a check runs. /jtf news shows it again.
+-- founded; never over the setup guide or a walkthrough or its offer (it waits for them: the owner, 8 Nov 2026, it
+-- covered the tour), never while the self-test, the developer's tour or a check runs. /jtf news shows it again.
 local _, ns = ...
 local L = ns.L
 local UI = ns.UI
@@ -11,6 +12,9 @@ local N = {}
 ns.News = N
 
 -- This update's news: a new ID shows the screen once more on every account. art: a dungeon's key (its picture).
+-- pic (U44): the item's own picture, a file in Media: NewsBig (512 x 512), NewsA and NewsB (1024 x 512), made in the
+-- Gemini app from art/prompts/news-art.json and converted by tools/convert-art.ps1 -Only news. Without the file the
+-- dungeon's loading screen shows, as before.
 N.ID = "1.2"
 N.BIG = { art = "dm", title = "NEWS_BIG_TITLE", text = "NEWS_BIG_TEXT" }
 N.CARDS = {
@@ -23,14 +27,38 @@ local PIC = 150 -- the round picture
 local RING_ATLAS = "adventureguide-ring"
 local CARD_W, CARD_H, CARD_GAP = 370, 170, 14
 
+-- An item's picture on tex, w x h: its own (pic, a picture aspect wide to 1 high, cut to fill), else its dungeon's.
+-- true when it is its own.
+function N.Art(tex, item, w, h, aspect)
+  if item.pic and tex:SetTexture(ns.MEDIA .. item.pic) ~= false then
+    local a = w / h
+    if a > aspect then local v = aspect / a; tex:SetTexCoord(0, 1, (1 - v) / 2, (1 + v) / 2)
+    else local u = a / aspect; tex:SetTexCoord((1 - u) / 2, (1 + u) / 2, 0, 1) end
+    return true
+  end
+  ns.SetDungeonArt(tex, item.art, w, h)
+  return false
+end
+
 -- Not seen on this account yet, and in a fellowship (the news is about fellowships).
 function N:Due()
   return ns.db ~= nil and ns.db.newsSeen ~= self.ID and ns.Fellowship:Current() ~= nil
 end
--- Due, and nothing of the developer's running (it would cover their pictures).
-function N:Pending()
-  local dev = (ns.SelfTest and ns.SelfTest.running) or (ns.Tour and ns.Tour.running) or (ns.Check and ns.Check.running)
-  return not dev and self:Due()
+-- The self-test, the developer's tour or a check runs (nothing may cover their pictures or start by itself).
+function N.Dev()
+  return (ns.SelfTest and ns.SelfTest.running) or (ns.Tour and ns.Tour.running) or (ns.Check and ns.Check.running) or false
+end
+-- Something else comes first: the setup guide, a walkthrough or its offer (Stop, Later and the guide's end ask again).
+function N:Busy()
+  local WK = ns.Walkthrough
+  return ns.Window.current == "setup" or ns.SetupGuide:Pending() or WK.on or WK.offer ~= nil
+end
+-- Due, and nothing first.
+function N:Pending() return not self.Dev() and not self:Busy() and self:Due() end
+-- On the screen now.
+function N:Showing()
+  local o = ns.Window.overlays and ns.Window.overlays.news
+  return o ~= nil and o:IsShown()
 end
 
 -- Made the first time it shows (never during combat): an overlay of the book (W:Overlay) with our parts.
@@ -76,12 +104,13 @@ function N:Build()
   -- Right: two picture cards.
   o.cards = {}
   for i, c in ipairs(self.CARDS) do
-    local card = UI.PictureTile(box, CARD_W, CARD_H, function(tex, w, h) ns.SetDungeonArt(tex, c.art, w, h) end)
+    local card = UI.PictureTile(box, CARD_W, CARD_H, function(tex, w, h) N.Art(tex, c, w, h, 2) end)
     card:SetPoint("TOPRIGHT", -24, -96 - (i - 1) * (CARD_H + CARD_GAP))
     card:EnableMouse(false)
     o.cards[i] = card
   end
-  o.ok = UI.TextButton(box, L.CONTINUE, function() o:Hide() end, "primary", 14)
+  -- Continue: the page under it may show you around now (its first visit was held back).
+  o.ok = UI.TextButton(box, L.CONTINUE, function() o:Hide(); ns.Walkthrough:Visited(W.current) end, "primary", 14)
   o.ok:SetPoint("BOTTOM", 0, 18)
   return o
 end
@@ -93,7 +122,7 @@ function N:Show()
   local o = self:Build()
   o.head:SetText(L.NEWS_TITLE)
   o.sub:SetText(L.NEWS_SUB)
-  ns.SetDungeonArt(o.pic, self.BIG.art, PIC, PIC)
+  N.Art(o.pic, self.BIG, PIC, PIC, 1)
   o.bigTitle:SetText(L[self.BIG.title])
   o.bigText:SetText(L[self.BIG.text])
   for i, c in ipairs(self.CARDS) do o.cards[i]:Set(L[c.title], L[c.text]) end

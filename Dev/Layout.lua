@@ -144,7 +144,8 @@ function LO:Scan(root)
   for i, a in ipairs(list) do
     local fs = a.fs
     if fs.IsTruncated and fs:IsTruncated() then add("cut: " .. name(fs)) end
-    if not within(a.l, a.b, a.r, a.t, rl, rb, rr, rt, self.SLACK) then
+    -- (A card that sits beside the book by design, as the tour's offer, is no finding: the check of 8 Nov 2026.)
+    if not within(a.l, a.b, a.r, a.t, rl, rb, rr, rt, self.SLACK) and not ancestor(fs, function(p) return p.layoutBeside end) then
       add("outside the book: " .. name(fs))
     elseif not a.clip then
       local holder = ancestor(fs, hasBox)

@@ -24,12 +24,16 @@ end
 -- more (optional): { dungeon = key (its picture on the left), kicker = text, who = a line under the text,
 -- solemn = true (a Fallen, the last shared life: darker, slower, with a bell; SPEC §9), icon = a path of ns.ICONS (in
 -- place of its kind's: a challenge's own), framed = true (the big moments' gold frame at the normal size: the Ring
--- passing on), sound = a name for ns.Sound }.
+-- passing on), sound = a name for ns.Sound, big = true (a big moment's banner for another kind: a Fallen, U43),
+-- go = a line in the lower right that says where a click leads, actions = { { label, fn }, ... } (up to two buttons
+-- under the text: the toast stays until one is pressed or the banner is clicked away; an invitation, U109), still =
+-- a function that says whether the answers still apply (answered elsewhere: the toast goes) }.
 function T:Push(kind, title, text, page, more)
   if Settings:Get("reduce") or (kind and not Settings:ToastOn(kind)) then return "off" end
   more = more or {}
   local t = { kind = kind, title = title, text = text, page = page, dungeon = more.dungeon, kicker = more.kicker, who = more.who,
-    solemn = more.solemn, icon = more.icon, framed = more.framed, sound = more.sound }
+    solemn = more.solemn, icon = more.icon, framed = more.framed, sound = more.sound, big = more.big, go = more.go,
+    actions = more.actions, still = more.still }
   -- The banner is made at login. Only after a /reload during combat can it be missing: then it shows after combat.
   if not self.frame and Combat:InCombat() then
     Combat:AfterCombat(function() T:Show(t) end)
@@ -155,6 +159,19 @@ function T:Build()
   if f.who.SetMaxLines then f.who:SetMaxLines(2) end
   f.who:SetJustifyV("TOP")
   f.who:Hide()
+  f.go = UI.Text(f, 12, "goldText", "title", "RIGHT")
+  f.go:SetPoint("BOTTOMRIGHT", -40, 12)
+  f.go:Hide()
+  -- Answers on the banner (U109): a press runs it and the toast goes.
+  f.acts = {}
+  for i = 1, 2 do
+    f.acts[i] = UI.TextButton(f, "", function(b)
+      T.mid = nil
+      f.anim:Stop(); f:Hide()
+      if b.fn then b.fn() end
+    end, i == 1 and "primary" or "plain", 12)
+    f.acts[i]:Hide()
+  end
   -- Fades in, stays, fades out: 4.2 seconds in all (as in the mockup).
   local ag = f:CreateAnimationGroup()
   -- (A solemn one fades in and out slowly and stays longer: Fill sets the times.)
@@ -165,6 +182,7 @@ function T:Build()
   local a3 = ag:CreateAnimation("Alpha"); a3:SetFromAlpha(1); a3:SetToAlpha(0); a3:SetDuration(0.8); a3:SetOrder(3)
   f.fadeOut = a3
   ag:SetScript("OnFinished", function() if not T.moving then f:Hide() end end)
+
   f.anim = ag
   f:EnableMouse(true)
   f:RegisterForDrag("LeftButton")
@@ -174,14 +192,18 @@ function T:Build()
   f:SetScript("OnMouseDown", function() if not (T.moving or IsControlKeyDown()) then T:Click() end end)
   f:SetScript("OnDragStart", function()
     if not (T.moving or IsControlKeyDown()) then return end
-    T.dragging = true
+    T.dragging, T.mid = true, nil
     if not T.moving then f.anim:Stop(); f:SetAlpha(1) end
     f:StartMoving()
   end)
   f:SetScript("OnDragStop", function() T:Drop() end)
   -- Hidden while dragged there is no OnDragStop: the drag is let go and it goes back to its place (code review of
   -- 1.3.0: until a /reload no toast showed any more).
+  -- And the toast that waited for an answered one (U109) shows once it goes.
   f:SetScript("OnHide", function()
+    local t = T.after
+    T.after = nil
+    if t then C_Timer.After(0, function() T:Show(t) end) end
     if not T.dragging then return end
     T.dragging, T.waiting = nil, nil
     f:StopMovingOrSizing()
@@ -198,8 +220,14 @@ end
 T.BIG = { chapter = true, journey = true, session = true }
 T.BIG_SOUND = 888 -- the game's level-up fanfare
 T.SOUND = { chapter = true, journey = true }
+-- U2 (the checks of 31 Oct and 1 Nov 2026): a chapter unlocked, the journey complete and the Endgame open show first
+-- in the middle of the screen, like the game's Level Up banner, then slide up to the toasts' place.
+T.MID = { chapter = true, journey = true }
+T.MID_Y, T.MID_HOLD, T.SLIDE = 160, 2.5, 0.45
 -- A solemn banner (a Fallen, the last shared life; SPEC §9): violet and silver instead of gold, a slower fade, longer
 -- on screen, and the bell (ns.Sound).
+-- A toast with answers (U109) stays this long unless answered or clicked away (the Inbox keeps it after).
+T.ANSWER_HOLD = 600
 T.SOLEMN = { hold = 5.5, fadeIn = 1, fadeOut = 2.2, edge = "8C7AA6", kicker = "B9AECB", title = "E8E2F0" }
 
 -- The big moments' gold and leather frame (our art, Media\MomentFrame, A9): one picture about 3.2 wide to 1 high,
@@ -249,7 +277,7 @@ end
 function T:Fill(t)
   local f = self.frame
   f:SetScale(ns.Window:BaseScale())
-  local big = t.kind ~= nil and self.BIG[t.kind] == true
+  local big = (t.kind ~= nil and self.BIG[t.kind] == true) or t.big == true
   local framed = big or (t.framed == true and t.solemn ~= true)
   local pictured = not big and t.dungeon ~= nil and self:SetPlace(f.place.tex, t.dungeon)
   f.place:SetShown(pictured)
@@ -266,6 +294,7 @@ function T:Fill(t)
   -- Taller when the text takes more than one line, and for the line of who was there.
   local extra = math.max(0, math.ceil((f.text:GetStringHeight() or 0) - (big and 17 or 15)))
   if t.who then extra = extra + math.ceil(f.who:GetStringHeight() or 0) + 4 end
+  if t.actions then extra = extra + 30 end
   local h = (big and 112 or 86) + extra
   -- With a picture the banner is as tall as it with its margins, and the words sit in the middle beside it.
   local top = 14
@@ -275,8 +304,21 @@ function T:Fill(t)
   end
   f.kicker:ClearAllPoints(); f.kicker:SetPoint("TOPLEFT", left, -top)
   f:SetSize(w, h)
-  local solemn = t.solemn == true and not big
-  f.hold:SetDuration(big and 6 or (solemn and T.SOLEMN.hold or 3.05))
+  -- (A big one is solemn only when it asks to be: a Fallen, U43.)
+  local solemn = t.solemn == true and (not big or t.big == true)
+  -- (One with answers stays until it is answered or clicked away.)
+  f.hold:SetDuration(t.actions and T.ANSWER_HOLD or (big and 6 or (solemn and T.SOLEMN.hold or 3.05)))
+  local x = 0
+  for i, b in ipairs(f.acts) do
+    local a = t.actions and t.actions[i]
+    b:SetShown(a ~= nil)
+    if a then
+      b.fn = a[2]
+      b:SetLabel(a[1])
+      b:ClearAllPoints(); b:SetPoint("TOPLEFT", f.who:IsShown() and f.who or f.text, "BOTTOMLEFT", x, -8)
+      x = x + b:GetWidth() + 8
+    end
+  end
   f.fadeIn:SetDuration(solemn and T.SOLEMN.fadeIn or 0.35)
   f.fadeOut:SetDuration(solemn and T.SOLEMN.fadeOut or 0.8)
   f.big, f.solemn = big, solemn
@@ -284,6 +326,11 @@ function T:Fill(t)
   -- special; normal toasts keep the plain banner), and on a toast that asks for it (the Ring passing on; the check of
   -- 3 Nov 2026, 21:57).
   framed = self:LayoutFrame(f, framed, h)
+  -- A solemn big one: the frame and the picture in the Fallen's violet and silver (U43).
+  for _, tex in ipairs(f.frame or {}) do
+    tex:SetDesaturated(solemn)
+    if solemn then tex:SetVertexColor(0.8, 0.74, 0.92) else tex:SetVertexColor(1, 1, 1) end
+  end
   f.glow:SetShown(not framed)
   local edge = solemn and T.SOLEMN.edge or "gold"
   f:SetBackdropBorderColor(Theme:RGBA(edge, framed and 0 or 1))
@@ -295,7 +342,18 @@ function T:Fill(t)
   if big then
     local fs = ns.Fellowship:Current()
     ns.Pages:SetChapterArt(f.pic, fs and ns.Pages:ArtOf(fs, ns.Journey:CurrentIndex(fs)), 676, 108, 0.45)
+    f.pic:SetDesaturated(solemn)
+    if solemn then
+      f.pic:SetVertexColor(0.7, 0.62, 0.82)
+      UI.SetGradient(f.picFade, "HORIZONTAL", { 0.05, 0.03, 0.08, 0.94 }, { 0.12, 0.08, 0.18, 0.35 })
+    else
+      f.pic:SetVertexColor(1, 1, 1)
+      UI.SetGradient(f.picFade, "HORIZONTAL", { 0.07, 0.04, 0.02, 0.92 }, { 0.07, 0.04, 0.02, 0.25 })
+    end
   end
+  f.go:SetText(t.go or "")
+  f.go:SetShown(t.go ~= nil)
+  f.go:SetTextColor(Theme:RGBA(solemn and T.SOLEMN.title or "goldText"))
   -- Its own icon, else its kind's (also when the game does not have its own).
   if not (t.icon and UI.SetIcon(f.icon, t.icon)) then
     UI.SetIcon(f.icon, ns.ICONS["toast_" .. (t.kind or "default")] or ns.ICONS.toast_default)
@@ -314,6 +372,7 @@ end
 -- opens what the toast is about (the share window after an invite got no answer).
 function T:Click()
   local f, t = self.frame, self.current
+  self.mid = nil
   f.anim:Stop(); f:Hide()
   if not (t and t.page and ns.Fellowship:Current()) then return end
   if type(t.page) == "function" then t.page() else ns.Window:Open(t.page) end
@@ -322,7 +381,7 @@ end
 -- The end of a drag: the place is kept, then the toast shows its time again, or the one that came meanwhile shows.
 function T:Drop()
   if not self.dragging then return end
-  self.dragging = nil
+  self.dragging, self.mid = nil, nil
   local f = self.frame
   f:StopMovingOrSizing()
   local point, _, rel, x, y = f:GetPoint()
@@ -343,8 +402,13 @@ function T:Show(t)
   -- While one is dragged a new toast would fade and hide it under the mouse: the newest waits for the drop (as
   -- toasts replace each other, only the newest).
   if self.dragging then self.waiting = t return end
+  -- An invitation waiting for its answer (U109) is not replaced: a toast without answers waits until it goes
+  -- (answered, clicked away or faded), the newest only.
+  local c = self.current
+  if c and c.actions and not t.actions and f:IsShown() and not (c.still and not c.still()) then self.after = t return end
   self:Fill(t)
   self.current = t
+  self:Settle(f, self.MID[t.kind] == true or t.big == true)
   self.shownCount = self.shownCount + 1
   f:SetAlpha(1)
   f:Show()
@@ -356,4 +420,40 @@ function T:Show(t)
   if t.sound then ns.Sound(t.sound) end
 end
 
+-- A big moment starts in the middle of the screen and, after MID_HOLD, slides to the toasts' place (another toast, a
+-- click or a drag ends that); any other toast shows at the place at once.
+function T:Settle(f, mid)
+  f:SetScript("OnUpdate", nil)
+  local token = mid and {} or nil
+  self.mid = token
+  if not mid then return self:Place() end
+  f:ClearAllPoints(); f:SetPoint("CENTER", UIParent, "CENTER", 0, self.MID_Y)
+  C_Timer.After(self.MID_HOLD, function()
+    if self.mid ~= token or not f:IsShown() then return end
+    -- Where the place puts its centre, as an offset from the screen's centre in the banner's own scale.
+    local k = UIParent:GetEffectiveScale() / f:GetEffectiveScale()
+    local ux, uy = UIParent:GetCenter()
+    self:Place()
+    local x1, y1 = f:GetCenter()
+    local dx, dy, t0 = x1 - ux * k, y1 - uy * k - self.MID_Y, GetTime()
+    f:ClearAllPoints(); f:SetPoint("CENTER", UIParent, "CENTER", 0, self.MID_Y)
+    f:SetScript("OnUpdate", function()
+      local p = math.min(1, (GetTime() - t0) / self.SLIDE)
+      if self.mid ~= token or p >= 1 then
+        f:SetScript("OnUpdate", nil)
+        if self.mid == token then self.mid = nil; self:Place() end
+        return
+      end
+      p = 1 - (1 - p) * (1 - p)
+      f:ClearAllPoints(); f:SetPoint("CENTER", UIParent, "CENTER", dx * p, self.MID_Y + dy * p)
+    end)
+  end)
+end
+
 ns:On("LOGIN", function() Combat:AfterCombat(function() T:Build() end) end)
+
+-- Answered elsewhere (the Join page, the Inbox): the toast with answers goes, and what waited shows.
+ns:On("FELLOWSHIP", function()
+  local c, f = T.current, T.frame
+  if f and f:IsShown() and c and c.still and not c.still() then f.anim:Stop(); f:Hide() end
+end)
