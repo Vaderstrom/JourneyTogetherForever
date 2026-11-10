@@ -1,6 +1,6 @@
 -- Shortcuts to other addons that tell more (asked for 29 Oct 2026): Lore Forever and Spoken tell a dungeon's or a
 -- raid's story (Settings: Stories from, 6 Nov 2026), Spoken reads quests aloud. Neither is needed, and both are made for Forever (and Classic), not retail. Their
--- buttons always show, as the Dungeon Journal's does (UI/Window.lua): without the addon a click says, in a toast,
+-- buttons always show: without the addon a click says, in a toast,
 -- what installing it would give (30 Oct 2026; they showed only while the addon ran, so nobody learnt of them).
 -- Lore Forever has no API for other addons: its chat command is asked about the place by name ("/lore The
 -- Deadmines"), as a player would. Spoken's Quests part opens its Compendium at a quest, the same call as the Open

@@ -42,7 +42,6 @@ Fellowship\Quests.lua
 Fellowship\QuestLists.lua
 Fellowship\Room.lua
 Fellowship\Ready.lua
-Fellowship\Entrances.lua
 Fellowship\Progress.lua
 Fellowship\Together.lua
 Fellowship\Session.lua

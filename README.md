@@ -51,7 +51,7 @@ Built for **WoW Forever**.
   dungeons is complete when everyone has reached the cap. Then the next chapter opens for the whole fellowship.
 - A dungeon is **cleared** for you once you were in the group for every boss that counts, in one run or over
   several. A boss kill counts when enough Adventurers of the fellowship are in the group (4 by default).
-- Each dungeon in a chapter is **Mandatory**, a **Bridge** (it belongs to the next chapter but may be run now) or
+- Each dungeon in a chapter is **Mandatory**, **From the next chapter** (it belongs to the next chapter but may be run now) or
   **Optional** (it never holds anyone back).
 - Stay at or below the cap until the chapter is done. The rules say how strict that is, and fellowship runs may take
   you a level further.
@@ -103,10 +103,8 @@ fellowship).
 - Its picture, a short story, its bosses with how many Adventurers were there and who cleared it.
 - **The room**: where to stop questing so its quests still fit by the cap level, which is left for the dungeons' mobs.
   **Show everyone** gives each Adventurer's line.
-- At the foot: **Find group**, a **Waypoint** to the entrance and shortcuts to other addons when you have them: the
-  **Dungeon Journal** addon (loot, quests) and **Spoken** or **Lore Forever** (more of its story; Settings says which
-  comes first). Nothing of theirs is copied into this addon. The Classic entrances are built in; where an Adventurer
-  walks into a dungeon is learned for the whole fellowship, also for WoW Forever's new dungeons.
+- At the foot: **Find group**. **Read more** under the story opens **Spoken** or **Lore Forever** when you have them
+  (Settings says which comes first). Nothing of theirs is copied into this addon.
 - **Who is ready**: a ring for each Adventurer fills as they pick up the dungeon's quests and turns gold when they are
   ready ("2 of 4 ready"). **Show who** lists them, each saying what is still missing ("Needs 1 prequest, 2 quests to
   pick up"); click someone to see their quests. **Remind** an Adventurer who is
@@ -117,7 +115,7 @@ fellowship).
   Every dungeon's quests, where they start and the chains before them are built in, the same for everyone in the
   fellowship. A toast tells you when a dungeon's
   first quest opens to you. **Pin on map** sets a waypoint to where a quest
-  starts.
+  starts, with Questie too.
 
 ![The Deadmines' page: the story, the bosses, Who is ready, and Destruction in Deadmines' ten prequest steps](.github/screenshots/dungeon-page.jpg)
 
@@ -377,7 +375,7 @@ be called `JourneyTogetherForever`). Restart the game fully after installing or 
 MIT License, see `LICENSE`. Copyright (c) 2026 Vaderstrom.
 
 - Dungeon and boss data (`Data/Encounters.lua`) comes from the game's own data tables, via [wago.tools](https://wago.tools).
-- Questie, Dungeon Journal, Attune, Spoken and Lore Forever are other people's addons. Journey Together Forever opens
+- Questie, Attune, Spoken and Lore Forever are other people's addons. Journey Together Forever opens
   them when you have them installed.
 
 Journey Together Forever is designed and developed by **Vaderstrom**. Claude, Anthropic's AI assistant, has assisted in

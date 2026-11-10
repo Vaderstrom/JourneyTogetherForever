@@ -75,13 +75,10 @@ local function build(pf)
       local f = ns.Fellowship:Current()
       if f and c.key then E:FindGroup(f, c.key) end
     end, "primary", 12)
-    c.dj = UI.RoundButton(c, 28, "journal", function() W:DungeonJournal(c.key) end)
-    UI.Tooltip(c.dj, L.DUNGEON_JOURNAL)
     -- The raid's story in Lore Forever; without it, a click says to install it (UI/OtherAddons.lua).
     c.lore = UI.RoundButton(c, 28, "lore", function() OA:Lore(c.key) end)
     UI.Tooltip(c.lore, function() return OA:StoryTip(c.key) end)
-    c.lore:SetPoint("LEFT", c.dj, "RIGHT", 6, 0)
-    -- The raid's own page (U96): its story, bosses with the kills, who cleared it, and the entrance.
+    -- The raid's own page (U96): its story, bosses with the kills, and who cleared it.
     c.page = UI.TextButton(c, L.DG_OPEN, function() if c.key then ns.DungeonPage:Open(c.key) end end, "link", 12)
     c.page:SetPoint("LEFT", c.lore, "RIGHT", 10, 0)
     return c
@@ -168,8 +165,8 @@ local function refresh(pf, ctx)
     -- Watching an alt's fellowship (Fellowship/Watch.lua): no Find group, it would form your own.
     local group = open and not ctx.watching
     c.group:SetShown(group)
-    c.dj:ClearAllPoints()
-    if group then c.dj:SetPoint("LEFT", c.group, "RIGHT", 6, 0) else c.dj:SetPoint("TOPLEFT", 12, -h) end
+    c.lore:ClearAllPoints()
+    if group then c.lore:SetPoint("LEFT", c.group, "RIGHT", 6, 0) else c.lore:SetPoint("TOPLEFT", 12, -h) end
     h = h + 34
     c:SetHeight(h)
     s:Place(c, h, 8)

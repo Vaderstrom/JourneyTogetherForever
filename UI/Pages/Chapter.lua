@@ -203,7 +203,7 @@ local function build(pf)
       GameTooltip:Show()
     end)
     c:SetScript("OnLeave", function() c.hl:Hide(); GameTooltip:Hide() end)
-    -- The row opens the Dungeon page (U96), with the story, the Dungeon Journal and the quests (the row's book and
+    -- The row opens the Dungeon page (U96), with the story and the quests (the row's book and
     -- story buttons went there).
     c:SetScript("OnMouseUp", function(_, button)
       if button == "LeftButton" and c.key and c:IsMouseOver() then ns.DungeonPage:Open(c.key) end

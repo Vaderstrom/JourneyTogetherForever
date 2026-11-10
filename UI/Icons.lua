@@ -20,7 +20,6 @@ ns.ICONS = {
   dungeons = I .. "Achievement_Dungeon_ClassicDungeonMaster", -- (the painted set: the clears' cell)
   heroes = I .. "INV_Misc_GroupNeedMore",
   gatherings = I .. "Spell_Fire_Fire",
-  journal = I .. "INV_Misc_Book_09", -- the Dungeon Journal button
   lore = I .. "INV_Misc_Book_07", -- Lore Forever: a dungeon's story
   listen = I .. "INV_Misc_Horn_01", -- Spoken: a quest read aloud
   manage = I .. "INV_Misc_Gear_01",
@@ -69,7 +68,7 @@ ns.ICONS = {
   -- Since last time (the Overview): an Adventurer who levelled; the game's own, not a medallion of our set, which
   -- looked alike at this size (the check of 9 Nov 2026).
   since_level = I .. "Spell_ChargePositive",
-  -- History (the mockup's ⚔ ✓ ↺ ✦ !) and the Dungeon Journal's bosses (☠)
+  -- History (the mockup's ⚔ ✓ ↺ ✦ !) and bosses (☠)
   hist_run = I .. "Ability_DualWield",
   hist_mark = "Interface\\RaidFrame\\ReadyCheck-Ready",
   hist_undo = "Interface\\Buttons\\UI-RefreshButton",
@@ -132,7 +131,7 @@ ns.ICON_SET = {
   rules = 10, rulesadmin = 10, characters = 11, inbox = 12, settings = 13,
   toast_chapter = 14, toast_default = 14, bn_done = 14, hist_chapter = 14, toast_floor = 14,
   toast_clear = 15, bn_open = 15, hist_run = 15, dungeons = 15,
-  toast_gathering = 16, bn_rested = 16, gatherings = 16, journal = 1,
+  toast_gathering = 16, bn_rested = 16, gatherings = 16,
   -- Shared cells: the hourglass waits, the helmets are Heroes, the scale is the cap rule, the keys lock and attune.
   bn_waiting = 4, bn_level = 4, bn_chain = 2, bn_quest = 3,
   toast_heroFloor = 6, toast_heroCap = 6, bn_group = 6, toast_ahead = 6, toast_session = 6, hist_session = 6,

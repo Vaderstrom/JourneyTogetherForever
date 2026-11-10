@@ -179,9 +179,10 @@ function F:Sanitize(f)
   ns.Journey.MigrateKeys(f)
   -- Challenges chosen at founding, turned off since, the falls, broken rules, the Ring and the race (Fellowship/Challenges.lua).
   ns.Challenges:Sanitize(f)
-  -- Reminders of the last two days (Fellowship/Ready.lua) and the entrances seen (Fellowship/Entrances.lua).
+  -- Reminders of the last two days (Fellowship/Ready.lua). The entrances seen went with the Dungeon page's Waypoint
+  -- (the owner, 10 Nov 2026).
   ns.Ready:Sanitize(f)
-  ns.Entrances:Sanitize(f)
+  f.entrances = nil
   for name, m in pairs(f.members) do
     if type(m) ~= "table" then f.members[name] = { role = "DPS" }
     elseif m.friend ~= nil then m.friend = (m.friend and name ~= f.leader) or nil end
@@ -436,8 +437,9 @@ function F:ApplyChange(f, op, by, t)
     -- Remind an Adventurer of a dungeon's quests (U100): any member, once per Adventurer, dungeon and day.
     if not ns.Ready:Apply(f, by, op, t) then return false end
   elseif k == "entrance" then
-    -- Where a dungeon's entrance is, seen by an Adventurer walking in (U97): the first one seen stays.
-    if not P.Rank(f, by) or not ns.Entrances:Apply(f, op) then return false end
+    -- Where a dungeon's entrance is (U97): older addons still send it. The Waypoint that used it went on
+    -- 10 Nov 2026 (the owner), so it is accepted, counted like any change so the copies stay alike, and kept nowhere.
+    if not P.Rank(f, by) then return false end
   elseif k == "broke" then
     -- An Adventurer broke one of the challenges' rules (Fellowship/ChallengeWatch.lua): only they record it.
     if not P.Rank(f, by) or not ns.Challenges:ApplyBreak(f, by, op, t) then return false end

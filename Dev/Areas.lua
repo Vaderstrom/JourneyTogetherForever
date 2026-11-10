@@ -71,7 +71,7 @@ A.LIST = {
     shots = { "leader-quests-empty", "quests", "quests-join", "quests-showall", "quests-chains" } },
   { key = "dquests", title = "Dungeon quests: the To do's needs, the lists and chains (U79, U101, U141)", checks = { "dungeon quests:" },
     shots = { "toast-dquest", "dungeon-page-chain" } },
-  { key = "dungeonpage", title = "The Dungeons page; the Dungeon page, Who is ready, Remind, Entrances; the game's tabs (U96-U102, U157)",
+  { key = "dungeonpage", title = "The Dungeons page; the Dungeon page, Who is ready, Remind; the game's tabs (U96-U102, U157)",
     checks = { "dungeon page:", "tabs:" }, shots = { "dungeons", "dungeons-open", "dungeon-page", "dungeon-page-who", "quests-dungeons-new", "toast-dready", "toast-dallready", "toast-dremind" } },
   { key = "room", title = "Room for the dungeon quests", checks = { "room:" },
     shots = { "overview-room", "chapter-room", "dungeon-page-room", "toast-room" } },

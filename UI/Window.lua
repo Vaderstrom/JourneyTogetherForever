@@ -871,32 +871,6 @@ function W:TextDialog(title, hint, text, okLabel, onOk)
   return o
 end
 
--- The DungeonJournal addon's chat command (/dj), when it is installed: its function in SlashCmdList, or nil.
-function W:JournalCommand() return ns.SlashCommand("/dj", "/dungeonjournal") end
-
--- What /dj takes to open a dungeon: its own short words ("/dj sfk", "/dj smlib"), not names; given "The Deadmines"
--- or "SM: Library" it only opened or closed its window (a player, 7 Nov 2026). Our keys are its words, but these.
--- A dungeon it lacks (Forever's own, the raids) opens it at its start.
-local JOURNAL_WORD = { exc = "exca" }
-function W:JournalWord(key)
-  local d = ns.Dungeon(key)
-  return d and (JOURNAL_WORD[d[1]] or d[1]) or nil
-end
-
--- Dungeon Journal: a shortcut to the DungeonJournal addon (loot, quests and where to find them), at the dungeon;
--- without the addon, a toast says where to get it. Returns true when it opened.
-function W:DungeonJournal(key)
-  local word = self:JournalWord(key)
-  if not word then return false end
-  local open = self:JournalCommand()
-  if not open then
-    ns:Toast(nil, L.DUNGEON_JOURNAL, L.DJ_MISSING)
-    return false
-  end
-  open(word)
-  return true
-end
-
 function W:Confirm(text, okLabel, onOk)
   local c = self.confirm
   if not c then return end

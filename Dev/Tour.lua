@@ -360,6 +360,7 @@ prep(function()
 end, 0.5)
 -- The dungeons new in WoW Forever (the owner, 7 Nov 2026): City of Dalaran has quests for both sides.
 shot("quests-dungeons-new", "Dungeon page (a dungeon new in WoW Forever)", "City of Dalaran's page: no story of ours yet (WoW Forever's own), its quests for your side under 1. Prequest chains (An Alarming Request, or Blood in the Streets for the Horde) and 2. Pick up before you go, each with its level and status icon", function()
+  page("dungeons") -- opened from the Dungeons page, so the sidebar marks Dungeons (the check of 10 Nov 2026 showed Quests)
   ns.DungeonPage:Open("dal")
 end)
 -- U123: a prequest chain, each step with where it starts.
@@ -376,7 +377,7 @@ shot("dungeon-page-chain", "Dungeon page (a prequest chain)", "The Deadmines (Wa
   return bottom(p.rscroll)
 end)
 -- The Dungeons page (U157).
-shot("dungeons", "Dungeons", "Every dungeon of the journey on the flat sheet, chapter by chapter under a heading (Chapter I · its name · Level 15-21), the current chapter's in gold; a picture tile each with its name in gold, its levels and a gold check once cleared. A chapter still hidden from Adventurers reads \"A chapter yet to be revealed\", its dungeons shown (U157); no subtitle (Show all)", function()
+shot("dungeons", "Dungeons", "Every dungeon of the journey on the flat sheet, chapter by chapter under a heading (Chapter I · its name · Level 15-21), the current chapter's in gold; a picture tile each with its name in gold, its levels and a gold check once cleared. A chapter still hidden from Adventurers reads \"A chapter yet to be revealed\", its dungeons shown without their levels (U157); no subtitle (Show all)", function()
   ns.Settings:Set("dungeonsShow", "all"); page("dungeons"); top(pf("dungeons").scroll)
 end)
 shot("dungeons-open", "Dungeons (Only open ones)", "Settings → Dungeons and raids → Dungeons page set to Only open ones: the subtitle \"The dungeons open to the fellowship\", only the dungeons the fellowship may run now; put back to Show all after (U164)", function()
@@ -384,7 +385,7 @@ shot("dungeons-open", "Dungeons (Only open ones)", "Settings → Dungeons and ra
 end)
 prep(function() ns.Settings:Set("dungeonsShow", "all") end)
 -- The Dungeon page (U96-U100).
-shot("dungeon-page", "Dungeon page", "The Deadmines (Ragefire Chasm for the Horde), on one flat sheet: no spine under the title across both halves (U111). Left: its picture, our story with Read more, the bosses with how many Adventurers were there (no \"Not yet\" beside each before any fell, U161), who cleared it; Find group, Waypoint and the Dungeon Journal at the foot. Right: the room as the answer (U145), Who is ready folded to a ring for each Adventurer, \"2 of 4 ready\" and Show who (U126), then the quests under 1. Prequest chains, 2. Pick up before you go, 3. Starts inside, each title over one line: where it starts, its level, your status (U160: no map numbers; they are on the pin's tooltip), a long chain folded to its next step (U127)", function()
+shot("dungeon-page", "Dungeon page", "The Deadmines (Ragefire Chasm for the Horde), on one flat sheet: no spine under the title across both halves (U111). Left: its picture, our story with Read more, the bosses with how many Adventurers were there (no \"Not yet\" beside each before any fell, U161), who cleared it; Find group at the foot. Right: the room as the answer (U145), Who is ready folded to a ring for each Adventurer, \"2 of 4 ready\" and Show who (U126), then the quests under 1. Prequest chains, 2. Pick up before you go, 3. Starts inside, each title over one line: where it starts, its level, your status (U160: no map numbers; they are on the pin's tooltip), a long chain folded to its next step (U127)", function()
   local p = pf("dungeon")
   if p then p.whoOpen = nil end
   ns.DungeonPage:Open(UnitFactionGroup("player") == "Horde" and "rfc" or "dm")
@@ -1202,11 +1203,15 @@ function TR:Finish(keep)
   end
   r.finished = time()
   self.running = false
-  ns:Print((self.brand and L.BRAND_DONE or L.TOUR_DONE):format(#r.shots), true)
-  self.brand, self.look = nil, self.TOUR_LOOK
   local done = self.onDone
   self.onDone = nil
-  if done then done() end
+  -- Within /jtf check the check says when all is done: a "Type /reload" between its tour and the README's pictures
+  -- would cut them short.
+  if not done then ns:Print((self.brand and L.BRAND_DONE or L.TOUR_DONE):format(#r.shots), true) end
+  self.brand, self.look = nil, self.TOUR_LOOK
+  if done then done(self.stopped) end
+  -- Said last, after "Check done", so it is not missed.
+  if self.stopped then ns:Print(L.CHECK_COVERED:format(self.stopped), true) end
 end
 
 -- Is this shot taken in this run? opts.areas (a set of area keys): only theirs; opts.ids (shot ids, /jtf brand):
@@ -1230,7 +1235,7 @@ function TR:Run(arg, opts)
   opts = opts or {}
   local areas, ids = opts.areas, opts.ids
   self.look, self.brand = opts.brand or self.TOUR_LOOK, opts.brand
-  self.onDone = opts.onDone
+  self.onDone, self.stopped = opts.onDone, nil
   self.running = true
   self.saved = { theme = ns.Settings:Get("theme"), size = ns.Settings:Get("size"), chat = ns.Settings:Get("chat"),
     trackerHover = ns.Settings:Get("trackerHover"), trackerDock = ns.Settings:Get("trackerDock"), fullscreen = ns.Settings:Get("fullscreen") }
@@ -1299,6 +1304,14 @@ function TR:Run(arg, opts)
       -- said is in the error log, and the shot notes that it was open).
       local errWin = ScriptErrorsFrame and ScriptErrorsFrame:IsShown() or nil
       if errWin then ScriptErrorsFrame:Hide() end
+      -- Another window over the book would be in every picture from here on (the game's Choose your Input Device
+      -- window covered all 222 of the check of 10 Nov 2026, 14:31): the run stops and says which.
+      local okCover, cover = pcall(TR.Covering, TR)
+      if okCover and cover then
+        rec.problems[#rec.problems + 1] = { id = s.id, err = "stopped: " .. cover .. " was open over the book" }
+        TR.stopped = cover
+        return TR:Finish(keep)
+      end
       -- The layout check (Dev/Layout.lua): what the game measures on this screen, before the picture.
       local okScan, layout = pcall(ns.Layout.Scan, ns.Layout)
       local okCrop, crop = true, nil
@@ -1363,11 +1376,16 @@ TR.BRAND_LOOK = { name = L.SAMPLE_NAME, color = ns.BANNERS[1][2], emblem = "Her_
 -- Room around what a picture keeps, in UIParent units.
 TR.BRAND_PAD = { book = 4, toast = 28, tracker = 14 }
 
-function TR:Brand()
-  if UnitFactionGroup("player") ~= "Alliance" then ns:Print(L.BRAND_FACTION, true) return end
-  local ids = {}
-  for _, b in ipairs(self.BRAND) do ids[b.id] = b end
-  self:Run(nil, { ids = ids, brand = self.BRAND_LOOK })
+-- onDone (optional): called when the pictures are done (/jtf check takes them after its tour).
+function TR:Brand(onDone)
+  if UnitFactionGroup("player") ~= "Alliance" then ns:Print(L.BRAND_FACTION, true)
+  else
+    local ids = {}
+    for _, b in ipairs(self.BRAND) do ids[b.id] = b end
+    self:Run(nil, { ids = ids, brand = self.BRAND_LOOK, onDone = onDone })
+  end
+  -- Not started (another faction, in combat): the caller still hears that it is over.
+  if not self.running and onDone then onDone() end
 end
 
 -- A part of the screen in the screenshot's pixels, from UIParent units (left, bottom, right, top) with room around
@@ -1403,4 +1421,35 @@ function TR:CropFor(b)
   elseif kind == "tracker" then l, bo, r, t = uiRect(ns.Tracker.frame) end
   if not l then return nil end
   return self:PixelRect(l, bo, r, t, self.BRAND_PAD[kind])
+end
+
+-- The name of a window over the book (over the screen's middle while the book is closed), or nil: one of the game's
+-- or another addon's, named, shown, taking the mouse and drawn above the book (a strata above its HIGH, or HIGH at a
+-- higher level; tooltips left out). The game's error window is not one: the tour closes it before each picture.
+local ABOVE = { DIALOG = true, FULLSCREEN = true, FULLSCREEN_DIALOG = true }
+-- One of UIParent's frames: its name when it covers the point x, y above the book's level, else nil.
+local function covers(f, x, y, level)
+  if f.IsForbidden and f:IsForbidden() then return nil end
+  local name = f.GetName and f:GetName()
+  local strata = name and f:GetFrameStrata()
+  if name and name ~= "ScriptErrorsFrame" and not name:find("^JourneyTogetherForever") and f:IsVisible()
+    and f:IsMouseEnabled() and (ABOVE[strata] or strata == "HIGH" and (f:GetFrameLevel() or 0) > level)
+    and (f:GetEffectiveAlpha() or 1) > 0.5 then
+    local fl, fb, fr, ft = uiRect(f)
+    if fl and x > fl and x < fr and y > fb and y < ft then return name end
+  end
+end
+
+function TR:Covering()
+  local book = W().frame
+  local l, b, r, t = uiRect(book and book:IsVisible() and book or UIParent)
+  if not l then return nil end
+  local x, y = (l + r) / 2, (b + t) / 2
+  local level = book and book:GetFrameLevel() or 0
+  for _, f in ipairs({ UIParent:GetChildren() }) do
+    -- A frame the game forbids addons to read, or one whose place is secret, errors: it is left out (the first
+    -- /jtf check in the game, 10 Nov 2026, stopped here without a word).
+    local ok, name = pcall(covers, f, x, y, level)
+    if ok and name then return name end
+  end
 end

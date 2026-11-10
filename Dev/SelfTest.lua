@@ -625,6 +625,12 @@ step("getting started (the leader of a new fellowship)", function(c)
   local todo = ns.Together:ToDo(f, ns.Journey:CurrentIndex(f))
   c:Eq(todo[1] and todo[1].kind, "start", "the first steps head the To do")
   c:Eq(ns.Together:Focus(f).head, L.START_INVITE, "Focus now: the first open step")
+  -- Viewed from another character, Focus now names who leads it, not "You" (the check of 10 Nov 2026).
+  local was = ns.Watch.rendering
+  ns.Watch.rendering = true
+  local ok, why = pcall(function() return ns.Together:Focus(f).why end)
+  ns.Watch.rendering = was
+  c:Eq(ok and why, L.FOCUS_START_WHY_WATCH:format(ns.Short(ns.Me())), "viewed from another character: Focus now names the Leader")
   for _, p in ipairs({ "rules", "chapter", "admin" }) do ns.Window:ShowPage(p) end
   list = ns.Together:Started(f)
   local open = 0
@@ -950,6 +956,15 @@ step("since last time on the Overview", function(c)
   click(si.link)
   c:Eq(ns.Window.current, "chronicle", "its link opens the Chronicle")
   ns.Window:ShowPage("overview")
+  -- A line that arrives late, with a time from before you looked, is new all the same (the release review of
+  -- 10 Nov 2026: a run held in an instance, another PC's clock).
+  local f = cur()
+  ns.Since:Mark(f)
+  ns.Fellowship:Log(f, "Self-test: a late line", time() - 3600, "joined")
+  local late
+  for _, e in ipairs((ns.Since:Digest(f) or { events = {} }).events) do if e.text == "Self-test: a late line" then late = true end end
+  for i, e in ipairs(f.chronicle) do if e.text == "Self-test: a late line" then table.remove(f.chronicle, i) break end end
+  c:That(late, "a line that arrives late shows")
 end)
 
 shot("since last time")
@@ -970,7 +985,7 @@ step("chapter page and Find group", function(c)
     c:Has(last and last.roleText or "", L.ROLE_BRIDGE, "the next chapter's bridge is listed: " .. bridges[1].d[2])
     c:Eq(last and last.borderRole, J.ROLE_COLOR.b[1], "in the bridge colour")
   end
-  -- A row opens the Dungeon page, which has the Dungeon Journal (U96); the stage track shows the chapter's stages.
+  -- A row opens the Dungeon page (U96); the stage track shows the chapter's stages.
   c:That(pf.rows.items[1]:GetScript("OnMouseUp") ~= nil and pf.rows.items[1].dj == nil, "a row opens the Dungeon page")
   c:That(pf.track:IsShown() and pf.nodes.items[1] and pf.nodes.items[1]:IsShown(), "the stage track")
   -- One Blackrock Depths over chapters XIII and XIV (the Prologue is chapter I), each with its part of the bosses.
@@ -1436,7 +1451,7 @@ step("dungeon quests: a dungeon's page has its quests under three headings in th
     if p:IsShown() then
       n = n + 1
       if (p.where:GetText() or "") == "" or (p.where:GetText() or ""):find("%d%.%d, %d") then bad = bad + 1 end
-      if p.pin:IsShown() ~= QL:CanPin(QL:Start(p.id) or {}) then bad = bad + 1 end
+      if p.pin:IsShown() ~= QL:CanPin(p.st) then bad = bad + 1 end
       for code in (p.where:GetText() or ""):gmatch("|c(........)") do
         if not code:find("^%x+$") then codes = codes + 1 end
       end
@@ -1446,6 +1461,15 @@ step("dungeon quests: a dungeon's page has its quests under three headings in th
   c:Eq(bad, 0, "each says where it starts and your status on one line, no spot numbers (U160); a pin where the place is known")
   c:Eq(codes, 0, "every colour in a status is a real one, not a theme's name")
   c:Eq(QL.WhereText({ by = "Scout Riell", zone = "Westfall", x = 56.7, y = 47.4 }), "Scout Riell, Westfall", "where, in words; the spot only on the pin (U160)")
+  -- A pin where the spot is known asks for the waypoint, with Questie running too (the owner, 10 Nov 2026: it only
+  -- opened the map).
+  for _, p in ipairs(pf.quests.items) do
+    if p:IsShown() and p.spot then
+      c:Eq(QL:Pin(p.st), "ask", "the pin asks to set a waypoint at " .. p.spot .. " (Questie " .. ns.Quests:QuestieState() .. ")")
+      ns.Window.confirm:Hide()
+      break
+    end
+  end
   -- In the game: is a zone's map found by its name, and does the game allow a waypoint there? (Unknown in Forever
   -- until this ran.)
   local map = QL:MapOf({ zone = UnitFactionGroup("player") == "Horde" and "Orgrimmar" or "Westfall" })
@@ -1676,6 +1700,12 @@ step("dungeon page: the Dungeons page lists every dungeon by chapter; a tile ope
   local n = 0
   for _ in pairs(later) do n = n + 1 end
   c:Eq(hidden, n, "a hidden chapter's name stays hidden, its dungeons show")
+  local leak = 0
+  for _, t in ipairs(pf.tiles.items) do
+    local x = t:IsShown() and ns.DungeonPage.Placed(cur(), t.key)
+    if x and x.n > view and (t.levels:GetText() or "") ~= "" then leak = leak + 1 end
+  end
+  c:Eq(leak, 0, "nor its dungeons' levels (the release review of 10 Nov 2026)")
   if first then
     click(first)
     c:Eq(W.current, "dungeon", "a tile opens its dungeon's page")
@@ -1688,7 +1718,7 @@ end)
 shot("dungeons")
 shot("dungeons-open")
 
--- The Dungeon page (U96), Entrances (U97), Who is ready (U98, U99), Remind (U100), the game's tabs (U102).
+-- The Dungeon page (U96), Who is ready (U98, U99), Remind (U100), the game's tabs (U102).
 step("dungeon page: opens from the Chapter page, the Overview, Journey Admin and a raid card; Back returns to each", function(c)
   local W = ns.Window
   local function back(from)
@@ -1740,11 +1770,15 @@ step("dungeon page: the story, the bosses with the kills, who cleared it, the fo
   if fell then c:Eq(blank, 0, "a boss fell: each row says who was there, or Not yet")
   else c:Eq(notYet, 0, "no boss fell yet: no Not yet beside each") end
   c:That((pf.cleared:GetText() or "") ~= "", "who cleared it")
-  c:That(pf.way:IsShown() and pf.dj:IsShown(), "Waypoint and the Dungeon Journal at the foot")
-  -- Every Classic place has its story (WoW Forever's own have none yet).
-  local missing = {}
-  for k in pairs(ns.Entrances.SHIPPED) do
-    if ns.Dungeon(k) and not rawget(L, "STORY_" .. k:upper()) then missing[#missing + 1] = k end
+  -- Find group alone at the foot: Waypoint and the Dungeon Journal went on 10 Nov 2026 (the owner).
+  c:That(pf.way == nil and pf.dj == nil, "no Waypoint, no Dungeon Journal at the foot")
+  -- Every Classic place has its story (WoW Forever's own have none yet: its nine dungeons, Barrow Deeps, Hyjal Summit).
+  local missing, own = {}, { barrow = true, hyjal = true }
+  for _, list in ipairs({ ns.DUNGEONS, ns.RAIDS }) do
+    for _, d in ipairs(list) do
+      local k = d[1]
+      if not ns.FOREVER_OWN[k] and not own[k] and not rawget(L, "STORY_" .. k:upper()) then missing[#missing + 1] = k end
+    end
   end
   c:Eq(#missing, 0, "a story for each Classic place " .. table.concat(missing, ", "))
   local raid = ns.RAIDS[1] and ns.RAIDS[1][1]
@@ -1753,21 +1787,6 @@ step("dungeon page: the story, the bosses with the kills, who cleared it, the fo
     c:Has(select(2, ns.DungeonPage.Titles(ns.Pages:Context())), L.DG_RAID_SUB:match("^[^%%]+"), "a raid's page says its size and level")
     c:That(pf.none:IsShown(), "a raid: no quest list here")
   end
-end)
-
-step("dungeon page: the entrance from the shipped table; where you stand is read outside instances (U97)", function(c)
-  local E = ns.Entrances
-  local e = E:Get(cur(), "dm")
-  c:Eq(e and e.zone, "Westfall", "the Deadmines' entrance in Westfall")
-  local here = E.Here()
-  report().entranceHere = here and { map = here.map, x = here.x, y = here.y, zone = here.zone } or false
-  if IsInInstance() then
-    c:That(true, "inside an instance: nothing read")
-  else
-    c:That(here ~= nil or not inGame(), "your place on the zone's map: " .. (here and (tostring(here.zone) .. " " .. here.x .. ", " .. here.y) or "none"))
-  end
-  c:Eq(E:Apply({}, { key = "krol", x = 40, y = 50 }), true, "a learned entrance is kept")
-  c:Eq(E:Apply({}, { key = "dm#2", x = 40, y = 50 }), false, "a placement is no place")
 end)
 
 step("dungeon page: who is ready, a ring each, Show who a row each; a click shows their quests; Remind only where it may go (U98, U100, U126)", function(c)
@@ -2139,6 +2158,9 @@ step("heroes and inspect", function(c)
   pf.sel = full("Brannic")
   ns.Window:Refresh()
   c:That(pf.whisper:IsShown(), "Whisper button")
+  -- A button enabled again is repainted (the check of 10 Nov 2026: one stayed grey after SetEnabled(true)).
+  pf.inviteBtn:SetEnabled(false); pf.inviteBtn:SetEnabled(true)
+  c:That(select(4, pf.inviteBtn.text:GetTextColor()) > 0.9, "a button enabled again is not left grey")
   -- The item-level box: a dash (not "1") until gear is shared, and a tooltip either way (check of 1 Nov 2026).
   c:That(pf.ilvlBox.tip ~= nil and pf.ilvlBox.tip ~= "", "the item level box says what it is: " .. tostring(pf.ilvlBox.tip))
   if pf.ilvlBox.tip == L.ILVL_NONE_TIP:format(ns.Short(full("Brannic"))) then c:Eq(pf.iIlvl:GetText(), "–", "no gear shared: a dash") end
@@ -3387,7 +3409,7 @@ step("challenges: Hardcore and shared lives, the Fallen honoured", function(c)
   c:That(hp.feed == nil, "no Recent history on the Adventurers page")
   local kept, fell = ns.char.since, Ch:Fallen(f, b)
   ns.char.since = ns.Since:Snapshot(f)
-  ns.char.since.t = (fell and fell.t or time()) - 1
+  ns.char.since.t, ns.char.since.seen = (fell and fell.t or time()) - 1, nil -- (by time: taken after the fall)
   local fallLine
   for _, ev in ipairs((ns.Since:Digest(f) or { events = {} }).events) do
     if ev.icon == "hist_fallen" and ev.text:find(ns.Short(b), 1, true) then fallLine = ev.text end
@@ -3982,17 +4004,13 @@ step("board: what WoW Addon Webhooks for Discord gets (built, not saved)", funct
   c:That(#g.news > 0, #g.news .. " news to post (clears and chapters)")
 end)
 
-step("other addons: DungeonJournal, Attune, Questie, Lore Forever and Spoken", function(c)
-  local dj = ns.Window:JournalCommand() ~= nil
-  -- /dj takes its own short words, not names (7 Nov 2026: the link only toggled its window).
-  c:Eq(ns.Window:JournalWord("smlib"), "smlib", "the Dungeon Journal link sends /dj its word for the dungeon")
-  c:Eq(ns.Window:JournalWord("exc"), "exca", "and its own word where ours differs")
+step("other addons: Attune, Questie, Lore Forever and Spoken", function(c)
   local at = ns.QuestLists:AttuneCommand() ~= nil
   local qs = ns.Quests:QuestieState()
   local lore, spoken = ns.OtherAddons:HasLore(), ns.OtherAddons:HasSpoken()
-  report().addons = { dungeonJournal = dj, attune = at, questie = qs, loreForever = lore, spoken = spoken }
+  report().addons = { attune = at, questie = qs, loreForever = lore, spoken = spoken }
   local function has(v) return v and "installed" or "not installed" end
-  c:That(true, "DungeonJournal " .. has(dj) .. ", Attune " .. has(at) .. ", Questie " .. qs .. ", Lore Forever " .. has(lore)
+  c:That(true, "Attune " .. has(at) .. ", Questie " .. qs .. ", Lore Forever " .. has(lore)
     .. ", Spoken " .. has(spoken))
   -- The Quests page names Questie: a credit when it runs, else the recommendation (unless hidden).
   -- (On the Quest chains tab, since 6 Nov 2026: the note is about chains.)
@@ -5071,6 +5089,8 @@ step("settings and themes", function(c)
   pf:Fold("tracker", true)
   c:That(pf.sections.tracker.body:IsShown() and not pf.sections.toasts.body:IsShown(), "the tracker opens, the toasts fold")
   c:That((pf.sections.toasts.head.sum:GetText() or "") ~= "", "the folded toasts say how many are on")
+  -- (The layout check looks under open headings only: the check of 10 Nov 2026 called the folded Dungeons and raids empty.)
+  c:That(not pf.sections.toasts.head.layoutHeading and pf.sections.tracker.head.layoutHeading, "the layout check skips a folded heading")
   pf:Fold("toasts", true)
   c:That(pf.sections.toasts.body:IsShown() and not pf.sections.tracker.body:IsShown(), "and back")
   -- U86: the toast lines under three headings, each line under one.

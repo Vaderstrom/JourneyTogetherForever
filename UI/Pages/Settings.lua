@@ -129,6 +129,9 @@ local function column(pf, parent, width)
       if sec.group and not shut then shut = openIn[sec.group] or false; openIn[sec.group] = true end
       h:ClearAllPoints(); h:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, -y)
       if not h.icon:SetTexture(FOLD_ICON[shut]) then h.icon:SetColorTexture(0, 0, 0, 0) end
+      -- (Dev/Layout.lua checks only an open section for something under it, as UI.FoldHeader; the check of 10 Nov
+      -- 2026 called the folded Dungeons and raids at the page's foot empty.)
+      h.layoutHeading = not shut or nil
       h.click:SetWidth(20 + h.text:GetStringWidth() + 4)
       local line = shut and sec.sum and sec.sum() or ""
       h.sum:SetText(line)

@@ -56,7 +56,9 @@ local function groups(f, me)
   for _, x in ipairs(ns.DungeonPage.List(f)) do
     if all or J:Open(f, x.key) then
       byChapter[x.n] = byChapter[x.n] or {}
-      table.insert(byChapter[x.n], { key = x.key, name = x.d[2], sub = L.CH_LEVELS:format(x.d[3], x.d[4]), n = x.n })
+      -- (A hidden chapter's dungeons without their levels, as its heading: the release review of 10 Nov 2026.)
+      local sub = x.n > view and "" or L.CH_LEVELS:format(x.d[3], x.d[4])
+      table.insert(byChapter[x.n], { key = x.key, name = x.d[2], sub = sub, n = x.n })
     end
   end
   for n, ch in ipairs(f.journey.chapters) do
@@ -79,9 +81,10 @@ local function refresh(pf, ctx)
   pf.none:SetText(showAll() and L.DGS_NONE or L.DGS_NONE_OPEN)
   pf.none:SetShown(none)
   if none then s:Place(pf.none, pf.none:GetStringHeight(), 10) end
-  local nh, nt = 0, 0
+  local nh, nt, stop = 0, 0, false
   local tw, ih = pf.tileW, TILE_H - 2 * UI.PIC_INSET
   for _, g in ipairs(gs) do
+    if stop then break end
     local head = pf.heads:Get(nh + 1)
     if not head then break end -- (in combat: made after it, UI.Pool)
     nh = nh + 1
@@ -91,7 +94,13 @@ local function refresh(pf, ctx)
     s:Place(head, 29, 6)
     for i, x in ipairs(g.list) do
       local t = pf.tiles:Get(nt + 1)
-      if not t then break end
+      -- In combat (made after it): the row so far is closed, and nothing comes under it (a heading landed on a
+      -- half-drawn row; the release review of 10 Nov 2026).
+      if not t then
+        if (i - 1) % COLS > 0 then s:Skip(TILE_H + GAP) end
+        stop = true
+        break
+      end
       nt = nt + 1
       t.key = x.key
       local ok, generic = ns.SetDungeonArt(t.tex, x.key, tw - 2 * UI.PIC_INSET, ih)

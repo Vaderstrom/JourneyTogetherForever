@@ -270,7 +270,9 @@ function T:Focus(f)
   local function page(x) return { key = x.key, text = L.FOCUS_LINK_DUNGEON } end
   for _, it in ipairs(items) do
     if it.kind == "start" and not it.done then
-      return { head = it.text, why = L.FOCUS_START_WHY, button = { kind = "page", page = it.page } }
+      -- Watching an alt's fellowship (Fellowship/Watch.lua): it is that character who leads it, not you.
+      local why = (ns.Watch.rendering and not ns.Watch.demo) and L.FOCUS_START_WHY_WATCH:format(ns.Short(me)) or L.FOCUS_START_WHY
+      return { head = it.text, why = why, button = { kind = "page", page = it.page } }
     end
   end
   local below = J:Below(f, ch.n)

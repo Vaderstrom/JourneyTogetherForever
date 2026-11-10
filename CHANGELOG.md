@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.6.0 (10 November 2026)
+- Dungeon page: Pin on map sets a waypoint to where you pick the quest up, with Questie too (it only opened the map); on a prequest chain, to where its next step starts.
+- Dungeon page: the Waypoint to the entrance and the Dungeon Journal button are gone; Pin on map is the waypoint that matters. The Raids page's cards lose the Dungeon Journal button too.
+- Overview: Since last time also shows what arrived late, such as a run reported after the group left the instance.
+- Dungeons page and Dungeon page: a chapter still hidden from Adventurers no longer shows its dungeons' levels.
+- Dungeons page: opened during combat, a heading no longer lands on a half-drawn row of pictures.
+- Focus now names the character whose fellowship you are viewing, not "You".
+- A button turned off and on again is no longer left grey.
+
 ## 1.5.0 (10 November 2026)
 - The book is easier to find your way in: each thing has one page, and the other pages link there.
 - Overview: one sheet across the book, all of it in view without scrolling. At the top the chapter's picture and Where we stand: the level track with every Adventurer, one line on where the fellowship is, and where to stop questing as a red tick (point at it for the figures). Below, side by side: Focus now (the one thing to do next, why, and one button), Since last time (who levelled and the Chronicle's newest lines) and Coming up (the next dungeon to get ready for, the next two Gatherings, the next chapter).

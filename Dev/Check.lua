@@ -2,11 +2,12 @@
 -- feature's checks, Dev/SelfTest.lua) and then the tour (a screenshot of every screen, Dev/Tour.lua), on a character
 -- without a fellowship, and writes JourneyTogetherForeverDB.check. After a /reload, tools/check-report.lua prints both
 -- by feature area (Dev/Areas.lua) with the screenshot files, and writes review/index.html to look through them.
---   /jtf check                  everything: all checks, all screenshots (about 4 minutes)
+--   /jtf check                  everything: all checks, all screenshots, then on an Alliance character the README's
+--                               pictures (/jtf brand) in the same run (about 12 minutes)
 --   /jtf check setup join       all checks, then only those areas' screenshots (to look again after a fix)
 --   /jtf check models           an area that stands alone (Dev/Areas.lua): only its checks and screenshots
 --   /jtf check quick            checks only, no screenshots (about a minute)
---   /jtf check shots [areas]    screenshots only (all, or those areas)
+--   /jtf check shots [areas]    screenshots only (all, or those areas; all of them also takes the README's pictures)
 --   /jtf check areas            the areas, with how many checks and screenshots each has
 local _, ns = ...
 local L = ns.L
@@ -50,6 +51,10 @@ function C:Run(text)
   if #unknown > 0 then ns:Print(L.CHECK_UNKNOWN:format(table.concat(unknown, ", ")), true) return end
   if ns.Combat:InCombat() then ns:Print(L.SELFTEST_COMBAT, true) return end
   if ns.Fellowship:Current() then ns:Print(L.SELFTEST_IN_FELLOWSHIP, true) return end
+  -- A window over the screen would be in every picture (the check of 10 Nov 2026, 14:31): closed first.
+  local ok, cover = true, nil
+  if shots then ok, cover = pcall(ns.Tour.Covering, ns.Tour) end
+  if ok and cover then ns:Print(L.CHECK_COVERED:format(cover), true) return end
   local list = {}
   for key in pairs(areas or {}) do list[#list + 1] = key end
   table.sort(list)
@@ -58,11 +63,19 @@ function C:Run(text)
     only = only and true or nil }
   self.running = true
   local count = shots and ns.Tour:Count(areas) or 0
+  -- A whole check also takes the README's pictures, so a release needs one run, not two (the owner, 10 Nov 2026).
+  -- They are taken on an Alliance character only (TR:Brand).
+  local brand = shots and not areas and UnitFactionGroup("player") == "Alliance"
+  ns.db.check.brand = brand or nil
   ns:Print(L.CHECK_START:format(selftest and L.CHECK_WITH_SELFTEST or "", count,
-    #list > 0 and table.concat(list, ", ") or L.CHECK_ALL_AREAS), true)
+    #list > 0 and table.concat(list, ", ") or L.CHECK_ALL_AREAS, brand and L.CHECK_WITH_BRAND:format(#ns.Tour.BRAND) or ""), true)
   local function tour()
     if not shots then return C:Finish() end
-    ns.Tour:Run("", { areas = areas, only = only, onDone = function() C:Finish() end })
+    ns.Tour:Run("", { areas = areas, only = only, onDone = function(stopped)
+      if stopped or not brand then return C:Finish() end
+      -- (A moment after the tour, as when /jtf brand was typed after it: its pretend fellowship is gone first.)
+      C_Timer.After(2, function() ns.Tour:Brand(function() C:Finish() end) end)
+    end })
   end
   if selftest then ns.SelfTest:Run("", { only = only, onDone = tour }) else tour() end
 end

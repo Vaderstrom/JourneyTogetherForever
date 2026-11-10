@@ -3,13 +3,15 @@
 --   cut       the game shortened it ("…") because it does not fit
 --   overlap   its letters run over another text's letters
 --   outside   it sticks out of the box it belongs to (the nearest frame with a background), or out of the book
+--   empty heading  a section heading (UI.SectionHeader) with nothing under it (the Leader's Rules page kept
+--             "Propose a change" over nothing until the brand pictures of 10 Nov 2026 showed it)
 -- Text inside a scrolling list that is only partly in view is fine (the list fades at its edge). Text under something
 -- drawn over it (a window in the book, a side panel, the walkthrough card) is not seen, so it is left out: in the first
 -- check most of the "overlaps" were page text under a window.
 -- Dev/Tour.lua scans before each screenshot; tools/check-report.lua prints what was found per screenshot.
 -- /jtf lab (Checks) scans the page that is open. Developer text, so it lives here and not in Locales.
 local _, ns = ...
-local LO = { MAX = 12, OVERLAP = 0.3, SLACK = 2 }
+local LO = { MAX = 12, OVERLAP = 0.3, SLACK = 2, UNDER = 30 }
 ns.Layout = LO
 
 -- How opaque a region is on screen. A text has no GetEffectiveAlpha in the game: its own alpha times its frame's (a
@@ -91,16 +93,34 @@ local function within(a1, b1, c1, d1, a2, b2, c2, d2, slack)
   return a1 >= a2 - slack and b1 >= b2 - slack and c1 <= c2 + slack and d1 <= d2 + slack
 end
 
--- Every visible text under root: { fs, l, b, r, t } with its letters' place (the part in view of a scroll list).
+-- Every visible text under root: { fs, l, b, r, t } with its letters' place (the part in view of a scroll list); the
+-- section headings; and what else is drawn ({ f, l, b, r, t }: pictures, buttons, bars), to find what is under a heading.
+local function inView(r)
+  local l, b, rr, t = box(r)
+  if not l then return nil end
+  local clip = ancestor(r, isScroll)
+  if clip then
+    local cl, cb, cr, ct = box(clip)
+    if not cl or rr <= cl or l >= cr or t <= cb or b >= ct then return nil end
+  end
+  return { f = r, l = l, b = b, r = rr, t = t }
+end
 local function collect(root)
-  local out, covers = {}, {}
+  local out, covers, heads, things = {}, {}, {}, {}
   local function visit(f)
     if not shown(f) then return end
+    if f ~= root then
+      if f.layoutHeading then heads[#heads + 1] = f
+      elseif f.GetObjectType and f:GetObjectType() ~= "Frame" and f:GetObjectType() ~= "ScrollFrame" then
+        things[#things + 1] = inView(f)
+      end
+    end
     if f ~= root and isCover(f) then
       local l, b, r, t = box(f)
       if l then covers[#covers + 1] = { f = f, l = l, b = b, r = r, t = t, order = order(f) } end
     end
     for _, region in ipairs({ f:GetRegions() }) do
+      if region.GetObjectType and region:GetObjectType() == "Texture" and shown(region) then things[#things + 1] = inView(region) end
       if region.GetObjectType and region:GetObjectType() == "FontString" and shown(region) and (region:GetText() or "") ~= "" then
         local l, b, r, t = letters(region)
         if l then
@@ -120,17 +140,40 @@ local function collect(root)
     for _, child in ipairs({ f:GetChildren() }) do visit(child) end
   end
   visit(root)
-  -- Leave out the texts that something drawn later covers (at the middle of their letters).
-  local seen = {}
-  for _, a in ipairs(out) do
-    local mine = order(a.fs:GetParent())
-    local x, y = (a.l + a.r) / 2, (a.b + a.t) / 2
+  -- Leave out the texts and headings that something drawn later covers (at their middle).
+  local function covered(r, mine, x, y)
     for _, c in ipairs(covers) do
-      if c.order > mine and x > c.l and x < c.r and y > c.b and y < c.t and not isAncestor(c.f, a.fs) then a.hidden = true; break end
+      if c.order > mine and x > c.l and x < c.r and y > c.b and y < c.t and not isAncestor(c.f, r) then return true end
     end
+    return false
+  end
+  local seen, open = {}, {}
+  for _, a in ipairs(out) do
+    a.hidden = covered(a.fs, order(a.fs:GetParent()), (a.l + a.r) / 2, (a.b + a.t) / 2)
     if not a.hidden then seen[#seen + 1] = a end
   end
-  return seen
+  for _, a in ipairs(seen) do things[#things + 1] = { f = a.fs, l = a.l, b = a.b, r = a.r, t = a.t } end
+  for _, h in ipairs(heads) do
+    local l, b, r, t = box(h)
+    if l and not covered(h, order(h), (l + r) / 2, (b + t) / 2) then open[#open + 1] = h end
+  end
+  return seen, open, things
+end
+
+-- Is anything drawn under a heading: its top below the heading's middle (the Rules page's road starts 7 over the
+-- heading's foot) and at most UNDER below its foot, across its width? A heading at the foot of a list's view, or
+-- scrolled out of it, is fine: what is under it is out of view.
+local function emptyHeading(h, things, under)
+  local l, b, r, t = box(h)
+  local clip = ancestor(h, isScroll)
+  if clip then
+    local _, cb, _, ct = box(clip)
+    if not cb or b - cb < under or b >= ct then return false end
+  end
+  for _, x in ipairs(things) do
+    if x.f ~= h and not isAncestor(h, x.f) and x.t < (b + t) / 2 and x.t >= b - under and x.r > l and x.l < r then return false end
+  end
+  return true
 end
 
 -- The problems on the screen under root (the book by default): a list of short lines, at most MAX.
@@ -140,7 +183,10 @@ function LO:Scan(root)
   if not root or not shown(root) or not box(root) then return out end
   local function add(line) if #out < self.MAX and not seen[line] then seen[line] = true; out[#out + 1] = line end end
   local rl, rb, rr, rt = box(root)
-  local list = collect(root)
+  local list, heads, things = collect(root)
+  for _, h in ipairs(heads) do
+    if (h.text:GetText() or "") ~= "" and emptyHeading(h, things, self.UNDER) then add("empty heading: " .. name(h.text)) end
+  end
   for i, a in ipairs(list) do
     local fs = a.fs
     if fs.IsTruncated and fs:IsTruncated() then add("cut: " .. name(fs)) end

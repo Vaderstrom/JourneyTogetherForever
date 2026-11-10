@@ -145,7 +145,7 @@ function R:Apply(f, by, op, t)
   local st = tonumber(op.st) or t
   -- Reminded already that day (two at once, from two copies), or a newer one is here (one from an earlier day that
   -- arrived late): the first of the day stays, and the change still counts, so the copies keep the same version (the
-  -- review of 8 Nov 2026; Entrances:Apply does the same).
+  -- review of 8 Nov 2026).
   local had = f.reminds and f.reminds[name] and f.reminds[name][key]
   if had and (day(had.t) == day(st) or had.t > st) then return true end
   f.reminds = f.reminds or {}

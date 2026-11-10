@@ -548,8 +548,9 @@ local function flatButton(parent, size, kind)
     end
   end
   function b:SetOn(on) self.on = on and true or false; self:Paint() end
-  b:HookScript("OnEnable", function() b:Paint() end)
-  b:HookScript("OnDisable", function() b:Paint() end)
+  -- Repainted after SetEnabled: with OnEnable/OnDisable hooks the game left a re-enabled button grey (the check of
+  -- 10 Nov 2026).
+  hooksecurefunc(b, "SetEnabled", function() b:Paint() end)
   Theme:Register(function() b:Paint() end)
   return b
 end
@@ -608,8 +609,9 @@ local function gameButton(parent, size, kind)
     self.text:SetTextColor(Theme:RGBA(c, enabled and 1 or 0.45))
   end
   function b:SetOn() end
-  b:HookScript("OnEnable", function() b:Paint() end)
-  b:HookScript("OnDisable", function() b:Paint() end)
+  -- Repainted after SetEnabled: with OnEnable/OnDisable hooks the game left a re-enabled button grey (the check of
+  -- 10 Nov 2026).
+  hooksecurefunc(b, "SetEnabled", function() b:Paint() end)
   b:Paint()
   return b
 end
@@ -2116,6 +2118,7 @@ end
 function UI.SectionHeader(parent, width)
   local f = CreateFrame("Frame", nil, parent)
   f:SetSize(width, 29)
+  f.layoutHeading = true -- (Dev/Layout.lua: a heading needs something under it)
   local rule = UI.Solid(f, "BORDER", "gold", 0.75)
   rule:SetHeight(1); rule:SetPoint("BOTTOMLEFT", 0, 3); rule:SetPoint("BOTTOMRIGHT", 0, 3)
   local fade = UI.Solid(f, "BORDER", "line", 0.5)
@@ -2145,7 +2148,8 @@ function UI.FoldHeader(parent, width, onClick)
   h.click = CreateFrame("Button", nil, h)
   h.click:SetAllPoints()
   h.click:SetScript("OnClick", onClick)
-  function h:SetOpen(open) self.open = open == true; self.icon:SetTexture(UI.FOLD_ICON[not open]) end
+  -- (Dev/Layout.lua checks only an open fold for something under it.)
+  function h:SetOpen(open) self.open = open == true; self.layoutHeading = self.open or nil; self.icon:SetTexture(UI.FOLD_ICON[not open]) end
   h:SetOpen(false)
   return h
 end

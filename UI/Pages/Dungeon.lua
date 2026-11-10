@@ -2,7 +2,7 @@
 -- page per dungeon and raid, opened from the Chapter page's To do, the Overview, Journey Admin and the Raids page.
 -- Left: its picture, our own story (Locales: STORY_<key>; the owner reads them before they ship) with Read more in
 -- Lore Forever or Spoken, its bosses with how many Adventurers were there for each, and who cleared it; at the foot
--- Find group, Waypoint (its entrance, Fellowship/Entrances.lua) and the Dungeon Journal. Right: the room for its quests
+-- Find group (Waypoint and the Dungeon Journal went on 10 Nov 2026: each quest's pin is the waypoint). Right: the room for its quests
 -- as the answer (U78, U145) with Count the mobs' XP and Show everyone, Who is ready folded to a row of rings (U126;
 -- U98-U100, Fellowship/Ready.lua) and the quests under three headings in the order you act: 1. Prequest chains, 2. Pick up
 -- before you go, 3. Starts inside (an empty one is left out), each line starting with its status (U125), a long chain
@@ -96,7 +96,10 @@ function DP.Titles(ctx)
   -- (A dungeon of the next chapter is mandatory in its own: "From the next chapter" is said only from the chapter before.)
   local role = x.role == "o" and L.ROLE_OPTIONAL or L.ROLE_MANDATORY
   local color = J.ROLE_COLOR[x.role == "o" and "o" or "m"][1]
-  return d[2], ("|cff%s%s|r  ·  %s  ·  %s"):format(Theme:HexFor(color), role, L.CHAPTER_ROMAN:format(J.Roman(x.n)), levels)
+  local head = ("|cff%s%s|r  ·  %s"):format(Theme:HexFor(color), role, L.CHAPTER_ROMAN:format(J.Roman(x.n)))
+  -- (A chapter the rule hides: not its levels, as on the Dungeons page; the release review of 10 Nov 2026.)
+  if x.n > J:MaxView(f, ctx.me or ns.Me()) then return d[2], head end
+  return d[2], head .. "  ·  " .. levels
 end
 
 local function questCard(pf, R, width)
@@ -114,12 +117,11 @@ local function questCard(pf, R, width)
   -- Where it starts, its level and status on one line (U160: they were two).
   p.where = UI.WrapText(p, 11, "ink2", width - 30)
   p.steps = UI.WrapText(p, 11, "ink2", width - 30)
-  p.pin = UI.RoundButton(p, 22, "quests", function() if p.id then ns.QuestLists:Pin(p.id) end end)
+  p.pin = UI.RoundButton(p, 22, "quests", function() if p.st then ns.QuestLists:Pin(p.st) end end)
   p.pin:SetPoint("TOPRIGHT")
   -- The spot's numbers only here (U160: they filled the page's lines).
   UI.Tooltip(p.pin, function()
-    if ns.Quests:QuestieState() == "on" then return L.DQ_PIN_TIP_QUESTIE end
-    return p.spot and L.DQ_PIN_TIP_AT:format(p.spot) or L.DQ_PIN_TIP
+    return p.spot and L.DQ_PIN_TIP_AT:format(p.spot) or L.DQ_PIN_TIP_QUESTIE
   end)
   return p
 end
@@ -152,7 +154,7 @@ end
 local function build(pf)
   local W = ns.Window
   local width = W.PAGE_W - 8
-  -- Left page: Back, then what the dungeon is; the three buttons at the foot.
+  -- Left page: Back, then what the dungeon is; Find group at the foot.
   pf.back = UI.TextButton(pf.left, L.DG_BACK, function() DP:Back() end, "link", 13)
   pf.back:SetPoint("TOPLEFT")
   pf.lscroll = UI.Scroll(pf.left)
@@ -188,12 +190,6 @@ local function build(pf)
     if ns.Raid(ns.BaseKey(key)) then ns.Endgame:FindGroup(f, key) else ns.Together:FindGroup(f, key) end
   end, "primary", 12)
   pf.group:SetPoint("BOTTOMLEFT", 0, 2)
-  pf.way = UI.TextButton(pf.left, L.DG_WAYPOINT, function()
-    local f = ns.Fellowship:Current()
-    if f and DP.key then ns.Entrances:Waypoint(f, DP.key) end
-  end, "plain", 12)
-  UI.Tooltip(pf.way, function() return pf.wayTip end)
-  pf.dj = UI.TextButton(pf.left, L.DUNGEON_JOURNAL, function() if DP.key then W:DungeonJournal(DP.key) end end, "plain", 12)
 
   -- Right page: the room for its quests (or when a later dungeon comes), who is ready, the quests.
   pf.rscroll = UI.Scroll(pf.right)
@@ -286,15 +282,8 @@ local function refreshLeft(pf, f, key, ctx)
   pf.cleared:SetText(#who > 0 and J.Names(f, who) or L.DG_CLEARED_NONE)
   s:Place(pf.cleared, pf.cleared:GetStringHeight(), 6)
   pf.lscroll:SetContentHeight(s.y + 8)
-  -- The foot: Find group (not while watching, nor for a later dungeon), Waypoint (only where the entrance is known),
-  -- the Dungeon Journal.
+  -- The foot: Find group (not while watching, nor for a later dungeon).
   pf.group:SetShown(not ctx.watching and not DP.Later(f, DP.Placed(f, key)))
-  local e = ns.Entrances:Get(f, key)
-  pf.way:SetEnabled(e ~= nil)
-  pf.wayTip = e and (e.learned and L.DG_WAY_LEARNED or L.DG_WAY_TIP) or L.DG_WAY_NONE
-  pf.way:ClearAllPoints()
-  if pf.group:IsShown() then pf.way:SetPoint("LEFT", pf.group, "RIGHT", 6, 0) else pf.way:SetPoint("BOTTOMLEFT", 0, 2) end
-  pf.dj:ClearAllPoints(); pf.dj:SetPoint("LEFT", pf.way, "RIGHT", 6, 0)
 end
 
 -- The room for its quests as the answer (U145; the figures on hover), for a dungeon of your chapter; Show everyone
@@ -445,7 +434,6 @@ local function refreshQuests(pf, f, key, r)
       p.icon:SetTexture((QL.STATUS[q.status] or QL.STATUS.no)[1])
       p.title:SetText(q.name)
       local st = q.start
-      p.spot = st.zone and st.x and L.DQ_AT:format(st.zone, st.x, st.y) or nil
       local parts = { QL.WhereText(st) }
       if st.lvl then parts[#parts + 1] = L.DQ_LEVEL:format(st.lvl) end
       parts[#parts + 1] = QL.StatusText(q.status, who ~= me and q.status == "log" and L.DQ_IN_LOG_OF:format(ns.Short(who)) or nil)
@@ -472,7 +460,12 @@ local function refreshQuests(pf, f, key, r)
       p.steps:SetShown(#steps > 0)
       p.more:SetShown(#all > STEPS_SHOWN)
       p.more:SetLabel(UI.FoldLabel(fold and L.DG_SHOW_STEPS:format(#all) or L.DG_HIDE_STEPS, not fold))
-      p.pin:SetShown(QL:CanPin(st))
+      -- The pin: where you pick up first, a chain's next step where its spot is known, else the quest's own giver
+      -- (the owner, 10 Nov 2026: "Waypoint to where you pickup quests").
+      local nx = nextK and all[nextK]
+      p.st = nx and nx.start.x and nx.start.y and nx.start or st
+      p.spot = p.st.zone and p.st.x and L.DQ_AT:format(p.st.zone, p.st.x, p.st.y) or nil
+      p.pin:SetShown(QL:CanPin(p.st))
       p.where:ClearAllPoints(); p.where:SetPoint("TOPLEFT", p.title, "BOTTOMLEFT", 0, -2)
       p.steps:ClearAllPoints(); p.steps:SetPoint("TOPLEFT", p.where, "BOTTOMLEFT", 0, -3)
       p.more:ClearAllPoints(); p.more:SetPoint("TOPLEFT", p.steps, "BOTTOMLEFT", -4, 0)

@@ -330,27 +330,31 @@ function QL:MapOf(st)
   return QL.maps[zone] or nil
 end
 
--- Pin on map: with Questie running, the zone's world map (Questie's pins show the quest giver); else a waypoint at
--- the quest giver, after asking. True when there is something to pin.
+-- Pin on map: a waypoint at the quest giver, after asking, wherever its spot is known, with Questie running too (the
+-- owner, 10 Nov 2026: it only opened the map); with Questie running and no spot, the zone's world map, where Questie
+-- marks the quest giver. True when there is something to pin.
 function QL:CanPin(st)
-  if ns.Quests:QuestieState() == "on" then return self:MapOf(st) ~= nil end
-  return st.x ~= nil and st.y ~= nil
+  if st.x and st.y then return true end
+  return ns.Quests:QuestieState() == "on" and self:MapOf(st) ~= nil
 end
 
-function QL:Pin(id)
-  local st = self:Start(id) or {}
+-- st: where it starts (a quest's start, or a chain step's).
+function QL:Pin(st)
+  st = st or {}
   local map = self:MapOf(st)
+  if st.x and st.y then
+    ns.Window:Confirm(L.DQ_PIN_ASK, L.DQ_PIN_OK, function() QL:Waypoint(st, map) end)
+    return "ask"
+  end
   if ns.Quests:QuestieState() == "on" and map and OpenWorldMap and not InCombatLockdown() then
     OpenWorldMap(map)
     return "map"
   end
-  if not (st.x and st.y) then return nil end
-  ns.Window:Confirm(L.DQ_PIN_ASK, L.DQ_PIN_OK, function() QL:Waypoint(st, map) end)
-  return "ask"
+  return nil
 end
 
--- shortcut: no TomTom; where the game allows no waypoint on that map (Forever may allow none),
--- the place goes to chat. Check C_Map.SetUserWaypoint in Forever, then decide whether TomTom is worth it.
+-- The game's own map pin, followed (WoW Forever allows it: the check of 10 Nov 2026, Westfall).
+-- shortcut: no TomTom; where the game allows no waypoint on that map, the place goes to chat.
 function QL:Waypoint(st, map)
   local where = L.DQ_PIN_WHERE:format(st.by or st.zone or "", st.zone or "", st.x, st.y)
   if map and C_Map.CanSetUserWaypointOnMap and C_Map.CanSetUserWaypointOnMap(map) and UiMapPoint then
