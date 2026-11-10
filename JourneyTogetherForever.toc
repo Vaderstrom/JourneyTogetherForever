@@ -20,6 +20,7 @@ Core\Comm.lua
 Data\Dungeons.lua
 Data\Encounters.lua
 Data\Presets.lua
+Data\DungeonQuests.lua
 Data\QuestLists.lua
 Data\QuestChains.lua
 Rules\Rules.lua
@@ -76,15 +77,14 @@ UI\Pages\Gatherings.lua
 UI\Pages\Manage.lua
 UI\Pages\Rules.lua
 UI\Pages\Overview.lua
-UI\Pages\Since.lua
 UI\Pages\Setup.lua
 UI\Pages\Chapter.lua
 UI\Pages\Raids.lua
 UI\Pages\Chronicle.lua
 UI\Pages\Moments.lua
 UI\Pages\History.lua
-UI\Pages\QuestDungeons.lua
 UI\Pages\Dungeon.lua
+UI\Pages\Dungeons.lua
 UI\Pages\Quests.lua
 UI\Pages\Tourney.lua
 UI\Pages\Admin.lua

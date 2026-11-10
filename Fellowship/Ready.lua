@@ -34,16 +34,16 @@ function R.Share(r)
   return (r.early + r.pick) / of, of - r.early - r.pick
 end
 
--- "Edstromar  ·  Start early ✓  ·  Picked up 2 of 4" (the check as the game's ready-check mark).
+-- "Edstromar  ·  Ready ✓" (the check as the game's ready-check mark), or what is still missing: "Pata  ·  Needs 1
+-- prequest, 2 quests to pick up" (U163: two counts, "Prequests 0 of 3  ·  Picked up 0 of 3", had to be worked out).
 function R.Line(name, r)
-  local parts = { ns.Short(name) }
-  if r and r.earlyOf > 0 then
-    parts[#parts + 1] = r.early == r.earlyOf and L.RD_EARLY_DONE:format("|TInterface\\RaidFrame\\ReadyCheck-Ready:12:12|t")
-      or L.RD_EARLY_N:format(r.early, r.earlyOf)
-  end
-  if r and r.pickOf > 0 then parts[#parts + 1] = L.RD_PICKED:format(r.pick, r.pickOf) end
-  if not r then parts[#parts + 1] = L.RD_NOTHING end
-  return table.concat(parts, "  ·  ")
+  local who = ns.Short(name) .. "  ·  "
+  if not r then return who .. L.RD_NOTHING end
+  local early, pick, need = r.earlyOf - r.early, r.pickOf - r.pick, {}
+  if early > 0 then need[#need + 1] = early == 1 and L.RD_NEED_EARLY_1 or L.RD_NEED_EARLY_N:format(early) end
+  if pick > 0 then need[#need + 1] = pick == 1 and L.RD_NEED_PICK_1 or L.RD_NEED_PICK_N:format(pick) end
+  if #need == 0 then return who .. L.RD_READY:format("|TInterface\\RaidFrame\\ReadyCheck-Ready:12:12|t") end
+  return who .. L.RD_NEEDS:format(table.concat(need, ", "))
 end
 
 -- Every Adventurer counted for the chapter is ready (two at least: alone, your own toast says it).
@@ -153,7 +153,7 @@ function R:Apply(f, by, op, t)
   f.reminds[name][key] = { by = by, t = st }
   -- (Fresh by the server's clock on both sides: the sender's PC clock may be off.)
   if name == ns.Me() and not f.sample and now() - st <= ns.Challenges.RECENT then
-    -- Quests to pick up, or else chains to start early (a chain not started is no quest to pick up).
+    -- Quests to pick up, or else prequest chains to start (a chain not started is no quest to pick up).
     local r = ns.QuestLists:Ready(f, key, name)
     local pick, early = r and r.pickOf - r.pick or 0, r and r.earlyOf - r.early or 0
     if pick + early > 0 then

@@ -1,22 +1,23 @@
--- Room for the dungeon quests (U78, SPEC §4.2): the level the current chapter's dungeon quests and the dungeons' mobs
--- would take an Adventurer to, and, when that goes past the cap (with its allowance), where to stop questing elsewhere
--- so they still fit. It counts exactly two things (the owner, 7 Nov 2026): the XP of the chapter's dungeon quests not
--- done yet (picked up or not), and the dungeons' mob XP learned from the fellowship's own runs (Settings can leave the
--- mobs out).
---   MOBXP  { fid, k (dungeon), l (level at the run), xp }: one run's mob XP, so one run teaches everyone.
+-- Room for the dungeon quests (U78, SPEC §4.4): the level the current chapter's dungeon quests would take an
+-- Adventurer to, and, when that goes past the start of the cap level (with its allowance), where to stop questing
+-- elsewhere so they still fit. Only the XP of the chapter's dungeon quests not done yet counts (picked up or not); the
+-- cap level itself is left for the dungeons' mobs, since only a level above it is over the cap (the owner, 10 Nov 2026:
+-- "Leave mobs out"; nothing public has WoW Forever's mob XP, and the runs' own figure came only after the first run).
+-- Older versions send MOBXP (a run's mob XP): it has no handler and is dropped.
 local _, ns = ...
 local L = ns.L
 local F, Hr, QL = ns.Fellowship, ns.Hero, ns.QuestLists
-local R = { SOON = 0.5, RUNS = 3, SAME_RUN = 1800 }
+local R = { SOON = 0.5 }
 ns.Room = R
 
 -- A quest's XP. First the game's own (WoW Forever's, at my level; the owner, 8 Nov 2026: from the game, not from
 -- other sites): for a quest in my log, or for any quest once the game has loaded it, asked once per session (the
--- book redraws when it arrives). Else learned at hand-ins, harvested or shipped (U79's data); nil when unknown.
+-- book redraws when it arrives). Else our data's (Data/DungeonQuests.lua; a chain step's comes as fallback); nil when
+-- unknown.
 -- shortcut: the game's number is for my level, also on another Adventurer's card; within a chapter's few levels it
 -- is the same (quest XP only drops for a player far above the quest).
 R.asked = {}
-function R.QuestXP(id)
+function R.QuestXP(id, fallback)
   if GetQuestLogRewardXP then
     local ok, xp = pcall(GetQuestLogRewardXP, id)
     if ok and not ns.Secret(xp) and tonumber(xp) and xp > 0 then return xp end
@@ -26,9 +27,7 @@ function R.QuestXP(id)
       if C_TaskQuest and C_TaskQuest.RequestPreloadRewardData then pcall(C_TaskQuest.RequestPreloadRewardData, id) end
     end
   end
-  local harvested = ns.QUEST_CHAINS and ns.QUEST_CHAINS.xp and ns.QUEST_CHAINS.xp[id]
-  local ship = ns.QUEST_STARTS[id] and ns.QUEST_STARTS[id].xp
-  return ns.db.questXP and ns.db.questXP[id] or harvested or ship
+  return ns.QUEST_STARTS[id] and ns.QUEST_STARTS[id].xp or fallback
 end
 
 ns:RegisterEvent("QUEST_DATA_LOAD_RESULT", function(_, id, ok)
@@ -36,37 +35,6 @@ ns:RegisterEvent("QUEST_DATA_LOAD_RESULT", function(_, id, ok)
   if ns.Window and ns.Window.RefreshSoon then ns.Window:RefreshSoon() end
   if ns.Tracker then ns.Tracker:RefreshSoon() end -- its room line; the book's RefreshSoon skips while it is closed
 end)
-
--- A level's runs, oldest first: ns.db.mobXP[base][level] = { { x = xp, t = when kept }, ... }. 1.2.0 kept one number
--- there, the best run; it counts as one run with no time.
-local function entries(v)
-  if type(v) == "table" then return v end
-  return v and { { x = v } } or {}
-end
-local function xpOf(e) return type(e) == "table" and e.x or e end
-
--- The middle of a level's last runs: one odd run, a duo's bigger share of the kills or one cut short, neither sticks
--- nor rules.
-local function middle(v)
-  local s = {}
-  for _, e in ipairs(entries(v)) do s[#s + 1] = xpOf(e) end
-  if #s == 0 then return nil end
-  table.sort(s)
-  return s[math.ceil(#s / 2)]
-end
-
--- A dungeon's mob XP at a level: the runs nearest that level, or nil before any run.
--- shortcut: not scaled between levels (kill XP grows with the mobs' level and shrinks for grey ones); fine within the
--- few levels a chapter spans.
-function R.MobXP(key, level)
-  local runs = ns.db.mobXP and ns.db.mobXP[ns.BaseKey(key)]
-  local best, gap
-  for l, list in pairs(runs or {}) do
-    local d = math.abs(l - level)
-    if not gap or d < gap then best, gap = list, d end
-  end
-  return middle(best)
-end
 
 -- An Adventurer's level, XP and level size as the book shows them: live for the character I play (so the warnings
 -- do not wait for the next shared state), else as shared. A pretend level (/jtf debug level) and the tour's sample
@@ -82,60 +50,56 @@ local function standing(f, name)
   return level, ns.Clamp(xp or 0, 0, max), max
 end
 
--- gain XP in levels for an Adventurer, from where they stand, level by level (Pace.Reach); nil without a level size.
-function R:Levels(f, name, gain)
-  local level, xp, max = standing(f, name)
-  return level and ns.Pace.Reach(level, xp, max, gain) - (level + xp / max) or nil
-end
-
--- One dungeon's share for an Adventurer: { quests (XP of the quests not done), unknown (quests whose XP nobody knows),
--- mobs (XP; nil before the fellowship has run it, 0 once cleared or with the mobs left out) }. seen: quests counted
--- already, for a chapter whose dungeons share one (Scarlet Monastery's wings), so it counts once.
+-- One dungeon's share for an Adventurer: { quests (XP of the quests not done), unknown (quests whose XP nobody knows) }.
+-- seen: quests counted already, for a chapter whose dungeons share one (Scarlet Monastery's wings), so it counts once.
 function R:Share(f, key, name, seen)
   local h = Hr:Get(f, name) or {}
-  local out = { quests = 0, unknown = 0, mobs = 0 }
-  for _, q in ipairs(QL:DungeonQuests(f, key)) do
-    if not (h.questsDone and h.questsDone[q.id] or seen and seen[q.id]) then
-      if seen then seen[q.id] = true end
-      local xp = R.QuestXP(q.id)
-      if xp then out.quests = out.quests + xp else out.unknown = out.unknown + 1 end
-    end
+  local out = { quests = 0, unknown = 0 }
+  seen = seen or {}
+  local function count(id, xp)
+    if h.questsDone and h.questsDone[id] or seen[id] then return end
+    seen[id] = true
+    xp = R.QuestXP(id, xp)
+    if xp then out.quests = out.quests + xp else out.unknown = out.unknown + 1 end
   end
-  if ns.Settings:Get("roomMobs") ~= false and not ns.Journey:Cleared(f, key) then
-    out.mobs = R.MobXP(key, (standing(f, name)) or 1)
+  for _, q in ipairs(QL:DungeonQuests(f, key)) do
+    count(q.id)
+    -- A step of its chain done in the run pays there too (Destruction in Deadmines' explosives, before Alba's quest).
+    local st = ns.QUEST_STARTS[q.id]
+    for _, s in ipairs(st and st.after or {}) do if s.run then count(s[1], s.xp) end end
   end
   return out
 end
 
--- The current chapter for an Adventurer: { now, levels, to, cap, limit, stop (shown from half a level before it; nil
--- with more room), quests, mobs (in levels), unknown, unrun (dungeons whose mobs nobody knows yet), n }. nil without
--- a chapter, a level size (at the level cap) or any XP known to count (no "about 0.0 levels" line).
+-- The current chapter for an Adventurer: { now, levels, to, cap, tol, limit (the start of the cap level, with its
+-- allowance), stopAt, stop (shown from half a level before it; nil with more room), unknown, n }. nil without a
+-- chapter, a level size (at the level cap) or any quest XP known (no "about 0.0 levels" line).
 -- Levels are walked one by one with the game's XP table (Pace.Reach, Pace.Back): each is bigger than the last.
 function R:Chapter(f, name)
   local J = ns.Journey
   local ch = f and J:Current(f)
   local level, xp, max = standing(f, name)
   if not (ch and level) then return nil end
-  local quests, mobs, unknown, unrun, seen = 0, 0, 0, 0, {}
+  local quests, unknown, seen = 0, 0, {}
   for _, x in ipairs(J:ChapterList(f, ch.n)) do
     if not x.early then
       local s = self:Share(f, x.key, name, seen)
       quests, unknown = quests + s.quests, unknown + s.unknown
-      if s.mobs then mobs = mobs + s.mobs else unrun = unrun + 1 end
     end
   end
-  if quests + mobs <= 0 then return nil end
+  if quests <= 0 then return nil end
   local Pa = ns.Pace
   local now = level + xp / max
-  local qTo, to = Pa.Reach(level, xp, max, quests), Pa.Reach(level, xp, max, quests + mobs)
-  local limit = ch.cap + f.rules.capTol
-  return { now = now, levels = to - now, to = to, cap = ch.cap, tol = f.rules.capTol, limit = limit,
-    stop = to > limit - R.SOON and Pa.Back(limit, quests + mobs, level, max) or nil, quests = qTo - now, mobs = to - qTo,
-    unknown = unknown, unrun = unrun, n = ch.n }
+  local to = Pa.Reach(level, xp, max, quests)
+  local limit = ns.Journey:CapLevel(f, ch)
+  local stopAt = Pa.Back(limit, quests, level, max)
+  return { now = now, levels = to - now, to = to, cap = ch.cap, tol = f.rules.capTol, limit = limit, stopAt = stopAt,
+    stop = to > limit - R.SOON and stopAt or nil, unknown = unknown, n = ch.n }
 end
 
 -- In words: "The dungeon quests here: about 1.4 levels, to 27.4 of the cap 28." and, when they would not fit, "Stop
--- questing at 26.6 to leave room for them."; then the notes (mobs, quests whose XP is not known yet).
+-- questing at 26.6 to leave room for them."; then the notes (the cap level left for the mobs, quests whose XP is not
+-- known yet).
 local function one(v) return math.floor(v * 10 + 0.5) / 10 end
 
 -- A stop level as the game's XP bar shows it (U85): level and percent, "level 26, 60% into it", not 26.6. short:
@@ -153,14 +117,23 @@ function R.Lines(r)
   local cap = r.tol > 0 and L.ROOM_CAP_TOL:format(r.cap, r.tol) or L.ROOM_CAP:format(r.cap)
   local main = L.ROOM_LINE:format(one(r.levels), one(r.to), cap)
   local stop = r.stop and L.ROOM_STOP:format(R.StopAt(r.stop)) or nil
-  local notes = {}
-  if ns.Settings:Get("roomMobs") == false then notes[1] = L.ROOM_MOBS_OFF
-  elseif r.unrun > 0 then notes[1] = L.ROOM_MOBS_UNKNOWN
-  else notes[1] = L.ROOM_MOBS:format(one(r.mobs)) end
+  local notes = { L.ROOM_MOBS:format(r.cap + r.tol) }
   if r.unknown > 0 then notes[#notes + 1] = r.unknown == 1 and L.ROOM_UNKNOWN_1 or L.ROOM_UNKNOWN_N:format(r.unknown) end
   return main, stop, table.concat(notes, "  ")
 end
 R.One = one
+
+-- The room as the answer a player wants (U145): "You have room: stop questing at level 18." in green; red from half a
+-- level before the stop point ("Stop questing at level 26, 60% into it ..."), and "Stop questing now ..." once there.
+-- Returns the text, its colour and the figures for its tooltip.
+function R.Answer(r)
+  r.stopAt = r.stopAt or r.stop or r.limit
+  local main, _, notes = R.Lines(r)
+  local tip = main .. "\n" .. L.ROOM_EXACT:format(one(r.stopAt)) .. "\n" .. notes
+  if r.now >= r.stopAt then return L.ROOM_NOW, "B0321E", tip end
+  if r.stop then return L.ROOM_STOP:format(R.StopAt(r.stopAt)), "B0321E", tip end
+  return L.ROOM_HAVE:format(R.StopAt(r.stopAt)), "3E7A3A", tip
+end
 
 ---------------------------------------------------------------------------
 -- The two warnings: half a level before the stop point, and at it (once each per chapter)
@@ -182,117 +155,10 @@ function R:Check()
   end
 end
 
----------------------------------------------------------------------------
--- Mob XP from the fellowship's runs: in a dungeon of the journey, the XP gained there minus quest hand-ins and the
--- rested bonus (rested doubles kill XP; the rested XP used is that bonus), kept for the dungeon and the level the run
--- began at when the player leaves (the last RUNS runs at that level), and shared. Keeping only the best run let one
--- inflated run count forever (code review of 1.2.0).
--- In an instance several dungeons share (Scarlet Monastery's wings, Dire Maul), the first boss down says which one
--- it was; a run there with no boss down is not kept.
--- shortcut: a /reload inside the dungeon starts the count again; the run then counts less, and the middle of the last
--- runs keeps it from ruling.
----------------------------------------------------------------------------
-local function xpNow()
-  local l, x, m = UnitLevel("player"), UnitXP("player"), UnitXPMax("player")
-  local rest = GetXPExhaustion and GetXPExhaustion()
-  if ns.Secret(x) or ns.Secret(m) or ns.Secret(rest) then return nil end
-  return l, x, m, tonumber(rest) or 0
-end
-
-function R:Keep(key, level, xp)
-  key, level, xp = ns.BaseKey(key), tonumber(level), tonumber(xp)
-  if not (key and ns.Dungeon(key) and level and level >= 1 and level <= 100 and xp and xp > 0 and xp < 1000000) then
-    return false
-  end
-  ns.db.mobXP = ns.db.mobXP or {}
-  local runs = ns.db.mobXP[key] or {}
-  ns.db.mobXP[key] = runs
-  level, xp = math.floor(level), math.floor(xp)
-  local list, now = entries(runs[level]), time()
-  -- One run, many figures: every Adventurer in it keeps their own when they leave and gets the others' (MOBXP), so
-  -- figures kept within SAME_RUN of each other are one run, which keeps the first. Else one run with the fellowship
-  -- filled every slot, and a duo's run still ruled (code review of 1.2.1).
-  -- shortcut: a second run of the same dungeon ending within half an hour of the first counts as the same run; a
-  -- whole run takes longer than that.
-  for _, e in ipairs(list) do
-    if type(e) == "table" and e.t and math.abs(now - e.t) < R.SAME_RUN then return false end
-  end
-  list[#list + 1] = { x = xp, t = now }
-  while #list > R.RUNS do table.remove(list, 1) end
-  runs[level] = list
-  return true
-end
-
-function R:OnXP()
-  local run = self.run
-  local l, x, m, rest = xpNow()
-  if not (run and l) then return end
-  local gain = 0
-  if l == run.l then gain = x - run.x elseif l == run.l + 1 then gain = (run.m - run.x) + x end
-  if gain > 0 then run.gain = run.gain + gain end
-  if rest < run.rest then run.rested = run.rested + (run.rest - rest) end
-  run.l, run.x, run.m, run.rest = l, x, m, rest
-end
-
-function R:OnZone()
-  local inside, kind = IsInInstance()
-  if inside and kind == "party" then
-    if self.run then return end
-    local iname, _, _, _, _, _, _, instID = GetInstanceInfo()
-    if ns.Secret(iname) then iname = nil end
-    if ns.Secret(instID) then instID = nil end
-    local keys = ns.Clears:KeysHere(instID, iname)
-    local l, x, m, rest = xpNow()
-    if keys[1] and l then
-      self.run = { key = keys[1], keys = #keys > 1 and keys or nil, start = l, l = l, x = x, m = m, rest = rest, rested = 0,
-        gain = 0, quests = 0 }
-    end
-  elseif self.run then
-    local run = self.run
-    self.run = nil
-    if run.keys then return end
-    local mob = run.gain - run.quests - run.rested
-    local f = F:Current()
-    if self:Keep(run.key, run.start, mob) and f then
-      ns.Comm:SendAll(ns.Others(f), "MOBXP", { fid = f.id, k = run.key, l = run.start, xp = mob })
-    end
-  end
-end
-
--- A boss down in an instance several dungeons share: its dungeon is the run's.
-function R:OnBoss(encounterID, name)
-  local run = self.run
-  if not (run and run.keys) then return end
-  if ns.Secret(encounterID) then encounterID = nil end
-  if ns.Secret(name) then name = nil end
-  for _, key in ipairs(run.keys) do
-    local mine, all = ns.Clears:DataBosses(key)
-    if mine and #mine < #all then
-      for _, b in ipairs(mine) do
-        if (encounterID and b.id == encounterID) or (name and b.name == name) then run.key, run.keys = key, nil return end
-      end
-    end
-  end
-end
-
+-- The two warnings follow the XP bar.
 ns:RegisterEvent("PLAYER_XP_UPDATE", function()
-  R:OnXP()
   if not R.checking then
     R.checking = true
     C_Timer.After(2, function() R.checking = nil; R:Check() end)
   end
-end)
-ns:RegisterEvent("QUEST_TURNED_IN", function(_, _, xp)
-  if R.run and not ns.Secret(xp) and tonumber(xp) then R.run.quests = R.run.quests + xp end
-end)
-ns:RegisterEvent("ENCOUNTER_END", function(_, encounterID, name, _, _, success)
-  if not ns.Secret(success) and (success == 1 or success == true) then R:OnBoss(encounterID, name) end
-end)
-ns:RegisterEvent("PLAYER_ENTERING_WORLD", function() R:OnZone() end)
-ns:RegisterEvent("ZONE_CHANGED_NEW_AREA", function() R:OnZone() end)
-
-ns.Comm:On("MOBXP", function(sender, d)
-  if type(d) ~= "table" or type(d.k) ~= "string" then return end
-  local f = F:Get(d.fid)
-  if f and f.members[sender] and not ns.Secret(d.xp) then R:Keep(d.k, d.l, d.xp) end
 end)

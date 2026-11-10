@@ -2,10 +2,11 @@
 --   rules       the rulebook (28 Oct 2026; it looked like a settings form, so how the rules are set was unclear):
 --               left page the rules as numbered articles in plain sentences, the values in colour; right page
 --               "Change a rule": the open votes with Yes / No, Propose a change (a rule and a new value; everyone
---               votes) and the votes decided this week. The Leader votes too, and changes the rules in Fellowship
---               Management. Following another character's fellowship: read only.
---   rulesadmin  the Leader's, the Rules tab of Manage (UI/Pages/Manage.lua): the form on a draft, then
---               Publish (everyone gets a toast and a History line) or Discard. Like Journey Admin.
+--               votes) and the votes decided this week. The Leader votes too, and edits the rules here (U143): a bar
+--               at the top of the left page with Edit the rules. Following another character's fellowship: read only.
+--   rulesadmin  the Leader's editing of the Rules page (parent = "rules"): the form on a draft, then Publish
+--               (everyone gets a toast and a line in the Chronicle's The fellowship) or Discard, which end the
+--               editing. Like Journey Admin.
 local _, ns = ...
 local L = ns.L
 local UI, Theme = ns.UI, ns.Theme
@@ -192,6 +193,13 @@ local function buildBook(pf)
   pf.rscroll:SetAllPoints()
   local Lc, Rc = pf.lscroll.child, pf.rscroll.child
 
+  -- The Leader edits the rules here (U143): a bar at the top of the left page with Edit the rules.
+  pf.editBar = UI.Card(Lc, "gold")
+  pf.editBar:SetWidth(width)
+  pf.editBar.text = UI.WrapText(pf.editBar, 13, "ink", width - 150, "book")
+  pf.editBar.text:SetPoint("LEFT", 12, 0)
+  pf.editBar.btn = UI.TextButton(pf.editBar, L.EDIT_RULES, function() W:ShowPage("rulesadmin") end, "primary", 12)
+  pf.editBar.btn:SetPoint("RIGHT", -10, 0)
   -- Left: who sets the rules, the play style and size, then the articles.
   pf.who = UI.WrapText(Lc, 12, "ink2", width, "book")
   pf.intro = UI.WrapText(Lc, 13, "ink", width, "book")
@@ -238,13 +246,7 @@ local function buildBook(pf)
   pf.now = UI.Text(Rc, 12, "ink2")
   pf.pNote = UI.WrapText(Rc, 12, "B0321E", width)
   pf.pNote:SetText(L.PROPOSE_OPEN)
-  -- The Leader sets the rules in Manage; following another character: read only.
-  pf.leaderBox = UI.Card(Rc, "gold")
-  pf.leaderBox:SetWidth(width)
-  pf.leaderText = UI.WrapText(pf.leaderBox, 13, "ink", width - 24, "book")
-  pf.leaderText:SetPoint("TOPLEFT", 12, -10)
-  pf.leaderText:SetText(L.PROPOSE_LEADER)
-  pf.toAdmin = UI.TextButton(pf.leaderBox, L.OPEN_RULES_TAB, function() W:ShowPage("rulesadmin") end, "plain", 12)
+  -- Following another character: read only.
   pf.watchText = UI.WrapText(Rc, 12, "ink2", width)
   pf.watchText:SetText(L.PROPOSE_WATCH)
   pf.dHead = UI.SectionHeader(Rc, width)
@@ -269,6 +271,15 @@ local function refreshBook(pf, ctx)
 
   -- Left page.
   local s = UI.Stack(pf.lscroll.child)
+  local edit = ctx.isLeader and not follow
+  pf.editBar:SetShown(edit)
+  if edit then
+    pf.editBar.text:SetText(L.RULES_EDIT_BAR:format(hl(L.RULES_EDIT_HERE)))
+    pf.editBar.btn:SetShown(not ctx.demo)
+    local h = math.max(44, pf.editBar.text:GetStringHeight() + 20)
+    pf.editBar:SetHeight(h)
+    s:Place(pf.editBar, h, 10)
+  end
   pf.who:SetText(follow and L.BOOK_WHO_WATCH:format(ns.TimeAgo(ns.Watch:AsOf(f))) or L.BOOK_WHO:format(ns.Short(f.leader)))
   s:Place(pf.who, pf.who:GetStringHeight(), 8)
   local count, made = F:Count(f), R.SizeOf(f.rules)
@@ -340,17 +351,19 @@ local function refreshBook(pf, ctx)
   if #open == 0 then t:Place(pf.vNone, pf.vNone.h, 6) end
   t:Skip(10)
 
-  t:Place(pf.pHead, 29, 6)
-  -- Adventurers propose; the Leader changes the rules in Manage; nothing for a follower. The walkthrough's sample
-  -- shows the form, but Propose does nothing there (its proposal would go to your own fellowship).
-  -- A Friend of the fellowship reads the votes (SPEC §1.1): the rules are the counted Adventurers'.
+  -- Adventurers propose; the Leader edits the rules on the left page (Edit the rules), so their Propose a change goes
+  -- (it was an empty heading, the brand pictures of 10 Nov 2026); a follower and a Friend are told why they cannot.
+  -- The walkthrough's sample shows the form, but Propose does nothing there (its proposal would go to your own
+  -- fellowship). A Friend of the fellowship reads the votes (SPEC §1.1): the rules are the counted Adventurers'.
   local friend = ctx.isFriend and not follow
   local showForm = not follow and not ctx.isLeader and not friend
+  local head = not ctx.isLeader or follow
+  pf.pHead:SetShown(head)
+  if head then t:Place(pf.pHead, 29, 6) end
   pf.canPropose = showForm and not ctx.demo
   local form = { pf.ruleLabel, pf.rule, pf.valueLabel, pf.value, pf.propose, pf.now }
   for _, w in ipairs(form) do w:SetShown(showForm) end
   pf.pNote:Hide()
-  pf.leaderBox:SetShown(ctx.isLeader and not follow)
   pf.watchText:SetShown(follow or friend)
   pf.watchText:SetText(friend and L.PROPOSE_FRIEND or L.PROPOSE_WATCH)
   if showForm then
@@ -379,16 +392,7 @@ local function refreshBook(pf, ctx)
       pf.pNote:Show()
       t:Place(pf.pNote, pf.pNote:GetStringHeight(), 4)
     end
-  elseif ctx.isLeader and not follow then
-    pf.toAdmin:SetShown(not ctx.demo)
-    local h = pf.leaderText:GetStringHeight() + 20
-    if pf.toAdmin:IsShown() then
-      pf.toAdmin:ClearAllPoints(); pf.toAdmin:SetPoint("TOPLEFT", 12, -h)
-      h = h + 34
-    end
-    pf.leaderBox:SetHeight(h)
-    t:Place(pf.leaderBox, h, 4)
-  else
+  elseif head then
     t:Place(pf.watchText, pf.watchText:GetStringHeight(), 4)
   end
 
@@ -431,7 +435,7 @@ local function refreshBook(pf, ctx)
 end
 
 ---------------------------------------------------------------------------
--- The Rules tab of Manage (rulesadmin)
+-- Editing the rules (rulesadmin), the Leader's
 ---------------------------------------------------------------------------
 -- The draft is the Leader's picks, { key = value } (pf.picks), laid over the rules as they are now: a vote passed
 -- meanwhile shows in the form, and Publish sends what the form shows. A size or a play style is one pick of all its
@@ -494,9 +498,8 @@ local BAR_H = 46
 local function buildAdmin(pf)
   local W = ns.Window
   local width = W.PAGE_W - 10
-  local top = ns.ManageTabs(pf)
   pf.lscroll = UI.Scroll(pf.left)
-  pf.lscroll:SetPoint("TOPLEFT", 0, -top); pf.lscroll:SetPoint("BOTTOMRIGHT", 0, BAR_H + 10)
+  pf.lscroll:SetPoint("TOPLEFT"); pf.lscroll:SetPoint("BOTTOMRIGHT", 0, BAR_H + 10)
   pf.rscroll = UI.Scroll(pf.right)
   pf.rscroll:SetAllPoints()
   local Lc = pf.lscroll.child
@@ -530,11 +533,12 @@ local function buildAdmin(pf)
         pf.picks = nil -- (refused: you no longer lead, so they could not be published)
         if ok then ns:Toast(nil, L.RULES_PUBLISHED_T, L.RULES_PUBLISHED_YOU) else ns:Toast(nil, L.RULES_NOT_PUBLISHED_T, L.RULES_NOT_PUBLISHED) end
       end
-      W:Refresh()
+      W:ShowPage("rules") -- (Publish ends the editing, U143)
     end)
   end, "primary")
   pf.propose:SetPoint("RIGHT", -9, 0)
-  pf.undo = UI.TextButton(pf.bar, L.DISCARD, function() pf.picks = nil; W:Refresh() end, "plain")
+  -- Discard (or Done, with nothing changed) ends the editing too.
+  pf.undo = UI.TextButton(pf.bar, L.DISCARD, function() pf.picks = nil; W:ShowPage("rules") end, "plain")
   pf.undo:SetPoint("RIGHT", pf.propose, "LEFT", -6, 0)
   pf.barText = UI.Text(pf.bar, 13, "ink", "book")
   pf.barText:SetPoint("LEFT", 14, 0)
@@ -601,7 +605,6 @@ end
 local function refreshAdmin(pf, ctx)
   local f = ctx.f
   if not f then return end
-  pf.tabs:Refresh()
   local s = UI.Stack(pf.lscroll.child)
   local yh = pf.yourPart.text:GetStringHeight() + 18
   pf.yourPart:SetHeight(yh)
@@ -609,7 +612,8 @@ local function refreshAdmin(pf, ctx)
   prune(pf, f) -- (a late rules op brought them, or a vote chose the same)
   local keys = changed(pf, f)
   pf.draftBox:SetShown(#keys > 0)
-  pf.propose:SetShown(#keys > 0); pf.undo:SetShown(#keys > 0)
+  pf.propose:SetShown(#keys > 0)
+  pf.undo:SetLabel(#keys > 0 and L.DISCARD or L.RULES_DONE)
   pf.bar:SetSelected(#keys > 0)
   pf.barText:SetText(#keys == 0 and L.PUBLISHED or (#keys == 1 and L.RULES_BAR_1 or L.RULES_BAR_N:format(#keys)))
   if #keys > 0 then
@@ -669,5 +673,5 @@ end
 
 ns.Pages:Register({ id = "rules", label = L.NAV_RULES, build = buildBook, refresh = refreshBook,
   title = function() return L.TITLE_RULES, L.SUB_RULES end })
-ns.Pages:Register({ id = "rulesadmin", label = L.MG_TAB_RULES, icon = "rules", parent = "manage", build = buildAdmin,
-  refresh = refreshAdmin, title = function() return L.TITLE_MANAGE, L.SUB_RULES_ADMIN end })
+ns.Pages:Register({ id = "rulesadmin", label = L.NAV_RULES, icon = "rules", parent = "rules", leader = true,
+  build = buildAdmin, refresh = refreshAdmin, title = function() return L.TITLE_RULES, L.SUB_RULES_ADMIN end })

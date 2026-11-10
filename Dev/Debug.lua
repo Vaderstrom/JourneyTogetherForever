@@ -7,6 +7,13 @@ local L = ns.L
 local D = { tourney = false, fakes = {}, game = {} }
 ns.Dev = D
 
+-- A made-up chain step open from level 1, in QuestLists:Groups' shape: the tracker's Prequest line (U124) for the
+-- self-test and the tour when your own log has none.
+function D.FakeChain()
+  return { earlier = { { status = "no", steps = { { status = "no", lvl = 1, name = "The Defias Brotherhood",
+    start = { by = "Gryan Stoutmantle", zone = "Westfall" } } } } } }
+end
+
 D.TEST_LEADER = "Testleader"
 D.TEST_ID = "dev-test-fellowship"
 D.TEST_HEROES = { { "Brannic", "Healer", "PALADIN" }, { "Elyra", "DPS", "MAGE" } }
@@ -142,7 +149,8 @@ function D:Hero(name, what, arg)
     end
     -- And one of their own that you could join (a made-up quest at your level).
     local lvl = UnitLevel("player") or 1
-    log[99900 + lvl] = { t = L.DEV_JOIN_QUEST, z = GetZoneText and GetZoneText() or "", l = lvl, h = 1, g = 8, k = true, o = L.DEV_JOIN_OBJ }
+    local brand = ns.Tour and ns.Tour.brand -- a README picture names it like a real quest
+    log[99900 + lvl] = { t = brand and brand.quest or L.DEV_JOIN_QUEST, z = GetZoneText and GetZoneText() or "", l = lvl, h = 1, g = 8, k = true, o = L.DEV_JOIN_OBJ }
     ns.Comm:Inject(full, "QUESTS", { fid = f.id, q = log, d = ns.Quests:MyDone(), ln = {}, t = time() })
   elseif what == "signup" then
     -- The pretend Hero signs up for the tournament (a real op from them).
@@ -616,9 +624,8 @@ function D:Command(msg)
     ns:Debug(L.DEV_PACE:format(self.pace and tostring(self.pace) or L.OFF))
     ns.Hero:SendState()
   elseif cmd == "since" then
-    -- "since mark": count from now; "since": show the page now.
-    if a:lower() == "mark" then ns.Since:Mark(); ns:Debug(L.DEV_SINCE_MARK)
-    else ns.Since.current = ns.Since:Digest(ns.Fellowship:Current()); ns.Window:Open("since") end
+    -- The Overview's Since last time counts from now.
+    ns.Since:Mark(); ns:Debug(L.DEV_SINCE_MARK)
     return
   elseif cmd == "group" then
     self:Group(a)

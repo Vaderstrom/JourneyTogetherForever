@@ -60,7 +60,9 @@ function ns.ChronicleGroups(list, open)
 end
 
 -- The tab strip at the top of each tab's left page (as Manage's, UI/Pages/Manage.lua). Returns the height it takes.
-local TABS = { { "CH_TAB_LOG", "chronicle", "chronicle" }, { "CH_TAB_MOMENTS", "moments", "history" } }
+-- The journey · Moments · The fellowship (U142: History is the third tab since 9 Nov 2026).
+local TABS = { { "CH_TAB_LOG", "chronicle", "chronicle" }, { "CH_TAB_MOMENTS", "moments", "history" },
+  { "CH_TAB_FELLOWSHIP", "history", "heroes" } }
 function ns.ChronicleTabs(pf)
   local W = ns.Window
   local opts = {}
@@ -241,6 +243,7 @@ local function build(pf)
   pf.lscroll = UI.Scroll(pf.left)
   pf.lscroll:SetPoint("TOPLEFT", 0, -top); pf.lscroll:SetPoint("BOTTOMRIGHT")
   local Lc = pf.lscroll.child
+  pf.days = UI.DayHeads(Lc, width)
   pf.choice = UI.Tabs(Lc, FILTERS, function() return pf.filter end, function(v) pf.filter = v; W:Refresh() end, width,
     function(v) local f = ns.Fellowship:Current(); return f and v ~= "all" and #entries(f, v) or nil end, 12)
   pf.rows = UI.Pool(function()
@@ -365,10 +368,12 @@ local function refresh(pf, ctx)
   local gallery = pf.filter == "first"
   local list = gallery and {} or ns.ChronicleGroups(entries(f, pf.filter), pf.open)
   local shown = 0
+  pf.days:Start()
   for i, entry in ipairs(list) do
     local e = pf.rows:Get(i)
     if not e then break end
     shown = i
+    pf.days:Place(s, entry.time)
     UI.SetIcon(e.icon, ns.ICONS[Cl.ICON[entry.icon] or "hist_run"])
     e.groupKey = entry.group and entry.key or nil
     e:EnableMouse(entry.group == true)
@@ -393,6 +398,7 @@ local function refresh(pf, ctx)
     s:Place(e, h, 4)
   end
   pf.rows:HideFrom(shown + 1)
+  pf.days:Done()
   local medals = 0
   pf.earnedHead:SetShown(false); pf.openHead:SetShown(false)
   if gallery then medals = placeMedals(pf, f, s) else pf.glinted = nil end

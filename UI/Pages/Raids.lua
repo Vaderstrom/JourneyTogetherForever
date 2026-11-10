@@ -130,7 +130,8 @@ local function refresh(pf, ctx)
   local me, J = ctx.me, ns.Journey
   local counted = J:Counted(f)
   local s = UI.Stack(pf.lscroll.child)
-  pf.help:SetText(L.RAIDS_HELP:format(f.rules.minHeroes))
+  -- (Shown before the journey is complete with Settings → Raids page: Show all, U165: it says when they open.)
+  pf.help:SetText((ns.Endgame:Open(f) and L.RAIDS_HELP or L.RAIDS_HELP_EARLY):format(f.rules.minHeroes))
   s:Place(pf.help, pf.help:GetStringHeight(), 10)
   -- The chosen raid, kept while the book is used (pf.sel is cleared each time a page opens).
   pf.raid = pf.raid or ns.RAIDS[1][1]
@@ -149,11 +150,12 @@ local function refresh(pf, ctx)
     local cleared = 0
     for name in pairs(J:ClearedBy(f, key)) do if f.members[name] then cleared = cleared + 1 end end
     local done = J:Cleared(f, key)
-    -- Not open yet (a date Blizzard announced): the date instead of progress, and no Find group.
-    local open = ns.IsOpen(key, f)
+    -- Not open yet (a date Blizzard announced, or the journey not complete: Settings → Raids page: Show all, U165):
+    -- the date or "After the journey" instead of progress, and no Find group.
+    local open = E:Open(f) and ns.IsOpen(key, f)
     c.mark:SetMark(not open and "locked" or (done and "cleared" or "open"))
     c.state:SetText(open and L.RAID_CLEARED_BY:format(cleared, #counted)
-      or countdown(key, f, true) or L.RAID_OPENS:format(ns.OpensText(key)))
+      or countdown(key, f, true) or (not E:Open(f) and L.SUB_RAIDS) or L.RAID_OPENS:format(ns.OpensText(key)))
     c.sel:SetShown(key == pf.raid)
     local st = E:AttuneStatus(f, r)
     local att = not r[5] and L.RAID_NO_ATTUNE

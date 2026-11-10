@@ -1,9 +1,8 @@
--- Manage (SPEC §4.9), the Leader's, in Admin (28 Oct 2026: Manage and Rules Admin in one place). One
--- sidebar entry with three tabs, each a page of its own (parent = "manage"):
---   manage            Adventurers: needs attention, every Adventurer with a menu (away, lead, remove); invites.
+-- Manage (SPEC §4.9), the Leader's, in Admin. One sidebar entry with two tabs, each a page of its own (parent =
+-- "manage"); on the right of both a bar says the rules are edited on the Rules page (U143):
+--   manage            Adventurers: every Adventurer with a menu (away, lead, remove); invites.
 --   managefellowship  The fellowship: its name, banner colour and emblem; your banner as the others see it; Leave.
---   rulesadmin        Rules: the rules as a draft, then Publish (UI/Pages/Rules.lua).
--- (Everyone invites on the Adventurers page too.) Join only by invitation.
+-- What needs the Leader is in the Inbox (U144). (Everyone invites on the Adventurers page too.) Join only by invitation.
 local _, ns = ...
 local L = ns.L
 local UI, Theme = ns.UI, ns.Theme
@@ -20,8 +19,7 @@ end
 ns.ManageTexts = { takeoverText = takeoverText }
 
 -- The tab strip at the top of each tab's left page. Returns the height it takes.
-local TABS = { { "MG_TAB_ADVENTURERS", "manage", "heroes" }, { "MG_TAB_FELLOWSHIP", "managefellowship", "manage" },
-  { "MG_TAB_RULES", "rulesadmin", "rulesadmin" } }
+local TABS = { { "MG_TAB_ADVENTURERS", "manage", "heroes" }, { "MG_TAB_FELLOWSHIP", "managefellowship", "manage" } }
 function ns.ManageTabs(pf)
   local W = ns.Window
   local opts = {}
@@ -29,6 +27,20 @@ function ns.ManageTabs(pf)
   pf.tabs = UI.Tabs(pf.left, opts, function() return W.current end, function(id) W:ShowPage(id) end, W.PAGE_W - 8)
   pf.tabs:SetPoint("TOPLEFT", 0, 0)
   return 40
+end
+
+-- Where the rules are edited (U143, the owner's condition of 9 Nov 2026 that it is clear to the Leader): a bar at the
+-- top of the right page with Open the Rules page. Returns the bar; its height is RULES_BAR_H.
+local RULES_BAR_H = 64
+local function rulesBar(parent, width)
+  local b = UI.Card(parent, "gold")
+  b:SetSize(width, RULES_BAR_H)
+  b.text = UI.WrapText(b, 13, "ink", width - 24, "book")
+  b.text:SetPoint("TOPLEFT", 12, -9)
+  b.text:SetText(L.MG_RULES_BAR)
+  b.btn = UI.TextButton(b, L.MG_OPEN_RULES, function() ns.Window:ShowPage("rules") end, "plain", 12)
+  b.btn:SetPoint("BOTTOMRIGHT", -10, 8)
+  return b
 end
 
 ---------------------------------------------------------------------------
@@ -39,29 +51,10 @@ local function build(pf)
   local width = W.PAGE_W - 8
   local top = ns.ManageTabs(pf)
 
-  -- Left: needs attention and the Adventurers.
+  -- Left: the Adventurers.
   pf.lscroll = UI.Scroll(pf.left)
   pf.lscroll:SetPoint("TOPLEFT", 0, -top); pf.lscroll:SetPoint("BOTTOMRIGHT")
   local L1 = pf.lscroll.child
-  -- Needs attention (SPEC §6).
-  pf.attHead = UI.SectionHeader(L1, width)
-  pf.attHead:SetText(L.NEEDS_ATTENTION)
-  pf.attLines = UI.Pool(function()
-    local l = CreateFrame("Frame", nil, L1)
-    l:SetWidth(width)
-    l.icon = UI.Round(l, "ARTWORK", 16)
-    l.icon:SetPoint("TOPLEFT", 0, 0)
-    l.text = UI.WrapText(l, 13, "ink", width - 26, "book")
-    l.text:SetPoint("TOPLEFT", 24, -1)
-    -- Where it is handled, and Seen (U106): the Inbox's small buttons, not grey links (U113).
-    l.go = UI.TextButton(l, "", function(b) if b.fn then b.fn() end end, "primary", 12)
-    l.go:SetPoint("TOPLEFT", l.text, "BOTTOMLEFT", 0, -4)
-    l.seen = UI.TextButton(l, L.NOTICE_SEEN, function(b) if b.key then ns.Attention:See(ns.Fellowship:Current(), b.key) end end, "plain", 12)
-    l.seen:SetPoint("LEFT", l.go, "RIGHT", 8, 0)
-    return l
-  end)
-  pf.attNone = UI.Text(L1, 12, "ink2")
-  pf.attNone:SetText(L.ATTENTION_NONE)
   -- What the Leader does here and who takes over, behind the "?".
   pf.memHead = UI.SectionHeader(L1, width)
   pf.memHead:SetText(L.NAV_HEROES)
@@ -105,6 +98,7 @@ local function build(pf)
   pf.rscroll = UI.Scroll(pf.right)
   pf.rscroll:SetAllPoints()
   local R1 = pf.rscroll.child
+  pf.rulesBar = rulesBar(R1, width)
   pf.ihead = UI.Heading(R1, width, L.INVITE_HEROES, "")
   pf.nameLabel = UI.Text(R1, 13, "ink2")
   pf.nameLabel:SetText(L.INVITE_NAME)
@@ -141,30 +135,8 @@ local function refresh(pf, ctx)
   local me, width = ctx.me, ns.Window.PAGE_W - 8
   local light = Theme:Current().light
 
-  -- Left page: Needs attention (the Leader), then the Adventurers.
+  -- Left page: the Adventurers.
   local s = UI.Stack(pf.lscroll.child)
-  pf.attHead:SetShown(ctx.isLeader)
-  if ctx.isLeader then s:Place(pf.attHead, 29, 4) end
-  local items = ctx.isLeader and ns.Attention:Items(f) or {}
-  local nAtt = 0
-  for i, item in ipairs(items) do
-    local l = pf.attLines:Get(i)
-    if not l then break end
-    nAtt = i
-    UI.SetIcon(l.icon, ns.ICONS["bn_" .. item.icon] or ns.ICONS.bn_done)
-    l.icon:SetAlpha(item.seen and 0.5 or 1)
-    l.text:SetText(item.text)
-    l.text:SetTextColor(Theme:RGBA(item.seen and "ink2" or "ink"))
-    l.go:SetLabel(item.act[1]); l.go.fn = item.act[2]
-    l.seen:SetShown(not item.seen); l.seen.key = item.key
-    local h = math.max(18, l.text:GetStringHeight() + 2) + 4 + l.go:GetHeight()
-    l:SetHeight(h)
-    s:Place(l, h, 8)
-  end
-  pf.attLines:HideFrom(nAtt + 1)
-  pf.attNone:SetShown(ctx.isLeader and #items == 0)
-  if ctx.isLeader and #items == 0 then s:Place(pf.attNone, 16, 4) end
-  if ctx.isLeader then s:Skip(8) end
   pf.memHead:SetHelp(L.MANAGE_HELP_LEADER .. "\n\n" .. takeoverText(f))
   s:Place(pf.memHead, 29, 6)
   local shown = 0
@@ -192,6 +164,7 @@ local function refresh(pf, ctx)
 
   -- Right page: invite, and the open invites.
   local t = UI.Stack(pf.rscroll.child)
+  t:Place(pf.rulesBar, RULES_BAR_H, 10)
   pf.ihead:Set(L.INVITE_HEROES, L.INVITE_HELP:format(f.faction or ""))
   t:Place(pf.ihead, pf.ihead:GetHeight(), 4)
   local canInvite = P.Can(f, me, "invite")
@@ -278,10 +251,13 @@ local function buildFellowship(pf)
 
   -- Right: the banner as the others see it, then leaving.
   local Rp = pf.right
+  pf.rulesBar = rulesBar(Rp, width)
+  pf.rulesBar:SetPoint("TOPLEFT")
+  local top = RULES_BAR_H + 10
   pf.bHead = UI.Heading(Rp, width, L.MG_BANNER_HEAD, L.MG_BANNER_SUB)
-  pf.bHead:SetPoint("TOPLEFT")
+  pf.bHead:SetPoint("TOPLEFT", 0, -top)
   pf.crest = UI.Crest(Rp, 96, 96)
-  pf.crest:SetPoint("TOP", 0, -64)
+  pf.crest:SetPoint("TOP", 0, -(top + 64))
   pf.fname = UI.Text(Rp, 20, "ink", "title", "CENTER")
   pf.fname:SetPoint("TOP", pf.crest, "BOTTOM", 0, -10); pf.fname:SetWidth(width)
   pf.fline = UI.Text(Rp, 13, "ink2", "body", "CENTER")
@@ -317,8 +293,6 @@ local function refreshFellowship(pf, ctx)
 end
 
 ns.Pages:Register({ id = "manage", label = L.NAV_MANAGE, build = build, refresh = refresh,
-  -- The sidebar shows how many things need attention.
-  badge = function(ctx) return ctx.f and ns.Attention:Count(ctx.f) or 0 end,
   title = function() return L.TITLE_MANAGE, L.SUB_MANAGE end })
 ns.Pages:Register({ id = "managefellowship", label = L.MG_TAB_FELLOWSHIP, icon = "manage", parent = "manage",
   build = buildFellowship, refresh = refreshFellowship, title = function() return L.TITLE_MANAGE, L.SUB_MANAGE_FELLOWSHIP end })

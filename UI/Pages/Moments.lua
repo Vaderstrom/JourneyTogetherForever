@@ -161,4 +161,4 @@ local function refresh(pf, ctx)
 end
 
 ns.Pages:Register({ id = "moments", label = L.CH_TAB_MOMENTS, icon = "chronicle", parent = "chronicle", build = build, refresh = refresh,
-  title = function() return L.TITLE_MOMENTS, L.SUB_MOMENTS end })
+  title = function() return L.TITLE_CHRONICLE, L.SUB_MOMENTS end })

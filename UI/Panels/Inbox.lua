@@ -1,4 +1,5 @@
--- Inbox panel (SPEC §4.13): invitations, asks to group up (Join / Not now), cap warnings and the tournament.
+-- Inbox panel (SPEC §4.13): invitations, asks to group up (Join / Not now), cap warnings, the tournament and, for the
+-- Leader, what needs attention (U144; Fellowship/Attention.lua).
 local _, ns = ...
 local L = ns.L
 local UI, Theme = ns.UI, ns.Theme
@@ -71,6 +72,12 @@ function Inbox:Gather()
   if cap then
     items[#items + 1] = { key = ("cap:%s:%s:%d"):format(cap, f.id, ch.n), important = cap == "at",
       text = cap == "at" and L.WARN_AT_CAP or L.WARN_CLOSE:format(ch.cap), actions = { { L.OPEN_CHAPTER, go("chapter"), "primary" } } }
+  end
+  -- For the Leader, what needs attention (U144; on Manage until the rebuild): each with its button and Seen.
+  for _, a in ipairs(f and ns.Attention:Gather(f) or {}) do
+    local act = a.act[2]
+    items[#items + 1] = { key = a.key, text = a.text, important = false,
+      actions = { { a.act[1], function() ns.Window:HidePanels(); act() end, "primary" } } }
   end
   -- The tournament: sign-up open, my next duel, and for the Guild Master the hand-over.
   local t = f and f.tourney
@@ -154,3 +161,14 @@ local function refresh(p)
 end
 
 ns.Window:RegisterPanel("inbox", { title = L.INBOX, build = build, refresh = refresh })
+
+-- 1.4's Seen marks on Manage's Needs attention carry over to the Inbox, once (U144); the pages' first visits went
+-- with U146 (walkPages).
+ns:On("DB_READY", function()
+  local c = ns.char
+  if type(c.attSeen) == "table" then
+    c.inboxSeen = type(c.inboxSeen) == "table" and c.inboxSeen or {}
+    for k, v in pairs(c.attSeen) do if v == true then c.inboxSeen[k] = true end end
+  end
+  c.attSeen, c.walkPages = nil, nil
+end)

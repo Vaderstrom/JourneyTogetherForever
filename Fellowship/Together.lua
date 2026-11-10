@@ -1,6 +1,5 @@
--- Playing together (SPEC §6): the You card on the Overview (my standing, my next step, catch-up for the Hero who is
--- behind, who is behind for the others) and the actions that bring Heroes together: invite to group and whisper.
--- No frames here: UI/Pages/Overview.lua draws what You() returns.
+-- Playing together (SPEC §6): your To do and Focus now (U139, U140), Play now's pick, your standing for the tracker,
+-- and the actions that bring Adventurers together: invite to group and whisper. No frames here.
 local _, ns = ...
 local L = ns.L
 local F, J, Hr = ns.Fellowship, ns.Journey, ns.Hero
@@ -107,10 +106,10 @@ function T:PlayNow(f)
   for _, name in ipairs(self:Online(f)) do if not J:Away(f, name) then online[#online + 1] = name end end
   if #online == 0 then return nil end
   local here = inGroup(f)
-  local function result(text, action, names, key)
+  local function result(kind, text, action, names, key)
     local grouped = true
     for _, n in ipairs(names) do if not here[n] then grouped = false end end
-    return { text = text, action = action, names = names, key = key, grouped = grouped }
+    return { kind = kind, text = text, action = action, names = names, key = key, grouped = grouped }
   end
   local ch = J:Current(f)
   if ch then
@@ -121,10 +120,12 @@ function T:PlayNow(f)
     end
     for _, name in ipairs(below) do
       if name ~= me and not mineBelow and Hr:Online(f, name) then
-        return result(L.PLAY_HELP:format(ns.Short(name)), "invite", online)
+        local r = result("help", L.PLAY_HELP:format(ns.Short(name)), "invite", online)
+        r.who = name
+        return r
       end
     end
-    if mineBelow then return result(L.PLAY_HELP_ME:format(ns.Quests.NameList(online)), "invite", online) end
+    if mineBelow then return result("helpme", L.PLAY_HELP_ME:format(ns.Quests.NameList(online)), "invite", online) end
     -- An open dungeon at least two of you still need (the first by level).
     for _, x in ipairs(J:Required(f, ch.n)) do
       if J:Open(f, x.key) and not J:Cleared(f, x.key) then
@@ -133,7 +134,7 @@ function T:PlayNow(f)
         for _, name in ipairs(online) do if not who[name] then need[#need + 1] = name end end
         if #need + (meToo and 1 or 0) >= 2 then
           local list = meToo and withYou(need) or ns.Quests.NameList(need)
-          return result(L.PLAY_RUN:format(x.d[2], list), "find", need, x.key)
+          return result("run", L.PLAY_RUN:format(x.d[2], list), "find", need, x.key)
         end
       end
     end
@@ -145,19 +146,10 @@ function T:PlayNow(f)
     if x.mine and not x.chain and not x.dungeon then
       local with = {}
       for _, n in ipairs(x.others or {}) do if isOn[n] then with[#with + 1] = n end end
-      if #with > 0 then return result(L.PLAY_QUEST:format(withYou(with), x.name), "invite", with) end
+      if #with > 0 then return result("quest", L.PLAY_QUEST:format(withYou(with), x.name), "invite", with) end
     end
   end
-  return result((#online == 1 and L.PLAY_LEVEL_1 or L.PLAY_LEVEL_N):format(ns.Quests.NameList(online)), "invite", online)
-end
-
--- Does what Play now says: Find group for the dungeon, else invite them.
-function T:DoPlayNow(f)
-  local p = self:PlayNow(f)
-  if not p then return nil end
-  if p.action == "find" then return self:FindGroup(f, p.key) end
-  self:Invite(p.names)
-  return p.names
+  return result("level", (#online == 1 and L.PLAY_LEVEL_1 or L.PLAY_LEVEL_N):format(ns.Quests.NameList(online)), "invite", online)
 end
 
 ---------------------------------------------------------------------------
@@ -170,44 +162,197 @@ local function started(f)
 end
 
 -- The book remembers which pages this character has opened (Window:Refresh).
-local VISITS = { rules = true, chapter = true, admin = true, quests = true }
+local VISITS = { rules = true, chapter = true, admin = true }
 function T:Visited(page)
   local f = F:Current()
   if f and VISITS[page] then started(f)[page] = true end
 end
 
--- How long a new member's welcome stays (M21): until done, hidden, or this long after joining.
-T.WELCOME_DAYS = 14
-
--- { { done, text } } and the card's label, or nil when it is not shown (hidden, or everything done).
--- The leader of a new fellowship: Getting started. A Hero who joined lately: the welcome (a new member got
--- nothing; seen in the tour review).
+-- The Leader of a new fellowship: { { done, text, page } }, the first items of the To do (SPEC §6, U140), or nil
+-- when everything is done (or hidden on the old card). (A new Adventurer's welcome went with the rebuild: the To do
+-- and the first tour show them the way, U146.)
 function T:Started(f)
   local s = started(f)
-  if s.hidden then return nil end
-  local steps, label
-  if f.leader == ns.Me() then
-    label = L.START_LABEL
-    steps = {
-      { done = F:Count(f) >= 2, text = L.START_INVITE }, { done = s.rules == true, text = L.START_RULES },
-      { done = s.chapter == true, text = L.START_CHAPTER }, { done = s.admin == true, text = L.START_BOSSES },
-    }
-  else
-    local m = f.members[ns.Me()]
-    if not m or time() - (tonumber(m.joined) or 0) > self.WELCOME_DAYS * 86400 then return nil end
-    label = L.WELCOME_LABEL
-    steps = {
-      { done = s.chapter == true, text = L.WELCOME_CHAPTER }, { done = s.rules == true, text = L.WELCOME_RULES },
-      { done = s.quests == true, text = L.WELCOME_QUESTS },
-    }
-  end
-  for _, st in ipairs(steps) do if not st.done then return steps, label end end
+  if s.hidden or f.leader ~= ns.Me() then return nil end
+  local steps = {
+    { done = F:Count(f) >= 2, text = L.START_INVITE, page = "heroes" },
+    { done = s.rules == true, text = L.START_RULES, page = "rules" },
+    { done = s.chapter == true, text = L.START_CHAPTER, page = "chapter" },
+    { done = s.admin == true, text = L.START_BOSSES, page = "admin" },
+  }
+  for _, st in ipairs(steps) do if not st.done then return steps end end
   return nil
 end
 
-function T:HideStarted()
-  local f = F:Current()
-  if f then started(f).hidden = true; ns:Fire("HEROES", true) end
+---------------------------------------------------------------------------
+-- Your To do (U140, SPEC §4.5) and Focus now (U139, SPEC §4.4)
+---------------------------------------------------------------------------
+local function plural(n, one, many) return n == 1 and L[one] or L[many]:format(n) end
+
+-- A dungeon row's state for you: its line, and the action at its right ("find": nothing to get first; "ready":
+-- quests to get first), or wait (the chapter waits for the floor).
+local function dungeonLine(f, x, st, fl)
+  if st == "cleared" then return L.STATE_CLEARED end
+  if st == "locked" then return L.TODO_WAIT:format(fl), nil, true end
+  if x.early then return L.TODO_EARLY:format(J.Roman(x.early)) end
+  local QL = ns.QuestLists
+  local r = QL:Ready(f, x.key, ns.Me())
+  if r and not r.ready then
+    local parts = {}
+    if r.early < r.earlyOf then parts[1] = plural(r.earlyOf - r.early, "TODO_CHAIN_1", "TODO_CHAIN_N") end
+    if r.pick < r.pickOf then parts[#parts + 1] = plural(r.pickOf - r.pick, "TODO_PICK_1", "TODO_PICK_N") end
+    return L.TODO_GET_READY:format(table.concat(parts, ", ")), "ready"
+  end
+  if r then return plural(r.earlyOf + r.pickOf, "TODO_READY_1", "TODO_READY_N"), "find" end
+  local _, _, _, _, _, open = QL:Counts(f, x.key)
+  if open and open > 0 then return plural(open, "TODO_INSIDE_1", "TODO_INSIDE_N"), "find" end
+  return L.TODO_NOTHING, "find"
+end
+
+-- Your To do for chapter n, in order: the new Leader's first steps (the current chapter only), reach the floor, the
+-- chapter's dungeons (the suggested order) and its Required milestones, steps for later dungeons still open (U136),
+-- and under If you like the next chapter's dungeons that may be run now and the Optional milestones. Each item
+-- { kind = "start" | "floor" | "dungeon" | "milestone" | "later" | "early", text or line, done }; a dungeon or early
+-- one also has x, state, action ("find" | "ready") and wait; a milestone m and req; a later one e (QL:Later's entry).
+-- noLater: without the steps for later dungeons (they cost the most; Focus now asks for them last).
+function T:ToDo(f, n, noLater)
+  local items, early = {}, {}
+  local ch = f.journey.chapters[n]
+  if not ch then return items end
+  local me = ns.Me()
+  if n == J:CurrentIndex(f) then
+    for _, st in ipairs(self:Started(f) or {}) do items[#items + 1] = { kind = "start", text = st.text, done = st.done, page = st.page } end
+  end
+  local fl, lvl = J:FloorLevel(f, ch), Hr:Level(f, me)
+  -- (A Friend of the fellowship never counts for the floor, SPEC §1.1.)
+  if not F:IsFriend(f, me) then items[#items + 1] = { kind = "floor", text = L.TODO_FLOOR:format(fl), done = lvl >= fl } end
+  for _, x in ipairs(J:ChapterList(f, n)) do
+    local st = J:DungeonState(f, n, x)
+    local line, action, wait = dungeonLine(f, x, st, fl)
+    local it = { kind = x.early and "early" or "dungeon", x = x, state = st, line = line, action = action, wait = wait,
+      done = st == "cleared" }
+    if x.early then early[#early + 1] = it else items[#items + 1] = it end
+  end
+  -- The milestones (SPEC §2; the owner, 9 Nov 2026): Required ones hold the chapter, Optional ones are goals.
+  for _, m in ipairs(ns.Milestones:List(f, n)) do
+    local it = { kind = "milestone", m = m, req = m.req, done = ns.Milestones:Progress(f, m).done }
+    if m.req then items[#items + 1] = it else early[#early + 1] = it end
+  end
+  if not noLater then
+    for _, e in ipairs(ns.QuestLists:Later(f, n)) do
+      if e.open > 0 then items[#items + 1] = { kind = "later", e = e, x = e.x, line = ns.QuestLists.LaterLine(e, lvl) } end
+    end
+  end
+  for _, it in ipairs(early) do items[#items + 1] = it end
+  return items
+end
+
+-- "All 4 of you still need it." for Focus now (SPEC §4.4), or nil when only you count.
+local function needLine(f, key)
+  local counted, who, n = J:Counted(f), J:ClearedBy(f, key), 0
+  for _, name in ipairs(counted) do if not who[name] then n = n + 1 end end
+  if #counted < 2 or n == 0 then return nil end
+  if n == #counted then return n == 2 and L.FOCUS_NEED_BOTH or L.FOCUS_NEED_ALL:format(n) end
+  return n == 1 and L.FOCUS_NEED_1 or L.FOCUS_NEED_N:format(n)
+end
+
+-- Focus now: the one thing to do now, the first open item of your chapter's To do, picked in Play now's order when
+-- others are online (SPEC §4.4, §6). { head, why, button = { kind = "page" | "find" | "invite" | "ready", page, key,
+-- names }, link = { page or key (a Dungeon page), text } }; the tracker shows head.
+function T:Focus(f)
+  local ch = J:Current(f)
+  if not ch then return { head = L.FOCUS_RAIDS, why = L.FOCUS_RAIDS_WHY, button = { kind = "page", page = "raids" } } end
+  local me = ns.Me()
+  local items = self:ToDo(f, ch.n, true)
+  local p = self:PlayNow(f)
+  local invite = p and { kind = "invite", names = p.names } or nil
+  local chapter = { page = "chapter", text = L.FOCUS_LINK_CHAPTER }
+  local function page(x) return { key = x.key, text = L.FOCUS_LINK_DUNGEON } end
+  for _, it in ipairs(items) do
+    if it.kind == "start" and not it.done then
+      return { head = it.text, why = L.FOCUS_START_WHY, button = { kind = "page", page = it.page } }
+    end
+  end
+  local below = J:Below(f, ch.n)
+  if not F:IsFriend(f, me) and Hr:Level(f, me) < J:FloorLevel(f, ch) then
+    local others = {}
+    for _, name in ipairs(below) do if name ~= me then others[#others + 1] = name end end
+    local why = self.HowFar(f, me, J:FloorLevel(f, ch), true)
+    if #others > 0 then why = why .. " " .. L.FOCUS_SAME_SPOT:format(ns.Quests.NameList(others)) end
+    return { head = L.FOCUS_FLOOR:format(J:FloorLevel(f, ch)), why = why, button = invite, link = chapter }
+  end
+  if p and p.kind == "help" then
+    return { head = L.FOCUS_HELP:format(ns.Short(p.who)), why = L.FOCUS_HELP_WHY, button = invite, link = chapter }
+  end
+  local pick
+  for _, it in ipairs(items) do
+    if it.kind == "dungeon" and not it.done and not it.wait and (not pick or (p and p.key == it.x.key)) then pick = it end
+  end
+  if pick then
+    local name, need = pick.x.d[2], needLine(f, pick.x.key)
+    local why = need and (pick.line .. " " .. need) or pick.line
+    if pick.action == "ready" then
+      return { head = L.FOCUS_READY:format(name), why = why, button = { kind = "ready", key = pick.x.key }, link = page(pick.x) }
+    end
+    return { head = L.FOCUS_RUN:format(name), why = why, button = { kind = "find", key = pick.x.key }, link = page(pick.x) }
+  end
+  -- A Required milestone holds the chapter once its dungeons are done (SPEC §1: the To do lists it), before the steps
+  -- for later dungeons, which never do.
+  local ms = #below == 0 and ns.Milestones:OpenRequired(f, ch.n)[1]
+  if ms then return { head = L.FOCUS_MILESTONE:format(ms.name), why = ns.Milestones:ProgressText(f, ms), link = chapter } end
+  local later = ns.QuestLists:Later(f, ch.n)
+  for _, e in ipairs(later) do
+    if e.open > 0 then
+      return { head = L.FOCUS_PREPARE:format(e.x.d[2]), why = ns.QuestLists.LaterLine(e, Hr:Level(f, me)),
+        button = { kind = "ready", key = e.x.key }, link = page(e.x) }
+    end
+  end
+  if #below > 0 then
+    return { head = L.FOCUS_WAITING, why = L.NEXT_WAITING:format(J.Names(f, below, true), J:FloorLevel(f, ch)), button = invite, link = chapter }
+  end
+  if p then return { head = L.FOCUS_TOGETHER, why = p.text, button = invite } end
+  if Hr:Level(f, me) < ch.cap then return { head = L.FOCUS_LEVEL:format(ch.cap), why = L.FOCUS_LEVEL_WHY, link = chapter } end
+  return { head = L.FOCUS_DONE, why = L.FOCUS_DONE_WHY, link = chapter }
+end
+
+-- The tracker's Prequest line (U124): the next step of a chain for your chapter's dungeons (not cleared) or a later
+-- dungeon's, once your level reaches it and it is not in your log yet. { text, key } or nil.
+function T:StartEarly(f)
+  local QL = ns.QuestLists
+  local cur, me = J:CurrentIndex(f), ns.Me()
+  local lvl = Hr:Level(f, me)
+  local keys = {}
+  for _, x in ipairs(J:ChapterList(f, cur)) do
+    if not x.early and not J:Cleared(f, x.key) then keys[#keys + 1] = x.key end
+  end
+  for _, e in ipairs(QL:Later(f, cur)) do if e.open > 0 then keys[#keys + 1] = e.x.key end end
+  for _, key in ipairs(keys) do
+    local g = QL:Groups(f, key, me)
+    for _, q in ipairs(g and g.earlier or {}) do
+      -- (The dungeon quest already in your log or done: nothing to start, as Who is ready counts it.)
+      for _, s in ipairs(q.status == "no" and q.steps or {}) do
+        if s.status ~= "done" then
+          -- The chain's next step: open now and not picked up yet, or nothing to say for this chain.
+          if s.status == "no" and s.lvl and s.lvl <= lvl then
+            local st = s.start or {}
+            local where = st.by and st.zone and L.TRACK_BY_IN:format(st.by, st.zone) or st.by or st.zone
+            return { text = L.TRACK_EARLY:format(s.name .. (where and (", " .. where) or "")), key = key }
+          end
+          break
+        end
+      end
+    end
+  end
+  return nil
+end
+
+-- Does what Focus now's button says.
+function T:DoFocus(f, b)
+  if not b then return end
+  if b.kind == "invite" then self:Invite(b.names)
+  elseif b.kind == "find" then self:FindGroup(f, b.key)
+  elseif b.kind == "ready" then ns.DungeonPage:Open(b.key)
+  elseif b.page then ns.Window:ShowPage(b.page) end
 end
 
 ---------------------------------------------------------------------------
@@ -268,137 +413,31 @@ end
 
 T.HowFar = howFar
 
--- Shared quests in my log that other Heroes are on: { names }, { quest names } (at most 3).
-local function sharedQuests(f)
-  local quests, heroes, seen = {}, {}, {}
-  for _, x in ipairs(ns.Quests:Items(f)) do
-    if x.mine and #x.others > 0 and #quests < 3 then
-      quests[#quests + 1] = x.name
-      for _, n in ipairs(x.others) do if not seen[n] then seen[n] = true; heroes[#heroes + 1] = n end end
-    end
-  end
-  return heroes, quests
-end
-
--- The journey's dungeons good for a level (their best levels include it): at most two, the ones you have not
--- cleared first, then by level. { dungeon rows (ns.DUNGEONS) }.
-function T:GoodFor(f, lvl)
-  local me, seen, list = ns.Me(), {}, {}
-  for key in pairs(f.journey.place or {}) do
-    local base = ns.BaseKey(key)
-    local d = ns.Dungeon(base)
-    if d and not seen[base] and lvl >= d[3] and lvl <= d[4] then
-      seen[base] = true
-      list[#list + 1] = { d = d, done = J:ClearedBy(f, key)[me] ~= nil }
-    end
-  end
-  table.sort(list, function(a, b)
-    if a.done ~= b.done then return not a.done end
-    if a.d[3] ~= b.d[3] then return a.d[3] < b.d[3] end
-    return a.d[2] < b.d[2]
-  end)
-  local out = {}
-  for i = 1, math.min(2, #list) do out[i] = list[i].d end
-  return out
-end
-
 ---------------------------------------------------------------------------
--- The You card
+-- Your standing, for the tracker (the You card went with the rebuild, U139)
 ---------------------------------------------------------------------------
--- { head, state (the head without the level, for the Overview card), lines = { { icon, text } }, online = { names } }
+-- { head ("Level 19 · 2.6 to the cap"), state (the head without the level) }.
 function T:You(f)
   local me = ns.Me()
   local lvl = Hr:Level(f, me)
   local ch = J:Current(f)
-  local out = { lines = {}, online = self:Online(f) }
-  local function add(icon, text) out.lines[#out.lines + 1] = { icon = icon, text = text } end
-  if not ch then
-    out.head, out.state = L.YOU_HEAD:format(lvl, L.YOU_DONE), L.YOU_DONE
-    return out
-  end
-  local r = f.rules
-  local fl = J:FloorLevel(f, ch)
-  local below = J:Below(f, ch.n)
-  -- A Friend of the fellowship (SPEC §1.1): nothing to reach, nobody waiting.
-  if F:IsFriend(f, me) then
-    out.head, out.state = L.YOU_HEAD:format(lvl, L.YOU_FRIEND), L.YOU_FRIEND
-    add("friend", L.YOU_FRIEND_TEXT)
-    out.friend = true
-    return out
-  end
-  if J:Away(f, me) then
-    out.head, out.state = L.YOU_HEAD:format(lvl, L.YOU_AWAY), L.YOU_AWAY
-    add("away", L.YOU_AWAY_TEXT)
-    return out
-  end
-  local h = Hr:Get(f, me) or {}
-  -- Levels to go count the XP you have, as on the Chapter page ("13 levels" here beside its "12.1"; seen in the
-  -- check of 30 Oct 2026).
-  local function togo(target) return levels(ns.Pace.LevelsTo(lvl, h.xp, h.xpMax, target)) end
-
-  -- Below the floor: the catch-up card.
-  if lvl < fl then
-    out.state = L.YOU_BELOW:format(togo(fl))
-    out.head = L.YOU_HEAD:format(lvl, out.state)
-    -- Alone, there are no others waiting (the card said so to a new Captain; seen in the tour).
-    local alone = F:Count(f) <= 1
-    if alone then add("waiting", L.YOU_ALONE)
-    -- New and catching up: the chapter goes on without waiting (Rules/Journey.lua, J:CatchingUp).
-    elseif J:CatchingUp(f, me) then add("waiting", L.YOU_CATCHING)
-    elseif #below == 1 then add("waiting", L.YOU_LAST)
-    else add("waiting", #below == 2 and L.YOU_BELOW_TOO_1 or L.YOU_BELOW_TOO:format(#below - 1)) end
-    add("level", howFar(f, me, fl, true))
-    -- Where to catch up (M25): the journey's dungeons good for your level, the ones you have not cleared first.
-    -- (Third, before rested XP: the Overview shows three lines.)
-    -- Who is online is said once, after the dungeons (it was repeated for each one; seen in the check of 29 Oct).
-    local good = self:GoodFor(f, lvl)
-    if #good > 0 then
-      local online = self:Online(f)
-      local parts = {}
-      for i, d in ipairs(good) do parts[i] = d[2] end
-      local list = table.concat(parts, ", ")
-      if #online > 0 then list = L.YOU_GOOD_ONLINE:format(list, ns.Quests.NameList(online)) end
-      add("open", L.YOU_GOOD_FOR:format(lvl, list))
-    end
-    if h.rested and h.rested > 0 and h.xpMax and h.xpMax > 0 then
-      add("rested", L.YOU_RESTED:format(math.min(150, math.floor(h.rested / h.xpMax * 100 + 0.5))))
-    end
-    local heroes, quests = sharedQuests(f)
-    if #quests > 0 then add("quest", L.YOU_HELP_QUESTS:format(ns.Quests.NameList(heroes), table.concat(quests, ", "))) end
-    if not alone then add("group", L.YOU_ASK_HELP) end
-    return out
-  end
-
-  -- Ready, at or over the cap.
   local state
-  if lvl > ch.cap + r.capTol then state = L.YOU_OVER:format(lvl - ch.cap)
-  elseif lvl >= ch.cap then state = L.YOU_AT_CAP
-  else state = L.YOU_READY:format(togo(ch.cap)) end
-  out.head, out.state = L.YOU_HEAD:format(lvl, state), state
-  -- Who is behind, and how to help them.
-  for i, name in ipairs(below) do
-    if i > 2 then break end
-    add("waiting", L.BEHIND:format(ns.Short(name), Hr:Level(f, name), howFar(f, name, fl, false)))
-  end
-  if #below > 0 then add("group", L.HELP_RUN) end
-  -- Ahead of someone who is not below the floor (M25): a run with them keeps you in step.
-  local who, gap = ns.Progress:Ahead(f)
-  local listed = false
-  for _, name in ipairs(below) do if name == who then listed = true end end
-  if who and not listed then add("waiting", L.YOU_AHEAD:format(gap, ns.Short(who))) end
-  -- My next step.
-  if #below == 0 then
-    local nextKey
-    for _, x in ipairs(J:Required(f, ch.n)) do
-      if not nextKey and not J:Cleared(f, x.key) and J:Open(f, x.key) then nextKey = x end
+  if not ch then state = L.YOU_DONE
+  elseif F:IsFriend(f, me) then state = L.YOU_FRIEND -- (nothing to reach, SPEC §1.1)
+  elseif J:Away(f, me) then state = L.YOU_AWAY
+  else
+    -- Levels to go count the XP you have, as on the Chapter page; the number alone, so the line fits the tracker
+    -- ("Ready, 2.6 levels to the cap" took two lines; the owner's pick of 9 Nov 2026).
+    local h = Hr:Get(f, me) or {}
+    local function togo(target)
+      local n = ns.Pace.LevelsTo(lvl, h.xp, h.xpMax, target)
+      return n == math.floor(n) and ('%d'):format(n) or L.LEVELS_NUM:format(n)
     end
-    if nextKey then
-      local mineDone = J:ClearedBy(f, nextKey.key)[me] ~= nil
-      add("open", (mineDone and L.YOU_NEXT_HELP or L.YOU_NEXT_RUN):format(nextKey.d[2]))
-    elseif #J:Required(f, ch.n) == 0 and lvl < ch.cap then
-      add("level", L.YOU_NEXT_LEVEL:format(ch.cap))
-    end
+    local fl = J:FloorLevel(f, ch)
+    if lvl < fl then state = L.YOU_BELOW:format(togo(fl))
+    elseif lvl > J:CapLevel(f, ch) then state = L.YOU_OVER:format(lvl - ch.cap)
+    elseif lvl >= ch.cap then state = L.YOU_AT_CAP
+    else state = L.YOU_READY:format(togo(ch.cap)) end
   end
-  if lvl >= ch.cap then add("cap", L.YOU_STOP_XP) end
-  return out
+  return { head = L.YOU_HEAD:format(lvl, state), state = state }
 end

@@ -151,6 +151,10 @@ ns:RegisterEvent("ADDON_LOADED", function(_, name)
   -- Per character: this character's membership, personal settings and window position.
   _G[CHAR_NAME] = _G[CHAR_NAME] or { schema = 1 }
   ns.db, ns.char = _G[DB_NAME], _G[CHAR_NAME]
+  -- Where dungeon quests start and their XP, as learned in play until 1.5: Data/DungeonQuests.lua's now.
+  ns.db.questStarts, ns.db.questXP = nil, nil
+  -- The dungeons' mob XP measured in runs until 1.5: the room no longer counts the mobs (10 Nov 2026).
+  ns.db.mobXP = nil
   ns.KeepWholeName()
   -- This copy's version (from the TOC; the packager fills it in), shared with the other Heroes.
   local meta = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata

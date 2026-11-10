@@ -423,11 +423,7 @@ end
 -- the two differ (KILLD: one fingerprint per dungeon, KILLS: those dungeons' kills and run entries). Kills only add
 -- up (an undo is a numbered change), so merging both ways makes both copies the same.
 ---------------------------------------------------------------------------
-local function hash(s)
-  local h = 5381
-  for i = 1, #s do h = (h * 33 + s:byte(i)) % 4294967296 end
-  return h
-end
+local hash = ns.Hash
 
 function C:KeyDigests(f)
   local out = {}

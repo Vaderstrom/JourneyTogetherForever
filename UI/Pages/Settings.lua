@@ -41,7 +41,6 @@ local function column(pf, parent, width)
     c.cur = sec
     return h
   end
-  function c:Gap() self.cur.y = self.cur.y + GAP end
   -- A row: the label (and its "?") on the left, the control at the right.
   function c:Row(label, control, help)
     local sec = self.cur
@@ -123,9 +122,11 @@ local function column(pf, parent, width)
   end
   -- Places the sections from the top down; returns the column's height.
   function c:Layout()
-    local y = 0
+    local y, openIn = 0, {}
     for i, sec in ipairs(self.sections) do
       local h, shut = sec.head, folded(sec)
+      -- One open per group, also from a fold saved before a section joined one (1.4's "Other addons", U165).
+      if sec.group and not shut then shut = openIn[sec.group] or false; openIn[sec.group] = true end
       h:ClearAllPoints(); h:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, -y)
       if not h.icon:SetTexture(FOLD_ICON[shut]) then h.icon:SetColorTexture(0, 0, 0, 0) end
       h.click:SetWidth(20 + h.text:GetStringWidth() + 4)
@@ -311,9 +312,16 @@ local function build(pf)
   pf.trackerPeek = opt(L.TRACKER_PEEK, "trackerPeek", L.TRACKER_PEEK_HINT, true)
   pf.trackerCombat = opt(L.TRACKER_HIDE_COMBAT, "trackerHideCombat")
   pf.trackerInstance = opt(L.TRACKER_HIDE_INSTANCE, "trackerHideInstance", L.TRACKER_HIDE_INSTANCE_HINT)
-  -- Other addons the book opens (6 Nov 2026): whose stories the dungeons' story button tells.
-  local FROM = { spoken = L.SPOKEN, lore = L.LORE_FOREVER }
-  right:Head("addons", L.SET_ADDONS, nil, { sum = function() return FROM[Settings:Get("storyFrom")] or "" end })
+  -- Dungeons and raids (U164, U165; "Other addons" until then: the left page had no room): what the Dungeons and Raids
+  -- pages show, and whose stories the dungeons' story button tells (6 Nov 2026). It takes turns with the toasts and
+  -- the tracker, so the page still needs no scrolling. (The id stays "addons": what is folded is kept by it.)
+  local SHOW = { all = L.SHOW_SUM_ALL, open = L.SHOW_SUM_OPEN }
+  local CHOICES = { { L.DUNGEONS_SHOW_ALL, "all" }, { L.DUNGEONS_SHOW_OPEN, "open" } }
+  right:Head("addons", L.SET_DUNGEONS, nil, { group = "right", folded = true, sum = function()
+    return L.SET_SUM_SHOW:format(SHOW[Settings:Get("dungeonsShow")] or "", SHOW[Settings:Get("raidsShow")] or "")
+  end })
+  right:Row(L.DUNGEONS_SHOW, dropdown(Rp, CHOICES, "dungeonsShow"), L.DUNGEONS_SHOW_HINT)
+  right:Row(L.RAIDS_SHOW, dropdown(Rp, CHOICES, "raidsShow"), L.RAIDS_SHOW_HINT)
   right:Row(L.STORY_FROM, dropdown(Rp, { { L.SPOKEN, "spoken" }, { L.LORE_FOREVER, "lore" } }, "storyFrom"), L.STORY_FROM_HINT)
   pf.heights = { left = left:MaxHeight(), right = right:MaxHeight() }
   function pf.layout() left:Layout(); right:Layout() end

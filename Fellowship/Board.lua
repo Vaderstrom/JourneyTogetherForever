@@ -147,10 +147,8 @@ function B:News(f)
     if i > self.NEWS then break end
     local d = p.key and ns.Dungeon(p.key)
     local who = p.names or { p.by }
-    local names = ns.Clears.AndList(who)
     list[#list + 1] = { id = ("picture:%s:%d"):format(p.by or "", p.time), kind = "picture", time = p.time, screenshot = p.time,
-      name = d and d[2] or nil, text = d and (p.photo and L.BOARD_EV_PHOTO or L.BOARD_EV_PICTURE):format(d[2], names)
-        or (p.photo and L.BOARD_EV_PHOTO_0 or L.BOARD_EV_PICTURE_0):format(names),
+      name = d and d[2] or nil, text = ns.Moments.PictureText(p),
       fields = { dungeon = d and d[2] or nil, who = shorts(who) } }
   end
   -- The fellowship's firsts (SPEC §8): posted only where the player draws "Firsts" to (default off). Only a settled

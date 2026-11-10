@@ -43,9 +43,9 @@ end
 -- Standing of each counted Hero in the current chapter
 ---------------------------------------------------------------------------
 local function standing(f, ch, name)
-  local lvl, r = Hr:Level(f, name), f.rules
-  if lvl < ch.floor - r.floorTol then return "below" end
-  if lvl > ch.cap + r.capTol then return "over" end
+  local lvl = Hr:Level(f, name)
+  if lvl < J:FloorLevel(f, ch) then return "below" end
+  if lvl > J:CapLevel(f, ch) then return "over" end
   if lvl >= ch.cap then return "cap" end
   return "ready"
 end
@@ -72,10 +72,10 @@ end
 function P:OverCap(f, ch, n, name)
   local lvl, r = Hr:Level(f, name), f.rules
   f.capLogged = f.capLogged or {}
-  if lvl <= ch.cap + r.capTol or lvl <= (f.capLogged[name] or 0) then return end
+  if lvl <= J:CapLevel(f, ch) or lvl <= (f.capLogged[name] or 0) then return end
   local h = Hr:Get(f, name)
   local inRun = h and h.run
-  if inRun and r.runXp and lvl <= ch.cap + r.capTol + r.runXpMax then return end
+  if inRun and r.runXp and lvl <= J:CapLevel(f, ch) + r.runXpMax then return end
   f.capLogged[name] = lvl
   -- (The same id on every copy that notices it: Clears:Merge keeps one.)
   ns.Clears:Log(f, { type = "cap", icon = "cap", ok = false, id = "cap:" .. name .. ":" .. lvl .. ":" .. n,

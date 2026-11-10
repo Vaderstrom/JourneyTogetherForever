@@ -56,8 +56,6 @@ local function buildAttune(pf, width)
   pf.alscroll = UI.Scroll(pf.left)
   pf.alscroll:SetPoint("TOPLEFT", 0, -34); pf.alscroll:SetPoint("BOTTOMRIGHT")
   local Lc = pf.alscroll.child
-  pf.aHelp = UI.WrapText(Lc, 12, "ink2", width)
-  pf.aHelp:SetText(L.ATT_HELP)
   pf.aNone = UI.SketchLine(Lc, width, "EmptySince")
   local colW = (width - ATT_NAME_W) / ATT_COLS
   pf.aHead = CreateFrame("Frame", nil, Lc)
@@ -156,7 +154,6 @@ local function refreshAttune(pf, f, me)
   local list = QL:Attunements(f, me)
   local heroes = gridHeroes(f, me)
   local s = UI.Stack(pf.alscroll.child)
-  s:Place(pf.aHelp, pf.aHelp:GetStringHeight(), 8)
   pf.aNone:SetShown(#list == 0); pf.aHead:SetShown(#list > 0)
   if #list == 0 then
     -- Which one opens first, from the list (it was a fixed text that named Blackrock Depths).
@@ -286,15 +283,15 @@ local function build(pf)
   local W = ns.Window
   local width = W.PAGE_W - 8
 
-  -- Tabs: Dungeon quests · Shared quests · Quest chains · Attunements & keys (the one shown first comes first; 6 Nov
-  -- 2026; Dungeon quests first since U79, 7 Nov 2026; named so since U101), the game's tabs with icons (U102).
-  pf.tab = "dungeons"
-  pf.tabs = UI.Tabs(pf.left, { { L.TAB_DUNGEONS, "dungeons", "toast_dquest" }, { L.TAB_QUESTS, "quests", "quests" },
+  -- Tabs (U141, the rebuild of 9 Nov 2026): Shared quests · Quest chains · Attunements & keys, with icons (U102). A
+  -- dungeon's quests are on its Dungeon page (the Dungeon quests tab is gone).
+  pf.tab = "quests"
+  pf.tabs = UI.Tabs(pf.left, { { L.TAB_QUESTS, "quests", "quests" },
     { L.TAB_CHAINS, "chains", "chapter" }, { L.TAB_ATTUNE, "attune", "toast_attune" } },
     function() return pf.tab end, function(v) pf.tab = v; pf.sel = nil; W:Refresh() end, width,
     function(v)
       local f = ns.Fellowship:Current()
-      if not f or v == "attune" or v == "dungeons" then return nil end
+      if not f or v == "attune" then return nil end
       local n = 0
       for _, x in ipairs(Q:Items(f)) do
         if (v == "chains") == (x.chain == true) and (x.together or x.join) then n = n + 1 end
@@ -438,7 +435,6 @@ local function build(pf)
   UI.Tooltip(pf.listen, L.LISTEN_TIP)
   pf.shareWhy = UI.WrapText(R, 12, "ink2", width)
   buildAttune(pf, width)
-  ns.QuestDungeons.Build(pf, width)
 end
 
 -- Quests tab: quests near this chapter's levels first (from 3 below the floor to 3 over the cap; unknown levels too).
@@ -472,16 +468,11 @@ local function refresh(pf, ctx)
   local width = ns.Window.PAGE_W - 8
   local me = ctx.me
   pf.tabs:Refresh()
-  local attune, dungeons = pf.tab == "attune", pf.tab == "dungeons"
-  pf.lscroll:SetShown(not (attune or dungeons)); pf.rscroll:SetShown(not (attune or dungeons))
+  local attune = pf.tab == "attune"
+  pf.lscroll:SetShown(not attune); pf.rscroll:SetShown(not attune)
   pf.alscroll:SetShown(attune); pf.arscroll:SetShown(attune)
-  pf.dlscroll:SetShown(dungeons); pf.drscroll:SetShown(dungeons)
   if attune then
     refreshAttune(pf, f, me)
-    return
-  end
-  if dungeons then
-    ns.QuestDungeons.Refresh(pf, f, me)
     return
   end
   -- The items of this tab: chains, or single quests (near this chapter's levels unless Show all). Only what is about
@@ -713,10 +704,6 @@ local function refresh(pf, ctx)
   pf.qArt:Fit(show and r.y or math.huge)
 end
 
+-- Titled Quests, with no line under it (U146).
 ns.Pages:Register({ id = "quests", label = L.NAV_QUESTS, build = build, refresh = refresh, news = { quests = true },
-  -- The title fits every tab; the line under it says what the chosen one is for ("Shared Quests" stood over the
-  -- Dungeon quests tab; the check of 8 Nov 2026).
-  title = function()
-    local pf = ns.Window.pageFrames and ns.Window.pageFrames.quests
-    return L.TITLE_QUESTS, L["SUB_QUESTS_" .. (pf and pf.tab or "quests"):upper()]
-  end })
+  title = function() return L.TITLE_QUESTS, "" end })

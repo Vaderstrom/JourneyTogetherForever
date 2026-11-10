@@ -242,9 +242,9 @@ function Hr:Standing(f, name)
   if F:IsFriend(f, name) then return L.STATUS_FRIEND, Hr.FRIEND end
   local ch = F:CurrentChapter(f)
   if not ch then return L.STATUS_DONE, "3E9A52" end
-  local lvl, r = self:Level(f, name), f.rules
-  if lvl < ch.floor - r.floorTol then return L.STATUS_TO_FLOOR:format(ch.floor - r.floorTol - lvl), "C8762E" end
-  if lvl > ch.cap + r.capTol then return L.STATUS_OVER_CAP, "C0392B" end
+  local lvl, fl = self:Level(f, name), ns.Journey:FloorLevel(f, ch)
+  if lvl < fl then return L.STATUS_TO_FLOOR:format(fl - lvl), "C8762E" end
+  if lvl > ns.Journey:CapLevel(f, ch) then return L.STATUS_OVER_CAP, "C0392B" end
   if lvl >= ch.cap then return L.STATUS_AT_CAP, "B8463E" end
   return nil
 end

@@ -1,6 +1,6 @@
--- Needs attention (SPEC §6): what the leader should look at, on the Manage page with a count in the sidebar.
--- Adventurers not seen for a while, falling behind, over the cap, open invites, older addon versions. Nothing here
--- changes the fellowship; it only points.
+-- Needs attention (SPEC §6, §4.13): what the Leader should look at, in the Inbox since U144 (9 Nov 2026; on the Manage
+-- page until then). Adventurers not seen for a while, falling behind, over the cap, open invites, older addon versions.
+-- Nothing here changes the fellowship; it only points.
 local _, ns = ...
 local L = ns.L
 local F, J, Hr = ns.Fellowship, ns.Journey, ns.Hero
@@ -19,15 +19,8 @@ local function card(name)
   end
 end
 
--- { { icon, text, key, act = { label, fn }, seen } }, most urgent first; seen ones last (U106: Seen takes a line off
--- the Manage count until its key changes: a new level, a login, a new version). Empty for Adventurers.
-function A:Items(f) return ns.SeenLast("attSeen", self:Gather(f)) end
-
-function A:See(f, key)
-  ns.MarkSeen("attSeen", key, self:Gather(f))
-  ns.Window:Refresh()
-end
-
+-- { { icon, text, key, act = { label, fn } } }, most urgent first; the Inbox adds Seen (U106: it takes a line off the
+-- count until its key changes: a new level, a login, a new version). Empty for Adventurers.
 function A:Gather(f)
   local me = ns.Me()
   local rank = ns.Permissions.Rank(f, me)
@@ -40,7 +33,7 @@ function A:Gather(f)
 
   -- Falling behind: below the floor of the current chapter.
   if ch then
-    -- (Not yourself: your own catch-up is on the You card.)
+    -- (Not yourself: Focus now tells you how far you are.)
     for _, name in ipairs(J:Below(f, ch.n)) do
       if name ~= me then
         add("waiting", L.NA_BEHIND:format(ns.Short(name), Hr:Level(f, name), J:FloorLevel(f, ch)),
@@ -82,8 +75,3 @@ function A:Gather(f)
   return items
 end
 
-function A:Count(f)
-  local n = 0
-  for _, item in ipairs(f and self:Gather(f) or {}) do if not ns.Seen("attSeen", item.key) then n = n + 1 end end
-  return n
-end

@@ -11,7 +11,6 @@ local PORTRAIT = 56 -- the 3D head (or class crest) on a Companion card
 local CARD_X = 8 + PORTRAIT + 8 -- where the card's text starts
 local OLD = "C8762E" -- an old addon: the orange of "2 to the floor"
 local FALLEN_BG = { Hr.FALLEN, 0.16 } -- a Fallen's card: muted violet over the page, in every theme
-local FEED_IN = 22 -- Recent history: where a line's words start, after its icon
 
 -- Fallen under a survival challenge (SPEC §9).
 local function isFallen(f, name) return f.falls ~= nil and ns.Challenges:Fallen(f, name) ~= nil end
@@ -113,15 +112,6 @@ local function buildList(pf, width)
   pf.compFriend = fr
   local div = UI.Divider(left)
   div:SetPoint("TOPLEFT", 0, -176); div:SetPoint("TOPRIGHT", 0, -176)
-  local ch = UI.Text(left, 17, "ink", "title")
-  ch:SetPoint("TOPLEFT", 0, -196)
-  ch:SetText(L.CHRONICLE)
-  pf.feed, pf.feedIcon = {}, {}
-  for i = 1, 6 do
-    pf.feed[i] = UI.WrapText(left, 13, "ink", width - FEED_IN, "book")
-    pf.feedIcon[i] = left:CreateTexture(nil, "ARTWORK")
-    pf.feedIcon[i]:SetSize(16, 16)
-  end
   pf.tourney = UI.WrapText(left, 12, "ink2", width)
   -- The level track of the current chapter in the page's empty half (U5, 31 Oct 2026).
   pf.trackHead = UI.Text(left, 17, "ink", "title")
@@ -259,25 +249,6 @@ local function buildList(pf, width)
   end
 end
 
--- Recent history: the fellowship's log and its falls, newest first (the check of 1 Nov 2026, 14:32: Brannic's fall
--- was missing here). Each line with an icon: the skull for a Fallen, the candle for a shared life, else its kind's.
-local FEED_ICON = { members = "heroes", rules = "rules", events = "gatherings", journey = "hist_mark" }
-function ns.RecentHistory(f, max)
-  local out = {}
-  for i, e in ipairs(F:ChronicleView(f, max)) do
-    out[#out + 1] = { text = e.text, time = e.time or 0, seq = i, icon = FEED_ICON[F.LOG_GROUP[e.k]] or "hist_chapter" }
-  end
-  for _, e in ipairs(ns.Challenges:Entries(f)) do
-    if e.icon == "fallen" or e.icon == "life" or e.icon == "candle" then
-      out[#out + 1] = { text = e.text, time = e.time or 0, seq = 0, icon = "hist_" .. e.icon, fall = true }
-    end
-  end
-  -- (In the same second the fall first, then the log in its own order.)
-  table.sort(out, function(a, b) if a.time ~= b.time then return a.time > b.time end return a.seq < b.seq end)
-  for i = #out, max + 1, -1 do out[i] = nil end
-  return out
-end
-
 local function tourneyLine(f)
   local state, guild = F:TournamentState(f)
   if state == "off" then return L.TOURNEY_OFF end
@@ -341,20 +312,8 @@ local function refreshList(pf, ctx, width)
     end
   end
   pf.compFriend.label:SetText(friendN == 1 and L.COMP_FRIEND or L.COMP_FRIENDS)
-  local y = 222
-  local chron = ns.RecentHistory(f, #pf.feed)
-  for i, fs in ipairs(pf.feed) do
-    local entry, icon = chron[i], pf.feedIcon[i]
-    fs:SetShown(entry ~= nil); icon:SetShown(entry ~= nil)
-    if entry then
-      fs:SetText(entry.text)
-      fs:ClearAllPoints(); fs:SetPoint("TOPLEFT", FEED_IN, -y)
-      UI.SetIcon(icon, ns.ICONS[entry.icon] or ns.ICONS.hist_chapter)
-      icon.key = entry.icon
-      icon:ClearAllPoints(); icon:SetPoint("TOPLEFT", 0, -(y - 1))
-      y = y + fs:GetStringHeight() + 6
-    end
-  end
+  -- (Recent history left this page in the rebuild: Since last time and the Chronicle hold it, SPEC §4.8.)
+  local y = 188
   pf.tourney:SetText(tourneyLine(f))
   pf.tourney:ClearAllPoints(); pf.tourney:SetPoint("TOPLEFT", 0, -(y + 8))
   -- The level track under it, as many lines as fit above Leave and Group photo (36 for the buttons).
@@ -1039,7 +998,7 @@ local function refreshInspect(pf, ctx, width)
       if why == "leader" then text = L.FRIEND_NOT_LEADER
       elseif why == "cap" then
         local cur = ns.Journey:Current(f)
-        text = L.FRIEND_ON_TEXT .. " " .. L.FRIEND_OVER_CAP:format(cur.cap + f.rules.capTol, Hr:Level(f, name))
+        text = L.FRIEND_ON_TEXT .. " " .. L.FRIEND_OVER_CAP:format(ns.Journey:CapLevel(f, cur), Hr:Level(f, name))
       end
       pf.friendText:SetText(text)
       pf.friendButton:SetLabel(friend and L.FRIEND_BACK or L.FRIEND_BECOME)

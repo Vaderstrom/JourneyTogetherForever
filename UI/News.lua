@@ -109,8 +109,7 @@ function N:Build()
     card:EnableMouse(false)
     o.cards[i] = card
   end
-  -- Continue: the page under it may show you around now (its first visit was held back).
-  o.ok = UI.TextButton(box, L.CONTINUE, function() o:Hide(); ns.Walkthrough:Visited(W.current) end, "primary", 14)
+  o.ok = UI.TextButton(box, L.CONTINUE, function() o:Hide() end, "primary", 14)
   o.ok:SetPoint("BOTTOM", 0, 18)
   return o
 end

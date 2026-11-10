@@ -24,9 +24,7 @@ Cf.PARTS = { "ring", "leader", "members", "rules", "journey", "banner", "invites
 Cf.ISSUES = { "leader", "invited", "role", "ring" }
 
 local function hash(v)
-  local s, h = ns.Serialize.Encode({ v == nil and false or v }), 5381
-  for i = 1, #s do h = (h * 33 + s:byte(i)) % 4294967296 end
-  return h
+  return ns.Hash(ns.Serialize.Encode({ v == nil and false or v }))
 end
 
 -- Nothing, or an empty list: the same (a copy that went through Fellowship:Sanitize has empty lists where another

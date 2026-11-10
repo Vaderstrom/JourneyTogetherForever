@@ -16,7 +16,7 @@ P.ART_HORDE = {
   council = { "HordeCouncil", 4 }, arena = { "HordeArena", 4 }, board = { "HordeBoard", 4 },
 }
 P.PAGE_ART = { chronicle = "board", moments = "board", history = "hall", gatherings = "board", overview = "land", chapter = "land", quests = "board", heroes = "heroes", manage = "council",
-  managefellowship = "council", tourney = "arena", raids = "land", setup = "hall", since = "land", admin = "board", rules = "council",
+  managefellowship = "council", tourney = "arena", raids = "land", dungeons = "land", setup = "hall", since = "land", admin = "board", rules = "council",
   rulesadmin = "council", create = "hall", welcome = "land", join = "heroes", settings = "hall" }
 
 -- Pages register themselves: { id, label, icon, title = function(ctx) return title, sub end, build, refresh }.
@@ -49,25 +49,27 @@ function P:Context()
   return ctx
 end
 
+-- Raids in the sidebar: once the journey is complete (Fellowship/Endgame.lua), or from the start when Settings →
+-- Raids page says Show all (U165, the owner, 9 Nov 2026: "Same options for Raids").
+local function raidsShown(f) return f and ns.Endgame and (ns.Endgame:Open(f) or ns.Settings:Get("raidsShow") == "all") end
+
 -- Sidebar groups for ctx (empty outside a fellowship).
 function P:Nav(ctx)
   if not ctx.inFellow then return {} end
   -- Watching: the pages to follow the fellowship by, nothing to act on. The rules read only (28 Oct 2026).
   if ctx.watching then
-    local journey = { "overview", "chapter", "chronicle" }
-    if ctx.f and ns.Endgame and ns.Endgame:Open(ctx.f) then table.insert(journey, 3, "raids") end
-    return { { label = L.NAV_JOURNEY, items = journey }, { label = L.NAV_FELLOWSHIP, items = { "heroes", "rules", "history" } } }
+    local journey = { "overview", "chapter", "dungeons", "chronicle" }
+    if raidsShown(ctx.f) then table.insert(journey, 4, "raids") end
+    return { { label = L.NAV_JOURNEY, items = journey }, { label = L.NAV_FELLOWSHIP, items = { "heroes", "rules" } } }
   end
   local fellowship = { "heroes", "gatherings" }
   if ctx.tActive then fellowship[#fellowship + 1] = "tourney" end
   -- The rules are the whole fellowship's: in the same place for everyone (they were under CAPTAIN for the Captain,
   -- which made them look like a Captain's page; 27 Oct 2026). What each rank may do there, the page says.
   fellowship[#fellowship + 1] = "rules"
-  -- The fellowship's own story (the journey's is the Chronicle; 29 Oct 2026).
-  fellowship[#fellowship + 1] = "history"
-  -- Raids once the Endgame is open (after the journey, Fellowship/Endgame.lua).
-  local journey = { "overview", "chapter", "quests", "chronicle" }
-  if ctx.f and ns.Endgame and ns.Endgame:Open(ctx.f) then table.insert(journey, 3, "raids") end
+  -- Every dungeon to browse (U157); Raids as raidsShown says.
+  local journey = { "overview", "chapter", "dungeons", "quests", "chronicle" }
+  if raidsShown(ctx.f) then table.insert(journey, 4, "raids") end
   local nav = {
     { label = L.NAV_JOURNEY, items = journey },
     { label = L.NAV_FELLOWSHIP, items = fellowship },
@@ -87,6 +89,9 @@ function P:NavItem(id)
 end
 
 function P:InNav(id, ctx)
+  -- (A page only the Leader has, under a sidebar entry everyone has: editing the rules, U143.)
+  local def = self.pages[id]
+  if def and def.leader and not ctx.isLeader then return false end
   local item = self:NavItem(id)
   for _, g in ipairs(self:Nav(ctx)) do
     for _, it in ipairs(g.items) do if it == item then return true end end
@@ -94,8 +99,8 @@ function P:InNav(id, ctx)
   return false
 end
 
--- Which page shows: in a fellowship the chosen page (if it is in the sidebar, or a free page such as Since you were
--- last here), otherwise the start page.
+-- Which page shows: in a fellowship the chosen page (if it is in the sidebar, or a free page such as a dungeon's),
+-- otherwise the start page.
 function P:Resolve(page, startView, ctx)
   local def = self.pages[page]
   -- Settings shows in and outside a fellowship (def.anywhere).
@@ -106,12 +111,11 @@ function P:Resolve(page, startView, ctx)
   return startView or "welcome"
 end
 
--- Accent colour of a page: leader red for Journey Admin and Manage, the fellowship's colour for Adventurers, Rules
--- and History.
+-- Accent colour of a page: leader red for Journey Admin and Manage, the fellowship's colour for Adventurers and Rules.
 function P:Accent(page, ctx)
   local A = ns.Theme.ACCENT
   if page == "admin" or self:NavItem(page) == "manage" then return A.leader end
-  if page == "heroes" or page == "rules" or page == "history" then return ctx.color or A.journey end
+  if page == "heroes" or page == "rules" then return ctx.color or A.journey end
   return A.journey
 end
 

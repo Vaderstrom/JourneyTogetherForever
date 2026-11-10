@@ -111,18 +111,13 @@ ns.ManualSteps = {
     cmds = { "/jtf adventurers", "/jtf companions", "/jtf heroes", "/jtf help" } },
 
   -- As an Adventurer
-  { id = "welcome-card", section = "As an Adventurer (Testleader leads)", todo = "Open the Overview, then the Chapter, Rules and Quests pages one by one, and the Overview again.",
-    see = "Welcome to the fellowship on the Overview: the Chapter, the rulebook and the quests, each ticked once you opened its page. When all three are ticked the card goes.",
+  { id = "focus-now", section = "As an Adventurer (Testleader leads)", todo = "Open the Overview, then the Chapter page.",
+    see = "No welcome card: Focus now on the Overview says one thing to do, why, and a button; the Chapter page's Your To do has it as its first open item.",
     auto = function()
       local f = cur()
       if not f then return false, "you are in no fellowship" end
-      local list, label = ns.Together:Started(f)
-      if label == ns.L.WELCOME_LABEL then
-        local done = 0
-        for _, s in ipairs(list) do if s.done then done = done + 1 end end
-        return false, ("the welcome card: %d of %d ticked"):format(done, #list)
-      end
-      return f.leader ~= ns.Me(), f.leader ~= ns.Me() and "all ticked: the card is gone" or "you lead this fellowship"
+      local fo = ns.Together:Focus(f)
+      return fo ~= nil, fo and fo.head or "no Focus now"
     end },
   { id = "rulebook", section = "As an Adventurer (Testleader leads)",
     todo = "Open Rules. Read the rulebook on the left; on the right choose a rule and a new value, and press Propose.",
@@ -136,7 +131,7 @@ ns.ManualSteps = {
       return false, "no vote proposed by you"
     end },
   { id = "leader-rules", section = "As an Adventurer (Testleader leads)", todo = "Testleader changes a rule.",
-    see = "A toast: New rules. Click it: the Rules page opens. A line under Recent history (Adventurers page) and in History.",
+    see = "A toast: New rules. Click it: the Rules page opens. A line in Since last time (Overview) and on the Chronicle's The fellowship tab.",
     cmds = { "/jtf debug hero Testleader rules" },
     auto = function()
       local f = cur()
@@ -145,7 +140,7 @@ ns.ManualSteps = {
     end },
   { id = "leader-journey", section = "As an Adventurer (Testleader leads)",
     todo = "Testleader publishes a shorter journey. Press the button once: each press removes one more chapter.",
-    see = "A toast: A new journey. The header says Chapter 1 of 14; a line under Recent history.",
+    see = "A toast: A new journey. The header says Chapter 1 of 14; a line in Since last time (Overview).",
     cmds = { "/jtf debug hero Testleader journey" },
     auto = function()
       local f = cur()
@@ -172,7 +167,7 @@ ns.ManualSteps = {
 
   -- As the Leader
   { id = "corwin-joins", section = "As the Leader", todo = "Corwin accepts an invite.",
-    see = "Corwin joins: his card on Adventurers and a line under Recent history and in History (Fellowship). (The Chronicle is for runs, Leader changes and the cap.)",
+    see = "Corwin joins: his card on Adventurers and a line on the Chronicle's The fellowship tab.",
     cmds = { "/jtf debug hero Corwin accept" },
     auto = function() return member("Corwin"), member("Corwin") and "Corwin is in" or "Corwin is not in" end },
   { id = "gathering", section = "As the Leader", todo = "Brannic sets up a Gathering; Elyra answers Maybe, Corwin No.",
@@ -239,12 +234,12 @@ ns.ManualSteps = {
       return on, on and "Darrow is invited" or "no invite to Darrow"
     end },
   { id = "swap", section = "As the Leader", todo = "Corwin plays another character.",
-    see = "Adventurers: Corwinalt in Corwin's place; a line in History.", cmds = { "/jtf debug hero Corwin swap Corwinalt" },
+    see = "Adventurers: Corwinalt in Corwin's place; a line on the Chronicle's The fellowship tab.", cmds = { "/jtf debug hero Corwin swap Corwinalt" },
     auto = function()
       return member("Corwinalt") and not member("Corwin"), member("Corwinalt") and "Corwinalt is in" or "no Corwinalt"
     end },
-  { id = "history", section = "As the Leader", todo = "Open History (Fellowship). Try its filters.",
-    see = "Who joined, left and leads, Gatherings and the rest, newest first; Adventurers, Rules and votes, Events filter them. Right: Founded on … by …, the numbers, the Leaders, Open the Chronicle.",
+  { id = "history", section = "As the Leader", todo = "Open the Chronicle's The fellowship tab. Try its filters.",
+    see = "Who joined, left and leads, Gatherings and the rest, newest first; Adventurers, Rules and votes, Events filter them. Right: Founded on … by …, the numbers, the Leaders.",
     auto = function()
       local f = cur()
       local n = f and #ns.Fellowship:ChronicleView(f, 1000, "members") or 0
@@ -267,15 +262,15 @@ ns.ManualSteps = {
 
   -- Playing together (M25)
   { id = "play-now", section = "Playing together", todo = "Elyra and Corwin come online. Open the Overview.",
-    see = "A gold Play now block: the one best thing to do with who is online (help someone to the floor, a dungeon two of you need, a shared quest, or level together) with one button. The tracker's next line says the same.",
+    see = "Focus now: the one best thing to do with who is online (help someone to the floor, a dungeon two of you need, a shared quest, or level together) with one button. The tracker's next line says the same.",
     cmds = { "/jtf debug hero Elyra online", "/jtf debug hero Corwin online", "/jtf" },
     auto = function()
       local f = cur()
-      local p = f and ns.Together:PlayNow(f)
-      return p ~= nil, p and p.text or "no Play now (nobody online?)"
+      local fo = f and ns.Together:Focus(f)
+      return fo ~= nil, fo and fo.head or "no Focus now"
     end },
   { id = "ahead", section = "Playing together", todo = "Corwin falls behind, then you level up (pretend) twice.",
-    see = "A toast \"You are … levels ahead of Corwin\"; the You card on the Overview says it too. Then set your level back.",
+    see = "A toast \"You are … levels ahead of Corwin\". Then set your level back.",
     cmds = { "/jtf debug hero Corwin level 15", "/jtf debug level 18", "/jtf debug level 19", "/jtf debug level off" } },
   { id = "session", section = "Playing together", todo = "End a pretend session with your group (as if you played 15 minutes), then click the big toast.",
     see = "The Session recap toast (big, no fanfare); its click opens the Chronicle at Sessions with the recap and a Your session chip.",
@@ -374,7 +369,7 @@ ns.ManualSteps = {
       return f ~= nil and f.name:sub(-1) == "*", f and f.name or "you are in no fellowship"
     end },
   { id = "hold", section = "Sync edge cases",
-    todo = "Hold on pretends you are in a dungeon (no combat needed; inside one the game holds addon messages). Then on the Adventurers page invite any name, on Manage's Rules tab change a rule and Publish, and Sync. Then Hold off, wait a few seconds, Sync again.",
+    todo = "Hold on pretends you are in a dungeon (no combat needed; inside one the game holds addon messages). Then on the Adventurers page invite any name, on the Rules page press Edit the rules, change a rule and Publish, and Sync. Then Hold off, wait a few seconds, Sync again.",
     see = "The invite: \"You can't invite during a fight or inside a dungeon.\" First sync: messages waiting, held on. Second: 0 waiting, held off.",
     cmds = { "/jtf debug hold on", "/jtf debug sync", "/jtf debug hold off", "/jtf debug sync" },
     auto = function()
@@ -394,7 +389,7 @@ ns.ManualSteps = {
   { id = "sounds-effects", section = "The client", todo = "Settings: sounds off, then on. Reduce effects on, then off again.",
     see = "Sounds only when on; with Reduce effects no page-turn animation and no toasts.", cmds = { "/jtf settings" } },
   { id = "relog", section = "The client", todo = "Log out and in again.",
-    see = "Everything is still there; Since you were last here; the setup guide does not come again." },
+    see = "Everything is still there; Since last time on the Overview; the setup guide does not come again." },
   { id = "other-character", section = "The client",
     todo = "Log in on another character, look at Your characters, press Follow this fellowship and open its Rules, then come back.",
     see = "Your characters lists this character's fellowship with \"as of …\" and Follow this fellowship. Its Rules page says \"Read only\" and \"as of …\"; nothing there can be changed." },

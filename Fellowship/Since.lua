@@ -1,11 +1,13 @@
--- Since you were last here (SPEC §6): what changed in the fellowship since you last opened the book.
--- A snapshot (time, chapter, every Hero's level) is kept per character in ns.char.since. It is taken when you press
--- Continue on the page, and at logout when the book was opened in that session; so a session without opening the
--- book keeps the older snapshot and nothing is missed.
+-- Since last time (the Overview, SPEC §4.4): what changed in the fellowship since you last opened the book.
+-- A snapshot (time, chapter, every Adventurer's level) is kept per character in ns.char.since. It is taken when the book
+-- closes (or the game logs out) after the Overview showed Since last time; so a session without looking keeps the older
+-- snapshot and nothing is missed.
 local _, ns = ...
 local L = ns.L
 local F, J, Hr = ns.Fellowship, ns.Journey, ns.Hero
 local S = { MAX_EVENTS = 8 }
+-- The challenges' lines it shows, as Recent history did: the falls and the shared lives (SPEC §4.8).
+local FALLS = { fallen = true, life = true, candle = true }
 ns.Since = S
 
 function S:Snapshot(f)
@@ -30,14 +32,16 @@ function S:Digest(f)
     local ch = f.journey.chapters[cur]
     d.chapter = ch and L.SINCE_CHAPTER:format(ns.Journey.Roman(cur), ch.name) or L.BN_JOURNEY_DONE
   end
-  -- Chronicle and counted runs, newest first.
+  -- The Chronicle's lines, newest first: the fellowship's log, counted runs, firsts, falls and shared lives, and the
+  -- pictures taken on this account.
   local list = {}
-  for _, e in ipairs(f.chronicle or {}) do
-    if (e.time or 0) > snap.t then list[#list + 1] = { text = e.text, time = e.time } end
-  end
-  for _, e in ipairs(f.history or {}) do
-    if (e.time or 0) > snap.t and e.type == "run" and e.ok then list[#list + 1] = { text = ns.Clears:Text(e), time = e.time } end
-  end
+  local function add(t, text, icon) if (tonumber(t) or 0) > snap.t then list[#list + 1] = { text = text, time = t, icon = icon } end end
+  -- Each line with its kind's icon, as on the History page (the same icon on every line said nothing; 9 Nov 2026).
+  for _, e in ipairs(f.chronicle or {}) do add(e.time, e.text, F.LOG_ICON[e.k]) end
+  for _, e in ipairs(f.history or {}) do if e.type == "run" and e.ok then add(e.time, ns.Clears:Text(e), "hist_run") end end
+  for _, e in ipairs(ns.Firsts:Entries(f)) do add(e.time, e.text, "hist_first") end
+  for _, e in ipairs(ns.Challenges:Entries(f)) do if FALLS[e.icon] then add(e.time, e.text, ns.Clears.ICON[e.icon]) end end
+  for _, p in ipairs(ns.Moments:Pictures(f)) do add(p.time, ns.Moments.PictureText(p), "bn_group") end
   table.sort(list, function(a, b) return a.time > b.time end)
   for i = 1, math.min(#list, self.MAX_EVENTS) do d.events[i] = list[i] end
   d.more = math.max(0, #list - self.MAX_EVENTS)
@@ -54,26 +58,19 @@ function S:Digest(f)
   return d
 end
 
--- The book shows the page once per session, the first time it opens (Window:Open).
-function S:Pending()
-  if self.shown then return false end
-  self.shown = true
-  local f = F:Current()
-  self.current = f and self:Digest(f)
-  return self.current ~= nil
-end
-
-function S:Continue()
-  self:Mark()
-  self.current = nil
-end
-
 ns:On("LOGIN", function()
   local f = F:Current()
   -- First time in this fellowship on this character: start counting from now.
   if f and (type(ns.char.since) ~= "table" or ns.char.since.fid ~= f.id) then S:Mark(f) end
 end)
 ns:On("JOINED", function() S:Mark() end)
-ns:RegisterEvent("PLAYER_LOGOUT", function()
-  if ns.Window and ns.Window.openedThisSession then S:Mark() end
-end)
+-- The Overview showed Since last time for your own fellowship (not another character's, not the first tour's sample,
+-- not during /jtf check): closing the book starts it over, so the next time says what came after ("since you last
+-- opened the book").
+-- shortcut: lines are compared by when they happened, so one held in an instance until after you looked (a run, a fall)
+-- is in the Chronicle and its toast only; keep an arrival time per line if players miss them.
+function S:Shown(f) if f == F:Current() and not ns.News.Dev() then self.shown = true end end
+function S:Closed()
+  if self.shown and not ns.News.Dev() then self.shown = nil; self:Mark() end
+end
+ns:RegisterEvent("PLAYER_LOGOUT", function() S:Closed() end)

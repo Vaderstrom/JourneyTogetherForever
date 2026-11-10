@@ -16,7 +16,9 @@
     ROGUE: ['#FFF468', '#7A6A00'], PRIEST: ['#E8E8E8', '#55555A'], SHAMAN: ['#2459FF', '#0A4AB8'],
     MAGE: ['#3FC7EB', '#1A6E8E'], WARLOCK: ['#8788EE', '#4A3E9A'], DRUID: ['#FF7C0A', '#A8540A'],
   };
-  const ROLE = { Mandatory: ['#A8761E', '#7A5410'], Bridge: ['#2F6FAE', '#1F4F80'], Optional: ['#4F7F3F', '#3A5F2E'] };
+  // "From the next chapter" since 1.5.0 (U147); "Bridge" from older versions.
+  const ROLE = { Mandatory: ['#A8761E', '#7A5410'], 'From the next chapter': ['#2F6FAE', '#1F4F80'], Bridge: ['#2F6FAE', '#1F4F80'],
+    Optional: ['#4F7F3F', '#3A5F2E'] };
   const STANDING = { below: 'var(--below)', ready: 'var(--ready)', cap: 'var(--cap)', over: 'var(--over)', away: 'var(--line)' };
 
   // ---------- Drawing ----------

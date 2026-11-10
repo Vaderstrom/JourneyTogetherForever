@@ -126,7 +126,7 @@ Lab.SCENARIOS = {
   { "Getting started: an invitation", "Testleader invites you: the inbox badge, the Join page with Accept / Decline and your role.", function()
     if invited() then C_Timer.After(0.3, function() start("join") end) end
   end },
-  { "Getting started as an Adventurer", "You accept the invitation as DPS: the Welcome to the fellowship card on the Overview (Chapter, rules, quests).", function()
+  { "Getting started as an Adventurer", "You accept the invitation as DPS: the Overview, with Focus now and your To do on the Chapter page.", function()
     if not invited() then return end
     ns.db.lab = { fid = ns.Dev.TEST_ID, started = time() }
     C_Timer.After(0.3, function()
@@ -134,7 +134,7 @@ Lab.SCENARIOS = {
       whenJoined(20)
     end)
   end },
-  { "Getting started as the Leader", "A new fellowship, alone: Getting started on the Overview, the Prologue on the Chapter page.", function()
+  { "Getting started as the Leader", "A new fellowship, alone: your first steps head the To do, the Prologue on the Chapter page.", function()
     if fresh(true) then open("overview") end
   end },
   { "The setup guide", "The three steps a new fellowship shows once: Look, While you play, Reminders.", function()
@@ -270,7 +270,7 @@ Lab.SWITCHES = {
   { "A sample toast", function() dev("toast") end },
   { "A session recap (15 min with your group)", function() dev("session") end },
   { "An invite with no answer (share window)", function() dev("share Kim") end },
-  { "Since you were last here", function() dev("since") end },
+  { "Since last time: count from now", function() dev("since") end },
   { "Show me around (Leader)", function() if ns.Walkthrough then ns.Window:Open("overview"); ns.Walkthrough:Start("leader") end end },
   { "Show me around (Adventurer)", function() if ns.Walkthrough then ns.Window:Open("overview"); ns.Walkthrough:Start("member") end end },
 }

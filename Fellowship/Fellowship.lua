@@ -66,6 +66,15 @@ F.LOG_GROUP = {
   gather = "events", gathercancel = "events", tstart = "events", champion = "events", tcancel = "events",
   marked = "journey", undid = "journey", reopened = "journey", ticked = "journey", unticked = "journey",
 }
+-- The icon of each kind of line, on the History page and the Overview's Since last time (older lines without a kind:
+-- the page's own).
+F.LOG_ICON = {
+  founded = "toast_chapter", invited = "inbox", joined = "heroes", swap = "heroes", left = "bn_away", removed = "bn_away",
+  leads = "manage", swapleader = "manage", takeover = "manage",
+  rules = "rules", journey = "admin", renamed = "rules", vote = "rules", votepassed = "rules",
+  gather = "gatherings", gathercancel = "gatherings", tstart = "tourney", champion = "tourney", tcancel = "tourney",
+  marked = "hist_mark", undid = "hist_undo", reopened = "hist_undo", ticked = "hist_mark", unticked = "hist_undo",
+}
 function F:Log(f, text, t, k, who)
   table.insert(f.chronicle, 1, { text = text, time = t or time(), k = k, who = who })
   while #f.chronicle > self.CHRONICLE_MAX do table.remove(f.chronicle) end
@@ -661,7 +670,7 @@ function F:Leave()
   if not f then return false end
   if f.leader ~= ns.Me() then return yourself(function() return self:Do({ k = "leave" }) end) end
   local heir = self:Successor(f)
-  if not heir then return yourself(function() return self:Do({ k = "disband" }) end) end
+  if not heir then return self:Disband() end
   return self:Do({ k = "lead", name = heir }) and yourself(function() return self:Do({ k = "leave" }) end)
 end
 
@@ -690,7 +699,7 @@ function F:FriendBlock(f, on)
   if ns.Challenges:Fallen(f, me) then return "fallen" end
   if not on then
     local ch = ns.Journey:Current(f)
-    if ch and ns.Hero:Level(f, me) > ch.cap + f.rules.capTol then return "cap" end
+    if ch and ns.Hero:Level(f, me) > ns.Journey:CapLevel(f, ch) then return "cap" end
   end
   return nil
 end

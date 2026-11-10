@@ -3,9 +3,9 @@
 -- is dimmed and cannot be clicked. The book shows a sample fellowship meanwhile (Fellowship/Sample.lua), drawn as
 -- you with the tour's rank (Watch.demo), so every page has something to show and nothing real changes.
 -- Two tours: Leader and Adventurer (two ranks since 27 Oct 2026). Offered once after the setup guide as a short first
--- tour (the Overview and what you see first; the owner, 8 Nov 2026: the whole book at once was too long), then each
--- page shows you around the first time you open it (About this page's two steps). Settings runs the whole tour; a
--- promotion offers a short tour of only what is new for you.
+-- tour (the Overview and what you see first; the owner, 8 Nov 2026: the whole book at once was too long); a page's
+-- own help is its "?" (About this page). Settings runs the whole tour; a promotion offers a short tour of only what is
+-- new for you.
 local _, ns = ...
 local L = ns.L
 local UI = ns.UI
@@ -24,10 +24,22 @@ local function pf(id) return W().pageFrames[id] end
 WK.STEPS = {
   { id = "INTRO", ranks = ALL, page = "overview", target = function() return W().frame.header end },
   { id = "NAV", ranks = ALL, page = "overview", target = function() return W().frame.nav end },
-  { id = "STAND", ranks = ALL, page = "overview", target = function() return pf("overview").you end },
-  { id = "STANDINGS", ranks = ALL, page = "overview", target = function() return pf("overview").right end },
-  { id = "CHAPTER", ranks = ALL, page = "chapter", target = function() return pf("chapter").rows.items[1] end },
+  -- The Overview's three parts, then Where we stand (U146, the rebuild of 9 Nov 2026).
+  { id = "FOCUS", ranks = ALL, page = "overview", target = function() return pf("overview").focus end },
+  { id = "SINCE", ranks = ALL, page = "overview", target = function() return pf("overview").since end },
+  { id = "COMING", ranks = ALL, page = "overview", target = function() return pf("overview").coming end },
+  { id = "STAND", ranks = ALL, page = "overview", target = function() return pf("overview").pic, pf("overview").stand end },
+  -- Your To do: its heading to the first dungeon.
+  { id = "CHAPTER", ranks = ALL, page = "chapter", target = function()
+    local p = pf("chapter")
+    return p.todoHead, p.rows.items[1]
+  end },
   { id = "CLEARS", ranks = ALL, page = "chapter", target = function() return pf("chapter").matrix end },
+  -- A dungeon's page: the chapter's first.
+  { id = "DUNGEON", ranks = ALL, page = "dungeon", before = function()
+    local x = (pf("chapter").rows.items[1] or {}).key
+    if x then W().dungeon = x end
+  end, target = function() return pf("dungeon").right end },
   { id = "QUESTS", ranks = ALL, page = "quests", target = function() return pf("quests").left end },
   { id = "HISTORY", ranks = ALL, page = "chronicle", target = function() return pf("chronicle").left end },
   { id = "COMPANIONS", ranks = ALL, page = "heroes", target = function() return pf("heroes").listR end },
@@ -35,11 +47,10 @@ WK.STEPS = {
     target = function() return pf("heroes").insR end },
   { id = "GATHERINGS", ranks = ALL, page = "gatherings", target = function() return pf("gatherings").left end },
   { id = "INVITE", ranks = ALL, page = "heroes", before = function() pf("heroes").invOpen = true end, target = function() return pf("heroes").invHead, pf("heroes").send end },
-  -- The rulebook, then the Leader's Manage with its Rules tab, one after the other; Journey Admin last before the
-  -- end (the tour went Manage, Rules, Journey Admin, Rules tab: back and forth; 28 Oct 2026).
+  -- The rulebook (where the Leader edits it, U143), then the Leader's Manage; Journey Admin last before the end (the
+  -- tour went back and forth between them; 28 Oct 2026).
   { id = "RULES", ranks = ALL, page = "rules", target = function() return pf("rules").left end },
   { id = "MANAGE", ranks = { leader = true }, page = "manage", target = function() return pf("manage").left end },
-  { id = "RULESADMIN", ranks = { leader = true }, page = "rulesadmin", target = function() return pf("rulesadmin").left end },
   { id = "HEADER", ranks = ALL, target = function()
     local h = W().frame.header
     return h.chars, h.settings
@@ -55,17 +66,20 @@ WK.STEPS = {
 -- About this page (the owner, 7 Nov 2026): the header's "?" walks through the page you are on, on your own fellowship
 -- (no sample), so what each page does can be looked up any time without the whole tour. Two steps: its left page
 -- (what the page is for) and its right page. Texts: WALK_PG_<PAGE>_T / WALK_PG_<PAGE> and WALK_PG_<PAGE>_R_T /
--- WALK_PG_<PAGE>_R.
+-- WALK_PG_<PAGE>_R. A flat sheet of parts (the Overview) goes part by part instead: WK.PARTS, WALK_PG_<PAGE>_<PART>.
 WK.PAGES = { welcome = true, create = true, join = true, overview = true, chapter = true, quests = true,
   chronicle = true, moments = true, raids = true, heroes = true, gatherings = true, rules = true, history = true,
-  tourney = true, since = true, settings = true, manage = true, managefellowship = true, rulesadmin = true, admin = true,
-  dungeon = true }
+  tourney = true, settings = true, manage = true, managefellowship = true, rulesadmin = true, admin = true,
+  dungeon = true, dungeons = true }
+WK.PARTS = {
+  overview = { { "", function(p) return p.pic, p.stand end }, { "_FOCUS", function(p) return p.focus end },
+    { "_SINCE", function(p) return p.since end }, { "_COMING", function(p) return p.coming end } },
+  dungeons = { { "", function(p) return p.scroll end } },
+}
 
--- The first tour: these steps of the whole tour, then its own end (WALK_FIRSTDONE).
-WK.FIRST = { INTRO = true, NAV = true, STAND = true, STANDINGS = true, HEADER = true, TRACKER = true }
--- Pages that never show you around by themselves: outside a fellowship, Since you were last here (it opens by itself
--- at login), and the Overview (the first tour's).
-WK.NO_VISIT = { welcome = true, create = true, join = true, since = true, overview = true }
+-- The first tour: these steps of the whole tour, then its own end (WALK_FIRSTDONE). No page shows you around by
+-- itself any more (U146): help is this short tour and the ?.
+WK.FIRST = { INTRO = true, NAV = true, FOCUS = true, SINCE = true, COMING = true, STAND = true, HEADER = true, TRACKER = true }
 
 -- Your rank in your own fellowship: "leader" or "member" (nil outside one).
 function WK:MyRank()
@@ -197,7 +211,7 @@ local function place()
   c:ClearAllPoints()
   if c.arrow and not c.arrow.none then c.arrow:Hide() end
   -- The offer: beside the book, right of it where the screen has room, else left of it, else in the book's lower
-  -- right corner; never over the You card and Play now, the first things a new Leader looks at (U88).
+  -- right corner; never over Focus now, the first thing a new Leader looks at (U88).
   if WK.offer then
     local ui, ws = UIParent:GetEffectiveScale() or 1, win:GetEffectiveScale() or 1
     local need = (CARD_W + GAP + 8) * ws / ui
@@ -299,6 +313,12 @@ function WK:StartPage(id)
     { id = key, target = function() return pf(id) and pf(id).left end },
     { id = key .. "_R", target = function() return pf(id) and pf(id).right end },
   }
+  if self.PARTS[id] then
+    self.steps = {}
+    for i, part in ipairs(self.PARTS[id]) do
+      self.steps[i] = { id = key .. part[1], target = function() return pf(id) and part[2](pf(id)) end }
+    end
+  end
   self.i, self.on, self.offer = 1, true, nil
   self.card.back:SetLabel(L.WALK_BACK)
   self.card.skip:SetLabel(L.WALK_CLOSE)
@@ -345,15 +365,11 @@ end
 function WK:Next() if self.offer then return self:Start(self.offer.rank, self.offer.since, self.offer.first) end self:Go(self.i + 1) end
 function WK:Back() if self.offer then return self:Later() end self:Go(math.max(1, self.i - 1)) end
 
--- Ends the tour (done = it went to the end; false = Skip); your own fellowship shows again. After the first tour each
--- page shows you around the first time it opens, unless it was skipped; after the whole tour, none does (all seen).
+-- Ends the tour (done = it went to the end; false = Skip); your own fellowship shows again.
 function WK:Stop(done)
   local was = self.on
   local page = self.page
   self.page = nil
-  if was and ns.char and not page and not self.since then
-    if self.first and done ~= false then ns.char.walkPages = ns.char.walkPages or {} else ns.char.walkPages = nil end
-  end
   self.on, self.offer = false, nil
   if self.card then self.card:Hide() end
   if self.glow then self.glow:Off() end
@@ -372,22 +388,6 @@ function WK:Stop(done)
   end
   -- What's New waited for the tour (UI/News.lua).
   if was and W():IsOpen() then ns.News:ShowIfDue() end
-end
-
--- A page opened (Window:Draw): its own short tour the first time, after the first tour, once the page is drawn.
-function WK:Visited(id)
-  local seen = ns.char and ns.char.walkPages
-  if not seen or seen[id] or self.on or self.offer or self.NO_VISIT[id] or not self:HasHelp(id) or ns.News.Dev() then return end
-  C_Timer.After(0.3, function() WK:FirstVisit(id) end)
-end
-
--- Its tour, if it is still the page shown and nothing else is over the book. Never in combat (the next visit, then).
-function WK:FirstVisit(id)
-  local seen, win = ns.char and ns.char.walkPages, W()
-  if not seen or seen[id] or self.on or self.offer or win.current ~= id or not win:IsOpen() or ns.News:Showing()
-    or ns.Combat:InCombat() then return false end
-  seen[id] = true
-  return self:StartPage(id)
 end
 
 ---------------------------------------------------------------------------
@@ -410,16 +410,14 @@ function WK:Offer(rank, since, first)
   return true
 end
 
--- Later: the pages still show you around, each the first time it opens; What's New may come now.
+-- Later: What's New may come now.
 function WK:Later()
-  local first = self.offer and self.offer.first
   self.offer = nil
   if self.card then self.card:Hide() end
   self.card.back:SetLabel(L.WALK_BACK)
   if ns.char then
     ns.char.walk = ns.char.walk or {}
     ns.char.walk[self:MyRank() or "member"] = ns.char.walk[self:MyRank() or "member"] or "later"
-    if first then ns.char.walkPages = ns.char.walkPages or {} end
   end
   if W():IsOpen() then ns.News:ShowIfDue() end
 end

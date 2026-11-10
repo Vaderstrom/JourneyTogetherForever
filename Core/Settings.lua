@@ -16,7 +16,6 @@ S.DEFAULTS = {
   theme = "journal", size = 1, fullscreen = false, chat = "all", warnCap = true, warnPct = 75, reduce = false, minimap = true, lang = "en",
   picture = true, -- the picture moment after a dungeon's final boss (UI/Picture.lua)
   sounds = true, -- the book's sounds (UI/Sound.lua)
-  roomMobs = true, -- room for the dungeon quests counts the dungeons' mobs too (Fellowship/Room.lua, U78)
   storyFrom = "spoken", -- the story button: Spoken first, or Lore Forever ("lore") (UI/OtherAddons.lua; 6 Nov 2026)
   tracker = true, -- the on-screen tracker (UI/Tracker.lua)
   trackerHover = false, -- hidden mode: the tracker is invisible until the mouse is over it
@@ -24,6 +23,8 @@ S.DEFAULTS = {
   trackerHideCombat = false, -- not shown in combat
   trackerHideInstance = false, -- not shown in dungeons, raids, battlegrounds and arenas
   keyPage = "chapter", -- the page the key binding opens (U107)
+  dungeonsShow = "all", -- the Dungeons page: every dungeon, or only those open to the fellowship ("open", U164)
+  raidsShow = "open", -- Raids in the sidebar once the journey is complete, or from the start ("all", U165)
   trackerDock = false, -- under the game's quest tracker, as one more section of it (off: its own panel, the default
   -- since the owner's word of 8 Nov 2026; the setup guide offers both)
   trackerLines = { status = true, you = true, bar = true, next = true, clears = true, run = true, quests = false,
@@ -67,7 +68,7 @@ end
 function S:ToastOn(kind) return self.data.toasts[kind] ~= false end
 
 -- The tracker's lines, each on or off (Settings → Tracker).
-S.TRACKER_LINES = { "status", "you", "bar", "next", "clears", "run", "quests", "online", "gather", "duel", "inbox" }
+S.TRACKER_LINES = { "status", "you", "bar", "next", "early", "clears", "run", "quests", "online", "gather", "duel", "inbox" }
 function S:TrackerLineOn(key) return self.data.trackerLines[key] ~= false end
 function S:SetTrackerLine(key, on)
   self.data.trackerLines[key] = on and true or false
@@ -120,8 +121,4 @@ end
 function S:SetWarn(v)
   v = math.floor(v / self.WARN_STEP + 0.5) * self.WARN_STEP
   self:Set("warnPct", ns.Clamp(v, self.WARN_MIN, self.WARN_MAX))
-end
-
-function S:StepWarn(dir)
-  self:Set("warnPct", ns.Clamp(self.data.warnPct + dir * self.WARN_STEP, self.WARN_MIN, self.WARN_MAX))
 end

@@ -9,7 +9,7 @@ done, the next one opens for everyone.
 
 Built for **WoW Forever**.
 
-![The Overview: where you stand, Play now, where the Adventurers stand and this chapter's dungeons](.github/screenshots/overview.jpg)
+![The Overview: where we stand, Focus now, Since last time and Coming up](.github/screenshots/overview.jpg)
 
 **At a glance**
 - **Chapters, not a race**: the road to 60 in chapters, each with a floor, a cap and dungeons you clear together.
@@ -26,7 +26,7 @@ Built for **WoW Forever**.
 
 - [How it works](#how-it-works)
 - [Features](#features):
-  - [Play together](#play-together): [where you stand](#where-you-stand), [chapters and dungeons](#chapters-and-dungeons),
+  - [Play together](#play-together): [where we stand](#where-we-stand), [chapters and dungeons](#chapters-and-dungeons),
     [the dungeon pages](#the-dungeon-pages), [nobody left behind](#nobody-left-behind), [Adventurers](#the-adventurers), [quests](#quests-and-attunements),
     [Gatherings](#gatherings), [raids](#the-endgame-and-raids)
   - [Challenge modes](#challenge-modes)
@@ -63,31 +63,29 @@ Built for **WoW Forever**.
 
 ### Play together
 
-#### Where you stand
-The **Overview** answers "what now?" at a glance:
-- **Where you stand**: one headline for the chapter ("Dungeons are open"), its three steps, your level on a line from
-  the floor to the cap ("Ready, 3 levels to the cap") and one main button.
-- **Play now**: the one best thing to do with whoever is online, with one button (Find group or Invite to group).
-- **Where the Adventurers stand**: below the floor, ready, at the cap, over the cap, away; and the chapter's dungeons.
-- **Room for the dungeon quests**: how far the chapter's dungeon quests (and the dungeons' mobs, once your fellowship
-  has run them) will take you, and where to stop questing so they still fit under the cap: a red pin on your level
-  bar, read like the game's XP bar ("level 26, 60% into it"). A quest's XP comes from the game itself. Two toasts warn
-  you half a level before that point and at it.
-- The **contents** of the whole journey (later chapters can stay hidden until reached), the next Gathering and the
-  recent history.
-- **Since you were last here**: what changed while you were away, who levelled, and where the fellowship stands now.
+#### Where we stand
+The **Overview** answers "what now?" at a glance, all of it in view without scrolling:
+- The chapter's picture and **Where we stand**: the level track with every Adventurer from the floor to the cap, one
+  line on where the fellowship is, and where to stop questing so the dungeon quests still fit under the cap (a red
+  tick on the track; the figures on hover). A quest's XP comes from the game itself. Two toasts warn you half a
+  level before that point and at it.
+- **Focus now**: the one thing to do next, why, and one button (Find group, Invite to group, Get ready).
+- **Since last time**: who levelled and the Chronicle's newest lines since you last looked.
+- **Coming up**: the next dungeon to get ready for, the next two Gatherings and the next chapter.
 
 #### Chapters and dungeons
 - A **stage track** for the chapter: Everyone at the floor, Run the dungeons, Milestones, Complete. While someone is
   below the floor, a waiting box says who, how far, and about how long at their pace.
-- The **level track**: the chapter's floor and cap with every Adventurer on one line, also on the Adventurers page.
-- Every dungeon as a row with its picture, role, levels and state ("4 of 7 bosses", "2 still need it"), with
-  **Find group**, which invites the Adventurers online who still need it (a tank and a healer first). Point at a
-  picture to see it large.
-- The dungeons in a **suggested order**: the mandatory ones first, lowest levels first, then the bridges and optional
-  ones. With several mandatory dungeons, the first one not cleared says **Recommended next**.
-- A **scroll** on each row with the number of quests to pick up before you go. A click on the row opens
-  [the dungeon's page](#the-dungeon-pages).
+- **Your To do**, in the order you act: reach the floor, then every dungeon as a row with its picture, role, levels
+  and what you need for it ("2 quests to pick up", "Ready: your quests are in your log"), with **Find group** (it
+  invites the Adventurers online who still need it, a tank and a healer first) or **Get ready**. The mandatory ones
+  come first, lowest levels first; the first one not cleared says **Recommended next**. Then the chapter's Required
+  **milestones**, with **Tick off** for the Leader. Then **For later dungeons**: a quest or a chain to start now for a
+  dungeon of a later chapter. Then **If you like**: the next chapter's dungeons that may be run now (From the next
+  chapter) and the Optional milestones. A click on a row opens [the dungeon's page](#the-dungeon-pages).
+- **All chapters**: the whole journey (later chapters can stay hidden until reached).
+- The **level track**, where the Adventurers stand (below the floor, ready, at the cap, over the cap, away) and the room
+  for the dungeon quests.
 - **Clears are picked up from boss kills** (no clicking needed). A message with the dungeon's picture and who was in
   the group tells everyone the moment the last needed boss dies; Adventurers outside the group hear it when the group
   leaves the instance.
@@ -97,21 +95,31 @@ The **Overview** answers "what now?" at a glance:
 ![The Chapter page: the stage track, the dungeons and who has cleared what](.github/screenshots/chapter.jpg)
 
 #### The dungeon pages
-Every dungeon and raid has a page of its own. Open it from a dungeon row on the Chapter page, the Overview, Journey
-Admin, the Dungeon quests list or a raid card; **‹ Back** returns to where you were.
-- Its picture, a short story, its bosses with how many Adventurers were there, who cleared it, and how much room its
-  quests and mobs give you.
+Every dungeon and raid has a page of its own, and it is the one place for getting ready. Open it from a dungeon row
+on the Chapter page, the Overview, the **Dungeons** page, Journey Admin or a raid card; **‹ Back** returns to where
+you were. The **Dungeons** page in the sidebar shows every dungeon of the journey chapter by chapter, later chapters
+too, with a gold check on the ones your fellowship has cleared (Settings can show only the ones open to the
+fellowship).
+- Its picture, a short story, its bosses with how many Adventurers were there and who cleared it.
+- **The room**: where to stop questing so its quests still fit by the cap level, which is left for the dungeons' mobs.
+  **Show everyone** gives each Adventurer's line.
 - At the foot: **Find group**, a **Waypoint** to the entrance and shortcuts to other addons when you have them: the
   **Dungeon Journal** addon (loot, quests) and **Spoken** or **Lore Forever** (more of its story; Settings says which
   comes first). Nothing of theirs is copied into this addon. The Classic entrances are built in; where an Adventurer
   walks into a dungeon is learned for the whole fellowship, also for WoW Forever's new dungeons.
 - **Who is ready**: a ring for each Adventurer fills as they pick up the dungeon's quests and turns gold when they are
-  ready. Click someone to see their quests. **Remind** an Adventurer who is online and not ready, once a day.
-- Its quests for your side, in the order you act: **1. Start early** (each step of the chain before a dungeon quest,
-  with its level and where it starts), **2. Pick up before you go** and **3. Starts inside**. **Pin on map** sets a
-  waypoint to where a quest starts.
+  ready ("2 of 4 ready"). **Show who** lists them, each saying what is still missing ("Needs 1 prequest, 2 quests to
+  pick up"); click someone to see their quests. **Remind** an Adventurer who is
+  online and not ready, once a day.
+- Its quests for your side, in the order you act: **1. Prequest chains** (the chain before a dungeon quest, folded to the
+  step you are on), **2. Pick up before you go** and **3. Starts inside**, each with where it starts, its level and
+  where you stand.
+  Every dungeon's quests, where they start and the chains before them are built in, the same for everyone in the
+  fellowship. A toast tells you when a dungeon's
+  first quest opens to you. **Pin on map** sets a waypoint to where a quest
+  starts.
 
-![The Deadmines' page: the story, the bosses, Who is ready, and Destruction in Deadmines' seven steps to start early](.github/screenshots/dungeon-page.jpg)
+![The Deadmines' page: the story, the bosses, Who is ready, and Destruction in Deadmines' ten prequest steps](.github/screenshots/dungeon-page.jpg)
 
 #### Nobody left behind
 - **Help runs**: a group with someone below the floor counts as a fellowship run.
@@ -150,14 +158,7 @@ Admin, the Dungeon quests list or a raid card; **‹ Back** returns to where you
 ![The Adventurers page](.github/screenshots/adventurers.jpg)
 
 #### Quests and attunements
-The **Quests** page has four tabs:
-- **Dungeon quests**: the dungeons that open at your chapter, each with your ring, a scroll with the quests still to
-  pick up or start, and a door where every quest starts inside. Every dungeon has its quest list, with each quest's
-  level and where it starts (the quest giver and zone, an item, or inside). With Questie running, a quest whose start
-  the addon does not know yet shows Questie's quest giver and place; nothing of Questie's is kept or sent. Where a
-  quest starts is also learned when anyone in the fellowship picks it up, and a toast tells you when a dungeon's first
-  quest opens to you. The right page lists your chapter's dungeons with how many Adventurers are ready ("2 of 4
-  ready").
+The **Quests** page has three tabs:
 - **Shared quests**: quests you and other Adventurers have (**Together now**) and quests they have that you could
   pick up (**Pick up and join**), grouped by zone with the zone you are in first, with everyone's progress and what you can do: **Ask to group up**, Invite to group, or
   the game's **Share quest**.
@@ -165,7 +166,7 @@ The **Quests** page has four tabs:
 - **Attunements and keys** up to 60 (Onyxia, Upper Blackrock Spire, Scholomance,
   Blackrock Depths, Stratholme, Dire Maul and more): a grid of who has done what, and each one's steps.
 
-![Quests: the Dungeon quests list, with your ring and the quests still to pick up for each dungeon](.github/screenshots/quests.jpg)
+![Quests: the quests you share, by zone, with everyone's progress](.github/screenshots/quests.jpg)
 
 ![Attunements: who has done which steps](.github/screenshots/attunements.jpg)
 
@@ -180,7 +181,8 @@ tracker show the next one.
 When the last chapter is complete, **the Endgame** opens: WoW Forever's raids (Barrow Deeps, Hyjal Summit and
 Onyxia's Lair, from 9 December 2026; more as Blizzard announces them), each with who is attuned, every boss with how many
 Adventurers have killed it, and **Find group** for the raid. A raid not open yet shows its picture and a countdown
-("Opens in 33 days").
+("Opens in 33 days"). To look through the raids before then, Settings → Dungeons and raids → Raids page: Show all puts
+**Raids** in the sidebar from the start.
 
 ![The Endgame: raids](.github/screenshots/raids.jpg)
 
@@ -200,7 +202,7 @@ honest from level 1.
 - The addon can't stop anyone, but it notices: a broken rule is written in the Chronicle and shown on that
   Adventurer's card, and they play on. One class only and No healers are held at the door.
 - The rulebook has an article for the challenges: each with its rule, who broke it, the lives left, the Ring and the
-  race clock, and tiles for where the challenges stand. The Leader can turn one off in Manage, for good.
+  race clock, and tiles for where the challenges stand. The Leader can turn one off when editing the rules, for good.
 
 ![The rulebook's challenges: who broke what, the Ring-bearer, the race clock, and where the challenges stand](.github/screenshots/challenges-rulebook.jpg)
 
@@ -231,7 +233,7 @@ Five steps, and you can change everything later except the challenges:
   **Whole journey** (start over, Import, Export).
 - Drag dungeons from **Every dungeon** (all of them by level, gold where it fits) onto a chapter. A dungeon can sit in
   more than one chapter (Blackrock Depths in three, for its parts).
-- Each dungeon is Mandatory, Bridge or Optional, and you can choose **which bosses** a clear needs.
+- Each dungeon is Mandatory, From the next chapter or Optional, and you can choose **which bosses** a clear needs.
 - **Milestones**, up to ten per chapter, Required or Optional: a quest everyone has handed in, a level everyone
   reaches, an attunement or key, or one the Leader ticks off by hand.
 - **Export** the journey as a string to share with another fellowship, or **Import** one. Changes are a draft until
@@ -240,21 +242,20 @@ Five steps, and you can change everything later except the challenges:
 ![Journey Admin: the ruler, the chapters with their dungeons, and the chosen chapter](.github/screenshots/journey-editor.jpg)
 
 #### Manage the fellowship
-The Leader's **Manage** page has three tabs:
-- **Adventurers**: what needs the Leader's attention (each line with Their card and **Seen**), then every Adventurer
-  with **Make leader**, **Mark away** and **Remove** (each asks first), and the invite box with the invites still
-  waiting for an answer.
+The Leader's **Manage** page has two tabs:
+- **Adventurers**: every Adventurer with **Make leader**, **Mark away** and **Remove** (each asks first), and the
+  invite box with the invites still waiting for an answer.
 - **The fellowship**: its name and banner, as the Adventurers see it in the book, and leaving.
-- **Rules**: the rules on a draft, then Publish in a bar at the foot of the page that never scrolls (see
-  [the rulebook](#the-rulebook-and-votes)), and the challenges.
+
+What needs the Leader's attention is in the inbox; the rules are edited on [the Rules page](#the-rulebook-and-votes).
 
 #### The rulebook and votes
 - The **Rules** page is the fellowship's rulebook: six numbered articles in plain sentences, today's values in colour
   (Leveling together, Dungeon runs, Away, If the Leader is away, The book, Guild Master tournament).
 - **Any Adventurer can propose a change**, and everyone votes Yes or No. It passes when more than half say Yes (away
   Adventurers are not counted), or ends after 3 days.
-- The Leader sets the rules on a draft in **Manage** and publishes them; everyone gets a toast and a line in the
-  History.
+- The Leader presses **Edit the rules** on the Rules page, changes them on a draft and presses **Publish**, in a bar
+  at the foot of the page that never scrolls; everyone gets a toast and a line in the Chronicle.
 - The rules: floor and cap allowance, XP from fellowship runs past the cap, Adventurers needed for a run, how many
   must clear each dungeon, away after N days, takeover after N days, which chapters Adventurers can see, and the
   tournament.
@@ -272,7 +273,8 @@ fought before the round ends goes to whoever was online longer that round.
 ### Memories
 
 #### Chronicle, Moments and History
-- **Chronicle**: the journey's story. Every run, whether it counted and why not ("3 Adventurers, 4 needed"), leader
+The **Chronicle** has three tabs:
+- **The journey**: its story. Every run, whether it counted and why not ("3 Adventurers, 4 needed"), leader
   changes, going over the cap, and **session recaps**: after playing together, how long, with whom, the levels, the
   dungeons, the bosses and the quests.
 - **Firsts**: the first Adventurer to reach level 10, 20 ... 60, to fall, to wear a rare or an epic item, to ride a
@@ -281,8 +283,8 @@ fought before the round ends goes to whoever was online longer that round.
 - **Moments**: the big moments, kept as they happened: a chapter begins, a dungeon is cleared for the first time, a
   milestone, a first, someone reaches 60, a champion is crowned. Each with its picture, **who was there** with their levels
   then, and how many screenshots you took.
-- **History**: the fellowship's own story: founded, who joined and left, Leaders, rules and votes, Gatherings and the
-  tournament.
+- **The fellowship**: its own story: founded, who joined and left, Leaders, rules and votes, Gatherings and the
+  tournament, each under its day.
 
 ![Firsts: a cabinet of medals, and the tallies](.github/screenshots/firsts.jpg)
 
@@ -317,14 +319,15 @@ log out; the app reads it from your saved data and posts nothing you have not ch
   banner. Each can be turned off, and you can drag them where you like, or hold Ctrl and drag one while it shows.
   Click one to open the page it is about.
 - **The tracker**: the chapter, where you stand (with a little bar to the floor or the cap and where to stop
-  questing), the next step, dungeons cleared, who is online, the next Gathering, shared quests, your next duel and
+  questing), Focus now, a prequest to pick up, dungeons cleared, who is online, the next Gathering, shared quests, your next duel and
   your inbox, each line with its icon. It starts as a panel you drag anywhere, which can hide until you point at it;
   or put it under the game's quest tracker, as one more section in the game's own look that moves and folds with the
   game's list. Hold Ctrl to drag it by any line, or out from under the game's list.
 - **Picture after a final boss**: Take a picture (with or without the interface) or open the group photo, right
   there in the dungeon.
-- The **inbox** in the header: invitations, votes, Gatherings, asks to group up, the tournament. A notice that asks
-  no answer has a button to where it is handled, and **Seen** takes it off the count.
+- The **inbox** in the header: invitations, votes, Gatherings, asks to group up, the tournament, and for the Leader
+  what needs their attention. A notice that asks no answer has a button to where it is handled, and **Seen** takes it
+  off the count.
 
 ![A big banner: Chapter IV unlocked](.github/screenshots/chapter-unlocked.jpg)
 
@@ -335,9 +338,8 @@ log out; the app reads it from your saved data and posts nothing you have not ch
   and frames). Drag the corner to resize it (80% to 120%), or go **full screen**, edge to edge.
 - **Themes**: Journal, Night, and Faction (Alliance blue or Horde red).
 - A **setup guide** the first time (it asks where you want the tracker), then **Show me around**: a short first tour
-  of the Overview, the sidebar, the buttons at the top and the tracker. After it, each page shows you around by itself
-  the first time you open it. The whole tour is in Settings, and the **?** in the header walks you through the page
-  you are on.
+  of the Overview, the sidebar, the buttons at the top and the tracker. The whole tour is in Settings, and the **?** in
+  the header walks you through the page you are on.
 - Settings for every toast (under three headings, each with a tick for its whole group), the tracker's lines, chat
   messages, the cap warning, sounds, reduced effects and the minimap button. A **key** opens the book (Options →
   Keybindings → AddOns), at the page you choose. Button collectors can gather the minimap button, and the addon is in the game's addon compartment.
@@ -363,6 +365,7 @@ Journey Together Forever is released for WoW Forever. Every version is checked i
 self-test and screenshot tour. Everyone in a fellowship should use the same version: the addon tells you when a newer one
 is out.
 Please report problems as GitHub issues, with a screenshot and the text of any Lua error (`/console scriptErrors 1`).
+The bug button in the book's header has the addresses to copy and your version.
 `CHANGELOG.md` lists what changed.
 
 ## Install
@@ -374,8 +377,8 @@ be called `JourneyTogetherForever`). Restart the game fully after installing or 
 MIT License, see `LICENSE`. Copyright (c) 2026 Vaderstrom.
 
 - Dungeon and boss data (`Data/Encounters.lua`) comes from the game's own data tables, via [wago.tools](https://wago.tools).
-- Questie, Dungeon Journal, Attune, Spoken and Lore Forever are other people's addons. Journey Together Forever only opens
-  them when you have them installed; none of their data is included.
+- Questie, Dungeon Journal, Attune, Spoken and Lore Forever are other people's addons. Journey Together Forever opens
+  them when you have them installed.
 
 Journey Together Forever is designed and developed by **Vaderstrom**. Claude, Anthropic's AI assistant, has assisted in
 its development.

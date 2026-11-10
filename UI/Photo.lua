@@ -600,12 +600,6 @@ function PH:Fit()
   self:Camera()
 end
 
-function PH:Shorts(names)
-  local out = {}
-  for i, n in ipairs(names) do out[i] = ns.Short(n) end
-  return out
-end
-
 -- The camera on its target, from the front (the actors face +x), a little above.
 function PH:Camera()
   local s = self.frame.scene

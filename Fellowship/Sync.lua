@@ -345,9 +345,7 @@ function S:Digest(f)
   -- (A Friend of the fellowship adds a mark only then, so copies without any Friends agree with older versions.)
   for name, m in pairs(f.members) do members[name] = { m.role, m.second or "", m.away or "", m.friend and 1 or nil } end
   core[#core + 1] = members
-  local s, h = ns.Serialize.Encode(core), 5381
-  for i = 1, #s do h = (h * 33 + s:byte(i)) % 4294967296 end
-  return h
+  return ns.Hash(ns.Serialize.Encode(core))
 end
 
 ---------------------------------------------------------------------------

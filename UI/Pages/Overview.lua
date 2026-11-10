@@ -1,699 +1,496 @@
--- Overview (SPEC §4.4, §6). Left: Where you stand (the chapter's state and steps, your level between floor and cap,
--- your next steps, who is online, the counts), Getting started, the next Gathering, the contents (every chapter:
--- done, current or yet to be revealed) and the chronicle.
--- Right: the chapter chosen in the contents: picture, where the Companions stand (the current chapter) or its status
--- (another one), its dungeons, buttons.
+-- Overview (SPEC §4.4, U139, the rebuild of 9 Nov 2026): the glance, one flat sheet across both pages that fits the
+-- book without scrolling. At the top the chapter's banner across the sheet: its picture (drifting slowly), its name and
+-- levels, the shared lives, and along its lower edge Where we stand (the level track, one line, the room for the
+-- dungeon quests as the answer). Below three cards side by side, each on its own picture with a link at its foot:
+-- Focus now (Together:Focus) on its dungeon's, Since last time (Since:Digest) on the Chronicle's notice board and Coming
+-- up (the first step for a later dungeon, the next two Gatherings, the next chapter) on the road ahead. Opening it, the
+-- cards fade in one after another (U148-U155, the owner's picks of 9 Nov 2026). The detail lives on the Chapter page.
 local _, ns = ...
 local L = ns.L
 local UI, Theme = ns.UI, ns.Theme
 local J, Hr = ns.Journey, ns.Hero
 
--- Where you stand (27 Oct 2026, the review "a quick look at where we are"): one card at the top of the left page with
--- the chapter's state, its three steps, your level between floor and cap, your next steps, who is online, and how
--- many Companions are below the floor, ready, at the cap, over the cap and away. It replaced the You card, the
--- status banner, What's next, the four count boxes and the level track (What's next is on the Chapter page now).
-local SEG_H, BAR_H = 26, 12
-local SEG_STYLE = { done = { "3E7A3A", 0.18 }, now = { "B8742A", 0.24 }, later = { "ink2", 0.10 } }
+local TOP_H, STRIP_H, GAP, PAD = 204, 108, 22, 16
+local DRIFT = 10 -- how far the banner's picture drifts each way
+local FEED_N, GATHER_N = 4, 2
 
-local function buildYou(parent, width)
-  local c = UI.Card(parent)
-  c:SetWidth(width)
-  local inner = width - 24
-  c.label = UI.Text(c, 11, "accent", "title")
-  c.label:SetPoint("TOPLEFT", 12, -10)
-  -- One large headline (U1, the check of 31 Oct 2026): what the chapter waits for, at a glance.
-  c.state = UI.WrapText(c, 21, "ink", inner, "title")
-  c.state:SetPoint("TOPLEFT", 12, -26)
-  -- The chapter's steps: reach the floor, the dungeons (or the cap), the next chapter.
-  c.segs = {}
-  local segW = (inner - 12) / 3
-  for i = 1, 3 do
-    -- Each step with a thin edge in its state's colour (the visual pass, 28 Oct 2026: flat tints read as unfinished).
-    local s = CreateFrame("Frame", nil, c, "BackdropTemplate")
-    s:SetSize(segW, SEG_H)
-    s:SetBackdrop({ bgFile = ns.WHITE, edgeFile = ns.WHITE, edgeSize = 1 })
-    s.text = UI.Text(s, 12, nil, "body", "CENTER")
-    s.text:SetPoint("CENTER")
-    s.text:SetWidth(segW - 6)
-    s.check = UI.Check(s, 12)
-    c.segs[i] = s
-  end
-  -- Your level on a line from the floor to the cap.
-  c.lvl = UI.Text(c, 24, "ink", "title", "CENTER")
-  c.lvl:SetWidth(44)
-  c.lvlKey = UI.Text(c, 11, "ink2", "body", "CENTER")
-  c.lvlKey:SetText(L.YOU_KEY)
-  -- (UI.Bar with a gold edge and a notch per level; the floor and the cap stand out above and below it.)
-  c.bar = UI.Bar(c, BAR_H, true)
-  c.bar:SetWidth(inner - 56)
-  c.ticks = CreateFrame("Frame", nil, c.bar)
-  c.ticks:SetAllPoints()
-  c.ticks:SetFrameLevel(c.bar:GetFrameLevel() + 5)
-  c.flTick = UI.Solid(c.ticks, "OVERLAY", "ink", 0.85)
-  c.flTick:SetSize(2, BAR_H + 6)
-  c.capTick = UI.Solid(c.ticks, "OVERLAY", "ink", 0.85)
-  c.capTick:SetSize(2, BAR_H + 6)
-  -- The room's stop point (U82): a red pin on the bar, its words on hover; the Room card below says them (U115: the
-  -- state, the stop's words and the floor and cap crowded the bar).
-  c.stopTick = UI.Solid(c.ticks, "OVERLAY", "B0321E", 1)
-  c.stopTick:SetSize(3, BAR_H + 8)
-  c.stopHead = UI.Round(c.ticks, "OVERLAY", 8)
-  Theme:Fill(c.stopHead, "B0321E", 1)
-  c.stopHead:SetPoint("BOTTOM", c.stopTick, "TOP", 0, -2)
-  c.stopHit = CreateFrame("Frame", nil, c.ticks)
-  c.stopHit:SetSize(14, BAR_H + 14); c.stopHit:SetPoint("BOTTOM", c.stopTick, "BOTTOM")
-  c.stopHit:EnableMouse(true)
-  UI.Tooltip(c.stopHit, function() return c.stopTip end)
-  c.lo = UI.Text(c, 11, "ink2")
-  c.hi = UI.Text(c, 11, "ink2")
-  c.say = UI.Text(c, 13, "ink", "title")
-  -- Your next steps (the You lines), who is online, Invite to group.
-  c.lines = UI.Pool(function()
-    local l = CreateFrame("Frame", nil, c)
-    l:SetWidth(inner)
-    l.icon = UI.Round(l, "ARTWORK", 16)
-    l.icon:SetPoint("TOPLEFT", 0, 0)
-    l.text = UI.WrapText(l, 13, "ink", inner - 26, "book")
-    l.text:SetPoint("TOPLEFT", 24, -1)
-    return l
-  end)
-  c.div = UI.Solid(c, "ARTWORK", "line", 0.6)
-  c.div:SetHeight(1)
-  c.online = UI.WrapText(c, 12, "ink2", inner)
-  c.invite = UI.TextButton(c, L.INVITE_TO_GROUP, function() ns.Together:Invite(c.names or {}) end, "primary", 12)
-  -- Play now (M25): the one best thing to do together right now, in a gold-edged box with its button.
-  c.play = UI.Card(c, "gold")
-  c.play:SetWidth(inner)
-  c.play.label = UI.Text(c.play, 11, "accentText", "title")
-  c.play.label:SetPoint("TOPLEFT", 10, -12)
-  c.play.label:SetText(L.PLAY_NOW:upper())
-  c.play.text = UI.WrapText(c.play, 13, "ink", inner - 20, "book")
-  c.play.text:SetPoint("TOPLEFT", 10, -24)
-  c.play.go = UI.TextButton(c.play, L.INVITE_TO_GROUP, function()
-    local f = ns.Fellowship:Current()
-    if f then ns.Together:DoPlayNow(f) end
-  end, "primary", 12)
-  c.play.grouped = UI.Text(c.play, 12, "3E7A3A", "body")
-  c.play.grouped:SetText(L.PLAY_GROUPED)
-  c.more = UI.TextButton(c, L.MORE_IN_CHAPTER, function() ns.Window:ShowPage("chapter") end, "link", 12)
-  -- The one main button when nobody is online to play with (U1): the chapter, where what's next is. (The five counts
-  -- went: the right page lists who stands where.)
-  c.go = UI.TextButton(c, L.YOU_GO_CHAPTER, function() ns.Window:ShowPage("chapter") end, "primary", 12)
-  return c
+-- The sheet's width: both halves of the book and the fold between them (W:PageInsets).
+local function sheetWidth() return 2 * ns.Window.PAGE_W + 52 end
+
+local function maxLines(fs, n) if fs.SetMaxLines then fs:SetMaxLines(n) end return fs end
+local function shadow(...) for _, t in ipairs({ ... }) do t:SetShadowOffset(1, -1); t:SetShadowColor(0, 0, 0, 1) end end
+
+-- A card: its own picture behind a dark fade, its heading (and a small note at the right), a gold rule, its words light
+-- in every theme, and a link at its foot. All three look as Focus now did (the owner after the check of 9 Nov 2026,
+-- 22:42: the torn parchment hid the headings; "I like the first windows style the best", each picture telling at once
+-- what the card is about). paint(p) sets the picture once the card has its size, and again on each refresh.
+local DUSK = { 0.055, 0.03, 0.01 }
+local function panel(parent, title, linkFn, paint)
+  local p = CreateFrame("Frame", nil, parent)
+  p.art = p:CreateTexture(nil, "BACKGROUND")
+  local shade = p:CreateTexture(nil, "BORDER")
+  UI.FramePicture(p, p.art, shade)
+  -- Darkest under the heading, lighter lower down so the picture shows; a dark foot again under the link.
+  UI.SetGradient(shade, "VERTICAL", { DUSK[1], DUSK[2], DUSK[3], 0.5 }, { DUSK[1], DUSK[2], DUSK[3], 0.84 })
+  local foot = p:CreateTexture(nil, "BORDER", nil, 1)
+  foot:SetPoint("BOTTOMLEFT", UI.PIC_INSET, UI.PIC_INSET); foot:SetPoint("BOTTOMRIGHT", -UI.PIC_INSET, UI.PIC_INSET)
+  foot:SetHeight(44)
+  UI.SetGradient(foot, "VERTICAL", { DUSK[1], DUSK[2], DUSK[3], 0.7 }, { DUSK[1], DUSK[2], DUSK[3], 0 })
+  p.head = UI.Text(p, 18, "chipText", "title")
+  p.head:SetPoint("TOPLEFT", PAD, -PAD)
+  p.head:SetText(title)
+  p.note = UI.Text(p, 12, "muted", "body", "RIGHT")
+  p.note:SetPoint("TOPRIGHT", -PAD, -PAD - 4)
+  p.note:EnableMouse(true)
+  local rule = UI.Solid(p, "BORDER", "gold", 0.5, 2)
+  rule:SetHeight(1); rule:SetPoint("TOPLEFT", PAD, -PAD - 26); rule:SetPoint("TOPRIGHT", -PAD, -PAD - 26)
+  p.link = UI.TextButton(p, "", linkFn, "link", 13)
+  p.link:SetPoint("BOTTOMLEFT", PAD - 4, PAD - 6)
+  Theme:TextColor(p.link.text, "chipText")
+  shadow(p.head, p.note, p.link.text)
+  p.top = PAD + 36 -- where the card's content starts
+  p.paint = function() paint(p) end
+  p:SetScript("OnSizeChanged", p.paint)
+  return p
 end
 
--- The three steps of the current chapter: { text, state = "done" | "now" | "later" }.
-local function chapterSteps(f, n, count)
-  local below = J:Below(f, n)
-  local req = J:Required(f, n)
-  local open = ns.Milestones:OpenRequired(f, n)
-  local goal = J:GoalDone(f, n)
-  local out = {}
-  out[1] = #below == 0 and { text = L.STRIP_FLOOR, state = "done" } or { text = L.STRIP_FLOOR_N:format(#below), state = "now" }
-  local text
-  if goal and #open > 0 then text = L.STRIP_MILESTONES:format(#open)
-  elseif #req > 0 then
-    local done = 0
-    for _, x in ipairs(req) do if J:Cleared(f, x.key) then done = done + 1 end end
-    text = L.STRIP_DUNGEONS:format(done, #req)
-  else
-    local counted, there = J:Counted(f), 0
-    for _, name in ipairs(counted) do if Hr:Level(f, name) >= f.journey.chapters[n].cap then there = there + 1 end end
-    text = L.STRIP_LEVEL:format(there, #counted)
-  end
-  out[2] = { text = text, state = (goal and #open == 0) and "done" or (#below == 0 and "now" or "later") }
-  out[3] = { text = n < count and L.STRIP_NEXT:format(J.Roman(n + 1)) or L.STRIP_END, state = "later" }
-  return out
+local function cardSize(p) return p:GetWidth() - 2 * UI.PIC_INSET, p:GetHeight() - 2 * UI.PIC_INSET end
+
+-- Focus now's picture: its dungeon's, else the chapter's; cropped to the card's size (known once it is laid out).
+local function focusArt(pf)
+  local fo, a = pf.focus, pf.focusArtOf
+  local w, h = cardSize(fo)
+  if not a or not (w > 0 and h > 0) then return end
+  local ok, generic = false, true
+  if a.key then ok, generic = ns.SetDungeonArt(fo.art, a.key, w, h) end
+  if not ok or generic then ns.Pages:SetChapterArt(fo.art, a.chapter, w, h, 0.4) end
 end
 
-local function refreshYou(c, f, watching)
-  local width = c:GetWidth()
-  local inner = width - 24
-  local y = ns.Together:You(f)
-  local ch = J:Current(f)
-  local cur, count = J:CurrentIndex(f), #f.journey.chapters
-  local bn = J:Banner(f, math.min(cur, count + 1))
-  c.label:SetText((ch and L.STAND_LABEL:format(J.Roman(ch.n), ch.name) or L.BN_JOURNEY_DONE):upper())
-  c.state:SetText(bn.title)
-  c.state:SetTextColor(Theme:RGBA(bn.color or "ink"))
-  local top = 28 + c.state:GetStringHeight() + 10
-  -- Steps and your level: only while a chapter is going on.
-  for _, s in ipairs(c.segs) do s:SetShown(ch ~= nil) end
-  for _, w in ipairs({ c.lvl, c.lvlKey, c.bar, c.lo, c.hi, c.say }) do w:SetShown(ch ~= nil) end
-  c.stopTick:Hide(); c.stopHead:Hide(); c.stopHit:Hide()
-  if ch then
-    local segW = (inner - 12) / 3
-    for i, st in ipairs(chapterSteps(f, ch.n, count)) do
-      local s = c.segs[i]
-      local style = SEG_STYLE[st.state]
-      local r, g, b = Theme:RGBA(style[1])
-      s:SetBackdropColor(r, g, b, style[2])
-      s:SetBackdropBorderColor(r, g, b, st.state == "now" and 0.75 or 0.4)
-      s.text:SetText(st.text)
-      s.text:SetTextColor(r, g, b, 1)
-      s.check:SetShown(st.state == "done")
-      s.check:ClearAllPoints(); s.check:SetPoint("LEFT", 6, 0)
-      s:ClearAllPoints(); s:SetPoint("TOPLEFT", c, "TOPLEFT", 12 + (i - 1) * (segW + 6), -top)
-    end
-    top = top + SEG_H + 14
-    -- Your level: a line from the floor to the cap with your mark and the line filled up to it. Below the floor the
-    -- line starts a level under you and the floor gets a tick, so you see how far it is (it sat empty with the mark
-    -- at the edge; seen in the tour); over the cap, the same at the other end.
-    local me = ns.Me()
-    local lvl = Hr:Level(f, me)
-    local h = Hr:Get(f, me) or {}
-    local frac = (h.xpMax and h.xpMax > 0) and ns.Clamp((h.xp or 0) / h.xpMax, 0, 0.99) or 0
-    local fl, cap = J:FloorLevel(f, ch), ch.cap
-    local lo, hi = math.min(fl, math.max(1, lvl - 1)), math.max(cap, lvl + 1 > cap and lvl + 1 or cap)
-    if hi <= lo then hi = lo + 1 end
-    local function at(v) return ns.Clamp((v - lo) / (hi - lo), 0, 1) end
-    local p = at(lvl + frac)
-    local color = lvl < fl and "B0321E" or (lvl > cap + f.rules.capTol and "C0392B" or (lvl >= cap and "B8742A" or "2E7A3E"))
-    -- (A Friend of the fellowship is never behind or over: their own calm colour, SPEC §1.1.)
-    if y.friend then color = Hr.FRIEND end
-    c.lvl:SetText(lvl)
-    c.lvl:ClearAllPoints(); c.lvl:SetPoint("TOPLEFT", c, "TOPLEFT", 12, -(top - 2))
-    c.lvlKey:ClearAllPoints(); c.lvlKey:SetPoint("TOP", c.lvl, "BOTTOM", 0, -1)
-    local bw = inner - 56
-    c.say:SetText(y.state or "")
-    c.say:SetTextColor(Theme:RGBA(color))
-    c.say:ClearAllPoints(); c.say:SetPoint("TOPLEFT", c, "TOPLEFT", 68, -top)
-    c.bar:ClearAllPoints(); c.bar:SetPoint("TOPLEFT", c, "TOPLEFT", 68, -(top + 20))
-    c.bar:SetColor(color)
-    c.bar:Set(bw, p)
-    local notches = {}
-    for v = lo + 1, hi - 1 do notches[#notches + 1] = at(v) end
-    c.bar:SetNotches(notches)
-    -- Floor and cap: a tick each, the name under it (kept inside the line at its ends). Close together (far over
-    -- the cap or under the floor) the floor's name ends at its tick and the cap's starts at its; closer still, one
-    -- name for both (they were printed over each other; seen in the check, 29 Oct 2026).
-    local xf, xc = bw * at(fl), bw * at(cap)
-    c.flTick:ClearAllPoints(); c.flTick:SetPoint("CENTER", c.bar, "LEFT", xf, 0)
-    c.capTick:ClearAllPoints(); c.capTick:SetPoint("CENTER", c.bar, "LEFT", xc, 0)
-    -- Where to stop questing for the dungeon quests (U82): the pin at its level.
-    local room = not watching and ns.Room:Chapter(f, me) or nil
-    if room and room.stop and room.stop > lo and room.stop < hi then
-      c.stopTick:ClearAllPoints(); c.stopTick:SetPoint("CENTER", c.bar, "LEFT", bw * at(room.stop), 0)
-      c.stopTick:Show(); c.stopHead:Show(); c.stopHit:Show()
-      c.stopTip = L.TRACK_STOP:format(ns.Room.StopAt(room.stop))
-    end
-    c.lo:SetText(L.TRACK_FLOOR:format(fl)); c.hi:SetText(L.TRACK_CAP:format(cap))
-    local wl, wh = c.lo:GetStringWidth(), c.hi:GetStringWidth()
-    local function inside(x, w) return ns.Clamp(x, 0, math.max(0, bw - w)) end
-    local ll, hl = inside(xf - wl / 2, wl), inside(xc - wh / 2, wh)
-    if ll + wl + 8 > hl then ll, hl = inside(xf - wl, wl), inside(xc, wh) end
-    if ll + wl + 8 > hl then
-      c.lo:SetText(L.TRACK_BOTH:format(fl, cap)); c.hi:SetText("")
-      wl = c.lo:GetStringWidth()
-      ll = inside((xf + xc) / 2 - wl / 2, wl)
-    end
-    c.lo:ClearAllPoints(); c.lo:SetPoint("TOPLEFT", c.bar, "BOTTOMLEFT", ll, -5)
-    c.hi:ClearAllPoints(); c.hi:SetPoint("TOPLEFT", c.bar, "BOTTOMLEFT", hl, -5)
-    top = top + 48  end
-  -- Your next steps (at most three; the rest of what's next is on the Chapter page).
-  c.div:ClearAllPoints()
-  c.div:SetPoint("TOPLEFT", c, "TOPLEFT", 12, -top); c.div:SetPoint("TOPRIGHT", c, "TOPRIGHT", -12, -top)
-  top = top + 4
-  -- Play now (below) says what to do with who is online: then the card leaves out the group-up step and the Online
-  -- now line, which said the same again (the card grew to 422; seen in the check of 29 Oct 2026).
-  -- Watching an alt's fellowship (Fellowship/Watch.lua): its Companions are not in your group to invite.
-  local play = not watching and ns.Together:PlayNow(f) or nil
-  local n = 0
-  for _, line in ipairs(y.lines) do
-    if n >= 3 then break end
-    if not (play and line.icon == "group") then
-      local l = c.lines:Get(n + 1)
-      if not l then break end
-      n = n + 1
-      UI.SetIcon(l.icon, ns.ICONS["bn_" .. line.icon] or ns.ICONS.bn_done)
-      l.text:SetText(line.text)
-      local h = math.max(18, l.text:GetStringHeight() + 2)
-      l:SetHeight(h)
-      l:ClearAllPoints(); l:SetPoint("TOPLEFT", c, "TOPLEFT", 12, -(top + 6)); l:Show()
-      top = top + 6 + h
-    end
-  end
-  c.lines:HideFrom(n + 1)
-  local names = {}
-  for i, name in ipairs(y.online) do
-    names[i] = L.ONLINE_HERO:format(ns.Short(name), L["ROLE_" .. ((f.members[name].role or "DPS"):upper())] or f.members[name].role or "", Hr:Level(f, name))
-  end
-  c.names = y.online
-  c.online:SetText(#names > 0 and L.ONLINE_NOW:format(table.concat(names, ", ")) or L.ONLINE_NONE)
-  c.online:SetShown(not play)
-  if not play then
-    c.online:ClearAllPoints(); c.online:SetPoint("TOPLEFT", c, "TOPLEFT", 12, -(top + 10))
-    top = top + 10 + c.online:GetStringHeight()
-  end
-  -- Play now: with others online, the best thing to do together, and its button (in place of Invite to group). The
-  -- button (or "in your group") sits on the label's row, so the box is no taller than its text (the card was 400
-  -- high while catching up; seen in the check of 29 Oct 2026).
-  c.play:SetShown(play ~= nil)
-  if play then
-    c.play.text:SetText(play.text)
-    local textTop = play.grouped and 30 or 38
-    c.play.text:ClearAllPoints(); c.play.text:SetPoint("TOPLEFT", 10, -textTop)
-    local h = textTop + c.play.text:GetStringHeight() + 10
-    c.play.go:SetShown(not play.grouped)
-    c.play.grouped:SetShown(play.grouped)
-    if play.grouped then
-      c.play.grouped:ClearAllPoints(); c.play.grouped:SetPoint("TOPRIGHT", -10, -12)
-    else
-      c.play.go:SetLabel(play.action == "find" and L.PLAY_FIND or L.INVITE_TO_GROUP)
-      c.play.go:ClearAllPoints(); c.play.go:SetPoint("TOPRIGHT", -8, -6)
-    end
-    c.play:SetHeight(h)
-    c.play:ClearAllPoints(); c.play:SetPoint("TOPLEFT", c, "TOPLEFT", 12, -(top + 8))
-    top = top + 8 + h
-  end
-  local invite = #names > 0 and not watching and not play
-  c.invite:SetShown(invite)
-  -- One main button (U1): Play now's, else Invite to group, else Open the chapter; What's next beside the first two.
-  local go = ch ~= nil and not invite and not play
-  c.go:SetShown(go)
-  c.more:SetShown(ch ~= nil and not go)
-  if invite then
-    c.invite:ClearAllPoints(); c.invite:SetPoint("TOPLEFT", c, "TOPLEFT", 12, -(top + 8))
-    c.more:ClearAllPoints(); c.more:SetPoint("TOPRIGHT", c, "TOPRIGHT", -12, -(top + 12))
-    top = top + 8 + c.invite:GetHeight()
-  elseif go then
-    c.go:ClearAllPoints(); c.go:SetPoint("TOPLEFT", c, "TOPLEFT", 12, -(top + 8))
-    top = top + 8 + c.go:GetHeight()
-  elseif ch then
-    c.more:ClearAllPoints(); c.more:SetPoint("TOPRIGHT", c, "TOPRIGHT", -12, -(top + 4))
-    top = top + 22
-  end
-  c:SetHeight(top + 12)
-  return top + 12
-end
--- Getting started (leader of a new fellowship): steps with a check mark when done, and Hide.
-local function buildStart(parent, width)
-  local c = UI.Card(parent)
-  c:SetWidth(width)
-  c.label = UI.Text(c, 11, "accent", "title")
-  c.label:SetPoint("TOPLEFT", 12, -10)
-  c.label:SetText(L.START_LABEL:upper())
-  c.hide = UI.TextButton(c, L.START_HIDE, function() ns.Together:HideStarted() end, "link", 12)
-  c.hide:SetPoint("TOPRIGHT", -8, -6)
-  c.lines = {}
-  for i = 1, 4 do
-    local l = CreateFrame("Frame", nil, c)
-    l:SetSize(width - 24, 18)
-    l.check = UI.Check(l, 14)
-    l.check:SetPoint("TOPLEFT", 0, 1)
-    l.dot = UI.Solid(l, "ARTWORK", "ink2", 1)
-    l.dot:SetSize(5, 5); l.dot:SetPoint("TOPLEFT", 5, -6)
-    -- Wraps instead of cutting a long step short (seen in the UI tour).
-    l.text = UI.WrapText(l, 13, "ink", width - 46, "book")
-    l.text:SetPoint("TOPLEFT", 20, 0)
-    c.lines[i] = l
-  end
-  return c
+-- A card on one of the book's own pictures (ns.Pages.ART, the Horde's where it has its own): Since last time on the
+-- Chronicle's notice board, Coming up on the road ahead.
+local function sceneArt(p, key)
+  local w, h = cardSize(p)
+  if not (w > 0 and h > 0) then return end
+  local art = (Theme:Horde() and ns.Pages.ART_HORDE or ns.Pages.ART)[key]
+  p.art:SetTexture(ns.MEDIA .. art[1])
+  UI.Cover(p.art, art[2], w, h)
+  p.artFile = art[1] -- (the self-test reads it: the game may give the texture back as a number)
 end
 
--- Places the steps under each other; returns the card's height.
-local function refreshStart(c, steps, label)
-  c.label:SetText((label or L.START_LABEL):upper())
-  local y = 28
-  for i, l in ipairs(c.lines) do
-    local st = steps[i]
-    l:SetShown(st ~= nil)
-    if st then
-    l.check:SetShown(st.done); l.dot:SetShown(not st.done)
-    l.text:SetText(st.text)
-    l.text:SetTextColor(Theme:RGBA(st.done and "ink2" or "ink"))
-    local h = math.max(18, l.text:GetStringHeight() + 2)
-    l:SetHeight(h)
-    l:ClearAllPoints(); l:SetPoint("TOPLEFT", c, "TOPLEFT", 12, -y)
-    y = y + h + 4
-    end
-  end
-  c:SetHeight(y + 8)
-  return y + 8
+-- The banner's picture at pf.driftAt (0 to 1): the 2:1 picture's whole width less 2 * DRIFT of the banner's, from its
+-- left part to its right part, so the banner is always full.
+local function pan(pf)
+  local w = pf.pic.artW
+  local show = w / (w + 2 * DRIFT)
+  local u = (1 - show) * (pf.driftAt or 0)
+  UI.Cover(pf.pic.art, 2 * show, w, pf.pic.artH, 0.45, { u, u + show, 0, 1 })
 end
 
--- Gatherings: one line about the next one; a click opens the Gatherings page (UI/Pages/Gatherings.lua). The whole
--- list here crowded the Overview (in-game run, 27 Oct 2026).
-local function buildGatherings(parent, width)
-  local b = CreateFrame("Button", nil, parent)
-  b:SetSize(width, 30)
-  b.icon = UI.Round(b, "ARTWORK", 22)
-  b.icon:SetPoint("TOPLEFT", 0, -2)
-  UI.SetIcon(b.icon, ns.ICONS.gatherings)
-  -- A link like "All 14 chapters ›" (the accent colour was too pale on parchment).
-  b.more = UI.TextButton(b, L.G_OPEN, function() ns.Window:ShowPage("gatherings") end, "link", 13)
-  b.more:SetPoint("TOPRIGHT", 0, -2)
-  b.text = UI.WrapText(b, 13, "ink", width - 30 - 90, "book")
-  b.text:SetPoint("TOPLEFT", 30, -5)
-  local hl = b:CreateTexture(nil, "HIGHLIGHT")
-  hl:SetAllPoints(); hl:SetColorTexture(1, 0.9, 0.6, 0.1)
-  b:SetScript("OnClick", function() ns.Window:ShowPage("gatherings") end)
-  return b
-end
-
-local function refreshGatherings(b, f, stack)
-  local G = ns.Gatherings
-  local list = G:Upcoming(f)
-  local g = list[1]
-  if g then
-    b.text:SetText(L.G_NEXT:format(G.When(g.at), G.What(g), G.Counts(g).yes)
-      .. (#list > 1 and L.G_NEXT_MORE:format(#list - 1) or ""))
-  else
-    b.text:SetText(L.G_NEXT_NONE)
-  end
-  local h = math.max(30, b.text:GetStringHeight() + 10)
-  b:SetHeight(h)
-  stack:Place(b, h, 6)
-end
-
--- Shared lives (SPEC §9): how many are left, as a row of candles (UI.Lives) the whole fellowship watches; the
--- tooltip names each life lost. A click opens the rulebook, where the Challenges article is.
-local function buildLives(parent, width)
-  local b = CreateFrame("Button", nil, parent)
-  b:SetSize(width, 52)
-  b.icon = UI.Round(b, "ARTWORK", 22)
-  b.icon:SetPoint("TOPLEFT", 0, -2)
-  UI.SetIcon(b.icon, ns.ICONS.chal_shared)
-  local open = function() ns.Window:ShowPage("rules") end
-  b.more = UI.TextButton(b, L.LIVES_OPEN, open, "link", 13)
-  b.more:SetPoint("TOPRIGHT", 0, -2)
-  b.text = UI.Text(b, 13, "ink", "book")
-  b.text:SetPoint("TOPLEFT", 30, -5)
-  b.candles = UI.Lives(b, width - 30)
-  b.candles:SetPoint("TOPLEFT", 30, -26)
-  b.candles.onClick = open
-  local hl = b:CreateTexture(nil, "HIGHLIGHT")
-  hl:SetAllPoints(); hl:SetColorTexture(1, 0.9, 0.6, 0.1)
-  b:SetScript("OnClick", open)
-  return b
-end
-
-local function refreshLives(b, f, stack)
-  local v = ns.Challenges:LivesView(f)
-  b:SetShown(v ~= nil)
-  if not v then return end
-  b.text:SetText(v.title)
-  b.candles:SetTip(v.title, v.lines)
-  local h = 26 + b.candles:Set(v.total, v.left) + 4
-  -- A life lost since you last looked: its candle goes out now, once (remembered for each fellowship, by this
-  -- character). Not for the walkthrough's sample.
-  if not f.sample then
-    ns.char.livesSeen = type(ns.char.livesSeen) == "table" and ns.char.livesSeen or {}
-    local seen = tonumber(ns.char.livesSeen[f.id])
-    if seen and v.left < seen then b.candles:Snuff(seen, v.left) end
-    ns.char.livesSeen[f.id] = v.left
-  end
-  b:SetHeight(h)
-  stack:Place(b, h, 6)
-end
-
--- Room for the dungeon quests (U78): a card of its own, for you: the level the chapter's dungeon quests and mobs take
--- you to, and where to stop questing when they would not fit under the cap (it must be clear: the stop in red).
-local function buildRoom(parent, width)
-  local c = UI.Card(parent)
-  c:SetWidth(width)
-  c.label = UI.Text(c, 11, "accent", "title")
-  c.label:SetPoint("TOPLEFT", 12, -10)
-  c.label:SetText(L.ROOM_TITLE:upper())
-  c.main = UI.WrapText(c, 13, "ink", width - 24, "book")
-  c.main:SetPoint("TOPLEFT", 12, -28)
-  c.stop = UI.WrapText(c, 14, "B0321E", width - 24, "title")
-  c.notes = UI.WrapText(c, 11, "ink2", width - 24)
-  return c
-end
-
-local function refreshRoom(c, f, stack, watching)
-  local r = not watching and ns.Room:Chapter(f, ns.Me()) or nil
-  c:SetShown(r ~= nil)
-  if not r then return end
-  local main, stop, notes = ns.Room.Lines(r)
-  c.main:SetText(main)
-  c.stop:SetText(stop or ""); c.stop:SetShown(stop ~= nil)
-  c.notes:SetText(notes)
-  local y = 28 + c.main:GetStringHeight() + 4
-  c.stop:ClearAllPoints(); c.stop:SetPoint("TOPLEFT", 12, -y)
-  if stop then y = y + c.stop:GetStringHeight() + 4 end
-  c.notes:ClearAllPoints(); c.notes:SetPoint("TOPLEFT", 12, -y)
-  y = y + c.notes:GetStringHeight() + 12
-  c:SetHeight(y)
-  stack:Place(c, y, 10)
+-- The gentle open: the panels fade in one after another and the banner's picture drifts. Not with Reduce effects.
+-- pf.openedAt: when it last played (the self-test reads it).
+local function playOpen(pf)
+  if ns.Settings:Get("reduce") then pf.drift:Stop(); return end
+  for _, ag in ipairs(pf.opens) do ag:Stop(); ag:Play() end
+  if not pf.drift:IsPlaying() then pf.drift:Play() end
+  pf.openedAt = GetTime()
 end
 
 local function build(pf)
   local W = ns.Window
-  local width = W.PAGE_W - 8
+  local width = sheetWidth()
+  local sheet = CreateFrame("Frame", nil, pf.left)
+  sheet:SetPoint("TOPLEFT", pf.left, "TOPLEFT")
+  sheet:SetPoint("BOTTOMRIGHT", pf.right, "BOTTOMRIGHT")
+  pf.sheet = sheet
 
-  -- Left: the You card, contents and chronicle.
-  pf.lscroll = UI.Scroll(pf.left)
-  pf.lscroll:SetAllPoints()
-  local Lc = pf.lscroll.child
-  pf.you = buildYou(Lc, width)
-  pf.start = buildStart(Lc, width)
-  pf.gather = buildGatherings(Lc, width)
-  pf.lives = buildLives(Lc, width)
-  pf.room = buildRoom(Lc, width)
-  pf.contents = UI.Text(Lc, 12, "ink2")
-  pf.contents:SetText(L.CONTENTS)
-  pf.tocDone = UI.TextButton(Lc, "", function() pf.allCh = true; W:Refresh() end, "link", 13)
-  pf.tocAll = UI.TextButton(Lc, "", function() pf.allCh = not pf.allCh; W:Refresh() end, "link", 13)
-  pf.toc = UI.Pool(function()
-    local b = CreateFrame("Button", nil, Lc)
-    b:SetSize(width, 24)
-    b.bg = b:CreateTexture(nil, "BACKGROUND")
-    b.bg:SetAllPoints()
-    b.bg:SetColorTexture(0.72, 0.53, 0.18, 0.2)
-    b.num = UI.Text(b, 13, nil, "title")
-    b.num:SetPoint("LEFT", 6, 0)
-    b.num:SetWidth(34)
-    b.name = UI.Text(b, 14, nil, "title")
-    b.name:SetPoint("LEFT", 42, 0)
-    b.name:SetWidth(width - 140)
-    b.mark = UI.Mark(b, 14)
-    b.mark:SetPoint("RIGHT", -4, 0)
-    b.range = UI.Text(b, 12, "ink2", "body", "RIGHT")
-    b.range:SetPoint("RIGHT", b.mark, "LEFT", -6, 0)
-    local hl = b:CreateTexture(nil, "HIGHLIGHT")
-    hl:SetAllPoints(); hl:SetColorTexture(1, 0.9, 0.6, 0.12)
-    b:SetScript("OnClick", function() pf.sel = b.n; W:Refresh() end)
-    return b
+  -- The chapter's banner across the top (it was a small picture with empty paper beside it; the owner's pick of
+  -- 9 Nov 2026). Its picture drifts by the part of the image it shows, never by moving: moved, the picture left the
+  -- dark ground showing at its left (the owner, check of 10 Nov 2026).
+  local inset = UI.PIC_INSET
+  local banner = CreateFrame("Frame", nil, sheet)
+  banner:SetSize(width, TOP_H)
+  banner:SetPoint("TOPLEFT")
+  pf.banner = banner
+  local lvl = banner:GetFrameLevel()
+  local ground = banner:CreateTexture(nil, "BACKGROUND")
+  ground:SetAllPoints(); ground:SetColorTexture(0.1, 0.07, 0.04, 1)
+  local art = CreateFrame("Frame", nil, banner)
+  art:SetFrameLevel(lvl + 1)
+  art:SetPoint("TOPLEFT", inset, -inset); art:SetPoint("BOTTOMRIGHT", -inset, inset)
+  pf.drift = art:CreateAnimationGroup() -- only a clock: there and back in a minute, gently at each end
+  pf.driftTick = pf.drift:CreateAnimation("Animation")
+  pf.driftTick:SetDuration(60)
+  pf.driftTick:SetScript("OnUpdate", function(self)
+    pf.driftAt = 0.5 - 0.5 * math.cos(2 * math.pi * (self:GetProgress() or 0)); pan(pf)
   end)
-  pf.feedDiv = UI.Divider(Lc)
-  pf.feedHead = UI.Text(Lc, 17, "ink", "title")
-  pf.feedHead:SetText(L.CHRONICLE)
-  pf.feed = {}
-  for i = 1, 6 do
-    local e = CreateFrame("Frame", nil, Lc)
-    e:SetSize(width, 30)
-    e.text = UI.WrapText(e, 13, "ink", width, "book")
-    e.text:SetPoint("TOPLEFT")
-    e.when = UI.Text(e, 11, "ink2")
-    e.line = UI.Solid(e, "ARTWORK", "line", 0.6)
-    e.line:SetHeight(1); e.line:SetPoint("BOTTOMLEFT"); e.line:SetPoint("BOTTOMRIGHT")
-    pf.feed[i] = e
+  pf.drift:SetLooping("REPEAT")
+  -- Above the picture: its name and levels (a click opens the Chapter page), then the strip of paper.
+  pf.pic = CreateFrame("Button", nil, banner)
+  pf.pic:SetFrameLevel(lvl + 3)
+  pf.pic:SetPoint("TOPLEFT", inset, -inset); pf.pic:SetPoint("BOTTOMRIGHT", banner, "BOTTOMRIGHT", -inset, STRIP_H)
+  pf.pic.art = art:CreateTexture(nil, "BACKGROUND")
+  pf.pic.art:SetAllPoints()
+  pf.pic.artW, pf.pic.artH = width - 2 * inset, TOP_H - 2 * inset
+  local fade = pf.pic:CreateTexture(nil, "BORDER")
+  fade:SetAllPoints()
+  UI.SetGradient(fade, "VERTICAL", { 0.055, 0.03, 0.01, 0.88 }, { 0.055, 0.03, 0.01, 0 })
+  local hl = pf.pic:CreateTexture(nil, "HIGHLIGHT")
+  hl:SetAllPoints(); hl:SetColorTexture(1, 0.9, 0.6, 0.12)
+  pf.pic.levels = UI.Text(pf.pic, 13, "chipText", "body")
+  pf.pic.levels:SetPoint("BOTTOMLEFT", 16, 10)
+  pf.pic.title = UI.Text(pf.pic, 26, "goldText", "fancy")
+  pf.pic.title:SetPoint("BOTTOMLEFT", pf.pic.levels, "TOPLEFT", 0, 2)
+  pf.pic.title:SetWidth(width - 2 * inset - 200); pf.pic.title:SetWordWrap(true); maxLines(pf.pic.title, 2)
+  -- The name of the strip below, at the picture's lower right.
+  pf.pic.stand = UI.Text(pf.pic, 11, "chipText", "title", "RIGHT")
+  pf.pic.stand:SetPoint("BOTTOMRIGHT", -16, 8)
+  pf.pic.stand:SetText(L.WHERE_WE_STAND:upper())
+  shadow(pf.pic.title, pf.pic.levels, pf.pic.stand)
+  pf.pic:SetScript("OnClick", function() W:ShowPage("chapter") end)
+  pf.pic.edge = UI.Box(banner, inset, nil, nil, "gold", 0.85)
+  pf.pic.edge:SetAllPoints(); pf.pic.edge:SetFrameLevel(lvl + 5)
+
+  -- Where we stand along the banner's lower edge, on the picture's own dark foot (U158: it was a strip of paper, the
+  -- one part not in the cards' style): one level track, one line, the room as the answer; light in every theme.
+  local sw = width - 2 * inset
+  local st = CreateFrame("Frame", nil, banner)
+  st:SetFrameLevel(lvl + 3)
+  st:SetPoint("BOTTOMLEFT", inset, inset); st:SetPoint("BOTTOMRIGHT", -inset, inset)
+  st:SetHeight(STRIP_H - inset)
+  st.w = sw
+  pf.stand = st
+  local foot = st:CreateTexture(nil, "BACKGROUND")
+  foot:SetAllPoints(); foot:SetColorTexture(DUSK[1], DUSK[2], DUSK[3], 0.88) -- (as dark as the fade above ends)
+  st.track = UI.LevelTrack(st, sw - 24, true)
+  st.line = UI.Text(st, 13, "chipText", "book")
+  st.line:SetWordWrap(false)
+  st.who = UI.TextButton(st, L.WHO_STANDS_WHERE, function() W:ShowPage("chapter") end, "link", 13)
+  Theme:TextColor(st.who.text, "goldText")
+  st.room = CreateFrame("Frame", nil, st)
+  st.room:SetSize(sw - 32, 18)
+  st.room.text = UI.Text(st.room, 14, "chipText", "title")
+  st.room.text:SetPoint("LEFT")
+  st.room.text:SetWordWrap(false)
+  shadow(st.line, st.who.text, st.room.text)
+  UI.Tooltip(st.room, function() return st.room.tip end)
+  -- Shared lives (SPEC §9): how many are left, and a candle for each, on the picture's top left; a click opens the
+  -- rulebook's Challenges.
+  st.lives = CreateFrame("Button", nil, pf.pic)
+  st.lives:SetSize(1, 24)
+  st.lives:SetPoint("TOPLEFT", 16, -12)
+  st.lives.text = UI.Text(st.lives, 13, "chipText", "book")
+  st.lives.text:SetPoint("LEFT")
+  shadow(st.lives.text)
+  -- shortcut: one row of candles up to 25 lives (Large suggests 15); 26 to 30 take a second row over the chapter's
+  -- name. Smaller candles on the banner if fellowships pick that many.
+  st.lives.candles = UI.Lives(st.lives, sw - 240)
+  st.lives.candles.onClick = function() W:ShowPage("rules") end
+  st.lives:SetScript("OnClick", function() W:ShowPage("rules") end)
+
+  -- The three panels, side by side.
+  local pw = math.floor((width - 2 * GAP) / 3)
+  local function place(p, i)
+    p:SetPoint("TOPLEFT", sheet, "TOPLEFT", (i - 1) * (pw + GAP), -(TOP_H + GAP))
+    p:SetPoint("BOTTOM", sheet, "BOTTOM")
+    p:SetWidth(pw)
   end
+  local inner = pw - 2 * PAD
+  pf.innerW = inner
 
-  -- Right: the chosen chapter.
-  pf.rscroll = UI.Scroll(pf.right)
-  pf.rscroll:SetAllPoints()
-  local R = pf.rscroll.child
-  local band = CreateFrame("Frame", nil, R)
-  band:SetSize(width, 112)
-  pf.band = band
-  band.art = band:CreateTexture(nil, "BACKGROUND")
-  local fade = band:CreateTexture(nil, "BORDER")
-  UI.FramePicture(band, band.art, fade)
-  band.w, band.h = width - 2 * UI.PIC_INSET, 112 - 2 * UI.PIC_INSET
-  UI.SetGradient(fade, "VERTICAL", { 0.055, 0.03, 0.01, 0.88 }, { 0.055, 0.03, 0.01, 0.05 })
-  band.num = UI.Text(band, 11, "E8C878")
-  band.num:SetPoint("BOTTOMLEFT", 14, 50)
-  band.title = UI.Text(band, 20, "goldText", "title")
-  band.title:SetPoint("BOTTOMLEFT", 14, 28)
-  band.title:SetShadowOffset(0, -1); band.title:SetShadowColor(0, 0, 0, 1)
-  band.line = UI.Text(band, 12, "chipText")
-  band.line:SetPoint("BOTTOMLEFT", 14, 10)
-  -- Another chapter chosen in the contents: its status. The current one: where the Companions stand (the grouped
-  -- list of the Chapter page; it was a level track with dots).
-  pf.banner = UI.StatusBanner(R, width)
-  pf.standHead = UI.Text(R, 17, "ink", "title")
-  pf.standHead:SetText(L.WHERE_STAND)
-  pf.stand = UI.Standings(R, width)
-  pf.dungHead = UI.Text(R, 17, "ink", "title")
-  pf.dungHead:SetText(L.OV_DUNGEONS)
-  pf.dungeons = UI.Pool(function()
-    -- A click opens the Dungeon page (U96).
-    local d = CreateFrame("Button", nil, R)
-    d:SetSize(width, 22)
-    local hl = d:CreateTexture(nil, "HIGHLIGHT")
-    hl:SetAllPoints(); hl:SetColorTexture(1, 0.9, 0.6, 0.12)
-    d:SetScript("OnClick", function() if d.key then ns.DungeonPage:Open(d.key) end end)
-    d.mark = UI.Mark(d, 14)
-    d.mark:SetPoint("LEFT")
-    -- U66: a small square picture before the name, as on Journey Admin; larger on hover (U64).
-    d.pic = CreateFrame("Frame", nil, d)
-    d.pic:SetSize(20, 20); d.pic:SetPoint("LEFT", 18, 0); d.pic:EnableMouse(true)
-    d.pic.tex = d.pic:CreateTexture(nil, "ARTWORK")
-    d.pic.tex:SetAllPoints()
-    UI.PictureTip(d.pic, function() return d.key end)
-    d.pic:SetScript("OnMouseUp", function() if d.key then ns.DungeonPage:Open(d.key) end end)
-    d.name = UI.Text(d, 13, "ink")
-    d.name:SetPoint("LEFT", 44, 0)
-    d.note = UI.Text(d, 12, "ink2", "body", "RIGHT")
-    d.note:SetPoint("RIGHT")
-    return d
-  end)
-  pf.noDungeons = UI.WrapText(R, 13, "ink2", width, "book")
-  pf.noDungeons:SetText(L.OV_NO_DUNGEONS)
-  pf.back = UI.TextButton(R, L.BACK_TO_CURRENT, function() pf.sel = nil; W:Refresh() end, "plain")
-  pf.open = UI.TextButton(R, L.OPEN_CHAPTER, function()
-    local chapter = W.pageFrames.chapter
-    if chapter then chapter.sel = pf.shown end
-    W.page = "chapter"
-    W:Refresh()
-  end, "primary")
+  -- Focus now: one thing to do, its reason, one button and the page it lives on; on its dungeon's picture, as the
+  -- Adventure Guide's Suggested Content has (it was a plain cream card; the owner's pick of 9 Nov 2026).
+  local fo = panel(sheet, L.FOCUS_NOW, function()
+    local l = pf.focusLink
+    if l and l.key then ns.DungeonPage:Open(l.key) elseif l then W:ShowPage(l.page) end
+  end, function() focusArt(pf) end)
+  place(fo, 1)
+  pf.focus = fo
+  fo.what = maxLines(UI.WrapText(fo, 24, "goldText", inner, "fancy"), 2)
+  fo.what:SetPoint("TOPLEFT", PAD, -fo.top)
+  fo.why = maxLines(UI.WrapText(fo, 13, "chipText", inner, "book"), 4)
+  shadow(fo.what, fo.why)
+  fo.btn = UI.TextButton(fo, "", function()
+    local f = ns.Fellowship:Current()
+    if f then ns.Together:DoFocus(f, pf.focusButton) end
+  end, "primary", 15)
+
+  -- Since last time: the newest lines, each with its kind's icon, and how many more the Chronicle has.
+  local si = panel(sheet, L.SINCE_LAST_TIME, function() W:ShowPage("chronicle") end, function(p) sceneArt(p, "board") end)
+  place(si, 2)
+  pf.since = si
+  UI.Tooltip(si.note, function() return si.noteTip end)
+  si.rows = {}
+  for i = 1, FEED_N do
+    local r = CreateFrame("Frame", nil, si)
+    r:SetWidth(inner)
+    r.icon = UI.Round(r, "ARTWORK", 20)
+    r.icon:SetPoint("TOPLEFT", 0, 1)
+    r.text = maxLines(UI.WrapText(r, 13, "chipText", inner - 28, "book"), 2)
+    r.text:SetPoint("TOPLEFT", 28, 0)
+    shadow(r.text)
+    si.rows[i] = r
+  end
+  si.none = UI.WrapText(si, 13, "muted", inner, "book")
+  si.none:SetPoint("TOPLEFT", PAD, -si.top)
+  si.none:SetText(L.SINCE_NOTHING_NEW)
+  shadow(si.none)
+
+  -- Coming up: the first step for a later dungeon (its picture; a click opens its page), the next two Gatherings and
+  -- the next chapter.
+  local co = panel(sheet, L.COMING_UP, function() W:ShowPage("gatherings") end, function(p) sceneArt(p, "land") end)
+  place(co, 3)
+  pf.coming = co
+  co.link:SetLabel(L.ALL_GATHERINGS)
+  co.prep = CreateFrame("Button", nil, co)
+  co.prep:SetSize(inner, 46)
+  co.prep.frame = CreateFrame("Frame", nil, co.prep)
+  co.prep.frame:SetSize(64, 40); co.prep.frame:SetPoint("TOPLEFT")
+  -- The picture belongs to its frame: on the row it filled the row behind the words, dark, and the frame's own ground
+  -- covered it (the owner's check, 9 Nov 2026).
+  co.prep.pic = co.prep.frame:CreateTexture(nil, "ARTWORK")
+  UI.FramePicture(co.prep.frame, co.prep.pic)
+  co.prep.title = UI.Text(co.prep, 14, "goldText", "title")
+  co.prep.title:SetPoint("TOPLEFT", 74, -1)
+  co.prep.title:SetWidth(inner - 74); co.prep.title:SetWordWrap(false)
+  co.prep.line = maxLines(UI.WrapText(co.prep, 12, "muted", inner - 74, "book"), 2)
+  co.prep.line:SetPoint("TOPLEFT", co.prep.title, "BOTTOMLEFT", 0, -2)
+  shadow(co.prep.title, co.prep.line)
+  co.prep:SetScript("OnClick", function() if co.prep.key then ns.DungeonPage:Open(co.prep.key) end end)
+  co.gathers = {}
+  for i = 1, GATHER_N do
+    local g = CreateFrame("Button", nil, co)
+    g:SetSize(inner, 38)
+    g.cal = UI.Solid(g, "BACKGROUND", "dark", 0.6)
+    g.cal:SetSize(36, 36); g.cal:SetPoint("TOPLEFT")
+    g.day = UI.Text(g, 10, "muted", "title", "CENTER")
+    g.day:SetPoint("TOP", g.cal, "TOP", 0, -3)
+    g.num = UI.Text(g, 16, "goldText", "title", "CENTER")
+    g.num:SetPoint("BOTTOM", g.cal, "BOTTOM", 0, 3)
+    g.title = UI.Text(g, 14, "chipText", "title")
+    g.title:SetPoint("TOPLEFT", 46, -2)
+    g.title:SetWidth(inner - 46); g.title:SetWordWrap(false)
+    g.sub = UI.Text(g, 12, "muted", "book")
+    g.sub:SetPoint("TOPLEFT", g.title, "BOTTOMLEFT", 0, -3)
+    shadow(g.title, g.sub)
+    g:SetScript("OnClick", function() W:ShowPage("gatherings") end)
+    co.gathers[i] = g
+  end
+  co.noGather = UI.Text(co, 13, "muted", "book")
+  co.noGather:SetText(L.G_NEXT_NONE)
+  co.nextCh = maxLines(UI.WrapText(co, 13, "chipText", inner, "book"), 2)
+  shadow(co.noGather, co.nextCh)
+
+  -- The gentle open (the owner's pick of 9 Nov 2026): each time the Overview opens, the panels fade in one after
+  -- another (all within the tour's settling time) and the banner's picture drifts while it is shown.
+  pf.opens = {}
+  for i, p in ipairs({ fo, si, co }) do
+    local ag = p:CreateAnimationGroup()
+    -- Each starts a tenth of a second after the one before, held unseen until then (a delay alone shows it first).
+    if i > 1 then
+      local hold = ag:CreateAnimation("Alpha")
+      hold:SetFromAlpha(0); hold:SetToAlpha(0); hold:SetDuration(0.1 * (i - 1)); hold:SetOrder(1)
+    end
+    local a = ag:CreateAnimation("Alpha")
+    a:SetFromAlpha(0); a:SetToAlpha(1); a:SetDuration(0.3); a:SetOrder(2)
+    if a.SetSmoothing then a:SetSmoothing("OUT") end
+    pf.opens[i] = ag
+  end
+  sheet:SetScript("OnShow", function() playOpen(pf) end)
+  sheet:SetScript("OnHide", function() pf.drift:Stop(); pf.driftAt = 0 end)
+  -- Reduce effects turned on with the Overview open (Settings is a side panel): the picture stops at once.
+  ns:On("SETTING", function(key, on) if key == "reduce" and on then pf.drift:Stop() end end)
+end
+
+-- Where we stand's line: who is below the floor (or that everyone is at the floor or the cap), and the clears.
+local function standLine(f, cur)
+  local c = J:Counts(f, cur)
+  local below = J:Below(f, cur)
+  local first
+  if #below == 1 then first = below[1] == ns.Me() and L.WS_BELOW_YOU or L.WS_BELOW_1:format(ns.Short(below[1]))
+  elseif #below > 1 then first = L.WS_BELOW_N:format(#below)
+  elseif c[2] and c[2][2] == 0 and (c[3][2] + c[4][2]) > 0 then first = L.WS_AT_CAP
+  else first = L.WS_AT_FLOOR end
+  local req, done = J:Required(f, cur), 0
+  for _, x in ipairs(req) do if J:Cleared(f, x.key) then done = done + 1 end end
+  if #req == 0 then return first end
+  return first .. " " .. L.WS_CLEARED:format(done, #req)
+end
+
+local function refreshStand(pf, f, cur, ch, watching)
+  local st = pf.stand
+  local y = 6
+  -- A Friend of the fellowship never holds anyone back (SPEC §1.1): that, with how to count again, in the room's place.
+  local friend = not watching and ns.Fellowship:IsFriend(f, ns.Me())
+  local room = not watching and not friend and ns.Room:Chapter(f, ns.Me()) or nil
+  local th = st.track:Set(f, cur, 0, room and room.stop)
+  st.track:ClearAllPoints(); st.track:SetPoint("TOPLEFT", 12, -y)
+  y = y + th + 2
+  st.line:SetText(standLine(f, cur))
+  st.line:ClearAllPoints(); st.line:SetPoint("TOPLEFT", 16, -y)
+  st.who:ClearAllPoints(); st.who:SetPoint("LEFT", st.line, "RIGHT", 10, 0)
+  st.line:SetWidth(math.min(st.line:GetStringWidth() + 2, st.w - st.who:GetWidth() - 46))
+  y = y + 22
+  st.room:SetShown(room ~= nil or friend)
+  if room or friend then
+    if friend then
+      st.room.text:SetText(L.WS_FRIEND); st.room.tip = L.WS_FRIEND_TIP
+    else
+      local text, color, tip = ns.Room.Answer(room)
+      -- (The colours lifted for the dark foot, as the Night theme's pages lift them.)
+      st.room.text:SetText(("|cff%s%s|r"):format(Theme.DARK_LIFT[color] or color, text))
+      st.room.tip = tip
+    end
+    st.room:ClearAllPoints(); st.room:SetPoint("TOPLEFT", 16, -y)
+  end
+  local v = ch and ns.Challenges:LivesView(f)
+  st.lives:SetShown(v ~= nil)
+  if v then
+    st.lives.text:SetText(v.title)
+    st.lives.candles:SetTip(v.title, v.lines)
+    local h = st.lives.candles:Set(v.total, v.left)
+    st.lives.candles:ClearAllPoints(); st.lives.candles:SetPoint("LEFT", st.lives.text, "RIGHT", 12, 0)
+    -- A life lost since you last looked: its candle goes out now, once (per fellowship, by this character). Not for
+    -- the walkthrough's sample.
+    if not f.sample then
+      ns.char.livesSeen = type(ns.char.livesSeen) == "table" and ns.char.livesSeen or {}
+      local seen = tonumber(ns.char.livesSeen[f.id])
+      if seen and v.left < seen then st.lives.candles:Snuff(seen, v.left) end
+      ns.char.livesSeen[f.id] = v.left
+    end
+    -- Only as wide as its words and candles: the rest of the picture still opens the Chapter page.
+    st.lives:SetSize(st.lives.text:GetStringWidth() + 12 + st.lives.candles.used, math.max(24, h))
+  end
+end
+
+local function refreshFocus(pf, f, cur, watching)
+  local fo = pf.focus
+  local x = ns.Together:Focus(f)
+  fo.what:SetText(x.head)
+  fo.why:SetText(x.why or "")
+  local y = fo.top
+  fo.what:ClearAllPoints(); fo.what:SetPoint("TOPLEFT", PAD, -y)
+  y = y + fo.what:GetStringHeight() + 8
+  fo.why:ClearAllPoints(); fo.why:SetPoint("TOPLEFT", PAD, -y)
+  y = y + fo.why:GetStringHeight() + 14
+  local b = not watching and x.button or nil
+  pf.focusButton = b
+  fo.btn:SetShown(b ~= nil)
+  if b then
+    fo.btn:SetLabel(b.kind == "find" and L.FIND_GROUP or (b.kind == "ready" and L.TODO_GET_READY_BUTTON
+      or (b.kind == "invite" and L.INVITE_TO_GROUP or L.FOCUS_OPEN)))
+    -- Larger than the book's other buttons: the one thing to press on this page.
+    fo.btn:SetSize(math.max(150, fo.btn.text:GetStringWidth() + 56), 34)
+    fo.btn:ClearAllPoints(); fo.btn:SetPoint("TOPLEFT", PAD, -y)
+  end
+  pf.focusLink = x.link or { page = "chapter", text = L.FOCUS_LINK_CHAPTER }
+  fo.link:SetLabel(pf.focusLink.text)
+  pf.focusArtOf = { key = pf.focusLink.key, chapter = ns.Pages:ArtOf(f, cur) }
+  focusArt(pf)
+end
+
+-- Since last time: the chapter unlocked, who levelled, then the Chronicle's lines, newest first; FEED_N of them.
+local function refreshSince(pf, f)
+  local si = pf.since
+  local d = ns.Since:Digest(f)
+  ns.Since:Shown(f)
+  local lines = {}
+  if d then
+    if d.chapter then lines[#lines + 1] = { "hist_chapter", d.chapter } end
+    for _, lv in ipairs(d.levels) do lines[#lines + 1] = { "since_level", L.SINCE_REACHED:format(ns.Short(lv.name), lv.to) } end
+    for _, e in ipairs(d.events) do lines[#lines + 1] = { e.icon or "chronicle", e.text, e.time } end
+  end
+  local snap = ns.char.since
+  si.note:SetText(d and d.ago or "")
+  si.noteTip = d and type(snap) == "table" and snap.t and L.SINCE_NOTE_TIP:format(date(L.G_DATE_FORMAT, snap.t)) or nil
+  local y = si.top
+  for i, r in ipairs(si.rows) do
+    local line = lines[i]
+    r:SetShown(line ~= nil)
+    if line then
+      UI.SetIcon(r.icon, ns.ICONS[line[1]] or ns.ICONS.chronicle)
+      r.text:SetText(line[2])
+      local h = math.max(20, r.text:GetStringHeight())
+      r:SetHeight(h)
+      r:ClearAllPoints(); r:SetPoint("TOPLEFT", PAD, -y)
+      y = y + h + 10
+    end
+  end
+  si.none:SetShown(#lines == 0)
+  local more = math.max(0, #lines - FEED_N) + (d and d.more or 0)
+  si.link:SetLabel(more > 0 and L.SINCE_MORE_LINK:format(more) or L.THE_CHRONICLE_LINK)
+end
+
+local function refreshComing(pf, f, cur, maxView)
+  local co = pf.coming
+  local y = co.top
+  local inner = pf.innerW
+  -- The first step for a later dungeon (U140).
+  local first
+  for _, e in ipairs(ns.QuestLists:Later(f, cur)) do if not first and e.open > 0 then first = e end end
+  co.prep:SetShown(first ~= nil)
+  if first then
+    local lvl = Hr:Level(f, ns.Me())
+    local step
+    for _, s in ipairs(first.steps) do if not step and s.open then step = s end end
+    co.prep.key = first.x.key
+    ns.SetDungeonArt(co.prep.pic, first.x.key, 64 - 2 * UI.PIC_INSET, 40 - 2 * UI.PIC_INSET)
+    co.prep.title:SetText(L.FOCUS_PREPARE:format(first.x.d[2]))
+    co.prep.line:SetText(lvl >= step.lvl and L.COMING_OPEN_NOW:format(step.name) or L.COMING_OPENS:format(step.name, step.lvl))
+    local h = math.max(42, co.prep.title:GetStringHeight() + co.prep.line:GetStringHeight() + 4)
+    co.prep:SetHeight(h)
+    co.prep:ClearAllPoints(); co.prep:SetPoint("TOPLEFT", 16, -y)
+    y = y + h + 12
+  end
+  -- The next two Gatherings.
+  local G = ns.Gatherings
+  local list = G:Upcoming(f)
+  for i, g in ipairs(co.gathers) do
+    local x = list[i]
+    g:SetShown(x ~= nil)
+    if x then
+      g.day:SetText(date(L.G_WEEKDAY_FORMAT, x.at))
+      g.num:SetText(tonumber(date("%d", x.at)))
+      g.title:SetText(G.What(x))
+      g.sub:SetText(L.COMING_GATHER_LINE:format(date(L.G_TIME_FORMAT, x.at), G.Counts(x).yes))
+      g:ClearAllPoints(); g:SetPoint("TOPLEFT", 16, -y)
+      y = y + 46
+    end
+  end
+  co.noGather:SetShown(#list == 0)
+  if #list == 0 then
+    co.noGather:ClearAllPoints(); co.noGather:SetPoint("TOPLEFT", 16, -y)
+    y = y + 26
+  end
+  -- Then the next chapter (or the raids).
+  local count = #f.journey.chapters
+  local text
+  if cur >= count then text = L.COMING_RAIDS
+  elseif cur + 1 > maxView then text = L.COMING_NEXT_HIDDEN:format(J.Roman(cur + 1))
+  else text = L.COMING_NEXT:format(J.Roman(cur + 1), f.journey.chapters[cur + 1].name) end
+  co.nextCh:SetWidth(inner)
+  co.nextCh:SetText(text)
+  co.nextCh:ClearAllPoints(); co.nextCh:SetPoint("TOPLEFT", 16, -(y + 2))
 end
 
 local function refresh(pf, ctx)
   local f = ctx.f
   if not f then return end
-  local cur = J:CurrentIndex(f)
-  local maxView = J:MaxView(f, ctx.me)
   local count = #f.journey.chapters
-  local sel = ns.Clamp(pf.sel or math.min(cur, count), 1, math.max(1, maxView))
-  pf.shown = sel
-
-  -- The You card, then the contents.
-  local s = UI.Stack(pf.lscroll.child)
-  s:Place(pf.you, refreshYou(pf.you, f, ctx.watching), 10)
-  local steps, label
-  if not ctx.watching then steps, label = ns.Together:Started(f) end
-  pf.start:SetShown(steps ~= nil)
-  if steps then
-    s:Place(pf.start, refreshStart(pf.start, steps, label), 10)
-  end
-  pf.gather:SetShown(not ctx.watching)
-  if not ctx.watching then refreshGatherings(pf.gather, f, s) end
-  refreshLives(pf.lives, f, s)
-  refreshRoom(pf.room, f, s, ctx.watching)
-  s:Skip(10)
-  s:Place(pf.contents, 16, 4)
-  -- Done chapters fold into one line and only the next few show, unless the player opens them all (fourteen rows
-  -- pushed everything below the fold; seen in the UI tour). A chapter chosen to read always shows.
-  local function visible(n) return pf.allCh or (n >= cur and n <= cur + 3) or n == sel end
-  local folded = 0
-  for n = 1, count do if not visible(n) then folded = folded + 1 end end
-  pf.tocDone:SetShown(not pf.allCh and cur > 1 and cur <= count + 1)
-  if pf.tocDone:IsShown() then
-    local last = math.min(cur - 1, count)
-    pf.tocDone:SetLabel(last == 1 and L.TOC_DONE_1 or L.TOC_DONE_N:format(J.Roman(1), J.Roman(last)))
-    s:Place(pf.tocDone, 22, 2, 4)
-  end
-  for n, ch in ipairs(f.journey.chapters) do
-    local b = pf.toc:Get(n)
-    if not b then break end
-    if not visible(n) then b:Hide() else
-    local hidden, done, now = n > maxView, n < cur, n == cur
-    b.n = n
-    b.num:SetText(J.Roman(n))
-    b.name:SetText(hidden and L.HIDDEN_CHAPTER or ch.name)
-    b.range:SetText(hidden and "" or (ch.floor .. "–" .. ch.cap))
-    b.mark:SetMark(done and "done" or (now and "current" or (hidden and "locked" or nil)))
-    local color = done and "3E7A3A" or (now and "B8742A" or "ink2") -- (pale "accent" was hard to read)
-    b.num:SetTextColor(Theme:RGBA(color)); b.name:SetTextColor(Theme:RGBA(color))
-    b.bg:SetShown(n == sel)
-    b:SetEnabled(not hidden)
-    s:Place(b, 24, 0)
-    end
-  end
-  pf.toc:HideFrom(count + 1)
-  pf.tocAll:SetShown(folded > 0 or pf.allCh)
-  if pf.tocAll:IsShown() then
-    pf.tocAll:SetLabel(pf.allCh and L.TOC_FEWER or L.TOC_ALL:format(count))
-    s:Place(pf.tocAll, 22, 2, 4)
-  end
-  s:Skip(8)
-  -- Recent history: under the contents; in full screen on the right page under the chapter's dungeons, so the whole
-  -- Overview shows without scrolling (U87: the right page ended halfway down while the left ran off its foot).
-  local feedRight = ns.Window:IsFullscreen()
-  local function placeFeed(st, page)
-    for _, w in ipairs({ pf.feedDiv, pf.feedHead, unpack(pf.feed) }) do
-      if w:GetParent() ~= page then w:SetParent(page) end
-    end
-    pf.feedDiv:ClearAllPoints()
-    pf.feedDiv:SetPoint("TOPLEFT", page, "TOPLEFT", 0, -st.y); pf.feedDiv:SetPoint("TOPRIGHT", page, "TOPRIGHT", 0, -st.y)
-    st:Skip(20)
-    st:Place(pf.feedHead, 22, 6)
-    local chron = ns.Fellowship:ChronicleView(f, #pf.feed)
-    for i, e in ipairs(pf.feed) do
-      local entry = chron[i]
-      e:SetShown(entry ~= nil)
-      if entry then
-        e.text:SetText(entry.text)
-        e.when:ClearAllPoints(); e.when:SetPoint("TOPLEFT", e.text, "BOTTOMLEFT", 0, -2)
-        e.when:SetText(ns.TimeAgo(entry.time))
-        local h = e.text:GetStringHeight() + 20
-        e:SetHeight(h)
-        st:Place(e, h, 4)
-      end
-    end
-  end
-  if not feedRight then placeFeed(s, pf.lscroll.child) end
-  pf.feedRight = feedRight
-  pf.lscroll:SetContentHeight(s.y + 8)
-
-  -- The chosen chapter.
-  local ch = f.journey.chapters[sel]
-  local r = UI.Stack(pf.rscroll.child)
-  ns.Pages:SetChapterArt(pf.band.art, ns.Pages:ArtOf(f, sel), pf.band.w, pf.band.h, 0.55)
-  pf.band.num:SetText(L.CHAPTER_ROMAN:format(J.Roman(sel)):upper())
-  pf.band.title:SetText(ch and ch.name or L.BN_JOURNEY_DONE)
-  pf.band.line:SetText(ch and J:LevelsLine(f, ch) or "")
-  r:Place(pf.band, 112, 10)
-  local isCurrent = sel == math.min(cur, count) and cur <= count
-  pf.banner:SetShown(not isCurrent)
-  pf.standHead:SetShown(isCurrent and ch ~= nil)
-  if isCurrent and ch then
-    r:Place(pf.standHead, 22, 6)
-    pf.stand:Set(f, sel, r)
-  else
-    pf.stand:Hide()
-    r:Place(pf.banner, pf.banner:Set(J:Banner(f, sel)), 10)
-  end
-  pf.dungHead:SetShown(ch ~= nil)
-  if ch then r:Place(pf.dungHead, 22, 6) end
-  local list = ch and J:ChapterList(f, sel) or {}
-  local shown = 0
-  for i, x in ipairs(list) do
-    local d = pf.dungeons:Get(i)
-    if not d then break end
-    shown = i
-    local state = J:DungeonState(f, sel, x)
-    d.mark:SetMark(state)
-    d.key = x.key
-    d.pic:SetShown(ns.SetDungeonArt(d.pic.tex, x.key, 20, 20))
-    d.name:SetText(x.d[2])
-    -- Open in a dark amber ("accent" is pale gold, and the lighter amber B8742A was still hard to read on parchment;
-    -- seen in the tour and the check of 29 Oct 2026).
-    d.name:SetTextColor(Theme:RGBA(state == "cleared" and "3E7A3A" or (state == "open" and "8C5A14" or "ink2")))
-    -- The role in its colour (Rules/Journey.lua, ROLE_COLOR), and the next chapter's bridges with their chapter.
-    local role = x.early and L.NOTE_BRIDGE_EARLY:format(J.Roman(x.early))
-      or (x.role == "b" and L.NOTE_BRIDGE or (x.role == "o" and L.NOTE_OPTIONAL or L.NOTE_MANDATORY))
-    d.note:SetText(role .. L.NOTE_LEVELS:format(x.d[3], x.d[4]))
-    d.note:SetTextColor(Theme:RGBA((J.ROLE_COLOR[x.role] or J.ROLE_COLOR.m)[1]))
-    r:Place(d, 22, 2)
-  end
-  pf.dungeons:HideFrom(shown + 1)
-  pf.noDungeons:SetShown(ch ~= nil and #list == 0)
-  if ch and #list == 0 then r:Place(pf.noDungeons, pf.noDungeons:GetStringHeight(), 4) end
-  r:Skip(10)
-  pf.back:SetShown(sel ~= math.min(cur, count))
-  local by = r.y
-  pf.open:SetShown(ch ~= nil)
-  pf.open:ClearAllPoints(); pf.open:SetPoint("TOPRIGHT", pf.rscroll.child, "TOPRIGHT", 0, -by)
-  pf.back:ClearAllPoints(); pf.back:SetPoint("TOPLEFT", pf.rscroll.child, "TOPLEFT", 0, -by)
-  r:Skip(40)
-  if feedRight then placeFeed(r, pf.rscroll.child) end
-  pf.rscroll:SetContentHeight(r.y + 8)
+  local cur = math.min(J:CurrentIndex(f), count)
+  local ch = J:Current(f)
+  ns.Pages:SetChapterArt(pf.pic.art, ns.Pages:ArtOf(f, cur), pf.pic.artW, pf.pic.artH, 0.45)
+  pan(pf)
+  local shownCh = f.journey.chapters[cur]
+  pf.pic.title:SetText(ch and L.CHAPTER_N_NAME:format(J.Roman(cur), shownCh.name) or L.BN_JOURNEY_DONE)
+  pf.pic.levels:SetText(L.OV_PIC_LEVELS:format(J:FloorLevel(f, shownCh), shownCh.cap))
+  refreshStand(pf, f, cur, ch, ctx.watching)
+  refreshFocus(pf, f, cur, ctx.watching)
+  refreshSince(pf, f)
+  refreshComing(pf, f, cur, J:MaxView(f, ctx.me))
+  -- (Again here: the board is the Horde's own for a Horde character, and the tour's Horde shots switch it.)
+  pf.since.paint(); pf.coming.paint()
 end
 
-ns.Pages:Register({ id = "overview", label = ns.L.NAV_OVERVIEW, build = build, refresh = refresh,
-  title = function() return L.TITLE_OVERVIEW, L.SUB_OVERVIEW end })
+ns.Pages:Register({ id = "overview", label = ns.L.NAV_OVERVIEW, header = "both", flat = true, build = build,
+  -- (No subtitle, U162: "Where the fellowship stands" said what the banner's Where we stand says just below it.)
+  refresh = refresh, title = function() return L.TITLE_OVERVIEW, "" end })

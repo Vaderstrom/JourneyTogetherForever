@@ -15,7 +15,7 @@ local TK = { WIDTH = 280, EVERY = 30, SOON = 24 * 3600 }
 ns.Tracker = TK
 -- Each line's icon (U13): the book's own painted icons for what the line is about.
 TK.ICON = 14
-TK.LINE_ICONS = { status = "chapter", you = "heroes", next = "overview", clears = "toast_clear", run = "raids",
+TK.LINE_ICONS = { status = "chapter", you = "heroes", next = "overview", early = "toast_dquest", clears = "toast_clear", run = "raids",
   quests = "quests", online = "characters", gather = "gatherings", duel = "tourney", inbox = "inbox" }
 -- Docked under the game's tracker: the game's section header (26 high), how far its background reaches left of its
 -- sections (when the game cannot say), how dark our background is at the game's Opacity 100%, and the game's line
@@ -74,8 +74,9 @@ function TK:Build()
   f.xp.bg:SetAllPoints(); f.xp.bg:SetColorTexture(0, 0, 0, 0.6)
   -- The lines: { key, size, role, page }. A click opens the book on the page the line is about.
   f.lines = {}
-  for i, spec in ipairs({ { "status", 12, nil, "chapter" }, { "you", 12, "toastText", "overview" },
-    { "next", 12, "toastText", "overview" }, { "clears", 11, "toastText", "chapter" }, { "run", 12, "goldText", "chapter" },
+  -- ("stop": where to stop questing, red, under your little bar and in line with your words; no icon of its own.)
+  for i, spec in ipairs({ { "status", 12, nil, "chapter" }, { "you", 12, "toastText", "overview" }, { "stop", 12, nil, "overview" },
+    { "next", 12, "toastText", "overview" }, { "early", 11, "goldText", "dungeon" }, { "clears", 11, "toastText", "chapter" }, { "run", 12, "goldText", "chapter" },
     { "quests", 11, "toastText", "quests" }, { "online", 11, "muted", "heroes" }, { "gather", 11, "muted", "gatherings" },
     { "duel", 11, "goldText", "tourney" }, { "inbox", 11, "goldText", "inbox" } }) do
     local b = CreateFrame("Button", nil, f)
@@ -83,16 +84,19 @@ function TK:Build()
     -- Each line's small round icon in front (U13, 31 Oct 2026: the tracker read as a block of small text).
     b.icon = UI.Round(b, "ARTWORK", TK.ICON)
     b.icon:SetPoint("TOPLEFT", 0, -1)
-    b.hasIcon = UI.SetIcon(b.icon, ns.ICONS[TK.LINE_ICONS[spec[1]] or "toast_default"])
+    b.hasIcon = spec[1] ~= "stop" and UI.SetIcon(b.icon, ns.ICONS[TK.LINE_ICONS[spec[1]] or "toast_default"])
     b.icon:SetShown(b.hasIcon)
-    local indent = b.hasIcon and TK.ICON + 6 or 0
+    local indent = (b.hasIcon or spec[1] == "stop") and TK.ICON + 6 or 0
+    b.indent = indent
     b.text = UI.WrapText(b, spec[2], spec[3], self.WIDTH - 20 - indent, "body")
     b.text:SetPoint("TOPLEFT", indent, 0)
     b.key, b.page, b.role, b.font = spec[1], spec[4], spec[3], { b.text:GetFont() }
     local hl = b:CreateTexture(nil, "HIGHLIGHT")
     hl:SetAllPoints(); hl:SetColorTexture(1, 0.85, 0.45, 0.08)
     b:SetScript("OnClick", function()
-      if b.page == "inbox" then ns.Window:OpenPanel("inbox") else ns.Window:Open(b.page) end
+      if b.page == "inbox" then ns.Window:OpenPanel("inbox")
+      elseif b.page == "dungeon" then if TK.earlyKey then ns.DungeonPage:Open(TK.earlyKey) end
+      else ns.Window:Open(b.page) end
     end)
     TK:Draggable(b)
     f.lines[i] = b
@@ -314,7 +318,6 @@ function TK:Content(f)
   local ch = f.journey.chapters[cur]
   local banner = J:Banner(f, cur)
   local you = T:You(f)
-  local steps = J:NextSteps(f)
   local online = {}
   -- (The Ring-bearer with the ring after the name, U55.)
   for _, name in ipairs(T:Online(f)) do
@@ -324,18 +327,22 @@ function TK:Content(f)
   for _, g in ipairs(G:Upcoming(f)) do
     if g.at >= time() - 3600 and g.at - time() <= self.SOON then gather = L.TRACK_GATHER:format(G.When(g.at), G.What(g)) break end
   end
-  -- After the last chapter the title already says the journey is complete (the tour showed it four times): the
-  -- status points at the Endgame instead, and there is no next step to repeat it.
-  local status, nextText = banner.title, steps[1] and steps[1].text or nil
-  -- With others online, the next step is Play now's (M25).
-  local play = ch and T:PlayNow(f)
-  if play then nextText = play.text end
-  if not ch then status, nextText = L.TOAST_ENDGAME, nil end
+  -- The next step is the Overview's Focus now (U139). After the last chapter the title already says the journey is
+  -- complete (the tour showed it four times): the status points at the Endgame instead, and there is no next step.
+  local status, nextText = banner.title, ch and T:Focus(f).head or nil
+  if not ch then status = L.TOAST_ENDGAME end
+  -- Prequest (U124): the next chain step your level reaches; a click opens its dungeon's page.
+  local early = ch and T:StartEarly(f)
+  TK.earlyKey = early and early.key or nil
   local me = ns.Me()
-  -- Where to stop questing for the dungeon quests (U85), under you in red.
+  -- Where to stop questing for the dungeon quests (U85), in red on its own line under your little bar (it ran into
+  -- the bar under the game's tracker), and "now" once you are past it, as the Overview says (the owner's check, 9 Nov
+  -- 2026).
   local room = ch and ns.Room:Chapter(f, me)
-  local youText = you.head
-  if youText and room and room.stop then youText = youText .. "\n|cffFF6A50" .. L.TRACK_STOP:format(ns.Room.StopAt(room.stop)) .. "|r" end
+  local stop
+  if you.head and room and room.stop then
+    stop = "|cffFF6A50" .. (room.now >= room.stop and L.TRACK_STOP_NOW or L.TRACK_STOP:format(ns.Room.StopAt(room.stop))) .. "|r"
+  end
   -- The chapter's required dungeons cleared.
   local clears
   if ch then
@@ -387,7 +394,7 @@ function TK:Content(f)
   return {
     title = ch and L.TRACKER_TITLE:format(ns.Journey.Roman(cur), ch.name) or L.BN_JOURNEY_DONE,
     status = status, statusColor = banner.color, stage = banner.stage,
-    you = youText, next = nextText, clears = clears, run = run, quests = quests,
+    you = you.head, stop = stop, next = nextText, early = early and early.text or nil, clears = clears, run = run, quests = quests,
     online = #online > 0 and L.TRACK_ONLINE:format(#online, table.concat(online, ", ")) or L.TRACK_NOBODY,
     gather = gather, duel = duel, inbox = waiting > 0 and (waiting == 1 and L.TRACK_INBOX_1 or L.TRACK_INBOX_N:format(waiting)) or nil,
     xp = pct, color = f.color, emblem = f.emblem, bar = bar,
@@ -405,6 +412,9 @@ function TK:Away()
 end
 
 TK.PEEK = 6 -- seconds the hidden tracker shows itself after a change
+
+-- A line Settings shows (where to stop goes with your line).
+local function lineOn(key) return Settings:TrackerLineOn(key == "stop" and "you" or key) end
 
 function TK:Refresh()
   local fr = self.frame
@@ -434,7 +444,7 @@ function TK:Refresh()
   -- Hidden mode: completely invisible (and letting clicks through) until pointed at; when something in it changes,
   -- it shows itself for PEEK seconds (Settings), then goes again. (It used to stay as a faint title bar.)
   local parts = {}
-  for _, b in ipairs(fr.lines) do parts[#parts + 1] = tostring(Settings:TrackerLineOn(b.key) and c[b.key] or "") end
+  for _, b in ipairs(fr.lines) do parts[#parts + 1] = tostring(lineOn(b.key) and c[b.key] or "") end
   local sig = c.title .. "|" .. table.concat(parts, "|")
   local hiddenMode = Settings:Get("trackerHover") == true
   if hiddenMode and Settings:Get("trackerPeek") ~= false and fr.sig and sig ~= fr.sig then
@@ -457,11 +467,15 @@ function TK:Refresh()
   local width = docked and self:DockWidth() or self.WIDTH
   local y = top + (showBar and 8 or 4)
   fr.floorBar:Hide()
+  -- The chapter's status and its dungeons cleared on one line when both are on (U159: the tracker was ten lines).
+  local merged = c.status and c.clears and lineOn("status") and lineOn("clears")
   for _, b in ipairs(fr.lines) do
-    local text = not folded and Settings:TrackerLineOn(b.key) and c[b.key] or nil
+    local text = not folded and lineOn(b.key) and c[b.key] or nil
+    if merged and b.key == "status" then text = text and (text .. "  ·  " .. c.clears) end
+    if merged and b.key == "clears" then text = nil end
     b:SetShown(text ~= nil)
     if text then
-      local indent = b.hasIcon and self.ICON + 6 or 0
+      local indent = b.indent
       b:SetWidth(width - left - 10); b.text:SetWidth(width - left - 10 - indent)
       b.text:SetText(text)
       local bright = b.key == "status" and self.STATUS_COLORS[c.stage]

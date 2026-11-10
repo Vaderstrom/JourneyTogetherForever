@@ -1,5 +1,43 @@
 # Changelog
 
+## 1.5.0 (10 November 2026)
+- The book is easier to find your way in: each thing has one page, and the other pages link there.
+- Overview: one sheet across the book, all of it in view without scrolling. At the top the chapter's picture and Where we stand: the level track with every Adventurer, one line on where the fellowship is, and where to stop questing as a red tick (point at it for the figures). Below, side by side: Focus now (the one thing to do next, why, and one button), Since last time (who levelled and the Chronicle's newest lines) and Coming up (the next dungeon to get ready for, the next two Gatherings, the next chapter).
+- Since you were last here is now Since last time on the Overview; its page is gone. It also shows firsts, falls and shared lives, and your pictures, and starts over when you close the book after seeing it.
+- Adventurers page: Recent history is gone; Since last time and the Chronicle have it.
+- Chapter page: Your To do, in the order you act. Reach the floor, then each dungeon with what you need for it ("2 quests to pick up", "Ready: your quests are in your log") and Find group or Get ready. Then For later dungeons, on a gold tint: a quest or a chain to start now for a dungeon of a later chapter, with when that dungeon comes. The chapter's Required milestones come right after its dungeons, with Tick off. Then If you like: the next chapter's dungeons that may be run now (From the next chapter) and the Optional milestones. All chapters shows the whole journey. Where the Adventurers stand and the room for the dungeon quests moved here from the Overview.
+- A new Leader's first steps (invite your Adventurers, read the rules, look at the chapter, check the bosses) are the first lines of the To do; the welcome card is gone.
+- A dungeon's page is the one place to get ready for it. The room says where to stop questing first, with Show everyone. Who is ready shows a ring for each Adventurer and "2 of 4 ready"; Show who lists them, each saying what is still missing ("Pata · Needs 1 prequest, 2 quests to pick up") or "Ready". Each quest is two lines, its name, then where it starts, its level and where you stand (the map numbers are on Pin on map's tooltip), and a long chain folds to the step you are on (Show all 7 steps). The Quests page's Dungeon quests tab is gone: a dungeon row on the Chapter page or the Overview opens its page.
+- Quests: three tabs, Shared quests, Quest chains and Attunements & keys, with no line under the title.
+- Chronicle: three tabs, The journey, Moments and The fellowship (the History page until now), each line under its day.
+- Rules: the Leader edits the rules on the Rules page (Edit the rules). Publish and Discard return to the rulebook. Manage has two tabs, Adventurers and The fellowship, with a bar to the Rules page.
+- Inbox: what needs the Leader's attention (someone below the floor, an older addon, an invite still open) is in the Inbox, each with its button and Seen, and counts on the Inbox button. What you had marked Seen on Manage stays seen.
+- About this page (the ?) on the Overview goes part by part. Pages no longer show you around by themselves the first time; the first tour is the Overview, the sidebar, the buttons at the top and the tracker.
+- Focus now says how many of you still need the dungeon: "All 4 of you still need it."
+- A Friend of the fellowship sees so under Where we stand, with how to count again (point at it), and has no floor to reach in the To do.
+- Show who, All chapters and a long chain fold with the game's plus and minus.
+- Tracker: Focus now is its next step, and a new line, A prequest to pick up, names a chain to start for a later dungeon (Settings → Tracker).
+- Tracker: where to stop questing has its own red line under your level bar (under the game's quest tracker it ran into the bar), and says "Stop questing now." once you are past it.
+- Overview: Coming up shows the later dungeon's picture in its frame, with the words beside it readable (it was a dark strip), and a long chapter name on the picture takes two lines instead of being cut.
+- Overview: a new look. The chapter's picture is a banner across the top, drifting slowly, with Where we stand along its foot. Focus now sits on its dungeon's picture with a gold headline and a larger button. Since last time and Coming up are cards like it, each on its own picture: the Chronicle's notice board and the road ahead. Each Since last time line has its own icon. The three fade in as the page opens (Settings → Reduce effects keeps it all still).
+- Dungeon page: Start early is now Prequest chains, the quests to do before the dungeon quest is offered (also in Who is ready, the reminder and the tracker).
+- The level track shows each Adventurer's class icon instead of a dot; where several share a level, a small badge says how many.
+- Tracker: your level line is shorter and fits on one line: "Level 18 · 2.6 to the cap".
+- Fewer words: shorter headings and help lines throughout.
+- What's New: the big news reads "Each dungeon's page".
+- Dungeon quests are built in for every dungeon, WoW Forever's new ones too (Krol'dok Stronghold, Alcaz Prison, Blackmaw Hold, Shaper's Terrace), each with where it starts, its level, its XP and its prequest chain. Everyone in the fellowship sees the same: nothing about dungeon quests is learned in play or read from Questie any more.
+- Who is ready: a step you finish in the dungeon itself (The Drowned City, before A Tale Spun Around the Fire) or one you only need to take (Rig Wars) counts once it is in your log.
+- What Adventurers found in play: 161 quest chain links (the Quest chains tab knows more of them).
+- Dungeons: a new page in the sidebar with every dungeon of the journey, chapter by chapter, as pictures, later chapters too (a chapter not yet revealed shows no name). A gold check marks the ones your fellowship has cleared; click one for its page, and Back returns.
+- Settings: Other addons is now Dungeons and raids. Dungeons page: Show all, or Only open ones (the dungeons the fellowship may run now). Raids page: Only open ones (Raids comes once the journey is complete, as before), or Show all (Raids in the sidebar from the start, to look through).
+- Report a bug: Blizzard's bug in the book's header, left of the ?, says where to report one (GitHub or the CurseForge page) with your version and the game's, the addresses ready to copy.
+- Overview: Where we stand sits on the banner's own dark foot in light words instead of a strip of paper, and the title is Overview alone.
+- Tracker: the dungeons cleared share the status line ("Waiting for the floor · Dungeons: 0 of 2 cleared").
+- Dungeon page: a dungeon nobody has been to lists its bosses by name, without "Not yet" beside each.
+- Room for the dungeon quests: only the dungeon quests count, and they must fit by the start of the cap level, which is left for the dungeons' mobs (only a level above it is over the cap). The mobs' XP is no longer measured in runs, and Count the mobs' XP is gone: the stop point no longer changes after the first run.
+- Chapter page: For later dungeons names only the first quest to start for each dungeon (two did not fit); the others are on its page.
+- Journey Admin: Bosses (which bosses a clear needs) has its own line under each dungeon's roles; beside From the next chapter it was cut off.
+
 ## 1.4.0 (8 November 2026)
 - Dungeon quests: Start early now lists each step of the chain before a dungeon quest, first step first, with its level and where it starts (the quest giver and zone, an item, or inside), so you know where to go before the dungeon quest is offered: Destruction in Deadmines shows its seven steps from Alba Fairmoon in Westfall. The chains come from WoW Forever sources only, up to Uldaman for now; where the addon has none, a chain your fellowship played or Questie knows shows instead. A chain that goes through the dungeon (Uldaman's necklace) is ready once its steps before the run are done, and a quest that starts inside with steps outside first is under Start early. 62 more quests on the lists, most of them in Uldaman, Blackrock Depths and Upper Blackrock Spire. Corruption of Earth and Seed shows the right giver for each side.
 - Dungeon quests: a long chain from Questie, such as Onyxia's attunement before Drakefire Amulet, now shows from its first step, and parts with the same name in a row (The True Masters) show as one step.

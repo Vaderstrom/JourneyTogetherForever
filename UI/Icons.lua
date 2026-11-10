@@ -17,6 +17,7 @@ ns.ICONS = {
   chronicle = I .. "INV_Misc_Book_09",
   history = I .. "INV_Misc_PocketWatch_01",
   raids = I .. "INV_Misc_Head_Dragon_01",
+  dungeons = I .. "Achievement_Dungeon_ClassicDungeonMaster", -- (the painted set: the clears' cell)
   heroes = I .. "INV_Misc_GroupNeedMore",
   gatherings = I .. "Spell_Fire_Fire",
   journal = I .. "INV_Misc_Book_09", -- the Dungeon Journal button
@@ -32,6 +33,8 @@ ns.ICONS = {
   inbox = I .. "INV_Letter_15",
   settings = I .. "Trade_Engineering",
   help = I .. "INV_Misc_QuestionMark",
+  bug = "Interface\\HelpFrame\\HelpIcon-Bug", -- Report a bug (U166): Blizzard's, as its issue reporter has it
+  bugSpare = I .. "Spell_Nature_InsectSwarm", -- where a client lacks it
   -- Toasts (one per event; "default" for other toasts)
   toast_chapter = I .. "INV_Misc_Book_09",
   toast_floor = I .. "Ability_Warrior_RallyingCry",
@@ -63,6 +66,9 @@ ns.ICONS = {
   bn_group = I .. "INV_Misc_GroupNeedMore",
   bn_away = I .. "Spell_Nature_TimeStop",
   bn_friend = I .. "Achievement_GuildPerk_EverybodysFriend",
+  -- Since last time (the Overview): an Adventurer who levelled; the game's own, not a medallion of our set, which
+  -- looked alike at this size (the check of 9 Nov 2026).
+  since_level = I .. "Spell_ChargePositive",
   -- History (the mockup's ⚔ ✓ ↺ ✦ !) and the Dungeon Journal's bosses (☠)
   hist_run = I .. "Ability_DualWield",
   hist_mark = "Interface\\RaidFrame\\ReadyCheck-Ready",
@@ -125,7 +131,7 @@ ns.ICON_SET = {
   overview = 1, chapter = 2, quests = 3, history = 4, chronicle = 14, raids = 5, heroes = 6, manage = 7, tourney = 8, admin = 9,
   rules = 10, rulesadmin = 10, characters = 11, inbox = 12, settings = 13,
   toast_chapter = 14, toast_default = 14, bn_done = 14, hist_chapter = 14, toast_floor = 14,
-  toast_clear = 15, bn_open = 15, hist_run = 15,
+  toast_clear = 15, bn_open = 15, hist_run = 15, dungeons = 15,
   toast_gathering = 16, bn_rested = 16, gatherings = 16, journal = 1,
   -- Shared cells: the hourglass waits, the helmets are Heroes, the scale is the cap rule, the keys lock and attune.
   bn_waiting = 4, bn_level = 4, bn_chain = 2, bn_quest = 3,
@@ -160,19 +166,6 @@ function ns.IconArt(path)
   return path, 0.08, 0.92, 0.08, 0.92
 end
 
--- The Adventure Guide's sprite sheets (Forever has the files, though not the guide). Coordinates from Blizzard's
--- Blizzard_EncounterJournal.xml. { left, right, top, bottom, file = other sheet }.
-ns.EJ_FILE = "Interface\\EncounterJournal\\UI-EncounterJournalTextures"
-local EJ_TILE = "Interface\\EncounterJournal\\UI-EncounterJournalTextures_Tile"
-ns.EJ_SPRITES = {
-  leftHeader = { 0, 0.755859375, 0.9599609375, 1 },
-  rightHeader = { 0.755859375, 0, 0.9599609375, 1 },
-  paperLeft = { 0.84960938, 0.97460938, 0.49023438, 0.51855469 },
-  paperRight = { 0.72656250, 0.85156250, 0.52441406, 0.55273438 },
-  paperMid = { 0, 1, 0.34375000, 0.40039063, file = EJ_TILE },
-  dungeonUp = { 0.00195313, 0.34179688, 0.42871094, 0.52246094 },
-  dungeonHighlight = { 0.34570313, 0.68554688, 0.33300781, 0.42675781 },
-}
 -- The Adventure Guide's book (both pages), and the part of the file that is the book.
 ns.EJ_BOOK = "Interface\\EncounterJournal\\UI-EJ-JournalBG"
 ns.EJ_BOOK_BOX = { 0, 0.766601562, 0, 0.830078125 }
@@ -342,12 +335,21 @@ function ns.InlineTexture(path, size)
 end
 
 -- A class's round icon (the game's class circles) inside a line of text, or "" for a class the game does not list.
+local CLASS_CIRCLES = "Interface\\TargetingFrame\\UI-Classes-Circles"
 function ns.ClassIconMarkup(token, size)
   local c = token and CLASS_ICON_TCOORDS and CLASS_ICON_TCOORDS[token]
   if not c then return "" end
   size = size or 12
-  return ("|TInterface\\TargetingFrame\\UI-Classes-Circles:%d:%d:0:0:256:256:%d:%d:%d:%d|t"):format(size, size,
+  return ("|T%s:%d:%d:0:0:256:256:%d:%d:%d:%d|t"):format(CLASS_CIRCLES, size, size,
     math.floor(c[1] * 256), math.floor(c[2] * 256), math.floor(c[3] * 256), math.floor(c[4] * 256))
+end
+
+-- The same round icon on a texture. Returns false (and leaves tex alone) for a class the game does not list.
+function ns.SetClassIcon(tex, token)
+  local c = token and CLASS_ICON_TCOORDS and CLASS_ICON_TCOORDS[token]
+  if not c or tex:SetTexture(CLASS_CIRCLES) == false then return false end
+  tex:SetTexCoord(c[1], c[2], c[3], c[4])
+  return true
 end
 
 ns.CIRCLE_MASK ="Interface\\CharacterFrame\\TempPortraitAlphaMask"

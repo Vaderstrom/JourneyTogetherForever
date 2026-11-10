@@ -186,6 +186,14 @@ function M:Pictures(f)
   return out
 end
 
+-- A picture's line (the Discord board, the Overview's Since last time): "The Deadmines: a group photo with Lea and Pata."
+function M.PictureText(p)
+  local d = p.key and ns.Dungeon(p.key)
+  local names = ns.Clears.AndList(p.names or { p.by })
+  if d then return (p.photo and L.BOARD_EV_PHOTO or L.BOARD_EV_PICTURE):format(d[2], names) end
+  return (p.photo and L.BOARD_EV_PHOTO_0 or L.BOARD_EV_PICTURE_0):format(names)
+end
+
 -- Forgets the pictures of fellowship fid (the self-test's and the tour's, at their end).
 function M:Forget(fid)
   local list = type(ns.db.pictures) == "table" and ns.db.pictures or {}

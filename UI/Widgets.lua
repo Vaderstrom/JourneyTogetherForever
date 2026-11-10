@@ -412,6 +412,7 @@ function UI.Lives(parent, width)
     end
     for i = total + 1, #self.items do self.items[i]:Hide() end
     self.total, self.left = total, math.min(left, total)
+    self.used = math.min(total, per) * (UI.LIFE + LIFE_GAP) - LIFE_GAP -- how wide the candles are drawn
     local rows = math.max(1, math.ceil(total / per))
     local h = rows * UI.LIFE + (rows - 1) * LIFE_GAP
     self:SetHeight(h)
@@ -872,7 +873,6 @@ end
 -- A "⋯" button that opens a small menu of actions. items() returns { { label, fn, danger } } (empty: no button).
 -- One menu is open at a time; it belongs to the window, so a scrolling page never cuts it off.
 UI.menu = nil
-function UI.CloseMenu() if UI.menu then UI.menu:Hide() end end
 function UI.MenuButton(parent, items)
   local b = gameButton(parent, 14)
   -- Three gold dots (the text "..." read as a stray button; seen in the tour).
@@ -1005,16 +1005,6 @@ function UI.SketchLine(parent, width, sketch)
     self:SetHeight(self.h)
   end
   return f
-end
-
--- Picks a menu row by its label (tests and /jtf tour).
-function UI.MenuPick(label)
-  local m = UI.menu
-  if not m or not m:IsShown() then return false end
-  for _, r in ipairs(m.rows) do
-    if r:IsShown() and r.label == label then r:Click(); return true end
-  end
-  return false
 end
 
 -- ‹ value › with the spellbook's page arrows (window size, days, durations).
@@ -1438,6 +1428,42 @@ function UI.Stack(parent)
   return s
 end
 
+-- A day as a heading (U132): Today, Yesterday, 7 Nov.
+function UI.DayLabel(t)
+  local L, now = ns.L, time()
+  local day = date("%Y-%m-%d", t)
+  if day == date("%Y-%m-%d", now) then return L.G_TODAY end
+  if day == date("%Y-%m-%d", now - 86400) then return L.DAY_YESTERDAY end
+  return L.DAY_HEAD:format(tonumber(date("%d", t)), date("%b", t))
+end
+
+-- Day headings in a list of entries, newest first (U132): heads:Start(), then heads:Place(stack, time) before each
+-- entry puts a heading before the first of each day; heads:Done() hides the rest. Days by this PC's calendar (each
+-- line's time is its writer's clock: one written near midnight on a PC whose clock is off may fall under the next day).
+function UI.DayHeads(parent, width)
+  local pool = UI.Pool(function()
+    local h = UI.Text(parent, 12, "accent", "title")
+    h:SetWidth(width)
+    return h
+  end)
+  local o = { n = 0 }
+  function o:Start() self.n, self.day = 0, nil end
+  function o:Place(s, t)
+    local day = t and date("%Y-%m-%d", t)
+    if not day or day == self.day then return end
+    self.day = day
+    local h = pool:Get(self.n + 1)
+    if not h then return end
+    self.n = self.n + 1
+    h:SetText(UI.DayLabel(t):upper())
+    if self.n > 1 then s:Skip(6) end
+    s:Place(h, 16, 4)
+  end
+  function o:Done() pool:HideFrom(self.n + 1) end
+  o.pool = pool
+  return o
+end
+
 -- A heading with an optional line under it (in the book font) and the ❦ divider (the mockup's h2 blocks).
 function UI.Heading(parent, width, text, sub, size)
   local f = CreateFrame("Frame", nil, parent)
@@ -1702,13 +1728,7 @@ function UI.ClassCrest(parent, size)
   c.ring:SetAllPoints()
   c.ring:SetShown(c.ring:SetTexture(ns.MEDIA .. "MedallionRing") == true)
   function c:Set(token)
-    local coords = token and CLASS_ICON_TCOORDS and CLASS_ICON_TCOORDS[token]
-    if coords then
-      self.icon:SetTexture("Interface\\TargetingFrame\\UI-Classes-Circles")
-      self.icon:SetTexCoord(unpack(coords))
-    else
-      UI.SetIcon(self.icon, ns.ICONS.heroes)
-    end
+    if not ns.SetClassIcon(self.icon, token) then UI.SetIcon(self.icon, ns.ICONS.heroes) end
   end
   return c
 end
@@ -1792,24 +1812,9 @@ function UI.Swatches(parent, getValue, pick)
   return row
 end
 
--- The chosen emblem and a button that opens every tabard emblem to choose from (Window:PickEmblem).
--- getColor() gives the banner colour for the preview; pick(n) when one is chosen.
-function UI.EmblemPicker(parent, getValue, pick, getColor)
-  local row = CreateFrame("Frame", nil, parent)
-  row:SetSize(220, 40)
-  row.crest = UI.Crest(row, 32, 40)
-  row.crest:SetPoint("LEFT")
-  row.button = UI.TextButton(row, ns.L.CHOOSE_EMBLEM, function()
-    ns.Window:PickEmblem(getColor(), getValue(), function(n) pick(n); row:Refresh() end)
-  end, "plain")
-  row.button:SetPoint("LEFT", row.crest, "RIGHT", 10, 0)
-  function row:Refresh() self.crest:Set(getColor(), getValue()) end
-  return row
-end
-
 -- Every emblem to choose from (Emblems:Sections: crests, heraldry or the game's icons) as a scrolling grid of cells in
--- the banner colour, the chosen one framed in gold: in the emblem picker, and on the right page of Create a
--- Fellowship's first step (28 Oct 2026). onPick(n) on a click; :Refresh(color, chosen). Build it out of combat: it
+-- the banner colour, the chosen one framed in gold: on the right page of Create a Fellowship's first step (28 Oct
+-- 2026) and on Manage. onPick(n) on a click; :Refresh(color, chosen). Build it out of combat: it
 -- probes the emblem files once.
 function UI.EmblemGrid(parent, width, onPick)
   local g = UI.Scroll(parent)
@@ -2041,41 +2046,6 @@ function UI.Presence(parent, size)
   return f
 end
 
--- The status banner of a chapter (SPEC §2): a coloured edge, a round icon, title, text and step line.
--- :Set(b) with a banner from Journey:Banner; returns its height.
-function UI.StatusBanner(parent, width)
-  local b = UI.Card(parent)
-  b:SetWidth(width)
-  b.edge = b:CreateTexture(nil, "ARTWORK")
-  b.edge:SetPoint("TOPLEFT", 4, -4); b.edge:SetPoint("BOTTOMLEFT", 4, 4); b.edge:SetWidth(4)
-  b.edge:SetTexture(ns.WHITE)
-  b.disc = UI.Round(b, "ARTWORK", 40, 1)
-  b.disc:SetPoint("TOPLEFT", 16, -10)
-  Theme:Gradient(b.disc, "VERTICAL", { "iconDark", 1 }, { "iconLight", 1 })
-  b.icon = UI.Round(b, "ARTWORK", 30, 2)
-  b.icon:SetPoint("CENTER", b.disc)
-  b.title = UI.Text(b, 15, nil, "title")
-  b.title:SetPoint("TOPLEFT", 66, -10)
-  b.text = UI.WrapText(b, 13, "ink", width - 80, "book")
-  b.text:SetPoint("TOPLEFT", b.title, "BOTTOMLEFT", 0, -4)
-  b.step = UI.Text(b, 11, "ink2")
-  function b:Set(data)
-    UI.SetIcon(self.icon, ns.ICONS["bn_" .. data.icon] or ns.ICONS.bn_done)
-    local r, g, bl = Theme:RGBA(data.color)
-    self.edge:SetVertexColor(r, g, bl, 1)
-    self.title:SetTextColor(r, g, bl, 1)
-    self.title:SetText(data.title)
-    self.text:SetText(data.text)
-    self.step:SetShown(data.step ~= "")
-    self.step:SetText(data.step)
-    self.step:ClearAllPoints(); self.step:SetPoint("TOPLEFT", self.text, "BOTTOMLEFT", 0, -5)
-    local h = math.max(60, 10 + 19 + 4 + self.text:GetStringHeight() + (data.step ~= "" and 19 or 0) + 10)
-    self:SetHeight(h)
-    return h
-  end
-  return b
-end
-
 -- Crop a picture so it covers a w×h area. aspect = picture width / height; focusY = which part stays in view.
 -- box = { left, right, top, bottom }: the part of the file that is the picture (default the whole file).
 function UI.Cover(tex, aspect, w, h, focusY, box)
@@ -2091,14 +2061,6 @@ function UI.Cover(tex, aspect, w, h, focusY, box)
     local left = (1 - show) / 2
     tex:SetTexCoord(l + (r - l) * left, l + (r - l) * (left + show), t, b)
   end
-end
-
--- A piece of the Adventure Guide's sprite sheet (ns.EJ_SPRITES) on tex. Returns false when the game has no such file.
-function UI.SetEJ(tex, key)
-  local s = ns.EJ_SPRITES[key]
-  local ok = tex:SetTexture(s.file or ns.EJ_FILE)
-  tex:SetTexCoord(s[1], s[2], s[3], s[4])
-  return ok ~= false
 end
 
 -- Our dialog frame (Media\DialogFrame: leather with gold corners around parchment) behind a box, reaching out
@@ -2187,6 +2149,8 @@ function UI.FoldHeader(parent, width, onClick)
   h:SetOpen(false)
   return h
 end
+-- The same plus or minus before a link's words (Show who, All chapters; ▾ and ▴ are not in the game's font).
+function UI.FoldLabel(text, open) return ("|T%s:14:14|t %s"):format(UI.FOLD_ICON[not open], text) end
 
 -- A small round "?" that explains on mouse-over (long help texts read like a manual on the page; seen in the
 -- tour). :SetHelp(title, text).
@@ -2211,28 +2175,36 @@ function UI.HelpIcon(parent)
 end
 
 -- The level track (GLOSSARY.md; Chapter and Adventurers pages): the chapter's line from its floor to its cap with
--- every counted Adventurer on it, a notch per level. Adventurers at one level share one marker with their number,
+-- every counted Adventurer on it, a notch per level, each marker their class's face. Adventurers at one level share
+-- one marker with their number on a badge,
 -- and a line under the track names them ("22: Brannic, Elyra"): the Overview's old track, a name per dot, was
 -- cluttered when many shared a level (the owner, 31 Oct 2026). :Set(f, n, maxLines) returns its height.
+-- dark: on a dark picture (the Overview's banner, U158): light lines and words in every theme, a lighter red.
 local LT_LINE_Y, LT_TEXT_Y, LT_PAD = 24, 54, 14
-function UI.LevelTrack(parent, width)
+function UI.LevelTrack(parent, width, dark)
+  local C = dark and { line = "muted", mark = "chipText", text = "chipText", card = "chipText", red = Theme.DARK_LIFT.B0321E }
+    or { line = "line", mark = "ink2", text = "ink", card = "card", red = "B0321E" }
+  local function lift(fs)
+    if dark then fs:SetShadowOffset(1, -1); fs:SetShadowColor(0, 0, 0, 1) end
+    return fs
+  end
   local t = CreateFrame("Frame", nil, parent)
   t:SetWidth(width)
-  t.band = UI.Solid(t, "BORDER", "3E7A3A", 0.22)
+  t.band = UI.Solid(t, "BORDER", "3E7A3A", dark and 0.5 or 0.22)
   t.band:SetHeight(10)
-  t.line = UI.Solid(t, "ARTWORK", "line", 1)
+  t.line = UI.Solid(t, "ARTWORK", C.line, 1)
   t.line:SetHeight(2)
   t.line:SetPoint("TOPLEFT", LT_PAD, -LT_LINE_Y); t.line:SetPoint("TOPRIGHT", -LT_PAD, -LT_LINE_Y)
   t.notches = UI.Pool(function()
-    local n = UI.Solid(t, "ARTWORK", "line", 0.9)
+    local n = UI.Solid(t, "ARTWORK", C.line, 0.9)
     n:SetSize(1, 6)
     return n
   end)
   t.marks = {}
   for i = 1, 2 do
-    local m = UI.Solid(t, "ARTWORK", "ink2", 1)
+    local m = UI.Solid(t, "ARTWORK", C.mark, 1)
     m:SetSize(2, 16)
-    m.label = UI.Text(t, 11, "ink2", "body", "CENTER")
+    m.label = lift(UI.Text(t, 11, C.mark, "body", "CENTER"))
     t.marks[i] = m
   end
   t.markers = UI.Pool(function()
@@ -2243,11 +2215,18 @@ function UI.LevelTrack(parent, width)
     d.ring:SetPoint("CENTER")
     d.dot = UI.Round(d, "OVERLAY", 10)
     d.dot:SetPoint("CENTER")
-    d.n = UI.Text(d, 11, "white", "title", "CENTER")
-    d.n:SetPoint("CENTER", 0, 0)
+    -- The class's own face (the game's class circles) instead of a dot; several at one level: the first one's, with
+    -- how many on a small badge (the owner's pick of 9 Nov 2026: a "3" on a dot said nothing at a glance).
+    d.face = d:CreateTexture(nil, "OVERLAY", nil, 1)
+    d.face:SetSize(16, 16); d.face:SetPoint("CENTER")
+    d.badge = UI.Round(d, "OVERLAY", 13, 2)
+    d.badge:SetPoint("CENTER", d, "BOTTOMRIGHT", -2, 3)
+    d.n = UI.Text(d, 10, "white", "title", "CENTER")
+    d.n:SetDrawLayer("OVERLAY", 7)
+    d.n:SetPoint("CENTER", d.badge, "CENTER", 0, 0)
     d.n:SetShadowOffset(1, -1); d.n:SetShadowColor(0, 0, 0, 1)
     -- On the marker, so it goes with it: on the track it stayed behind when fewer levels were left (check, 31 Oct).
-    d.lv = UI.Text(d, 11, "ink", "title", "CENTER")
+    d.lv = lift(UI.Text(d, 11, C.text, "title", "CENTER"))
     d:EnableMouse(true)
     d:SetScript("OnEnter", function(self)
       GameTooltip:SetOwner(self, "ANCHOR_TOP")
@@ -2258,18 +2237,18 @@ function UI.LevelTrack(parent, width)
     return d
   end)
   -- The room's stop point (U82): a red tick with its level and percent.
-  t.stop = UI.Solid(t, "OVERLAY", "B0321E", 1)
+  t.stop = UI.Solid(t, "OVERLAY", C.red, 1)
   t.stop:SetSize(3, 18)
-  t.stopLabel = UI.Text(t, 11, "B0321E", "title", "CENTER")
-  t.lines = UI.Pool(function() return UI.WrapText(t, 12, "ink", width, "book") end)
-  t.more = UI.Text(t, 11, "ink2")
+  t.stopLabel = lift(UI.Text(t, 11, C.red, "title", "CENTER"))
+  t.lines = UI.Pool(function() return lift(UI.WrapText(t, 12, C.text, width, "book")) end)
+  t.more = lift(UI.Text(t, 11, C.mark))
 
   -- stopAt (optional): the level to stop questing at (ns.Room), shown as a red tick.
   function t:Set(f, n, maxLines, stopAt)
     local J, Hr, L = ns.Journey, ns.Hero, ns.L
     local tr = J:TrackLevels(f, n)
     if not tr then self:Hide(); return 0 end
-    local light = Theme:Current().light
+    local light = not dark and Theme:Current().light -- (class colours for a light page, or bright ones on the dark)
     local span = math.max(1, tr.hi - tr.lo)
     local function x(v) return LT_PAD + (v - tr.lo) / span * (width - 2 * LT_PAD) end
     self.band:ClearAllPoints()
@@ -2333,15 +2312,20 @@ function UI.LevelTrack(parent, width)
       if not d then break end
       local many = #e.names > 1
       local below = e.level < tr.floor
-      d.ring:SetSize(many and 20 or 14, many and 20 or 14)
+      local _, token = Hr:ClassName(f, e.names[1])
+      local hasFace = ns.SetClassIcon(d.face, token)
+      d.face:SetShown(hasFace); d.dot:SetShown(not hasFace)
+      local big = hasFace or many
+      d.ring:SetSize(big and 20 or 14, big and 20 or 14)
       d.dot:SetSize(many and 16 or 10, many and 16 or 10)
-      d.ring:SetColorTexture(Theme:RGBA(below and "B0321E" or "card"))
+      d.ring:SetColorTexture(Theme:RGBA(below and C.red or C.card))
       if many then
-        d.dot:SetColorTexture(Theme:RGBA(below and "B0321E" or "ink"))
+        d.dot:SetColorTexture(Theme:RGBA(below and C.red or C.text))
       else
-        local _, token = Hr:ClassName(f, e.names[1])
         d.dot:SetColorTexture(ns.Hex(ns.ClassHex(token, light) or "7A6A55"))
       end
+      d.badge:SetShown(many)
+      d.badge:SetColorTexture(Theme:RGBA(below and C.red or "dark"))
       d.n:SetText(many and #e.names or "")
       local cx = x(e.level)
       d:ClearAllPoints(); d:SetPoint("CENTER", self, "TOPLEFT", cx, -LT_LINE_Y - 1); d:Show()
@@ -2357,8 +2341,9 @@ function UI.LevelTrack(parent, width)
     -- The lines: one per level, highest first, each name in dark ink after its class icon (class colours were faint
     -- on parchment, the warrior's brown above all; U12, 31 Oct 2026).
     local y = LT_TEXT_Y
+    -- (maxLines 0: no lines, the names only on hover: the Overview's Where we stand, U139.)
     local shown = math.min(#tr.levels, maxLines or 8)
-    if shown < #tr.levels then shown = shown - 1 end
+    if shown > 0 and shown < #tr.levels then shown = shown - 1 end
     for i = 1, shown do
       local e = tr.levels[i]
       local names = {}
@@ -2375,7 +2360,7 @@ function UI.LevelTrack(parent, width)
     end
     self.lines:HideFrom(shown + 1)
     local rest = 0
-    for i = shown + 1, #tr.levels do rest = rest + #tr.levels[i].names end
+    if maxLines ~= 0 then for i = shown + 1, #tr.levels do rest = rest + #tr.levels[i].names end end
     self.more:SetShown(rest > 0)
     if rest > 0 then
       self.more:SetText(L.TRACK_MORE_LOWER:format(rest))

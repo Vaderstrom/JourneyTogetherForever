@@ -10,6 +10,13 @@ end
 
 function ns.Clamp(v, lo, hi) return math.max(lo, math.min(hi, v)) end
 
+-- A short fingerprint of a text (djb2): copies compare these instead of sending themselves (Sync, Clears, Conflicts).
+function ns.Hash(s)
+  local h = 5381
+  for i = 1, #s do h = (h * 33 + s:byte(i)) % 4294967296 end
+  return h
+end
+
 -- A level-up starts several jobs. Each waits its own moment, so they run in separate frames within two seconds
 -- instead of all on the game's busiest second (U73); the state goes first, so the others hear of it at once.
 ns.LEVEL_UP = { state = 1, characters = 1.3, race = 1.6, attune = 1.9 }

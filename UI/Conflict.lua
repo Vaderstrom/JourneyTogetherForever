@@ -1,6 +1,7 @@
 -- The conflict window (the owner, 3 Nov 2026): Fellowship/Conflicts.lua found data the Adventurers' addons should agree
 -- on but do not. In the book (it opens when closed), never in a fight: what was found, the report to copy, and where
 -- to post it (GitHub issues, the CurseForge page's comments). Its addresses and report cannot be typed over.
+-- Report a bug (U166) shows the same two addresses, from the header's bug button.
 local _, ns = ...
 local L = ns.L
 local UI = ns.UI
@@ -23,14 +24,6 @@ local function build(o)
   o.items = {}
   o.hint = UI.WrapText(o.box, 12, "ink2", W)
   o.hint:SetText(L.CONFLICT_HINT)
-  o.ghLabel = UI.Text(o.box, 12, "ink2")
-  o.ghLabel:SetText(L.CONFLICT_GITHUB)
-  o.gh = UI.EditBox(o.box, W, 200, "")
-  locked(o.gh.edit, function() return Cw.GITHUB end)
-  o.cfLabel = UI.Text(o.box, 12, "ink2")
-  o.cfLabel:SetText(L.CONFLICT_CURSEFORGE)
-  o.cf = UI.EditBox(o.box, W, 200, "")
-  locked(o.cf.edit, function() return Cw.CURSEFORGE end)
   o.reportLabel = UI.Text(o.box, 12, "ink2")
   o.reportLabel:SetText(L.CONFLICT_REPORT)
   -- U59 (the check of 4 Nov 2026): one click selects the whole report and says what to press.
@@ -49,6 +42,29 @@ local function build(o)
   o.report:SetScript("OnEscapePressed", function() o:Hide() end)
   locked(o.report, function() return o.reportText or "" end)
   o.scroll:SetScrollChild(o.report)
+end
+
+-- Where to post, from y down in overlay o (built the first time): GitHub's issues, then the CurseForge page's
+-- comments, each a label over a box to copy from. Returns the y below them.
+local function addresses(o, y)
+  if not o.gh then
+    o.ghLabel = UI.Text(o.box, 12, "ink2")
+    o.ghLabel:SetText(L.CONFLICT_GITHUB)
+    o.gh = UI.EditBox(o.box, W, 200, "")
+    locked(o.gh.edit, function() return Cw.GITHUB end)
+    o.cfLabel = UI.Text(o.box, 12, "ink2")
+    o.cfLabel:SetText(L.CONFLICT_CURSEFORGE)
+    o.cf = UI.EditBox(o.box, W, 200, "")
+    locked(o.cf.edit, function() return Cw.CURSEFORGE end)
+  end
+  for _, row in ipairs({ { o.ghLabel, o.gh, Cw.GITHUB }, { o.cfLabel, o.cf, Cw.CURSEFORGE } }) do
+    row[1]:ClearAllPoints(); row[1]:SetPoint("TOPLEFT", 16, -y)
+    y = y + 18
+    row[2]:ClearAllPoints(); row[2]:SetPoint("TOPLEFT", 16, -y)
+    row[2]:SetText(row[3])
+    y = y + 26 + 8
+  end
+  return y
 end
 
 -- One line of the list: the part's icon in a gold ring, its words beside it.
@@ -96,14 +112,7 @@ function Cw:Open(c)
   for i = #list + 1, #o.items do o.items[i]:Hide() end
   y = y + 6
   o.hint:ClearAllPoints(); o.hint:SetPoint("TOPLEFT", 16, -y)
-  y = y + o.hint:GetStringHeight() + 12
-  for _, row in ipairs({ { o.ghLabel, o.gh, self.GITHUB }, { o.cfLabel, o.cf, self.CURSEFORGE } }) do
-    row[1]:ClearAllPoints(); row[1]:SetPoint("TOPLEFT", 16, -y)
-    y = y + 18
-    row[2]:ClearAllPoints(); row[2]:SetPoint("TOPLEFT", 16, -y)
-    row[2]:SetText(row[3])
-    y = y + 26 + 8
-  end
+  y = addresses(o, y + o.hint:GetStringHeight() + 12)
   o.reportLabel:ClearAllPoints(); o.reportLabel:SetPoint("TOPLEFT", 16, -y)
   o.select:ClearAllPoints(); o.select:SetPoint("TOPRIGHT", o.box, "TOPLEFT", 16 + W, -(y - 8))
   o.selected:ClearAllPoints(); o.selected:SetPoint("RIGHT", o.select, "LEFT", -8, 0)
@@ -116,6 +125,32 @@ function Cw:Open(c)
   o:Show()
   o.report:SetFocus()
   o.report:HighlightText()
+  return o
+end
+
+-- Report a bug (U166, the owner, 10 Nov 2026: "a bug report button like dungeon journal has it"): the header's bug
+-- button opens or closes it. What to send, your version and the game's, and the two addresses. Not in a fight (it is
+-- built the first time it opens).
+function Cw:ToggleBug()
+  local Win = ns.Window
+  local o = Win.overlays and Win.overlays.bug
+  if o and o:IsShown() then o:Hide(); return o end
+  if not Win.frame or ns.Combat:InCombat() then return nil end
+  o = Win:Overlay("bug", W + 32, 300)
+  if not o.text then
+    o.text = UI.WrapText(o.box, 14, "ink", W, "book")
+    o.ver = UI.WrapText(o.box, 12, "ink2", W)
+  end
+  o.title:SetText(L.BUG_T)
+  o.text:SetText(L.BUG_TEXT)
+  o.ver:SetText(L.BUG_VERSION:format(ns.VERSION or "?", GetBuildInfo()))
+  local y = 48
+  o.text:ClearAllPoints(); o.text:SetPoint("TOPLEFT", 16, -y)
+  y = y + o.text:GetStringHeight() + 8
+  o.ver:ClearAllPoints(); o.ver:SetPoint("TOPLEFT", 16, -y)
+  y = addresses(o, y + o.ver:GetStringHeight() + 12)
+  o.box:SetHeight(y + 8)
+  o:Show()
   return o
 end
 

@@ -19,10 +19,10 @@ local OUT_L, OUT_T, OUT_R, OUT_B = 64, 54, FRAME_CORNER - FRAME_IN, FRAME_CORNER
 -- The logo's size, and in full screen (where it sits inside the header) its size and how far the header's crest,
 -- name and chip move right to make room for it.
 local LOGO, LOGO_FULL, HEAD_SHIFT = 156, 118, 48
--- A sidebar entry's height: 46, or less when more entries are shown than fit (12 with Raids, the tournament and
--- Admin: 42; 29 Oct 2026). NAV_SPACE is the sidebar's height, GROUP_H what a group label takes with its gap.
+-- A sidebar entry's height: 46, or less when more entries are shown than fit (12 with Dungeons, Raids, the tournament
+-- and Admin: 42; 29 Oct 2026, U157). NAV_SPACE is the sidebar's height, GROUP_H what a group label takes with its gap.
 local NAV_ROW, NAV_SPACE, GROUP_H = 46, 600, 26
-local NAV_IDS = { "overview", "chapter", "raids", "quests", "chronicle", "heroes", "gatherings", "manage", "tourney", "admin",
+local NAV_IDS = { "overview", "chapter", "dungeons", "raids", "quests", "chronicle", "heroes", "gatherings", "manage", "tourney", "admin",
   "rules", "history" }
 W.WIDTH, W.HEIGHT = WIDTH, HEIGHT
 -- Width for content on one page: with the sidebar (pages of a fellowship) and without (start pages). Half the book
@@ -336,8 +336,13 @@ local function buildHeader(f)
   -- About this page (the owner, 7 Nov 2026): a short walk through the page you are on (UI/Walkthrough.lua).
   h.help = UI.RoundButton(h, 40, "help", function() ns.Walkthrough:StartPage() end)
   h.help:SetPoint("RIGHT", h.chars, "LEFT", -8, 0)
-  for key, b in pairs({ chars = h.chars, inbox = h.inbox, settings = h.settings, close = h.close, help = h.help }) do
-    local label = ({ chars = L.YOUR_CHARACTERS, inbox = L.INBOX, settings = L.SETTINGS, close = L.CLOSE, help = L.WALK_PAGE })[key]
+  -- Report a bug (U166): where to report one; left of the ?, or of Your characters where there is no ? (RefreshHeader).
+  h.bug = UI.RoundButton(h, 40, "bug", function() ns.ConflictWindow:ToggleBug() end)
+  if not UI.SetIcon(h.bug.icon, ns.ICONS.bug) then UI.SetIcon(h.bug.icon, ns.ICONS.bugSpare) end
+  h.bug.icon:SetSize(28, 28) -- Blizzard's bug has room around it
+  for key, b in pairs({ chars = h.chars, inbox = h.inbox, settings = h.settings, close = h.close, help = h.help, bug = h.bug }) do
+    local label = ({ chars = L.YOUR_CHARACTERS, inbox = L.INBOX, settings = L.SETTINGS, close = L.CLOSE, help = L.WALK_PAGE,
+      bug = L.BUG_T })[key]
     b:SetScript("OnEnter", function() GameTooltip:SetOwner(b, "ANCHOR_BOTTOM"); GameTooltip:SetText(label); GameTooltip:Show() end)
     b:SetScript("OnLeave", function() GameTooltip:Hide() end)
   end
@@ -707,6 +712,8 @@ function W:Build()
     local WT = ns.Watch
     if WT and WT.active then WT.active, WT.fid, WT.as, WT.demo = false, nil, nil, nil end
     if ns.Walkthrough and ns.Walkthrough.on then ns.Walkthrough:Stop() end
+    -- Since last time starts over once you have seen it (Fellowship/Since.lua).
+    ns.Since:Closed()
   end)
   -- A page turn (M20): the pages fade in from half when another page opens (not with Reduce effects).
   f.turn = {}
@@ -754,41 +761,6 @@ function W:BuildConfirm(area)
   self.confirm = c
 end
 
--- Every emblem in a grid; the banner colour behind each. onPick(key) when one is clicked.
--- Built the first time it is opened (never during combat).
-function W:PickEmblem(color, current, onPick)
-  if not self.frame or ns.Combat:InCombat() then return end
-  local p = self.emblemPicker
-  if not p then
-    p = CreateFrame("Frame", nil, self.frame.area)
-    p:SetAllPoints()
-    p:SetFrameLevel(self.frame.area:GetFrameLevel() + W.LAYER.overlay)
-    p:EnableMouse(true)
-    local dim = p:CreateTexture(nil, "BACKGROUND")
-    dim:SetAllPoints(); dim:SetColorTexture(0, 0, 0, 0.45)
-    local box = UI.Card(p, "gold")
-    box.bgRole = "page1"
-    box:Paint()
-    UI.DialogFrame(box)
-    box:SetSize(560, 470)
-    box:SetPoint("CENTER")
-    local title = UI.Text(box, 17, "ink", "title")
-    title:SetPoint("TOPLEFT", 16, -14)
-    title:SetText(L.CHOOSE_EMBLEM)
-    local close = UI.TextButton(box, L.CLOSE, function() p:Hide() end, "plain")
-    close:SetPoint("TOPRIGHT", -12, -10)
-    p.scroll = UI.EmblemGrid(box, 526, function(n) p:Hide(); if p.onPick then p.onPick(n) end end)
-    p.scroll:SetPoint("TOPLEFT", 16, -44); p.scroll:SetPoint("BOTTOMRIGHT", -18, 14)
-    p.cells = p.scroll.cells
-    -- Sized to its emblems (it was 470 high around two short rows; seen in the tour), at most 470.
-    box:SetHeight(math.min(470, p.scroll.height + 44 + 14 + 12))
-    self.emblemPicker = p
-  end
-  p.scroll:Refresh(color, current)
-  p.onPick = onPick
-  p:Show()
-end
-
 -- An overlay in the book: dimmed background and a card. Returns the overlay (with .box). Built once per key.
 function W:Overlay(key, width, height)
   self.overlays = self.overlays or {}
@@ -813,49 +785,6 @@ function W:Overlay(key, width, height)
   o:Hide()
   self.overlays[key] = o
   return o
-end
-
--- A list to choose from: items = { { text, sub, highlight } }; onPick(i) with the item's number.
-function W:PickFromList(title, items, onPick)
-  if not self.frame or ns.Combat:InCombat() then return end
-  local o = self:Overlay("list", 460, 470)
-  if not o.scroll then
-    o.scroll = UI.Scroll(o.box)
-    o.scroll:SetPoint("TOPLEFT", 16, -46); o.scroll:SetPoint("BOTTOMRIGHT", -18, 14)
-    o.rows = UI.Pool(function()
-      local r = CreateFrame("Button", nil, o.scroll.child)
-      r:SetSize(418, 24)
-      r.text = UI.Text(r, 13, "ink")
-      r.text:SetPoint("LEFT", 6, 0)
-      r.sub = UI.Text(r, 12, "ink2", "body", "RIGHT")
-      r.sub:SetPoint("RIGHT", -6, 0)
-      r.mark = UI.Check(r, 14)
-      r.mark:SetPoint("RIGHT", r.sub, "LEFT", -6, 0)
-      local hl = r:CreateTexture(nil, "HIGHLIGHT")
-      hl:SetAllPoints(); hl:SetColorTexture(1, 0.9, 0.6, 0.2)
-      r:SetScript("OnClick", function() o:Hide(); if o.onPick then o.onPick(r.i) end end)
-      return r
-    end)
-  end
-  o.title:SetText(title)
-  o.onPick = onPick
-  local stack = UI.Stack(o.scroll.child)
-  local shown = 0
-  for i, item in ipairs(items) do
-    local r = o.rows:Get(i)
-    if not r then break end
-    shown = i
-    r.i = i
-    r.text:SetText(item.text)
-    r.sub:SetText(item.sub or "")
-    r.mark:SetShown(item.highlight == true)
-    stack:Place(r, 24, 0)
-  end
-  o.rows:HideFrom(shown + 1)
-  o.scroll:SetContentHeight(stack.y)
-  -- As tall as the list needs, up to the book's height (one dungeon showed in a box for twenty).
-  o.box:SetHeight(math.min(470, 46 + stack.y + 30))
-  o:Show()
 end
 
 -- A list to tick several things in: items = { { text, on } }; onDone(ons) with on/off per item number when Done
@@ -998,11 +927,8 @@ function W:IsOpen() return self.frame ~= nil and self.frame:IsShown() end
 
 function W:Open(page)
   self:WhenBuilt(function()
-    W.openedThisSession = true
-    -- The first time the book opens in a session: what changed since you were last here (if anything did).
-    -- Before that, once per character: the setup guide (UI/Pages/Setup.lua).
+    -- Once per character: the setup guide (UI/Pages/Setup.lua).
     if not page and ns.SetupGuide and ns.SetupGuide:Pending() then page = "setup"; ns.SetupGuide.step = 1 end
-    if not page and ns.Since and ns.Fellowship:Current() and ns.Since:Pending() then page = "since" end
     if page then
       -- "chronicle#session": a page and the tab it opens at (the session recap's toast); the page takes W.tab when
       -- it refreshes.
@@ -1122,6 +1048,8 @@ function W:RefreshHeader(ctx)
   local n = ns.Inbox and ns.Inbox:Count() or 0
   h.inbox.badge:SetCount(n)
   h.help:SetShown(ns.Walkthrough:HasHelp(self.current) and not ns.Walkthrough.on)
+  h.bug:ClearAllPoints()
+  h.bug:SetPoint("RIGHT", h.help:IsShown() and h.help or h.chars, "LEFT", -8, 0)
 end
 
 function W:RefreshNav(ctx, page)
@@ -1338,13 +1266,10 @@ function W:Draw()
   end
   if self.confirm and self.confirm.page ~= page then
     self.confirm:Hide()
-    if self.emblemPicker then self.emblemPicker:Hide() end
     for _, o in pairs(self.overlays or {}) do o:Hide() end
   end
   if self.confirm then self.confirm.page = page end
   if def and def.refresh then def.refresh(self.pageFrames[page], ctx) end
-  -- The first time a page opens it shows you around (UI/Walkthrough.lua).
-  if turned and ns.Walkthrough then ns.Walkthrough:Visited(page) end
 end
 
 -- Other Heroes' news arrives in bursts (a login, a heartbeat round, a quest log): one redraw a second at most (U74).

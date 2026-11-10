@@ -246,15 +246,8 @@ function Q:MyDone()
   end
   local links = self:Links()
   for a, b in pairs(links) do check(a); check(b) end
+  -- (Our lists, the dungeon quests and their chains' steps: QuestLists:AllIDs.)
   for _, id in ipairs(ns.QuestLists and ns.QuestLists:AllIDs() or {}) do check(id) end
-  -- And the chain steps Questie gives before a dungeon quest (QuestLists:Before): its links reach Links only for the
-  -- quests in the log, so a step handed in earlier would show Not yet and Who is ready would wait for it. (What is sent
-  -- is the game's own word that I handed it in, as for Questie's links above; nothing of Questie's database.)
-  if ns.QuestLists and questieDB() then
-    for _, list in pairs(ns.DUNGEON_QUESTS) do
-      for _, q in ipairs(list) do for _, s in ipairs((ns.QuestLists:Start(q[1]) or {}).after or {}) do check(s[1]) end end
-    end
-  end
   -- And the quests of the journey's milestones.
   for _, id in ipairs(ns.Milestones:QuestIDs(F:Current())) do check(id) end
   table.sort(out)
@@ -591,21 +584,6 @@ function Q:ThereNow(f, x)
   return out
 end
 
--- Shared quests and chains in my log that others are still on (for What's next on the Overview).
-function Q:SharedCounts(f)
-  local singles, chains = 0, 0
-  for _, x in ipairs(self:Items(f)) do
-    if x.mine and #x.others > 0 then
-      if x.chain then
-        local open = false
-        for _, n in ipairs(x.others) do if x.at[n] < #x.steps then open = true end end
-        if open then chains = chains + 1 end
-      elseif x.have[ns.Me()] < x.goal then singles = singles + 1 end
-    end
-  end
-  return singles, chains
-end
-
 local function nameList(list)
   local out = {}
   for i, n in ipairs(list) do out[i] = ns.Short(n) end
@@ -755,8 +733,6 @@ function Q:ShareID(x)
   if not id or not (self.last and self.last[id]) then return nil end
   return id
 end
-
-function Q:CanShare(x) return (self:ShareState(x)) == "ok" end
 
 -- Can I share it, and if not why (M21: the button was hidden without a word)? "ok", "group" (not in a group),
 -- "no" (the game does not let this quest be shared), or nil (not a quest in my log: no button at all).

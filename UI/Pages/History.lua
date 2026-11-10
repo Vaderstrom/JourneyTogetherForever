@@ -1,20 +1,12 @@
--- History (SPEC §4.8a, 29 Oct 2026): the fellowship's own story, in the Fellowship section (the journey's is the
--- Chronicle). Left: filter (All, Adventurers, Rules and votes, Events) and the chronicle's lines (Fellowship.lua,
--- F:Log), each with an icon and when. Right: the fellowship so far: when it was founded, numbers, its Leaders.
+-- History (SPEC §4.7, 29 Oct 2026): the fellowship's own story, the Chronicle's third tab The fellowship since U142
+-- (9 Nov 2026; parent = "chronicle"), its lines under day headings (U132). Left: filter (All, Adventurers, Rules and
+-- votes, Events) and the chronicle's lines (Fellowship.lua, F:Log), each with an icon and when. Right: the fellowship so far: when it was founded, numbers, its Leaders.
 local _, ns = ...
 local L = ns.L
 local UI = ns.UI
 local F, J, Theme = ns.Fellowship, ns.Journey, ns.Theme
 
 local FILTERS = { { L.HI_ALL, "all" }, { L.HI_MEMBERS, "members" }, { L.HI_RULES, "rules" }, { L.HI_EVENTS, "events" } }
--- The icon of each kind of line (older lines without a kind: the page's own).
-local ICON = {
-  founded = "toast_chapter", invited = "inbox", joined = "heroes", swap = "heroes", left = "bn_away", removed = "bn_away",
-  leads = "manage", swapleader = "manage", takeover = "manage",
-  rules = "rules", journey = "admin", renamed = "rules", vote = "rules", votepassed = "rules",
-  gather = "gatherings", gathercancel = "gatherings", tstart = "tourney", champion = "tourney", tcancel = "tourney",
-  marked = "hist_mark", undid = "hist_undo", reopened = "hist_undo", ticked = "hist_mark", unticked = "hist_undo",
-}
 local LEADS = { founded = true, leads = true, swapleader = true, takeover = true }
 local ALL = 1000
 
@@ -63,9 +55,11 @@ local function build(pf)
   local width = W.PAGE_W - 8
   pf.filter = "all"
 
+  local top = ns.ChronicleTabs(pf)
   pf.lscroll = UI.Scroll(pf.left)
-  pf.lscroll:SetAllPoints()
+  pf.lscroll:SetPoint("TOPLEFT", 0, -top); pf.lscroll:SetPoint("BOTTOMRIGHT")
   local Lc = pf.lscroll.child
+  pf.days = UI.DayHeads(Lc, width)
   pf.choice = UI.Tabs(Lc, FILTERS, function() return pf.filter end, function(v) pf.filter = v; W:Refresh() end, width,
     function(v) local f = F:Current(); return f and v ~= "all" and #entries(f, v) or nil end)
   pf.rows = UI.Pool(function()
@@ -125,10 +119,6 @@ local function build(pf)
     d.since:SetPoint("RIGHT")
     return d
   end)
-  pf.div = UI.Divider(R)
-  pf.note = UI.WrapText(R, 12, "ink2", width, "book")
-  pf.note:SetText(L.HI_NOTE)
-  pf.open = UI.TextButton(R, L.HI_OPEN_CHRONICLE, function() W:ShowPage("chronicle") end, "plain", 12)
 end
 
 local function refresh(pf, ctx)
@@ -136,16 +126,19 @@ local function refresh(pf, ctx)
   if not f then return end
   local width = ns.Window.PAGE_W - 8
 
+  pf.tabs:Refresh()
   local s = UI.Stack(pf.lscroll.child)
   pf.choice:Refresh()
   s:Place(pf.choice, pf.choice:GetHeight(), 10)
   local list = entries(f, pf.filter)
   local shown = 0
+  pf.days:Start()
   for i, entry in ipairs(list) do
     local e = pf.rows:Get(i)
     if not e then break end
     shown = i
-    UI.SetIcon(e.icon, ns.ICONS[ICON[entry.k] or "history"])
+    pf.days:Place(s, entry.time)
+    UI.SetIcon(e.icon, ns.ICONS[F.LOG_ICON[entry.k] or "history"])
     e.text:SetText(entry.text)
     e.when:ClearAllPoints(); e.when:SetPoint("TOPLEFT", e.text, "BOTTOMLEFT", 0, -4)
     e.when:SetText(ns.TimeAgo(entry.time))
@@ -154,6 +147,7 @@ local function refresh(pf, ctx)
     s:Place(e, h, 4)
   end
   pf.rows:HideFrom(shown + 1)
+  pf.days:Done()
   pf.empty:SetShown(#list == 0)
   if #list == 0 then
     s:Skip(20)
@@ -219,14 +213,8 @@ local function refresh(pf, ctx)
     r:Place(d, 24, 2)
   end
   pf.leads:HideFrom(nl + 1)
-  r:Skip(12)
-  pf.div:ClearAllPoints()
-  pf.div:SetPoint("TOPLEFT", pf.rscroll.child, "TOPLEFT", 0, -r.y); pf.div:SetPoint("TOPRIGHT", pf.rscroll.child, "TOPRIGHT", 0, -r.y)
-  r:Skip(20)
-  r:Place(pf.note, pf.note:GetStringHeight(), 8)
-  r:Place(pf.open, 24, 8)
   pf.rscroll:SetContentHeight(r.y + 8)
 end
 
-ns.Pages:Register({ id = "history", label = L.NAV_HISTORY, build = build, refresh = refresh,
-  title = function() return L.TITLE_HISTORY, L.SUB_HISTORY end })
+ns.Pages:Register({ id = "history", label = L.CH_TAB_FELLOWSHIP, icon = "chronicle", parent = "chronicle", build = build,
+  refresh = refresh, title = function() return L.TITLE_CHRONICLE, L.SUB_HISTORY end })

@@ -321,7 +321,7 @@ function JED.New(left, right, lw, rw, src)
   ed.dHead:SetText(L.DUNGEONS_IN_CHAPTER)
   ed.drows = UI.Pool(function()
     local c = UI.Card(R, "line", "Button")
-    c:SetSize(rw, 58)
+    c:SetSize(rw, 84)
     -- The dungeon's picture, small and square, beside it (the owner, 6 Nov 2026).
     c.edge = UI.Solid(c, "BORDER", "line", 1)
     c.edge:SetSize(48, 48); c.edge:SetPoint("TOPLEFT", 5, -5)
@@ -347,7 +347,7 @@ function JED.New(left, right, lw, rw, src)
     c.roles:SetPoint("TOPLEFT", 60, -28)
     -- Which bosses are needed for a clear (every boss until it is chosen).
     c.bosses = UI.TextButton(c, "", function() ed:PickBosses(c.key) end, "plain", 11)
-    c.bosses:SetPoint("TOPLEFT", c.roles, "TOPRIGHT", 8, 1)
+    c.bosses:SetPoint("TOPLEFT", c.roles, "BOTTOMLEFT", 0, -4) -- its own line: no room beside "From the next chapter"
     -- A place the game has no boss list for: a short label (the long one ran out of the card; check of 6 Nov 2026).
     UI.Tooltip(c.bosses, function() return c.unknown and L.BOSSES_UNKNOWN or nil end)
     c:RegisterForDrag("LeftButton")
@@ -792,7 +792,7 @@ function JED:Refresh()
     c.bosses:SetLabel(#bosses > 0 and L.ADMIN_BOSSES:format(#(p.bosses or ns.Clears:DefaultNeeded(pl.key)), #bosses) or L.ADMIN_BOSSES_NONE)
     c.bosses:SetEnabled(#bosses > 0)
     c.unknown = #bosses == 0
-    r:Place(c, 58, 6)
+    r:Place(c, 84, 6)
   end
   self.drows:HideFrom(shown + 1)
   self.empty:SetShown(shown == 0)

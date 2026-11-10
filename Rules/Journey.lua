@@ -214,6 +214,8 @@ function J:Current(f)
 end
 
 function J:FloorLevel(f, ch) return ch.floor - f.rules.floorTol end
+-- The highest level that is not over the cap (its allowance included): a level above it is over.
+function J:CapLevel(f, ch) return ch.cap + f.rules.capTol end
 
 -- Counted Heroes below the floor of chapter n who hold it. Newcomers catching up do not (27 Oct 2026): someone who
 -- joins, or takes a place, below the floor counts from the time they reach it (J:CatchingUp).
@@ -241,9 +243,6 @@ function J:Newcomer(f, lvl)
   local ch = self:Current(f)
   local first = (f.journey.chapters[1] and f.journey.chapters[1].art == "prologue") and 2 or 1
   return ch ~= nil and ch.n > first and (tonumber(lvl) or 0) < self:FloorLevel(f, ch)
-end
-function J:MarkNewcomer(f, name, lvl)
-  if f.members[name] and self:Newcomer(f, lvl) then f.members[name].catching = true end
 end
 
 -- Their level reached the current floor: from now on they count like everyone (Hero:Store). Returns true when it changed.
@@ -368,7 +367,7 @@ local function readyBelow(ch) return ch.floor >= ch.cap and ch.cap + 1 or ch.cap
 function J:Counts(f, n)
   local ch = f.journey.chapters[n]
   if not ch then return {} end
-  local fl, top, over = self:FloorLevel(f, ch), readyBelow(ch), ch.cap + f.rules.capTol
+  local fl, top, over = self:FloorLevel(f, ch), readyBelow(ch), self:CapLevel(f, ch)
   local below, ready, cap, above, away = 0, 0, 0, 0, 0
   -- (A Friend of the fellowship and the Fallen are not in the counts: they never hold anyone back. The Fallen were,
   -- "4 Below the floor" beside 3 on the right page; seen in the check of 1 Nov 2026, 11:30.)
@@ -389,7 +388,7 @@ end
 function J:Groups(f, n)
   local ch = f.journey.chapters[n]
   if not ch then return {} end
-  local fl, cap, tol, top = self:FloorLevel(f, ch), ch.cap, f.rules.capTol, readyBelow(ch)
+  local fl, cap, over, top = self:FloorLevel(f, ch), ch.cap, self:CapLevel(f, ch), readyBelow(ch)
   -- Levels to a target with the XP into this level, as the You card says it ("2.6 levels"; the whole "3 levels"
   -- here disagreed with it; seen in the check, 29 Oct 2026).
   local function far(name, target)
@@ -402,9 +401,9 @@ function J:Groups(f, n)
     { label = L.GRP_BELOW, range = L.GRP_BELOW_RANGE:format(fl), color = "B0321E", rows = {} },
     { label = L.GRP_READY, range = fl >= top - 1 and L.GRP_READY_ONE:format(top - 1) or L.GRP_READY_RANGE:format(fl, top - 1),
       color = "2E7A3E", rows = {} },
-    { label = L.GRP_CAP, range = cap + tol > top and L.GRP_READY_RANGE:format(top, cap + tol) or L.GRP_READY_ONE:format(top),
+    { label = L.GRP_CAP, range = over > top and L.GRP_READY_RANGE:format(top, over) or L.GRP_READY_ONE:format(top),
       color = "B8742A", rows = {} },
-    { label = L.GRP_OVER, range = L.GRP_CAP_RANGE:format(cap + tol + 1), color = "C0392B", rows = {} },
+    { label = L.GRP_OVER, range = L.GRP_CAP_RANGE:format(over + 1), color = "C0392B", rows = {} },
     { label = L.GRP_AWAY, range = L.GRP_AWAY_RANGE, color = "ink2", rows = {} },
   }
   for _, name in ipairs(self:Counted(f)) do
@@ -412,7 +411,7 @@ function J:Groups(f, n)
     if l < fl then
       table.insert(g[1].rows, { name = name, note = (self:CatchingUp(f, name) and L.NOTE_CATCHING or L.NOTE_TO_FLOOR):format(far(name, fl)) })
     elseif l < top then table.insert(g[2].rows, { name = name, note = l < cap and L.NOTE_TO_CAP:format(far(name, cap)) or L.NOTE_AT_CAP })
-    elseif l > cap + tol then table.insert(g[4].rows, { name = name, note = L.NOTE_OVER_BY:format(l - cap - tol) })
+    elseif l > over then table.insert(g[4].rows, { name = name, note = L.NOTE_OVER_BY:format(l - over) })
     else table.insert(g[3].rows, { name = name, note = l > cap and L.NOTE_OVER_ALLOWED:format(l - cap) or L.NOTE_AT_CAP })
     end
   end
@@ -454,63 +453,8 @@ function J:OverCap(f)
   local ch = self:Current(f)
   local list = {}
   if not ch then return list end
-  for _, name in ipairs(self:Counted(f)) do if level(f, name) > ch.cap + f.rules.capTol then list[#list + 1] = name end end
+  for _, name in ipairs(self:Counted(f)) do if level(f, name) > self:CapLevel(f, ch) then list[#list + 1] = name end end
   return list
-end
-
--- "What's next" on the Overview (quest lines arrive with M6): { icon, text }.
-function J:NextSteps(f)
-  local steps = {}
-  local ch = self:Current(f)
-  if not ch then return { { icon = "done", text = L.NEXT_JOURNEY_DONE } } end
-  local n = ch.n
-  local counted = self:Pacing(f)
-  local below = self:Below(f, n)
-  if #below > 0 then steps[#steps + 1] = { kind = "waiting", icon = "waiting", text = L.NEXT_WAITING:format(names(f, below, true), self:FloorLevel(f, ch)) } end
-  local unlocked = #below == 0
-  if unlocked and #self:Required(f, n) == 0 then
-    local there = 0
-    for _, name in ipairs(counted) do if level(f, name) >= ch.cap then there = there + 1 end end
-    steps[#steps + 1] = { kind = "level", icon = "level", text = #counted == 1 and L.NEXT_LEVEL_ONE:format(ch.cap, there)
-      or L.NEXT_LEVEL:format(ch.cap, there, #counted) }
-  end
-  if unlocked then
-    for _, x in ipairs(self:Required(f, n)) do
-      if not self:Cleared(f, x.key) then
-        local count = 0
-        for _ in pairs(self:ClearedBy(f, x.key)) do count = count + 1 end
-        steps[#steps + 1] = { kind = "dungeon", icon = "open", text = #counted == 1 and L.NEXT_DUNGEON_ONE:format(x.d[2], count)
-          or L.NEXT_DUNGEON:format(x.d[2], count, #counted) }
-      end
-    end
-  end
-  -- Required milestones of this chapter not done yet.
-  for _, m in ipairs(ns.Milestones:OpenRequired(f, n)) do
-    steps[#steps + 1] = { kind = "milestone", icon = "open", text = L.NEXT_MILESTONE:format(m.name, ns.Milestones:ProgressText(f, m)) }
-  end
-  -- At the cap, not over it: those over it have their own red line ("X is at the cap" stood next to "X is over the
-  -- cap"; seen in the check, 29 Oct 2026).
-  local atCap = {}
-  for _, name in ipairs(self:Counted(f)) do
-    local lv = level(f, name)
-    if lv >= ch.cap and lv <= ch.cap + f.rules.capTol then atCap[#atCap + 1] = name end
-  end
-  if #atCap > 0 then steps[#steps + 1] = { kind = "cap", icon = "cap", text = (#atCap == 1 and L.NEXT_AT_CAP_1 or L.NEXT_AT_CAP_N):format(names(f, atCap)) } end
-  -- Quests and chains in my log that other Heroes have too (Fellowship/Quests.lua).
-  if ns.Quests then
-    local singles, chains = ns.Quests:SharedCounts(f)
-    if singles > 0 then steps[#steps + 1] = { kind = "quest", icon = "quest", text = (singles == 1 and L.NEXT_QUESTS_1 or L.NEXT_QUESTS_N):format(singles) } end
-    if chains > 0 then steps[#steps + 1] = { kind = "chain", icon = "chain", text = (chains == 1 and L.NEXT_CHAINS_1 or L.NEXT_CHAINS_N):format(chains) } end
-  end
-  if #steps == 0 then steps[1] = { kind = "done", icon = "done", text = L.NEXT_ALL_CLEARED } end
-  return steps
-end
-
--- "Floor 25 (−1 allowed)  ·  cap 29 (+1 allowed)"
-function J:LevelsLine(f, ch)
-  local r = f.rules
-  return L.LINE_FLOOR:format(ch.floor) .. (r.floorTol > 0 and L.LINE_FLOOR_TOL:format(r.floorTol) or "")
-    .. L.LINE_CAP:format(ch.cap) .. (r.capTol > 0 and L.LINE_CAP_TOL:format(r.capTol) or "")
 end
 
 ---------------------------------------------------------------------------
