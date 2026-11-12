@@ -2,11 +2,11 @@
 -- page per dungeon and raid, opened from the Chapter page's To do, the Overview, Journey Admin and the Raids page.
 -- Left: its picture, our own story (Locales: STORY_<key>; the owner reads them before they ship) with Read more in
 -- Lore Forever or Spoken, its bosses with how many Adventurers were there for each, and who cleared it; at the foot
--- Find group (Waypoint and the Dungeon Journal went on 10 Nov 2026: each quest's pin is the waypoint). Right: the room for its quests
+-- Find group and Waypoint (to its entrance, from our data: the owner, 10 Nov 2026; raids have none). Right: the room for its quests
 -- as the answer (U78, U145) with Count the mobs' XP and Show everyone, Who is ready folded to a row of rings (U126;
 -- U98-U100, Fellowship/Ready.lua) and the quests under three headings in the order you act: 1. Prequest chains, 2. Pick up
--- before you go, 3. Starts inside (an empty one is left out), each line starting with its status (U125), a long chain
--- folded to its next step (U127). A later dungeon (U137, U138) says when it comes instead of the room and Who is
+-- before you go, 3. Starts inside (an empty one is left out), each a short row: its status (U125), level and how far
+-- along its chain; where it starts and the steps on a click (U185). A later dungeon (U137, U138) says when it comes instead of the room and Who is
 -- ready. A click on an Adventurer's row shows the quests with their status. ‹ Back returns to the page it came from.
 local _, ns = ...
 local L = ns.L
@@ -16,7 +16,12 @@ local DP = {}
 ns.DungeonPage = DP
 
 local PIC_H, FOOT_H, READY_H, RING = 150, 34, 36, 22
-local STEPS_SHOWN = 5 -- a chain with more steps shows only its next one until opened (U127)
+-- Its entrance, from our data (the owner, 10 Nov 2026: "if we have a waypoint to the quests, let's have a waypoint to the
+-- dungeons"), as a quest start for the pin; nil for a raid.
+function DP.Entrance(key)
+  local e, d = ns.DUNGEON_ENTRANCES[ns.BaseKey(key)], ns.Dungeon(key)
+  return e and { by = d and d[2] or key, zone = e.zone, map = e.map, x = e.x, y = e.y } or nil
+end
 -- The headings: the kind, its words, its picture (an hourglass of the game's, a scroll, the map's dungeon door).
 DP.GROUPS = {
   { "earlier", "DQ_EARLIER_HEAD", "|TInterface\\Icons\\INV_Misc_PocketWatch_01:16:16|t" },
@@ -34,7 +39,7 @@ function DP:Open(key)
   if from and from ~= "dungeon" then W.dungeonBack = from end
   W.dungeon = key
   local pf = W.pageFrames and W.pageFrames.dungeon
-  if pf then pf.who = nil; UI.ScrollsToTop(pf) end
+  if pf then pf.who = nil; pf.opened = {}; UI.ScrollsToTop(pf) end -- (its rows folded each time, U185)
   if W:IsOpen() then
     local turned = W.current ~= "dungeon"
     W.page = "dungeon"
@@ -103,22 +108,30 @@ function DP.Titles(ctx)
 end
 
 local function questCard(pf, R, width)
-  local p = CreateFrame("Frame", nil, R)
+  -- Where it starts and the steps open on a click on the row (U185; the check of 12 Nov 2026: a link under each row
+  -- made it three lines), what opens in its tooltip.
+  local p = CreateFrame("Button", nil, R)
   p:SetWidth(width)
+  p:SetScript("OnClick", function()
+    pf.opened[p.id] = not pf.opened[p.id] or nil
+    if GameTooltip:IsOwned(p) then GameTooltip:Hide() end -- (it said what the click did)
+    ns.Window:Refresh()
+  end)
+  UI.Tooltip(p, function() return p.tip end)
+  local hl = p:CreateTexture(nil, "HIGHLIGHT")
+  hl:SetPoint("TOPLEFT", -4, 3); hl:SetPoint("BOTTOMRIGHT", 4, -3); hl:SetColorTexture(1, 0.9, 0.6, 0.12)
   -- Its status first (U125): done, in your log, not yet.
   p.icon = p:CreateTexture(nil, "ARTWORK")
   p.icon:SetSize(14, 14); p.icon:SetPoint("TOPLEFT", 0, -1)
-  p.title = UI.WrapText(p, 13, "ink", width - 50, "title")
+  p.title = UI.WrapText(p, 13, "ink", width - 70, "title")
   p.title:SetPoint("TOPLEFT", 20, 0)
-  p.more = UI.TextButton(p, "", function()
-    pf.openSteps[p.id] = not pf.openSteps[p.id] or nil
-    ns.Window:Refresh()
-  end, "link", 11)
-  -- Where it starts, its level and status on one line (U160: they were two).
+  -- Folded, its status, level and how far; opened, where it starts too (U160: on one line, they were two).
   p.where = UI.WrapText(p, 11, "ink2", width - 30)
   p.steps = UI.WrapText(p, 11, "ink2", width - 30)
   p.pin = UI.RoundButton(p, 22, "quests", function() if p.st then ns.QuestLists:Pin(p.st) end end)
   p.pin:SetPoint("TOPRIGHT")
+  p.fold = p:CreateTexture(nil, "ARTWORK")
+  p.fold:SetSize(14, 14); p.fold:SetPoint("TOPRIGHT", p.pin, "TOPLEFT", -6, -1)
   -- The spot's numbers only here (U160: they filled the page's lines).
   UI.Tooltip(p.pin, function()
     return p.spot and L.DQ_PIN_TIP_AT:format(p.spot) or L.DQ_PIN_TIP_QUESTIE
@@ -190,6 +203,11 @@ local function build(pf)
     if ns.Raid(ns.BaseKey(key)) then ns.Endgame:FindGroup(f, key) else ns.Together:FindGroup(f, key) end
   end, "primary", 12)
   pf.group:SetPoint("BOTTOMLEFT", 0, 2)
+  pf.way = UI.TextButton(pf.left, L.DG_WAYPOINT, function()
+    local st = DP.key and DP.Entrance(DP.key)
+    if st then ns.QuestLists:Pin(st, L.DG_WAY_ASK) end
+  end, "plain", 12)
+  UI.Tooltip(pf.way, function() return pf.wayTip end)
 
   -- Right page: the room for its quests (or when a later dungeon comes), who is ready, the quests.
   pf.rscroll = UI.Scroll(pf.right)
@@ -206,6 +224,7 @@ local function build(pf)
   pf.roomHeroes = UI.WrapText(R, 12, "ink2", width)
   pf.readyHead = UI.SectionHeader(R, width)
   pf.readyHead:SetText(L.RD_HEAD)
+  pf.pickLine = UI.WrapText(R, 12, "ink", width) -- only quests to pick up are left (U177)
   -- Folded (U126): a ring for each Adventurer, you first, "2 of 4 ready" and Show who.
   pf.rings = CreateFrame("Frame", nil, R)
   pf.rings:SetSize(width, RING + 4)
@@ -226,7 +245,7 @@ local function build(pf)
   pf.whoNote = UI.WrapText(R, 11, "ink2", width)
   pf.secs = {}
   for i = 1, #DP.GROUPS do pf.secs[i] = UI.SectionHeader(R, width) end
-  pf.openSteps = {}
+  pf.opened = {}
   pf.quests = UI.Pool(function() return questCard(pf, R, width) end)
   pf.none = UI.SketchLine(R, width, "EmptySince")
 end
@@ -247,9 +266,14 @@ local function refreshLeft(pf, f, key, ctx)
     pf.story:SetText(story)
     s:Place(pf.story, pf.story:GetStringHeight(), 4)
   end
+  -- Read more where an addon tells more, or the line to install one; none where Spoken runs and has nothing on the
+  -- place (The Drowned City said "in Spoken or Lore Forever": the check of 10 Nov 2026, 22:46).
   local from = OA:StoryFrom(key)
-  pf.more:SetLabel(from == "spoken" and L.DG_MORE_SPOKEN or (from == "lore" and L.DG_MORE_LORE or L.DG_MORE_NONE))
-  s:Place(pf.more, pf.more:GetHeight(), 8)
+  pf.more:SetShown(from ~= nil or not OA:HasSpoken())
+  if pf.more:IsShown() then
+    pf.more:SetLabel(from == "spoken" and L.DG_MORE_SPOKEN or (from == "lore" and L.DG_MORE_LORE or L.DG_MORE_NONE))
+    s:Place(pf.more, pf.more:GetHeight(), 8)
+  end
   -- The bosses, each with how many Adventurers counted for the journey were there for it.
   s:Place(pf.bossHead, 29, 4)
   local counted = J:Counted(f)
@@ -275,15 +299,27 @@ local function refreshLeft(pf, f, key, ctx)
   pf.bossNone:SetShown(#bosses == 0)
   if #bosses == 0 then s:Place(pf.bossNone, pf.bossNone:GetStringHeight(), 2) end
   s:Skip(8)
-  s:Place(pf.clearHead, 29, 4)
   local who = {}
-  for name in pairs(J:ClearedBy(f, key)) do who[#who + 1] = name end
-  table.sort(who)
-  pf.cleared:SetText(#who > 0 and J.Names(f, who) or L.DG_CLEARED_NONE)
-  s:Place(pf.cleared, pf.cleared:GetStringHeight(), 6)
+  for name in pairs(J:ClearedBy(f, key)) do if not ns.Fellowship:IsFriend(f, name) then who[#who + 1] = name end end
+  -- Who cleared it: not before the dungeon opens (a later chapter's), unless someone has (U184, the owner, 12 Nov
+  -- 2026: "It would appear once the dungeon's chapter opens").
+  local later = DP.Later(f, DP.Placed(f, key))
+  local showWho = #who > 0 or J:Open(f, key)
+  pf.clearHead:SetShown(showWho); pf.cleared:SetShown(showWho)
+  if showWho then
+    s:Place(pf.clearHead, 29, 4)
+    table.sort(who)
+    pf.cleared:SetText(#who > 0 and J.Names(f, who) or L.DG_CLEARED_NONE)
+    s:Place(pf.cleared, pf.cleared:GetStringHeight(), 6)
+  end
   pf.lscroll:SetContentHeight(s.y + 8)
-  -- The foot: Find group (not while watching, nor for a later dungeon).
-  pf.group:SetShown(not ctx.watching and not DP.Later(f, DP.Placed(f, key)))
+  -- The foot: Find group (not while watching, nor for a later dungeon), Waypoint where the entrance is known.
+  pf.group:SetShown(not ctx.watching and not later)
+  local e = DP.Entrance(key)
+  pf.way:SetShown(e ~= nil)
+  pf.wayTip = e and L.DG_WAY_TIP:format(L.DQ_AT:format(e.zone, e.x, e.y))
+  pf.way:ClearAllPoints()
+  if pf.group:IsShown() then pf.way:SetPoint("LEFT", pf.group, "RIGHT", 6, 0) else pf.way:SetPoint("BOTTOMLEFT", 0, 2) end
 end
 
 -- The room for its quests as the answer (U145; the figures on hover), for a dungeon of your chapter; Show everyone
@@ -332,15 +368,14 @@ local function refreshReady(pf, f, key, ctx, r)
   local Rd, Hr = ns.Ready, ns.Hero
   local width = ns.Window.PAGE_W - 8
   local rows = Rd:Rows(f, key)
-  local any, ready = false, 0
-  for _, x in ipairs(rows) do
-    if x.r then any = true end
-    if x.r and x.r.ready then ready = ready + 1 end
-  end
-  pf.readyHead:SetShown(any); pf.rings:SetShown(any)
+  local ready = Rd.Tally(rows)
+  local any = ready ~= nil
+  local pick = any and Rd.PickLine(rows) or nil
+  pf.readyHead:SetShown(any); pf.rings:SetShown(any); pf.pickLine:SetShown(pick ~= nil)
   if not any then pf.readyRows:HideFrom(1) return end
   r:Skip(6)
   r:Place(pf.readyHead, 29, 4)
+  if pick then pf.pickLine:SetText(pick); r:Place(pf.pickLine, pf.pickLine:GetStringHeight(), 6) end
   local made = 0
   for i, x in ipairs(rows) do
     local g = pf.rings.pool:Get(i)
@@ -349,7 +384,8 @@ local function refreshReady(pf, f, key, ctx, r)
     local ok = x.r and x.r.ready
     g:Set(Rd.Share(x.r), ok and "gold" or "B8742A")
     g.check:SetShown(ok == true)
-    g.tip = Rd.Line(x.name, x.r)
+    local shares = Rd.Shares(x.r)
+    g.tip = Rd.Line(x.name, x.r) .. (shares and "\n" .. shares or "")
     g:Show()
   end
   pf.rings.pool:HideFrom(made + 1)
@@ -367,8 +403,8 @@ local function refreshReady(pf, f, key, ctx, r)
     row.ring:Set(Rd.Share(x.r), ok and "gold" or "B8742A")
     row.check:SetShown(ok == true)
     row.line:SetText(Rd.Line(x.name, x.r))
-    local subs = {}
-    if not x.online then subs[1] = L.RD_AS_OF:format(ns.TimeAgo(Hr:LastSeen(f, x.name))) end
+    local subs = { Rd.Shares(x.r) }
+    if not x.online then subs[#subs + 1] = L.RD_AS_OF:format(ns.TimeAgo(Hr:LastSeen(f, x.name))) end
     local rem = Rd:Reminded(f, x.name, key)
     if rem then subs[#subs + 1] = L.RD_REMINDED:format(ns.Short(rem.by)) end
     row.sub:SetText(table.concat(subs, "  ·  "))
@@ -396,6 +432,32 @@ local function stepLine(QL, k, x, nextK)
   if s.by or s.item or s.zone or s.inside then line = line .. "  ·  " .. QL.WhereText(s) end
   local color = k == nextK and x.status ~= "done" and Theme:HexFor("B8742A") or hexOf(x.status == "done" and "ink2" or "ink")
   return ("|T%s:12:12|t |cff%s%s|r"):format((QL.STATUS[x.status] or QL.STATUS.no)[1], color, line)
+end
+
+-- Its level, with the level it can be taken from: "Level 17" alone read as "not before 17" (the owner, 10 Nov 2026).
+-- Not for a quest that starts inside: it is taken in the run (the owner, 12 Nov 2026: "Only chains").
+local function levelText(st, inside)
+  if not st.lvl then return nil end
+  return not inside and st.min and st.min < st.lvl and L.DQ_LEVEL_FROM:format(st.lvl, st.min) or L.DQ_LEVEL:format(st.lvl)
+end
+
+-- Your status in words, or the chosen Adventurer's.
+local function statusText(QL, q, who, me)
+  return QL.StatusText(q.status, who ~= me and q.status == "log" and L.DQ_IN_LOG_OF:format(ns.Short(who)) or nil)
+end
+
+-- A quest's line, opened: its status first (the answer; its icon is before the name), where it starts (unless said
+-- once above it), its level, and who else has it in their log.
+local function questLine(QL, q, who, me, said, inside)
+  local parts = { statusText(QL, q, who, me) }
+  if not said then parts[2] = QL.WhereText(q.start) end
+  parts[#parts + 1] = levelText(q.start, inside)
+  if #q.others > 0 then
+    local names = {}
+    for _, n in ipairs(q.others) do names[#names + 1] = n == me and L.YOU_LABEL or ns.Short(n) end
+    parts[#parts + 1] = L.DQ_ALSO:format(table.concat(names, ", "))
+  end
+  return table.concat(parts, "  ·  ")
 end
 
 -- The quests under their headings, with the chosen Adventurer's status.
@@ -426,40 +488,53 @@ local function refreshQuests(pf, f, key, r)
       r:Skip(4)
       r:Place(pf.secs[i], 29, 4)
     end
+    local inside = grp[1] == "inside"
     for _, q in ipairs(quests) do
       local p = pf.quests:Get(nq + 1)
       if not p then break end
       nq = nq + 1
       p.id = q.id
       p.icon:SetTexture((QL.STATUS[q.status] or QL.STATUS.no)[1])
-      p.title:SetText(q.name)
       local st = q.start
-      local parts = { QL.WhereText(st) }
-      if st.lvl then parts[#parts + 1] = L.DQ_LEVEL:format(st.lvl) end
-      parts[#parts + 1] = QL.StatusText(q.status, who ~= me and q.status == "log" and L.DQ_IN_LOG_OF:format(ns.Short(who)) or nil)
-      if #q.others > 0 then
-        local names = {}
-        for _, n in ipairs(q.others) do names[#names + 1] = n == me and L.YOU_LABEL or ns.Short(n) end
-        parts[#parts + 1] = L.DQ_ALSO:format(table.concat(names, ", "))
-      end
-      p.where:SetText(table.concat(parts, "  ·  "))
-      -- The chain's steps (U123); more than five fold to the next one (U127).
       local all = q.steps or {}
       local nextK
       for k, x in ipairs(all) do if not nextK and x.status ~= "done" then nextK = k end end
-      local fold = #all > STEPS_SHOWN and not pf.openSteps[q.id]
+      -- (A quest that starts inside has nothing more to open: its heading says where.)
+      local canOpen = #all > 0 or not st.inside
+      local open = canOpen and pf.opened[q.id]
+      local names = {}
+      for k, x in ipairs(q.quests or { q }) do names[k] = x.name end
+      p.title:SetText(table.concat(names, L.AND))
+      -- Short rows (U185, the owner, 12 Nov 2026): folded, a row says your status, its level (or how many quests after
+      -- its one chain, U171) and how far along the chain; where it starts and every step open on a click.
       local steps = {}
-      if fold then
-        local x = nextK and all[nextK]
-        steps[1] = x and L.DG_STEP_OF:format(nextK, #all, x.name .. ((x.start.by or x.start.zone) and (", " .. QL.WhereText(x.start)) or ""))
-          or L.DG_STEPS_DONE:format(#all)
+      if not open then
+        local parts = { statusText(QL, q, who, me), q.quests and L.DQ_SHARED_N:format(#q.quests) or levelText(st, inside) }
+        -- (A chain of one quest says nothing until it is done: "Step 1 of 1" read as noise, the check of 12 Nov 2026.)
+        if #all > 1 then parts[#parts + 1] = nextK and L.DG_STEP_OF:format(nextK, #all) or L.DG_STEPS_DONE:format(#all)
+        elseif #all == 1 and not nextK then parts[#parts + 1] = L.DG_STEP_1_DONE end
+        p.where:SetText(table.concat(parts, "  ·  "))
+      elseif q.quests then
+        -- One chain, two quests (U171): a line for each, so both are picked up; one giver said once (U185).
+        local at = QL.WhereText(q.quests[1].start)
+        for _, x in ipairs(q.quests) do
+          if QL.WhereText(x.start) ~= at or x.start.inside or not (x.start.by or x.start.zone) then at = nil end
+        end
+        local lines = { at and L.DQ_SHARED_AT:format(#q.quests, at) or L.DQ_SHARED:format(#q.quests) }
+        for _, x in ipairs(q.quests) do lines[#lines + 1] = L.DQ_SHARED_ONE:format(x.name, questLine(QL, x, who, me, at)) end
+        p.where:SetText(table.concat(lines, "\n"))
       else
-        for k, x in ipairs(all) do steps[k] = stepLine(QL, k, x, nextK) end
+        p.where:SetText(questLine(QL, q, who, me, nil, inside))
       end
+      -- The chain's steps (U123), each with where it starts.
+      if open then for k, x in ipairs(all) do steps[k] = stepLine(QL, k, x, nextK) end end
       p.steps:SetText(table.concat(steps, "\n"))
       p.steps:SetShown(#steps > 0)
-      p.more:SetShown(#all > STEPS_SHOWN)
-      p.more:SetLabel(UI.FoldLabel(fold and L.DG_SHOW_STEPS:format(#all) or L.DG_HIDE_STEPS, not fold))
+      local label = #all > 1 and L.DG_SHOW_STEPS:format(#all) or (#all == 1 and L.DG_SHOW_STEP_1 or L.DG_SHOW_WHERE)
+      p:EnableMouse(canOpen)
+      p.fold:SetShown(canOpen)
+      p.fold:SetTexture(UI.FOLD_ICON[not open])
+      p.tip = canOpen and (open and L.DG_HIDE_STEPS or label) or nil
       -- The pin: where you pick up first, a chain's next step where its spot is known, else the quest's own giver
       -- (the owner, 10 Nov 2026: "Waypoint to where you pickup quests").
       local nx = nextK and all[nextK]
@@ -468,9 +543,8 @@ local function refreshQuests(pf, f, key, r)
       p.pin:SetShown(QL:CanPin(p.st))
       p.where:ClearAllPoints(); p.where:SetPoint("TOPLEFT", p.title, "BOTTOMLEFT", 0, -2)
       p.steps:ClearAllPoints(); p.steps:SetPoint("TOPLEFT", p.where, "BOTTOMLEFT", 0, -3)
-      p.more:ClearAllPoints(); p.more:SetPoint("TOPLEFT", p.steps, "BOTTOMLEFT", -4, 0)
       local h = p.title:GetStringHeight() + p.where:GetStringHeight() + 4
-        + (#steps > 0 and p.steps:GetStringHeight() + 3 or 0) + (p.more:IsShown() and 18 or 0)
+        + (#steps > 0 and p.steps:GetStringHeight() + 3 or 0)
       h = math.max(h, 24)
       p:SetHeight(h)
       r:Place(p, h, 8)
@@ -488,7 +562,7 @@ local function refresh(pf, ctx)
   local r = UI.Stack(pf.rscroll.child)
   local x = DP.Placed(f, key)
   local later = DP.Later(f, x)
-  -- A later dungeon (U137, U138): when it comes, and how many of its quests open now (they are in the To do).
+  -- A later dungeon (U137, U138): when it comes, and how many of its prequests are in your To do now.
   pf.later:SetShown(later)
   if later then
     local open = 0
@@ -501,7 +575,7 @@ local function refresh(pf, ctx)
     r:Place(pf.later, pf.later:GetStringHeight(), 8)
   end
   refreshRoom(pf, f, ctx.me, r, x ~= nil and x.n == ns.Journey:CurrentIndex(f))
-  if later then pf.readyHead:Hide(); pf.rings:Hide(); pf.readyRows:HideFrom(1)
+  if later then pf.readyHead:Hide(); pf.rings:Hide(); pf.pickLine:Hide(); pf.readyRows:HideFrom(1)
   else refreshReady(pf, f, key, ctx, r) end
   refreshQuests(pf, f, key, r)
   pf.rscroll:SetContentHeight(r.y + 8)

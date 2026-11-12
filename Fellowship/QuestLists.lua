@@ -134,44 +134,10 @@ function QL:DungeonQuests(f, key)
   if list then return list end
   list = {}
   for _, q in ipairs(ns.DUNGEON_QUESTS[base] or {}) do
-    if forSide({ side = q[3] }, s) then list[#list + 1] = { id = q[1], name = q[2] } end
+    if forSide({ side = q[3] }, s) then list[#list + 1] = { id = q[1], name = ns.Quests.Name(q[1], q[2]) } end
   end
   self.made[id] = list
   return list
-end
-
--- Per Hero: how many of the dungeon's quests they carry, and how many they have not done yet.
--- { { name, have, open } } in the order given, or nil when the dungeon has no list.
-function QL:DungeonStatus(f, key, names)
-  local quests = self:DungeonQuests(f, key)
-  if #quests == 0 then return nil end
-  local out = {}
-  for _, name in ipairs(names) do
-    local h = Hr:Get(f, name) or {}
-    local have, open = 0, 0
-    for _, q in ipairs(quests) do
-      if not (h.questsDone and h.questsDone[q.id]) then
-        open = open + 1
-        if h.quests and h.quests[q.id] then have = have + 1 end
-      end
-    end
-    out[#out + 1] = { name = name, have = have, open = open }
-  end
-  return out
-end
-
--- "Quests picked up: You 2/5, Brannic 0/6" (open quests only).
-function QL:DungeonLine(f, key)
-  local me, names = ns.Me(), {}
-  names[1] = me
-  for _, n in ipairs(F:Members(f)) do if n ~= me and not ns.Journey:Away(f, n) then names[#names + 1] = n end end
-  local status = self:DungeonStatus(f, key, names)
-  if not status then return nil end
-  local parts = {}
-  for _, s in ipairs(status) do
-    parts[#parts + 1] = L.DQ_HERO:format(s.name == me and L.YOU_LABEL or ns.Short(s.name), s.have, s.open)
-  end
-  return L.DQ_LINE:format(table.concat(parts, ", "))
 end
 
 ---------------------------------------------------------------------------
@@ -185,6 +151,7 @@ local function statusOf(h, id)
   if h.questsDone and h.questsDone[id] then return "done" end
   return h.quests and h.quests[id] and "log" or "no"
 end
+QL.StatusOf = statusOf
 
 -- How many steps of a quest's chain come before the run: those before the first that starts in the dungeon (that one
 -- is done in the run), and at most one that is done in the run (run: it is taken before, The Drowned City for A Tale
@@ -204,11 +171,24 @@ local function stepReady(s, status) return status == "done" or ((s.run or s.acce
 -- The group a quest belongs to: earlier when its chain has steps to do before the run (also when the quest itself
 -- starts inside, as The Truth Comes Crashing Down does), else inside or pick by where it starts.
 local function groupOf(st) return leadIn(st) > 0 and "earlier" or (st.inside and "inside" or "pick") end
+QL.GroupOf = groupOf
+-- A chain as one key: quests after exactly the same chain (U171: the Deadmines' Red Silk Bandanas and The Defias
+-- Brotherhood) are one row and one chain to start. The whole chain, not only its steps before the run: one that goes
+-- on otherwise inside keeps its own row (The Truth Comes Crashing Down).
+local function chainKey(st)
+  local ids = {}
+  for k, s in ipairs(st.after or {}) do ids[k] = s[1] end
+  return table.concat(ids, ",")
+end
+local NEED = { no = 1, log = 2, done = 3 }
 
 -- A dungeon's quests for this fellowship's side in three groups (SPEC §4.6): pick (pick up before you go), earlier
 -- (a chain to start earlier) and inside (starts in the dungeon), each lowest level first. A quest: { id, name, start,
 -- status (yours, or who's: "done", "log" or "no"), others (other Adventurers with it in their log), steps = { { id,
--- name, lvl, start (where it starts, as a quest start), status } } }. nil when the dungeon has no list.
+-- name, lvl, start (where it starts, as a quest start), status } } }. Quests after the same chain are one row (U171, the
+-- owner, 10 Nov 2026: "One row as long as it's clear that it's two quests you should pick up"): quests = { each quest },
+-- the first one's start and steps, and the status that needs most (Not yet, else In your log, else Done). nil when
+-- the dungeon has no list.
 function QL:Groups(f, key, who)
   local quests = self:DungeonQuests(f, key)
   if #quests == 0 then return nil end
@@ -225,7 +205,7 @@ function QL:Groups(f, key, who)
     if st.after then
       x.steps = {}
       for _, s in ipairs(st.after) do
-        x.steps[#x.steps + 1] = { id = s[1], name = s[2], lvl = s.lvl, start = s, status = statusOf(mine, s[1]) }
+        x.steps[#x.steps + 1] = { id = s[1], name = ns.Quests.Name(s[1], s[2]), lvl = s.lvl, start = s, status = statusOf(mine, s[1]) }
       end
     end
     local list = g[groupOf(st)]
@@ -238,38 +218,76 @@ function QL:Groups(f, key, who)
       return a.name < b.name
     end)
   end
+  local rows, at = {}, {}
+  for _, x in ipairs(g.earlier) do
+    local c = chainKey(x.start)
+    local r = at[c] and rows[at[c]]
+    if not r then
+      at[c] = #rows + 1
+      rows[#rows + 1] = x
+    else
+      if not r.quests then
+        r = { id = r.id, name = r.name, start = r.start, status = r.status, others = {}, steps = r.steps, quests = { r } }
+        rows[at[c]] = r
+      end
+      r.quests[#r.quests + 1] = x
+      if NEED[x.status] < NEED[r.status] then r.status = x.status end
+    end
+  end
+  g.earlier = rows
   return g
 end
 
 -- Who is ready for a dungeon (U98, the owner, 8 Nov 2026): every Start-early chain ready up to the dungeon quest, or up
 -- to the run (stepReady; or the quest itself in the log or done), and every Pick-up quest in the log or done, by
 -- name's shared quest log. The same on every PC: it reads only the shipped data and the shared logs.
--- { early, earlyOf, pick, pickOf, ready }; nil when there is nothing to get ready (no list, or only quests inside).
+-- { early, earlyOf (chains), pick, pickOf, quests (earlier and pick-up quests), ready, shares }; nil when there is nothing to get ready (no list, or only quests inside).
 function QL:Ready(f, key, name)
-  local h = Hr:Get(f, name) or {}
-  local r = { early = 0, earlyOf = 0, pick = 0, pickOf = 0 }
+  local h, lvl, counted = Hr:Get(f, name) or {}, Hr:Level(f, name), nil
+  local r = { early = 0, earlyOf = 0, pick = 0, pickOf = 0, shares = {}, quests = 0 }
+  local chains = {} -- (a chain two quests share counts once, U171)
+  -- A shareable quest to pick up that another Adventurer counted for the chapter has in their log is ready for you too,
+  -- shared at the entrance (U177, the owner, 10 Nov 2026): shares = { { id, by } }. Not below the level it opens at.
+  local function sharer(q, st)
+    if not st.share or lvl < (st.min or 0) then return nil end
+    counted = counted or ns.Journey:Counted(f)
+    for _, n in ipairs(counted) do
+      if statusOf(Hr:Get(f, n) or {}, q.id) == "log" then return n end
+    end
+  end
   for _, q in ipairs(self:DungeonQuests(f, key)) do
     local st = self:Start(q.id) or {}
     local g = groupOf(st)
-    if g ~= "inside" then
-      local ok = statusOf(h, q.id) ~= "no"
-      if g == "earlier" and not ok then
+    local ok = statusOf(h, q.id) ~= "no"
+    if g ~= "inside" then r.quests = r.quests + 1 end -- (quests, not chains: the To do counts them)
+    if g == "pick" then
+      r.pickOf = r.pickOf + 1
+      local by = not ok and sharer(q, st)
+      if by then r.shares[#r.shares + 1] = { q.id, by } end
+      if ok or by then r.pick = r.pick + 1 end
+    elseif g == "earlier" then
+      if not ok then
         ok = true
         for k = 1, leadIn(st) do
           if not stepReady(st.after[k], statusOf(h, st.after[k][1])) then ok = false break end
         end
       end
-      local n = g == "earlier" and "early" or "pick"
-      r[n .. "Of"] = r[n .. "Of"] + 1
-      if ok then r[n] = r[n] + 1 end
+      local c = chainKey(st)
+      chains[c] = chains[c] or ok
     end
+  end
+  for _, ok in pairs(chains) do
+    r.earlyOf = r.earlyOf + 1
+    if ok then r.early = r.early + 1 end
   end
   if r.earlyOf + r.pickOf == 0 then return nil end
   r.ready = r.early == r.earlyOf and r.pick == r.pickOf
   return r
 end
 
--- A quest's status as an icon and a coloured word (U101): Done in green, In your log in gold, Not yet in grey.
+-- A quest's status as an icon and a coloured word (U101): Done in green, In your log in gold, Not yet in grey. The icon
+-- stands before the quest's name, the word first on the line under it (the owner, 11 Nov 2026: at the line's end, a
+-- second icon and "Not" / "yet" broke over two lines).
 QL.STATUS = {
   done = { "Interface\\RaidFrame\\ReadyCheck-Ready", "3E7A3A", "DQ_DONE" },
   log = { "Interface\\Icons\\INV_Scroll_03", "B8742A", "DQ_IN_LOG" },
@@ -278,12 +296,11 @@ QL.STATUS = {
 function QL.StatusText(status, word)
   local s = QL.STATUS[status] or QL.STATUS.no
   local text = word or L[s[3]]
-  if s[2] then text = ("|cff%s%s|r"):format(ns.Theme:HexFor(s[2]), text) end
-  return ("|T%s:13:13|t %s"):format(s[1], text)
+  return s[2] and ("|cff%s%s|r"):format(ns.Theme:HexFor(s[2]), text) or text
 end
 
 -- How many quests of each group you still have to pick up or start, neither in your log nor done (U98: one in your
--- log is picked up): pick, earlier, inside; then how many of its quests start outside at all, and how many you have
+-- log is picked up; a chain two quests share once): pick, earlier, inside; then how many of its quests start outside at all, and how many you have
 -- not done (nil when the dungeon has no list). Only counted: the Dungeon quests list asks this for every dungeon of
 -- the journey at each redraw, and building their groups each time was too much (code review of 1.2.0).
 function QL:Counts(f, key)
@@ -291,12 +308,18 @@ function QL:Counts(f, key)
   if #quests == 0 then return nil end
   local mine = Hr:Get(f, ns.Me()) or {}
   local n = { pick = 0, earlier = 0, inside = 0 }
-  local outside, open = 0, 0
+  local outside, open, chains = 0, 0, {}
   for _, q in ipairs(quests) do
-    local g, st = groupOf(self:Start(q.id) or {}), statusOf(mine, q.id)
+    local start = self:Start(q.id) or {}
+    local g, st = groupOf(start), statusOf(mine, q.id)
     if g ~= "inside" then outside = outside + 1 end
     if st ~= "done" then open = open + 1 end
-    if st == "no" then n[g] = n[g] + 1 end
+    -- (A chain two quests share once, as its one row: U171.)
+    local c = g == "earlier" and chainKey(start)
+    if st == "no" and not (c and chains[c]) then
+      n[g] = n[g] + 1
+      if c then chains[c] = true end
+    end
   end
   return n.pick, n.earlier, n.inside, outside, open
 end
@@ -338,12 +361,12 @@ function QL:CanPin(st)
   return ns.Quests:QuestieState() == "on" and self:MapOf(st) ~= nil
 end
 
--- st: where it starts (a quest's start, or a chain step's).
-function QL:Pin(st)
+-- st: where it starts (a quest's start, or a chain step's; a dungeon's entrance with its own ask).
+function QL:Pin(st, ask)
   st = st or {}
   local map = self:MapOf(st)
   if st.x and st.y then
-    ns.Window:Confirm(L.DQ_PIN_ASK, L.DQ_PIN_OK, function() QL:Waypoint(st, map) end)
+    ns.Window:Confirm(ask or L.DQ_PIN_ASK, L.DQ_PIN_OK, function() QL:Waypoint(st, map) end)
     return "ask"
   end
   if ns.Quests:QuestieState() == "on" and map and OpenWorldMap and not InCombatLockdown() then
@@ -374,17 +397,19 @@ local function opensAt(st, dungeonFrom)
   return st.min or (st.lvl or dungeonFrom) - QL.TAKE_BELOW
 end
 
--- Steps for later dungeons (U136, U140): for each dungeon of a chapter after n (once, by its base key: Blackrock
--- Depths is in two), its quests to pick up and its chains' next steps before the run that open at or under chapter n's
--- cap, lowest first. A step not started yet is open; in your log or done, it is not. A step stays in each chapter's
--- To do until done (the next chapter asks the same). The next chapter's dungeons that may be run now (If you like)
--- and dungeons already cleared are left out. { { x (ChapterList entry), chapter, steps = { { id, name, lvl, open } },
--- open (steps still open) } }.
+-- Steps for later dungeons (U136, U140; the owner, 10 Nov 2026): for each dungeon of a chapter after n (once, by its
+-- base key: Blackrock Depths is in two), the next step before the run of each of its prequest chains not done yet, once
+-- your level reaches that step's level and it is within chapter n's cap. A chain under way counts until it is done (its
+-- step in your log too), whatever its level, and comes first; a chain two quests share is one step. Quests you only pick up wait for their dungeon's own
+-- chapter. The next chapter's dungeons that may be run now (If you like) and dungeons already cleared are left out.
+-- Nearest chapter first: { { x (ChapterList entry), chapter, steps = { { id, name, lvl, k, of (steps before the run),
+-- status, under } }, open (steps listed) } }.
 function QL:Later(f, n, who)
   local J, chapters = ns.Journey, f.journey.chapters
   local ch = chapters[n]
   if not ch then return {} end
-  local mine = Hr:Get(f, who or ns.Me()) or {}
+  who = who or ns.Me()
+  local mine, level = Hr:Get(f, who) or {}, Hr:Level(f, who)
   local seen, out = {}, {}
   for _, x in ipairs(J:ChapterList(f, n)) do seen[ns.BaseKey(x.key)] = true end
   for m = n + 1, #chapters do
@@ -392,28 +417,35 @@ function QL:Later(f, n, who)
       local base = ns.BaseKey(x.key)
       if not x.early and not seen[base] then
         seen[base] = true
-        local steps, open = {}, 0
-        local function add(id, name, lvl, status)
-          if lvl <= ch.cap then
-            steps[#steps + 1] = { id = id, name = name, lvl = lvl, open = status == "no" }
-            if status == "no" then open = open + 1 end
-          end
-        end
+        local steps, took = {}, {}
         for _, q in ipairs(J:Cleared(f, x.key) and {} or self:DungeonQuests(f, x.key)) do
           local st = self:Start(q.id) or {}
-          local g, status = groupOf(st), statusOf(mine, q.id)
-          if g == "pick" then add(q.id, q.name, opensAt(st, x.d[3]), status)
-          elseif g == "earlier" and status == "no" then
-            for k = 1, leadIn(st) do
+          if groupOf(st) == "earlier" and statusOf(mine, q.id) == "no" then
+            local of = leadIn(st)
+            for k = 1, of do
               local s = st.after[k]
               local ss = statusOf(mine, s[1])
-              if not stepReady(s, ss) then add(s[1], s[2], s.lvl and s.lvl - QL.TAKE_BELOW or opensAt(st, x.d[3]), ss) break end
+              if not stepReady(s, ss) then
+                local lvl = s.lvl or st.lvl or x.d[3]
+                -- Under way (an earlier step done, or this one in your log): it stays whatever its level (review of
+                -- 1.7.0: Blackrock Depths' step 3 is level 59, step 2 level 54).
+                local under = k > 1 or ss ~= "no"
+                if (under or (lvl <= ch.cap and level >= lvl)) and not took[s[1]] then
+                  took[s[1]] = true
+                  steps[#steps + 1] = { id = s[1], name = ns.Quests.Name(s[1], s[2]), lvl = lvl, k = k, of = of, status = ss, under = under }
+                end
+                break
+              end
             end
           end
         end
         if #steps > 0 then
-          table.sort(steps, function(a, b) if a.lvl ~= b.lvl then return a.lvl < b.lvl end return a.name < b.name end)
-          out[#out + 1] = { x = x, chapter = m, steps = steps, open = open }
+          table.sort(steps, function(a, b)
+            if a.under ~= b.under then return a.under end
+            if a.lvl ~= b.lvl then return a.lvl < b.lvl end
+            return a.name < b.name
+          end)
+          out[#out + 1] = { x = x, chapter = m, steps = steps, open = #steps }
         end
       end
     end
@@ -421,21 +453,17 @@ function QL:Later(f, n, who)
   return out
 end
 
--- A later dungeon's first open step in words (U140): "In Search of Thaelrid at level 18, 1 level to go." or "In
--- Search of Thaelrid: open now."; the others are on its Dungeon page (a second one ran out of the row; check of
--- 10 Nov 2026). nil when none is open.
-function QL.LaterLine(e, level)
-  for _, s in ipairs(e.steps) do
-    if s.open then
-      if level >= s.lvl then return L.LATER_NOW:format(s.name) end
-      local togo = s.lvl - level
-      return L.LATER_AT:format(s.name, s.lvl, (togo == 1 and L.LEVELS_1 or L.LEVELS_N):format(togo))
-    end
-  end
+-- A later dungeon's first step in words (U140): "Testing the Wells: open now." or, for a chain under way, "The Defias
+-- Brotherhood, step 3 of 6."; the others are on its Dungeon page (a second one ran out of the row; check of 10 Nov 2026).
+function QL.LaterLine(e)
+  local s = e.steps[1]
+  if s.k == 1 and s.status == "no" then return L.LATER_NOW:format(s.name) end
+  return L.LATER_STEP:format(s.name, s.k, s.of)
 end
 
 -- The reminder (U79, folds in U69): once per dungeon of the current or the next chapter, when its first quest to pick
--- up or a chain's first step opens to you. Never in combat (it waits), never twice (ns.char.dqToasted).
+-- up opens to you (your own chapter's dungeons only) or you reach a chain's next step's level. Never in combat (it
+-- waits), never twice (ns.char.dqToasted).
 function QL:Remind(level)
   local f = F:Current()
   level = tonumber(level) or UnitLevel("player")
@@ -455,7 +483,8 @@ function QL:Remind(level)
       local g = not ns.char.dqToasted[key] and self:Groups(f, x.key)
       if g then
         local pick, zones, seen, chain = 0, {}, {}, nil
-        for _, q in ipairs(g.pick) do
+        -- (Quests you only pick up: for your own chapter's dungeons, not the next one's; the owner, 10 Nov 2026.)
+        for _, q in ipairs(n == cur and g.pick or {}) do
           if q.status == "no" and level >= opensAt(q.start, x.d[3]) then
             pick = pick + 1
             if q.start.zone and not seen[q.start.zone] then seen[q.start.zone] = true; zones[#zones + 1] = q.start.zone end
@@ -466,7 +495,8 @@ function QL:Remind(level)
             for k, s in ipairs(q.steps) do
               if k > leadIn(q.start) then break end -- (a step inside is done in the run)
               if not stepReady(s.start, s.status) then
-                if level >= (s.lvl and s.lvl - QL.TAKE_BELOW or opensAt(q.start, x.d[3])) then chain = s.name end
+                -- (At the step's own level, as the To do and Coming up: the owner, 10 Nov 2026.)
+                if level >= (s.lvl or q.start.lvl or x.d[3]) then chain = s.name end
                 break
               end
             end

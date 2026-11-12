@@ -80,8 +80,8 @@ The **Overview** answers "what now?" at a glance, all of it in view without scro
   and what you need for it ("2 quests to pick up", "Ready: your quests are in your log"), with **Find group** (it
   invites the Adventurers online who still need it, a tank and a healer first) or **Get ready**. The mandatory ones
   come first, lowest levels first; the first one not cleared says **Recommended next**. Then the chapter's Required
-  **milestones**, with **Tick off** for the Leader. Then **For later dungeons**: a quest or a chain to start now for a
-  dungeon of a later chapter. Then **If you like**: the next chapter's dungeons that may be run now (From the next
+  **milestones**, with **Tick off** for the Leader. Then **For later dungeons**: a prequest chain to start now for a
+  dungeon of a later chapter, once you reach its first step's level (a chain you have started comes first, with its step). Then **If you like**: the next chapter's dungeons that may be run now (From the next
   chapter) and the Optional milestones. A click on a row opens [the dungeon's page](#the-dungeon-pages).
 - **All chapters**: the whole journey (later chapters can stay hidden until reached).
 - The **level track**, where the Adventurers stand (below the floor, ready, at the cap, over the cap, away) and the room
@@ -103,15 +103,19 @@ fellowship).
 - Its picture, a short story, its bosses with how many Adventurers were there and who cleared it.
 - **The room**: where to stop questing so its quests still fit by the cap level, which is left for the dungeons' mobs.
   **Show everyone** gives each Adventurer's line.
-- At the foot: **Find group**. **Read more** under the story opens **Spoken** or **Lore Forever** when you have them
-  (Settings says which comes first). Nothing of theirs is copied into this addon.
+- At the foot: **Find group**, and **Waypoint** to the dungeon's entrance. **Read more** under the story opens
+  **Spoken** or **Lore Forever** where one of them has the place's story (Settings says which comes first), and Lore
+  Forever reads it aloud where it has a recording. Nothing of theirs is copied into this addon.
 - **Who is ready**: a ring for each Adventurer fills as they pick up the dungeon's quests and turns gold when they are
   ready ("2 of 4 ready"). **Show who** lists them, each saying what is still missing ("Needs 1 prequest, 2 quests to
   pick up"); click someone to see their quests. **Remind** an Adventurer who is
-  online and not ready, once a day.
+  online and not ready, once a day. A quest to pick up that another Adventurer has counts as ready: they can share it
+  at the entrance ("Pata shares 2 quests at the entrance"). Inside the dungeon, a toast asks you to share a quest
+  someone in your group still lacks.
 - Its quests for your side, in the order you act: **1. Prequest chains** (the chain before a dungeon quest, folded to the
-  step you are on), **2. Pick up before you go** and **3. Starts inside**, each with where it starts, its level and
-  where you stand.
+  step you are on), **2. Pick up before you go** and **3. Starts inside**, each with where you stand, where it starts, and its level
+  with the level it opens at ("Not yet · Scout Riell, Westfall · Level 17, open from 14"). Two quests after the same
+  chain share one row.
   Every dungeon's quests, where they start and the chains before them are built in, the same for everyone in the
   fellowship. A toast tells you when a dungeon's
   first quest opens to you. **Pin on map** sets a waypoint to where a quest
@@ -131,7 +135,7 @@ fellowship).
 - **If the Leader is away** for the rule's number of days, the Adventurer who joined first takes over.
 - **Friend of the fellowship**: someone who plays along now and then. A Friend fills a slot in a dungeon run but never
   counts for the floor, the votes, the firsts, the tournament or the challenges. Invite them as one, or become one
-  yourself; back to Adventurer at or below the chapter's cap.
+  yourself; the Leader can also make a member one. Back to Adventurer at or below the chapter's cap.
 
 #### The Adventurers
 - Every Adventurer with role, class, level, XP and rested XP, and a **presence mark** like the game's friends list:
@@ -339,14 +343,14 @@ log out; the app reads it from your saved data and posts nothing you have not ch
   of the Overview, the sidebar, the buttons at the top and the tracker. The whole tour is in Settings, and the **?** in
   the header walks you through the page you are on.
 - Settings for every toast (under three headings, each with a tick for its whole group), the tracker's lines, chat
-  messages, the cap warning, sounds, reduced effects and the minimap button. A **key** opens the book (Options →
-  Keybindings → AddOns), at the page you choose. Button collectors can gather the minimap button, and the addon is in the game's addon compartment.
+  messages, the cap warning, sounds, reduced effects and the minimap button. A **key**, Shift+J unless the game uses it already, opens the book at the page you
+  choose (Options → Keybindings → Journey Together Forever). Button collectors can gather the minimap button, and the addon is in the game's addon compartment.
 - **What's New**: once after an update, a page over the book with the update's news. `/jtf news` shows it again.
 
 ![What's New, once after each update](.github/screenshots/whats-new.jpg)
 
 ## Commands
-- `/jtf`: open or close the book (or click the minimap button, or set a key: Options → Keybindings → AddOns)
+- `/jtf`: open or close the book (or click the minimap button, or press Shift+J; change the key in Options → Keybindings → Journey Together Forever)
 - `/jtf chapter`, `/jtf heroes`, `/jtf quests`: open those pages
 - `/jtf photo`: the group photo
 - `/jtf news`: What's New

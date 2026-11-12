@@ -1,7 +1,11 @@
-<!-- Key Bindings → AddOns → Journey Together Forever (U107): opens the book at the page Settings chose (the Chapter
-     page by default) and closes it when it is open. Through /jtf, the one global the addon has for commands. -->
+<!-- Key Bindings → Journey Together Forever (U107): opens the book at the page Settings chose (the Chapter page by
+     default) and closes it when it is open. Through /jtf, the one global the addon has for commands.
+     category is the section on the game's Keybindings page, titled with _G[category] (BINDING_HEADER_..., set in
+     Core/Slash.lua). No header attribute: that page draws a header as a blank spacer, so under AddOns the row said
+     only "Open or close the book" (the owner, 10 Nov 2026: "no option to set a keybinding"). The name is what the
+     players' keys are saved under: never rename it. Shift+J is given in code (Core/Slash.lua), only while it is free. -->
 <Bindings>
-  <Binding name="JOURNEYTOGETHERFOREVER_OPEN" header="JOURNEYTOGETHERFOREVER" category="ADDONS">
+  <Binding name="JOURNEYTOGETHERFOREVER_OPEN" category="BINDING_HEADER_JOURNEYTOGETHERFOREVER">
     SlashCmdList.JOURNEYTOGETHERFOREVER("key")
   </Binding>
 </Bindings>

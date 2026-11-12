@@ -145,7 +145,8 @@ local function refresh(pf, ctx)
     if default then ns.Pages:SetChapterArt(c.pic.tex, nil, width - 8 - 2 * UI.PIC_INSET, PIC_H - 2 * UI.PIC_INSET, 0.5); ok = true end
     c.pic.tex:SetShown(ok)
     local cleared = 0
-    for name in pairs(J:ClearedBy(f, key)) do if f.members[name] then cleared = cleared + 1 end end
+    local who = J:ClearedBy(f, key)
+    for _, name in ipairs(counted) do if who[name] then cleared = cleared + 1 end end -- (of the counted only: no Friends)
     local done = J:Cleared(f, key)
     -- Not open yet (a date Blizzard announced, or the journey not complete: Settings → Raids page: Show all, U165):
     -- the date or "After the journey" instead of progress, and no Find group.

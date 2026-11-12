@@ -47,7 +47,7 @@ ns.ICONS = {
   toast_attune = I .. "INV_Misc_Key_03",
   toast_dquest = I .. "INV_Misc_Map_01",
   toast_dready = I .. "INV_Scroll_03", toast_dallready = I .. "Ability_Warrior_BattleShout",
-  toast_dremind = I .. "INV_Letter_15",
+  toast_dremind = I .. "INV_Letter_15", toast_dshare = I .. "INV_Misc_Note_01",
   toast_invite = I .. "INV_Letter_18",
   toast_ahead = I .. "INV_Misc_GroupNeedMore",
   toast_session = I .. "INV_Misc_GroupNeedMore",

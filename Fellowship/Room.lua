@@ -98,7 +98,7 @@ function R:Chapter(f, name)
 end
 
 -- In words: "The dungeon quests here: about 1.4 levels, to 27.4 of the cap 28." and, when they would not fit, "Stop
--- questing at 26.6 to leave room for them."; then the notes (the cap level left for the mobs, quests whose XP is not
+-- questing at 26.6 to leave room for the dungeon quests."; then the notes (the cap level left for the mobs, quests whose XP is not
 -- known yet).
 local function one(v) return math.floor(v * 10 + 0.5) / 10 end
 
@@ -123,7 +123,7 @@ function R.Lines(r)
 end
 R.One = one
 
--- The room as the answer a player wants (U145): "You have room: stop questing at level 18." in green; red from half a
+-- The room as the answer a player wants (U145): "You have room for the dungeon quests: stop questing at level 18." in green; red from half a
 -- level before the stop point ("Stop questing at level 26, 60% into it ..."), and "Stop questing now ..." once there.
 -- Returns the text, its colour and the figures for its tooltip.
 function R.Answer(r)

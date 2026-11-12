@@ -8,11 +8,12 @@
 local _, ns = ...
 local L = ns.L
 local UI, Theme = ns.UI, ns.Theme
-local J, Hr = ns.Journey, ns.Hero
+local J = ns.Journey
 
 local TOP_H, STRIP_H, GAP, PAD = 204, 108, 22, 16
 local DRIFT = 10 -- how far the banner's picture drifts each way
 local FEED_N, GATHER_N = 4, 2
+local FOOT = 40 -- a card's link at its foot, and the gap above it
 
 -- The sheet's width: both halves of the book and the fold between them (W:PageInsets).
 local function sheetWidth() return 2 * ns.Window.PAGE_W + 52 end
@@ -225,7 +226,7 @@ local function build(pf)
     r:SetWidth(inner)
     r.icon = UI.Round(r, "ARTWORK", 20)
     r.icon:SetPoint("TOPLEFT", 0, 1)
-    r.text = maxLines(UI.WrapText(r, 13, "chipText", inner - 28, "book"), 2)
+    r.text = maxLines(UI.WrapText(r, 13, "chipText", inner - 28, "book"), 4)
     r.text:SetPoint("TOPLEFT", 28, 0)
     shadow(r.text)
     si.rows[i] = r
@@ -322,7 +323,9 @@ local function refreshStand(pf, f, cur, ch, watching)
   -- A Friend of the fellowship never holds anyone back (SPEC §1.1): that, with how to count again, in the room's place.
   local friend = not watching and ns.Fellowship:IsFriend(f, ns.Me())
   local room = not watching and not friend and ns.Room:Chapter(f, ns.Me()) or nil
-  local th = st.track:Set(f, cur, 0, room and room.stop)
+  -- The stop point on the track whenever the line names it, with room to spare too (U179, the owner, 10 Nov 2026: "mark
+  -- in the overview where you should stop questing"); the Chapter page's track keeps it for the last half level.
+  local th = st.track:Set(f, cur, 0, room and (room.stopAt or room.stop))
   st.track:ClearAllPoints(); st.track:SetPoint("TOPLEFT", 12, -y)
   y = y + th + 2
   st.line:SetText(standLine(f, cur))
@@ -396,27 +399,43 @@ local function refreshSince(pf, f)
   local lines = {}
   if d then
     if d.chapter then lines[#lines + 1] = { "hist_chapter", d.chapter } end
-    for _, lv in ipairs(d.levels) do lines[#lines + 1] = { "since_level", L.SINCE_REACHED:format(ns.Short(lv.name), lv.to) } end
+    -- Everyone who levelled on one line (U169), so a fall or a clear is not pushed behind "more in the Chronicle".
+    local lv = d.levels
+    if #lv == 1 then
+      lines[#lines + 1] = { "since_level", L.SINCE_REACHED:format(ns.Short(lv[1].name), lv[1].to) }
+    elseif #lv > 1 then
+      local parts = {}
+      for i, x in ipairs(lv) do parts[i] = L.SINCE_LEVEL_ONE:format(ns.Short(x.name), x.to) end
+      lines[#lines + 1] = { "since_level", L.SINCE_LEVELS:format(table.concat(parts, "  ·  ")) }
+    end
     for _, e in ipairs(d.events) do lines[#lines + 1] = { e.icon or "chronicle", e.text, e.time } end
   end
   local snap = ns.char.since
   si.note:SetText(d and d.ago or "")
   si.noteTip = d and type(snap) == "table" and snap.t and L.SINCE_NOTE_TIP:format(date(L.G_DATE_FORMAT, snap.t)) or nil
-  local y = si.top
+  -- Each line whole, as many as fit above the link; the rest wait in the Chronicle, counted in its link (cut at two
+  -- lines, a fall and a Gathering lost their end: the check of 10 Nov 2026, 22:46). Before the card is laid out its
+  -- height is not known (nor in the unit-test harness): no limit then.
+  local room = si:GetHeight() - FOOT
+  if room < si.top + 40 then room = math.huge end
+  local y, shown = si.top, 0
   for i, r in ipairs(si.rows) do
     local line = lines[i]
-    r:SetShown(line ~= nil)
     if line then
       UI.SetIcon(r.icon, ns.ICONS[line[1]] or ns.ICONS.chronicle)
       r.text:SetText(line[2])
       local h = math.max(20, r.text:GetStringHeight())
-      r:SetHeight(h)
-      r:ClearAllPoints(); r:SetPoint("TOPLEFT", PAD, -y)
-      y = y + h + 10
+      if shown > 0 and (shown < i - 1 or y + h > room) then line = nil end -- (in order: none after one left out)
+      if line then
+        r:SetHeight(h)
+        r:ClearAllPoints(); r:SetPoint("TOPLEFT", PAD, -y)
+        y, shown = y + h + 10, shown + 1
+      end
     end
+    r:SetShown(line ~= nil)
   end
   si.none:SetShown(#lines == 0)
-  local more = math.max(0, #lines - FEED_N) + (d and d.more or 0)
+  local more = math.max(0, #lines - shown) + (d and d.more or 0)
   si.link:SetLabel(more > 0 and L.SINCE_MORE_LINK:format(more) or L.THE_CHRONICLE_LINK)
 end
 
@@ -424,18 +443,14 @@ local function refreshComing(pf, f, cur, maxView)
   local co = pf.coming
   local y = co.top
   local inner = pf.innerW
-  -- The first step for a later dungeon (U140).
-  local first
-  for _, e in ipairs(ns.QuestLists:Later(f, cur)) do if not first and e.open > 0 then first = e end end
+  -- The first step for a later dungeon (U140), nearest chapter first: a prequest chain once your level reaches it.
+  local first = ns.QuestLists:Later(f, cur)[1]
   co.prep:SetShown(first ~= nil)
   if first then
-    local lvl = Hr:Level(f, ns.Me())
-    local step
-    for _, s in ipairs(first.steps) do if not step and s.open then step = s end end
     co.prep.key = first.x.key
     ns.SetDungeonArt(co.prep.pic, first.x.key, 64 - 2 * UI.PIC_INSET, 40 - 2 * UI.PIC_INSET)
     co.prep.title:SetText(L.FOCUS_PREPARE:format(first.x.d[2]))
-    co.prep.line:SetText(lvl >= step.lvl and L.COMING_OPEN_NOW:format(step.name) or L.COMING_OPENS:format(step.name, step.lvl))
+    co.prep.line:SetText(ns.QuestLists.LaterLine(first))
     local h = math.max(42, co.prep.title:GetStringHeight() + co.prep.line:GetStringHeight() + 4)
     co.prep:SetHeight(h)
     co.prep:ClearAllPoints(); co.prep:SetPoint("TOPLEFT", 16, -y)

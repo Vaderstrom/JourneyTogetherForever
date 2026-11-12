@@ -3,13 +3,13 @@ local _, ns = ...
 local S = {}
 ns.Settings = S
 
-S.TOAST_EVENTS = { "chapter", "floor", "clear", "heroFloor", "heroCap", "overCap", "ahead", "session", "gathering", "attune", "dquest", "dready", "dallready", "dremind", "room", "version", "first", "invite",
+S.TOAST_EVENTS = { "chapter", "floor", "clear", "heroFloor", "heroCap", "overCap", "ahead", "session", "gathering", "attune", "dquest", "dready", "dallready", "dremind", "dshare", "room", "version", "first", "invite",
   "challenge" }
 -- Settings shows them under three headings (U86); every event is in one group (tests/test_aaa_batch5.lua).
 S.TOAST_GROUPS = {
   { "TOAST_GROUP_JOURNEY", { "chapter", "floor", "ahead", "room", "session", "version" } },
   { "TOAST_GROUP_FELLOWSHIP", { "invite", "heroFloor", "heroCap", "overCap", "gathering", "first", "challenge" } },
-  { "TOAST_GROUP_DUNGEONS", { "clear", "dquest", "dready", "dallready", "dremind", "attune" } },
+  { "TOAST_GROUP_DUNGEONS", { "clear", "dquest", "dready", "dallready", "dremind", "dshare", "attune" } },
 }
 
 S.DEFAULTS = {

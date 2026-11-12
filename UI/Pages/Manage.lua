@@ -72,18 +72,39 @@ local function build(pf)
     r.lead:SetPoint("TOPLEFT", 24, -28)
     -- Mark away, Make leader and Remove in a "⋯" menu (in a row they ran off the page; seen in the UI tour).
     r.menu = UI.MenuButton(r, function()
+      -- The member the menu opened on: the pooled row may hold another by the time a choice is made (a redraw when
+      -- someone joins; review of 1.7.0).
+      local who = r.who
       local f, me, list = F:Current(), ns.Me(), {}
-      if not f or not f.members[r.who] or r.who == f.leader then return list end
+      if not f or not f.members[who] or who == f.leader then return list end
       if f.leader == me then
-        list[#list + 1] = { f.members[r.who].away == "forced" and L.CLEAR_AWAY or L.MARK_AWAY,
-          function() F:SetAway(r.who, f.members[r.who].away ~= "forced") end }
+        list[#list + 1] = { f.members[who].away == "forced" and L.CLEAR_AWAY or L.MARK_AWAY,
+          function() F:SetAway(who, f.members[who].away ~= "forced") end }
+        -- A Friend of the fellowship and back (the owner, 10 Nov 2026); back only at or below the chapter's cap. Not for
+        -- one of the Fallen (the rules refuse it).
+        if P.Can(f, me, "friend", who) then
+          local friend = F:IsFriend(f, who)
+          list[#list + 1] = { friend and L.MAKE_ADVENTURER or L.MAKE_FRIEND, function()
+            if friend then
+              local ok, why = F:SetFriend(false, who)
+              if not ok and why == "offline" then
+                ns:Toast(nil, L.MAKE_ADVENTURER, L.MAKE_ADVENTURER_OFFLINE:format(ns.Short(who)))
+              elseif not ok and why == "cap" then
+                ns:Toast(nil, L.MAKE_ADVENTURER, L.MAKE_ADVENTURER_CAP:format(ns.Short(who),
+                  ns.Journey:CapLevel(f, ns.Journey:Current(f)), ns.Hero:Level(f, who)))
+              end
+            else
+              W:Confirm(L.MAKE_FRIEND_CONFIRM:format(ns.Short(who)), L.MAKE_FRIEND, function() F:SetFriend(true, who) end)
+            end
+          end }
+        end
         list[#list + 1] = { L.MAKE_LEADER, function()
-          W:Confirm(L.MAKE_LEADER_CONFIRM:format(ns.Short(r.who)), L.MAKE_LEADER, function() F:MakeLeader(r.who) end)
+          W:Confirm(L.MAKE_LEADER_CONFIRM:format(ns.Short(who)), L.MAKE_LEADER, function() F:MakeLeader(who) end)
         end }
       end
-      if P.Can(f, me, "remove", r.who) then
+      if P.Can(f, me, "remove", who) then
         list[#list + 1] = { L.REMOVE, function()
-          W:Confirm(L.REMOVE_CONFIRM:format(ns.Short(r.who)), L.REMOVE, function() F:Remove(r.who) end)
+          W:Confirm(L.REMOVE_CONFIRM:format(ns.Short(who)), L.REMOVE, function() F:Remove(who) end)
         end, true }
       end
       return list

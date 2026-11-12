@@ -141,6 +141,8 @@ end
 -- A value the game keeps from addons (12.0's secret values: in combat and in instances). Never compare, join or
 -- keep one.
 function ns.Secret(v) return issecretvalue ~= nil and issecretvalue(v) or false end
+-- The value, or nil when it is secret: what the game says, where it may say nothing.
+function ns.Plain(v) if ns.Secret(v) then return nil end return v end
 
 -- The other members of f (not this character): who a change or a state goes to.
 function ns.Others(f)

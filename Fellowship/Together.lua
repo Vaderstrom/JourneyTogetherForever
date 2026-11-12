@@ -190,11 +190,31 @@ end
 local function plural(n, one, many) return n == 1 and L[one] or L[many]:format(n) end
 
 -- A dungeon row's state for you: its line, and the action at its right ("find": nothing to get first; "ready":
--- quests to get first), or wait (the chapter waits for the floor).
-local function dungeonLine(f, x, st, fl)
+-- quests to get first), or wait (the chapter waits for the floor), and a short line for where the line does not fit
+-- beside Find group (the check of 10 Nov 2026, 22:46: "Nothing to get first: its 4 quests start i...").
+-- waiting: x's chapter is yours and waits for the floor. Its dungeons the game has opened then say what to get ready
+-- meanwhile, dimmed and without a button; the waiting box above says what it waits for (the check of 11 Nov 2026,
+-- 23:49).
+local function dungeonLine(f, x, st, fl, waiting)
   if st == "cleared" then return L.STATE_CLEARED end
-  if st == "locked" then return L.TODO_WAIT:format(fl), nil, true end
+  if st == "locked" then
+    if not waiting or x.early or not ns.IsOpen(x.key, f) then return L.TODO_WAIT:format(fl), nil, true end
+    local line, _, _, short = dungeonLine(f, x, "open", fl)
+    return line, nil, true, short
+  end
   if x.early then return L.TODO_EARLY:format(J.Roman(x.early)) end
+  -- Cleared by you while the clear rule waits for others (the owner, 11 Nov 2026): who still needs it, and Find group
+  -- to help them, not Get ready.
+  local who = J:ClearedBy(f, x.key)
+  if who[ns.Me()] then
+    local need, pacers = {}, J:Pacing(f)
+    for _, name in ipairs(pacers) do if not who[name] then need[#need + 1] = name end end
+    local mode = f.rules.clearMode
+    -- Where the names do not fit beside the button: how many (the check of 11 Nov 2026, 23:49; the tooltip names them).
+    if mode == "all" then return L.TODO_YOU_CLEARED:format(J.Names(f, need)), "find", nil, L.TODO_YOU_CLEARED_N:format(#need) end
+    local more = math.max(1, (mode == "n" and math.min(f.rules.clearN, #pacers) or 1) - (#pacers - #need))
+    return L.TODO_YOU_CLEARED_N:format(more), "find", nil, L.TODO_YOU_CLEARED_SHORT
+  end
   local QL = ns.QuestLists
   local r = QL:Ready(f, x.key, ns.Me())
   if r and not r.ready then
@@ -203,9 +223,12 @@ local function dungeonLine(f, x, st, fl)
     if r.pick < r.pickOf then parts[#parts + 1] = plural(r.pickOf - r.pick, "TODO_PICK_1", "TODO_PICK_N") end
     return L.TODO_GET_READY:format(table.concat(parts, ", ")), "ready"
   end
-  if r then return plural(r.earlyOf + r.pickOf, "TODO_READY_1", "TODO_READY_N"), "find" end
-  local _, _, _, _, _, open = QL:Counts(f, x.key)
-  if open and open > 0 then return plural(open, "TODO_INSIDE_1", "TODO_INSIDE_N"), "find" end
+  -- (Ready with a quest someone shares at the entrance, U177: not "in your log".)
+  local shares = ns.Ready.Shares(r)
+  if shares then return L.TODO_READY_SHARED:format(shares), "find", nil, L.TODO_READY_SHARED_SHORT end
+  if r then return plural(r.quests, "TODO_READY_1", "TODO_READY_N"), "find" end
+  local _, _, _, _, open = QL:Counts(f, x.key)
+  if open and open > 0 then return plural(open, "TODO_INSIDE_1", "TODO_INSIDE_N"), "find", nil, L.TODO_NOTHING end
   return L.TODO_NOTHING, "find"
 end
 
@@ -219,8 +242,8 @@ function T:ToDo(f, n, noLater)
   local items, early = {}, {}
   local ch = f.journey.chapters[n]
   if not ch then return items end
-  local me = ns.Me()
-  if n == J:CurrentIndex(f) then
+  local me, now = ns.Me(), n == J:CurrentIndex(f)
+  if now then
     for _, st in ipairs(self:Started(f) or {}) do items[#items + 1] = { kind = "start", text = st.text, done = st.done, page = st.page } end
   end
   local fl, lvl = J:FloorLevel(f, ch), Hr:Level(f, me)
@@ -228,9 +251,9 @@ function T:ToDo(f, n, noLater)
   if not F:IsFriend(f, me) then items[#items + 1] = { kind = "floor", text = L.TODO_FLOOR:format(fl), done = lvl >= fl } end
   for _, x in ipairs(J:ChapterList(f, n)) do
     local st = J:DungeonState(f, n, x)
-    local line, action, wait = dungeonLine(f, x, st, fl)
+    local line, action, wait, short = dungeonLine(f, x, st, fl, now and not J:Unlocked(f))
     local it = { kind = x.early and "early" or "dungeon", x = x, state = st, line = line, action = action, wait = wait,
-      done = st == "cleared" }
+      short = short, done = st == "cleared", you = J:ClearedBy(f, x.key)[me] ~= nil }
     if x.early then early[#early + 1] = it else items[#items + 1] = it end
   end
   -- The milestones (SPEC §2; the owner, 9 Nov 2026): Required ones hold the chapter, Optional ones are goals.
@@ -240,7 +263,7 @@ function T:ToDo(f, n, noLater)
   end
   if not noLater then
     for _, e in ipairs(ns.QuestLists:Later(f, n)) do
-      if e.open > 0 then items[#items + 1] = { kind = "later", e = e, x = e.x, line = ns.QuestLists.LaterLine(e, lvl) } end
+      items[#items + 1] = { kind = "later", e = e, x = e.x, line = ns.QuestLists.LaterLine(e) }
     end
   end
   for _, it in ipairs(early) do items[#items + 1] = it end
@@ -286,12 +309,17 @@ function T:Focus(f)
   if p and p.kind == "help" then
     return { head = L.FOCUS_HELP:format(ns.Short(p.who)), why = L.FOCUS_HELP_WHY, button = invite, link = chapter }
   end
+  -- Play now's dungeon, else the first you still need (as Recommended next), else the first one you cleared.
   local pick
   for _, it in ipairs(items) do
-    if it.kind == "dungeon" and not it.done and not it.wait and (not pick or (p and p.key == it.x.key)) then pick = it end
+    if it.kind == "dungeon" and not it.done and not it.wait then
+      if p and p.key == it.x.key then pick = it break end
+      if not pick or (pick.you and not it.you) then pick = it end
+    end
   end
   if pick then
-    local name, need = pick.x.d[2], needLine(f, pick.x.key)
+    -- (One you cleared: its line already names who still needs it.)
+    local name, need = pick.x.d[2], not pick.you and needLine(f, pick.x.key)
     local why = need and (pick.line .. " " .. need) or pick.line
     if pick.action == "ready" then
       return { head = L.FOCUS_READY:format(name), why = why, button = { kind = "ready", key = pick.x.key }, link = page(pick.x) }
@@ -302,12 +330,10 @@ function T:Focus(f)
   -- for later dungeons, which never do.
   local ms = #below == 0 and ns.Milestones:OpenRequired(f, ch.n)[1]
   if ms then return { head = L.FOCUS_MILESTONE:format(ms.name), why = ns.Milestones:ProgressText(f, ms), link = chapter } end
-  local later = ns.QuestLists:Later(f, ch.n)
-  for _, e in ipairs(later) do
-    if e.open > 0 then
-      return { head = L.FOCUS_PREPARE:format(e.x.d[2]), why = ns.QuestLists.LaterLine(e, Hr:Level(f, me)),
-        button = { kind = "ready", key = e.x.key }, link = page(e.x) }
-    end
+  local e = ns.QuestLists:Later(f, ch.n)[1] -- (each has a step at least)
+  if e then
+    return { head = L.FOCUS_PREPARE:format(e.x.d[2]), why = ns.QuestLists.LaterLine(e),
+      button = { kind = "ready", key = e.x.key }, link = page(e.x) }
   end
   if #below > 0 then
     return { head = L.FOCUS_WAITING, why = L.NEXT_WAITING:format(J.Names(f, below, true), J:FloorLevel(f, ch)), button = invite, link = chapter }
@@ -327,7 +353,7 @@ function T:StartEarly(f)
   for _, x in ipairs(J:ChapterList(f, cur)) do
     if not x.early and not J:Cleared(f, x.key) then keys[#keys + 1] = x.key end
   end
-  for _, e in ipairs(QL:Later(f, cur)) do if e.open > 0 then keys[#keys + 1] = e.x.key end end
+  for _, e in ipairs(QL:Later(f, cur)) do keys[#keys + 1] = e.x.key end
   for _, key in ipairs(keys) do
     local g = QL:Groups(f, key, me)
     for _, q in ipairs(g and g.earlier or {}) do

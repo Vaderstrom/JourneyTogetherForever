@@ -156,7 +156,7 @@ end
 ---------------------------------------------------------------------------
 -- What the game itself says about a character (the presence marks, SPEC §4.8)
 ---------------------------------------------------------------------------
-local function plain(v) if issecretvalue and issecretvalue(v) then return nil end return v end
+local plain = ns.Plain
 
 -- Your group: the game tells whether each member is connected, and AFK.
 local function group(map)

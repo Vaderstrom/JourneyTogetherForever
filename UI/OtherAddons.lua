@@ -22,6 +22,19 @@ function OA:HasLore() return self:LoreCommand() ~= nil end
 -- The name Lore Forever knows a place by: ours shortens Scarlet Monastery's wings ("SM: Library").
 function OA.LoreName(name) return (name:gsub("^SM: ", "Scarlet Monastery ")) end
 
+-- Lore Forever's pages with a recording (its zone: entries), by our key. The story button plays it too (the owner,
+-- 10 Nov 2026: "Play it for you"), the way Lore Forever's own Listen link in chat does: an addon:LoreForever: link
+-- passed to the game's SetItemRef callbacks. Nothing plays for a place not listed; again while it plays stops it.
+OA.LORE_VOICED = { hot = "hallofthanes", rol = "ruinsoflordaeron", dm = "deadmines", wc = "wailing",
+  sfk = "shadowfang", bfd = "blackfathom", stocks = "stockade", rfk = "razorfenkraul", gnomer = "gnomeregan",
+  rfc = "ragefire", smlib = "scarlet", smgy = "scarlet", smarm = "scarlet", smcath = "scarlet" }
+
+function OA.LoreListen(key)
+  local page = OA.LORE_VOICED[key]
+  if not (page and type(EventRegistry) == "table" and EventRegistry.TriggerEvent) then return false end
+  return (pcall(EventRegistry.TriggerEvent, EventRegistry, "SetItemRef", "addon:LoreForever:listen::zone:" .. page))
+end
+
 ---------------------------------------------------------------------------
 -- Spoken's stories of places (the owner, 6 Nov 2026: Spoken instead of Lore Forever, the two talk over each other)
 ---------------------------------------------------------------------------
@@ -82,6 +95,7 @@ function OA:Lore(key)
     local ask = self:LoreCommand()
     if not ask then return false end
     ask(self.LoreName(d[2]))
+    OA.LoreListen(key)
     return true
   end
   local first = self:StoryFrom(key)
@@ -97,7 +111,8 @@ function OA:Lore(key)
     end
     if forever() then return true end
   end
-  ns:Toast(nil, L.STORIES, L.LORE_MISSING)
+  -- (With Spoken running, installing it is not the answer: it has no story here, or its Places part is off.)
+  ns:Toast(nil, L.STORIES, self:HasSpoken() and L.SPOKEN_NO_STORY or L.LORE_MISSING)
   return false
 end
 

@@ -86,7 +86,9 @@ local function refresh(pf, ctx)
   for _, g in ipairs(gs) do
     if stop then break end
     local head = pf.heads:Get(nh + 1)
-    if not head then break end -- (in combat: made after it, UI.Pool)
+    -- (In combat both are made after it, UI.Pool: no heading without a tile to go under it; the release review of 10
+    -- Nov 2026.)
+    if not head or not pf.tiles:Get(nt + 1) then break end
     nh = nh + 1
     head:SetText(g.head)
     head.text:SetTextColor(Theme:RGBA(g.gold and "accentText" or "ink"))

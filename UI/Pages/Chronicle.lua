@@ -296,8 +296,8 @@ local function build(pf)
   pf.div = UI.Divider(R)
   pf.note = UI.WrapText(R, 12, "ink2", width, "book")
   pf.note:SetText(L.HIST_NOTE)
-  -- The journey's dungeons so far (M21; the page was half empty): each with its picture and how many Heroes have
-  -- cleared it, the cleared ones marked.
+  -- (The journey's dungeons so far left this page on 10 Nov 2026, U170: who cleared what is on the Chapter page
+  -- and the Dungeons page.)
   -- The tallies (SPEC §8): who has fallen most, run most dungeons, turned in most quests.
   pf.tHead = UI.SectionHeader(R, width)
   pf.tHead:SetText(L.HIST_TALLIES)
@@ -333,23 +333,6 @@ local function build(pf)
       GameTooltip:Show()
     end)
     d:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    return d
-  end)
-  pf.clHead = UI.SectionHeader(R, width)
-  pf.clHead:SetText(L.HIST_DUNGEONS)
-  pf.clRows = UI.Pool(function()
-    local d = CreateFrame("Frame", nil, R)
-    d:SetSize(width, 30)
-    d.ring = UI.Round(d, "ARTWORK", 26)
-    d.ring:SetPoint("LEFT"); Theme:Fill(d.ring, "gold", 0.9)
-    d.pic = UI.Round(d, "OVERLAY", 22)
-    d.pic:SetPoint("CENTER", d.ring)
-    d.name = UI.Text(d, 13, "ink")
-    d.name:SetPoint("LEFT", 34, 0)
-    d.n = UI.Text(d, 12, "ink2", "body", "RIGHT")
-    d.n:SetPoint("RIGHT", -20, 0)
-    d.mark = UI.Mark(d, 14)
-    d.mark:SetPoint("RIGHT")
     return d
   end)
 end
@@ -431,31 +414,6 @@ local function refresh(pf, ctx)
   pf.div:SetPoint("TOPLEFT", pf.rscroll.child, "TOPLEFT", 0, -r.y); pf.div:SetPoint("TOPRIGHT", pf.rscroll.child, "TOPRIGHT", 0, -r.y)
   r:Skip(20)
   r:Place(pf.note, pf.note:GetStringHeight(), 4)
-  -- The dungeons of the chapters reached so far.
-  local J = ns.Journey
-  local cur = math.min(J:CurrentIndex(f), #f.journey.chapters)
-  local counted, n = #J:Counted(f), 0
-  for chN = 1, cur do
-    for _, x in ipairs(J:InChapter(f, chN)) do
-      local row = pf.clRows:Get(n + 1)
-      if not row then break end
-      n = n + 1
-      local ok = ns.SetDungeonArt(row.pic, x.key, 22, 22)
-      row.pic:SetShown(ok)
-      row.name:SetText(x.d[2])
-      local have = 0
-      for name in pairs(J:ClearedBy(f, x.key)) do if f.members[name] then have = have + 1 end end
-      row.n:SetText((counted == 1 and L.HIST_CLEARED_BY_1 or L.HIST_CLEARED_BY):format(have, counted))
-      row.mark:SetMark(J:Cleared(f, x.key) and "cleared" or nil)
-    end
-  end
-  pf.clHead:SetShown(n > 0)
-  if n > 0 then
-    r:Skip(10)
-    r:Place(pf.clHead, 29, 6)
-    for i = 1, n do r:Place(pf.clRows.items[i], 30, 2) end
-  end
-  pf.clRows:HideFrom(n + 1)
   -- The tallies, once someone has a count.
   local tallies = ns.Firsts:Tallies(f)
   pf.tHead:SetShown(#tallies > 0)

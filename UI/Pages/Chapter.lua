@@ -390,8 +390,9 @@ local function refreshMatrix(pf, ctx, list, r, width)
     col:Show()
   end
   M.cols:HideFrom(nCols + 1)
+  -- The Adventurers only: a Friend's clears are never needed (the owner, 11 Nov 2026).
   local heroes = {}
-  for name in pairs(f.members) do heroes[#heroes + 1] = name end
+  for name in pairs(f.members) do if not ns.Fellowship:IsFriend(f, name) then heroes[#heroes + 1] = name end end
   table.sort(heroes, function(a, b)
     local la, lb = Hr:Level(f, a), Hr:Level(f, b)
     if la ~= lb then return la > lb end
@@ -545,9 +546,10 @@ local function rowTip(f, x, st, roleText, counted)
   if #Cl:Placements(f, ns.BaseKey(x.key)) > 1 then
     tip[#tip + 1] = L.CH_PART_BOSSES:format(#Cl:Needed(f, x.key), #Cl:Bosses(x.key))
   end
-  -- The dungeon's quests (our own list): how many each Hero has picked up of the ones they still need.
-  local dq = st ~= "cleared" and ns.QuestLists:DungeonLine(f, x.key) or nil
-  if dq then tip[#tip + 1] = dq end
+  -- Who is ready, in one line as the dungeon's page says it; each Adventurer's quests are there (U186).
+  local rows = st ~= "cleared" and ns.Ready:Rows(f, x.key) or {}
+  local ready = ns.Ready.Tally(rows)
+  if ready then tip[#tip + 1] = L.DQ_READY_N:format(ready, #rows) end
   tip[#tip + 1] = L.CH_ROW_JOURNAL
   return tip
 end
@@ -701,7 +703,7 @@ local function refresh(pf, ctx)
         for _, step in ipairs(it.e.steps) do
           tip[#tip + 1] = L.LATER_TIP_STEP:format(step.name, step.lvl)
         end
-        tip[#tip + 1] = L.CH_ROW_JOURNAL
+        tip[#tip + 1] = L.CH_ROW_LATER -- (a later dungeon's page has no Who is ready, SPEC §4.5b)
       else
         tip = rowTip(f, x, st, roleText, counted)
         if x.key == nextKey then label = L.CH_ROW_NEXT; table.insert(tip, #tip, L.CH_ROW_NEXT_TIP) end
@@ -732,8 +734,10 @@ local function refresh(pf, ctx)
       end
       local textW = rx - (THUMB_W + 18) - 4
       c.name:SetWidth(textW); c.sub:SetWidth(textW); c.brief:SetWidth(textW)
-      -- Where the line does not fit beside the button, the levels drop to the tooltip.
+      -- Where the line does not fit beside the button, the levels drop to the tooltip; the need line takes its short
+      -- form (its page has the rest).
       if c.sub:GetStringWidth() > textW then c.sub:SetText(line(nil)) end
+      if it.short and c.brief:GetStringWidth() > textW then c.brief:SetText(it.short) end
       local ok, default = ns.SetDungeonArt(c.pic.tex, x.key, THUMB_W - 2 * UI.PIC_INSET, THUMB_H - 2 * UI.PIC_INSET)
       -- No picture of its own (only the game's blurry default tile): the chapter's illustration instead.
       if default then ns.Pages:SetChapterArt(c.pic.tex, ns.Pages:ArtOf(f, it.e and it.e.chapter or view), THUMB_W - 2 * UI.PIC_INSET, THUMB_H - 2 * UI.PIC_INSET, 0.6); ok = true end

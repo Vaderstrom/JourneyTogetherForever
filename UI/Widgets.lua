@@ -453,12 +453,17 @@ function UI.Lives(parent, width)
 end
 
 -- A one-line tooltip on hover (icon buttons say what they do).
--- A function may return nil: no tooltip then.
+-- A function may return nil: no tooltip then. Only plain text goes to the game's tooltip, and a refusal is logged, not
+-- shown: 1.5 once raised "bad argument #1 to 'SetText'" on a red button's tooltip in WoW Forever (the owner, 10 Nov
+-- 2026; the cause is not known yet, the self-test hovers those buttons to find it).
 function UI.Tooltip(frame, text)
   frame:HookScript("OnEnter", function()
     local t = type(text) == "function" and text() or text
-    if not t then return end
-    GameTooltip:SetOwner(frame, "ANCHOR_TOP"); GameTooltip:SetText(t, nil, nil, nil, nil, true); GameTooltip:Show()
+    if type(t) ~= "string" or (issecretvalue and issecretvalue(t)) or t == "" then return end
+    GameTooltip:SetOwner(frame, "ANCHOR_TOP")
+    local ok, err = pcall(GameTooltip.SetText, GameTooltip, t, nil, nil, nil, nil, true)
+    if not ok then GameTooltip:Hide(); ns:LogError("tooltip", err) return end
+    GameTooltip:Show()
   end)
   frame:HookScript("OnLeave", function() GameTooltip:Hide() end)
 end
@@ -2379,7 +2384,7 @@ function UI.LevelTrack(parent, width, dark)
 end
 
 -- Where the Companions stand (Chapter and Overview pages): a section per group (below the floor, ready, at the cap,
--- over the cap, away) with its Companions under it; groups with nobody fold into one line at the end.
+-- over the cap, away) with its Companions under it; a group with nobody says nothing (U187, the owner, 12 Nov 2026).
 -- :Set(f, n, stack) places it on a UI.Stack.
 function UI.Standings(parent, width)
   local s = { groups = {} }
@@ -2395,7 +2400,6 @@ function UI.Standings(parent, width)
     g.n:SetPoint("RIGHT", -14, 0)
     s.groups[i] = g
   end
-  s.nobody = UI.WrapText(parent, 12, "ink2", width - 8, "book")
   s.rows = UI.Pool(function()
     local r = CreateFrame("Frame", nil, parent)
     r:SetSize(width, 22)
@@ -2421,19 +2425,17 @@ function UI.Standings(parent, width)
 
   function s:Hide()
     for _, g in ipairs(self.groups) do g:Hide() end
-    self.nobody:Hide()
     self.rows:HideFrom(1)
   end
 
   function s:Set(f, n, stack)
     local J, Hr, L = ns.Journey, ns.Hero, ns.L
     local light = Theme:Current().light
-    local rowN, nobody = 0, {}
+    local rowN = 0
     for i, g in ipairs(J:Groups(f, n)) do
       local gf = self.groups[i]
       if #g.rows == 0 then
         gf:Hide()
-        nobody[#nobody + 1] = g.label:lower()
       else
         local cr, cg, cb = Theme:RGBA(g.color)
         gf.dot:SetColorTexture(cr, cg, cb, 1)
@@ -2468,12 +2470,6 @@ function UI.Standings(parent, width)
       end
     end
     self.rows:HideFrom(rowN + 1)
-    self.nobody:SetShown(#nobody > 0)
-    if #nobody > 0 then
-      local text = #nobody == 1 and nobody[1] or (table.concat(nobody, ", ", 1, #nobody - 1) .. L.OR .. nobody[#nobody])
-      self.nobody:SetText(L.GRP_NOBODY:format(text))
-      stack:Place(self.nobody, self.nobody:GetStringHeight(), 10, 4)
-    end
   end
   return s
 end

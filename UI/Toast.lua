@@ -199,10 +199,9 @@ function T:Build()
   f:SetScript("OnDragStop", function() T:Drop() end)
   -- Hidden while dragged there is no OnDragStop: the drag is let go and it goes back to its place (code review of
   -- 1.3.0: until a /reload no toast showed any more).
-  -- And the toast that waited for an answered one (U109) shows once it goes.
+  -- And the toasts that waited for an answered one (U109) show once it goes, oldest first.
   f:SetScript("OnHide", function()
-    local t = T.after
-    T.after = nil
+    local t = T.after and table.remove(T.after, 1)
     if t then C_Timer.After(0, function() T:Show(t) end) end
     if not T.dragging then return end
     T.dragging, T.waiting = nil, nil
@@ -394,6 +393,14 @@ function T:Drop()
   f.fadeIn:SetDuration(0); f.anim:Play()
 end
 
+-- A toast that waits for an answer is up (an invitation, a share).
+function T:Waiting()
+  local c, f = self.current, self.frame
+  return (c and c.actions and f and f:IsShown() and not (c.still and not c.still())) and true or false
+end
+
+T.AFTER_MAX = 5
+
 function T:Show(t)
   local f = self:Build()
   if self.moving then return end
@@ -402,10 +409,15 @@ function T:Show(t)
   -- While one is dragged a new toast would fade and hide it under the mouse: the newest waits for the drop (as
   -- toasts replace each other, only the newest).
   if self.dragging then self.waiting = t return end
-  -- An invitation waiting for its answer (U109) is not replaced: a toast without answers waits until it goes
-  -- (answered, clicked away or faded), the newest only.
-  local c = self.current
-  if c and c.actions and not t.actions and f:IsShown() and not (c.still and not c.still()) then self.after = t return end
+  -- An invitation or a share waiting for its answer (U109, U178) is not replaced: toasts without answers wait until it
+  -- goes (answered, clicked away or faded), the newest AFTER_MAX (review of 1.7.0: a share left up for a whole run
+  -- kept only the last, and a cap warning was lost).
+  if not t.actions and self:Waiting() then
+    self.after = self.after or {}
+    table.insert(self.after, t)
+    if #self.after > self.AFTER_MAX then table.remove(self.after, 1) end
+    return
+  end
   self:Fill(t)
   self.current = t
   self:Settle(f, self.MID[t.kind] == true or t.big == true)

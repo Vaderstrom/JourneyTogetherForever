@@ -362,7 +362,7 @@ function F:ApplyChange(f, op, by, t)
     if not P.Can(f, by, "away", n) then return false end
     f.members[n].away = op.on and (by == n and "self" or "forced") or nil
   elseif k == "friend" then
-    -- Become a Friend of the fellowship, or play on as an Adventurer: yourself only, and never the Leader. (Back only
+    -- Become a Friend of the fellowship, or play on as an Adventurer: yourself or by the Leader, never the Leader. (Back only
     -- at or below the chapter's cap is the page's rule, F:SetFriend: a copy that saw another level must not refuse it.)
     if not P.Can(f, by, "friend", n) or not f.members[n] then return false end
     local on = op.on and true or nil
@@ -692,25 +692,29 @@ function F:Disband() return yourself(function() return self:Do({ k = "disband" }
 function F:SetRoles(name, role, second) return self:Do({ k = "role", name = name, role = role, second = second or "" }) end
 function F:SetAway(name, on) return self:Do({ k = "away", name = name, on = on and true or false }) end
 
--- Become a Friend of the fellowship (on), or play on as an Adventurer. Returns true, or false and why: "leader" (the
--- Leader always counts), "cap" (back only at or below the current chapter's cap, so nobody skips ahead), "fallen".
-function F:FriendBlock(f, on)
-  local me = ns.Me()
-  if not f or not f.members[me] then return "none" end
-  if f.leader == me then return "leader" end
-  if ns.Challenges:Fallen(f, me) then return "fallen" end
+-- Become a Friend of the fellowship (on), or play on as an Adventurer: you, or a member the Leader switches (name; the
+-- owner, 10 Nov 2026). Returns true, or false and why: "leader" (the Leader always counts), "cap" (back only at or
+-- below the current chapter's cap, so nobody skips ahead), "offline" (the Leader brings back only a member online: an
+-- offline one's level may be older than what they played since; review of 1.7.0), "fallen".
+function F:FriendBlock(f, on, name)
+  name = name or ns.Me()
+  if not f or not f.members[name] then return "none" end
+  if f.leader == name then return "leader" end
+  if ns.Challenges:Fallen(f, name) then return "fallen" end
   if not on then
+    if name ~= ns.Me() and not ns.Hero:Online(f, name) then return "offline" end
     local ch = ns.Journey:Current(f)
-    if ch and ns.Hero:Level(f, me) > ns.Journey:CapLevel(f, ch) then return "cap" end
+    if ch and ns.Hero:Level(f, name) > ns.Journey:CapLevel(f, ch) then return "cap" end
   end
   return nil
 end
 
-function F:SetFriend(on)
+function F:SetFriend(on, name)
   local f = self:Current()
-  local why = self:FriendBlock(f, on)
+  name = name or ns.Me()
+  local why = self:FriendBlock(f, on, name)
   if why then return false, why end
-  return self:Do({ k = "friend", name = ns.Me(), on = on and true or false, level = ns.Hero:Level(f, ns.Me()) })
+  return self:Do({ k = "friend", name = name, on = on and true or false, level = ns.Hero:Level(f, name) })
 end
 function F:Tick(id, on) return self:Do({ k = "tick", id = id, on = on and true or false }) end
 

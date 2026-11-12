@@ -74,13 +74,13 @@ local function heroes(f, n)
 end
 
 local function dungeons(f, n)
-  local list, pacing = {}, #J:Pacing(f)
+  local list, pacers = {}, J:Pacing(f)
   for _, x in ipairs(J:ChapterList(f, n)) do
-    local count = 0
-    for _ in pairs(J:ClearedBy(f, x.key)) do count = count + 1 end
+    local count, who = 0, J:ClearedBy(f, x.key)
+    for _, name in ipairs(pacers) do if who[name] then count = count + 1 end end -- (no Friends: "N of pacing")
     local state = J:DungeonState(f, n, x)
     list[#list + 1] = { key = ns.BaseKey(x.key), name = x.d[2], role = ROLE[x.role] or ROLE.o, state = state,
-      done = state == "cleared", text = state == "cleared" and L.BOARD_CLEARED or L.BOARD_CLEARED_BY:format(count, pacing),
+      done = state == "cleared", text = state == "cleared" and L.BOARD_CLEARED or L.BOARD_CLEARED_BY:format(count, #pacers),
       art = ns.DungeonScreen(x.key) }
   end
   return list

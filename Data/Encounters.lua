@@ -5,7 +5,7 @@
 --   finder: the Dungeon Finder's dungeons and raids, { [ID] = name }.
 local _, ns = ...
 ns.ENCOUNTERS = {
-  wowf = { build = "1.60.1.70862",
+  wowf = { build = "1.60.1.70888",
   finder = {
     [1] = "Wailing Caverns",
     [2] = "Scholomance",

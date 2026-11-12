@@ -109,14 +109,15 @@ function J:ChapterList(f, n)
   return list
 end
 
--- The dungeon to do next in chapter n: the first mandatory one not cleared, in the suggested order. nil when the
--- chapter has fewer than two mandatory dungeons (one needs no suggestion) or all are cleared.
+-- The dungeon to do next in chapter n: the first mandatory one, in the suggested order, that neither the fellowship nor
+-- you have cleared (the owner, 11 Nov 2026: with "Every Adventurer" it stayed on a dungeon you had already done). nil
+-- when the chapter has fewer than two mandatory dungeons (one needs no suggestion) or none is left for you.
 function J:NextDungeon(f, n, list)
-  local count, key = 0, nil
+  local count, key, me = 0, nil, ns.Me()
   for _, x in ipairs(list or self:ChapterList(f, n)) do
     if x.role == "m" and not x.early then
       count = count + 1
-      if not key and self:DungeonState(f, n, x) ~= "cleared" then key = x.key end
+      if not key and not self:ClearedBy(f, x.key)[me] and self:DungeonState(f, n, x) ~= "cleared" then key = x.key end
     end
   end
   return count >= 2 and key or nil
@@ -145,7 +146,12 @@ function J:Cleared(f, key)
   local who = self:ClearedBy(f, key)
   if not next(who) then return false end
   local r = f.rules
-  if r.clearMode == "one" then return true end
+  if r.clearMode == "one" then
+    -- Anyone counted (not a Friend of the fellowship, whose clears are never needed, nor the Fallen), or who has left
+    -- (review of 11 Nov 2026).
+    for name in pairs(who) do if not self:Uncounted(f, name) then return true end end
+    return false
+  end
   local counted = self:Pacing(f)
   local have = 0
   for _, name in ipairs(counted) do if who[name] then have = have + 1 end end

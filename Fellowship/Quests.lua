@@ -64,7 +64,7 @@ local function gameTitle(id)
   local QL = C_QuestLog
   if not (QL and QL.GetTitleForQuestID) then return nil end
   local ok, t = pcall(QL.GetTitleForQuestID, id)
-  if ok and type(t) == "string" and t ~= "" and not secret(t) then
+  if ok and type(t) == "string" and not secret(t) and t ~= "" then -- (secret first: no comparing a secret value)
     db().questTitles[id] = t
     return t
   end
@@ -87,10 +87,25 @@ local function knownTitle(id)
 end
 Q.Title = knownTitle -- (the chain before a dungeon quest, QuestLists.lua)
 
+-- A dungeon quest's name as the game names it, else our data's (the owner, 11 Nov 2026: the game renamed 5047 and
+-- 5214, and the book kept the old names).
+function Q.Name(id, fallback)
+  return gameTitle(id) or db().questTitles[id] or fallback
+end
+
 -- A title the game was asked for has arrived: show it.
+local dungeonIDs -- (the dungeon quests' IDs, made at the first title that arrives)
 ns:RegisterEvent("QUEST_DATA_LOAD_RESULT", function(_, id, ok)
   if not (ok and Q.titleAsked[id] and gameTitle(id)) then return end
-  if ns.QuestLists then ns.QuestLists.prevAt = -math.huge end -- (the chains still waiting for a title walk again)
+  -- (The chains still waiting for a title walk again; the dungeon lists are made again with the game's names.)
+  if ns.QuestLists then
+    ns.QuestLists.prevAt = -math.huge
+    if not dungeonIDs then
+      dungeonIDs = {}
+      for _, list in pairs(ns.DUNGEON_QUESTS or {}) do for _, q in ipairs(list) do dungeonIDs[q[1]] = true end end
+    end
+    if dungeonIDs[id] then ns.QuestLists.made = {} end
+  end
   if ns.Window and ns.Window.RefreshSoon then ns.Window:RefreshSoon("quests") end
 end)
 
@@ -746,7 +761,12 @@ end
 
 function Q:Share(x)
   local id = self:ShareID(x)
-  if not id or not QuestLogPushQuest then return end
+  if id then self:Push(id) end
+end
+
+-- The game's quest sharing for a quest in my log (also the share reminder in a dungeon, U178).
+function Q:Push(id)
+  if not QuestLogPushQuest then return end
   if C_QuestLog and C_QuestLog.SetSelectedQuest then C_QuestLog.SetSelectedQuest(id) end
   QuestLogPushQuest()
 end

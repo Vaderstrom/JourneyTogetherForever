@@ -113,10 +113,7 @@ local function buildList(pf, width)
   local div = UI.Divider(left)
   div:SetPoint("TOPLEFT", 0, -176); div:SetPoint("TOPRIGHT", 0, -176)
   pf.tourney = UI.WrapText(left, 12, "ink2", width)
-  -- The level track of the current chapter in the page's empty half (U5, 31 Oct 2026).
-  pf.trackHead = UI.Text(left, 17, "ink", "title")
-  pf.trackHead:SetText(L.WHERE_STAND)
-  pf.levelTrack = UI.LevelTrack(left, width)
+  -- (The level track left this page on 10 Nov 2026, U168: its home is the Chapter page, and each card has its level.)
   pf.leave = UI.TextButton(left, L.LEAVE, function()
     local f = F:Current()
     if f then ns.Window:Confirm(F:LeaveQuestion(f), L.LEAVE_SHORT, function() F:Leave() end) end
@@ -316,18 +313,6 @@ local function refreshList(pf, ctx, width)
   local y = 188
   pf.tourney:SetText(tourneyLine(f))
   pf.tourney:ClearAllPoints(); pf.tourney:SetPoint("TOPLEFT", 0, -(y + 8))
-  -- The level track under it, as many lines as fit above Leave and Group photo (36 for the buttons).
-  y = y + 8 + pf.tourney:GetStringHeight() + 22
-  local room = (pf.listL:GetHeight() or 0) - y - 36 - 24 - 54
-  local lines = math.floor(room / 16)
-  local trackShown = ch ~= nil and lines >= 1
-  pf.trackHead:SetShown(trackShown)
-  pf.levelTrack:SetShown(trackShown)
-  if trackShown then
-    pf.trackHead:ClearAllPoints(); pf.trackHead:SetPoint("TOPLEFT", 0, -y)
-    pf.levelTrack:ClearAllPoints(); pf.levelTrack:SetPoint("TOPLEFT", 0, -(y + 24))
-    pf.levelTrack:Set(f, ch.n, math.min(lines, 8))
-  end
   -- The leader too: leaving hands the fellowship over. Not while watching an alt's fellowship (Fellowship/Watch.lua).
   pf.leave:SetShown(not ctx.watching)
   pf.photo:SetShown(not ctx.watching)

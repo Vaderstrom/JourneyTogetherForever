@@ -29,7 +29,12 @@ function P.Can(f, who, action, target)
   if action == "lead" or action == "disband" or action == "leave" then leader = f.leader == who end
   if action == "roles" or action == "away" then return P.Rank(f, target) ~= nil and (target == who or leader) end
   if action == "swap" then return true end
-  if action == "friend" then return target == who and not leader and not (f.falls and ns.Challenges:Fallen(f, who)) end
+  -- A Friend of the fellowship: yourself, or anyone by the Leader (the owner, 10 Nov 2026); never the Leader, never a
+  -- Fallen one. (An older addon refuses the Leader's change and takes it with the next copy it asks for.)
+  if action == "friend" then
+    return P.Rank(f, target) ~= nil and target ~= f.leader and (target == who or leader)
+      and not (f.falls and ns.Challenges:Fallen(f, target))
+  end
   if action == "leave" then return not leader end
   if action == "remove" then return leader and P.Rank(f, target) == "member" end
   if action == "lead" then return leader and target ~= who and P.Rank(f, target) ~= nil end

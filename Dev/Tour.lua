@@ -199,27 +199,27 @@ prep(function()
   for _, n in ipairs(PRETEND) do dev("hero " .. n .. " level 17") end
   dev("pace 1800"); dev("level 18")
 end, 0.5)
-shot("overview-ready", "Overview (ready)", "The chapter's banner across the sheet, its name in gold Morpheus whole; along its dark foot, in light words, Where we stand (U158): the level track with a class face on each marker (a small badge where several share a level), one line, Who stands where, the room; Focus now on its dungeon's picture: a gold headline, why in light words, one larger button, all readable; Since last time on the Chronicle's notice board and Coming up on the road ahead, the three cards alike, their headings light with a gold rule, Coming up's later dungeon in its small gold frame; all in view, nothing to scroll (U139, U148, U149, U151, U152, U155)", function() page("overview") end)
+shot("overview-ready", "Overview (ready)", "The chapter's banner across the sheet, its name in gold Morpheus whole; along its dark foot, in light words, Where we stand (U158): the level track with a class face on each marker (a small badge where several share a level), the red stop tick where to stop questing when the room is known, with room to spare too (U179), one line, Who stands where, the room; Focus now on its dungeon's picture: a gold headline, why in light words, one larger button, all readable; Since last time on the Chronicle's notice board and Coming up on the road ahead, the three cards alike, their headings light with a gold rule, Coming up's later dungeon in its small gold frame; all in view, nothing to scroll (U139, U148, U149, U151, U152, U155)", function() page("overview") end)
 shot("overview-catchup", "Overview (catch-up)", "You below the floor: Focus now says Reach level 15, how far and about how long at your pace; the line under the track says you are below the floor", function()
   dev("level 13"); page("overview")
 end)
-shot("chapter-waiting", "Chapter (waiting for the floor)", "The stage track; the waiting box with who is below the floor and how far; the dungeons dimmed below", function()
+shot("chapter-waiting", "Chapter (waiting for the floor)", "The stage track; the waiting box with who is below the floor and how far; the dungeons dimmed below, without a button, each saying what to get ready meanwhile (\"1 chain to start, 3 quests to pick up.\"), not when it opens", function()
   page("chapter"); top(pf("chapter").lscroll)
 end)
 shot("overview-behind", "Overview (someone behind)", "Focus now: Help Corwin to the floor, with Invite to group; the line under the track names him", function()
   dev("level 19"); dev("hero Corwin level 12"); page("overview")
 end)
-shot("overview-since", "Overview: Since last time", "On the Chronicle's notice board in light words: Elyra and Brannic levelled, then the Chronicle's newest lines, each with its own icon (a level gained, who joined, a Gathering...); how long ago at the right; its link opens the Chronicle (U139, U151, U155)", function()
+shot("overview-since", "Overview: Since last time", "On the Chronicle's notice board in light words: Elyra and Brannic levelled, on one line with the level's icon (U169), the only news since the book was marked just before; how long ago at the right; its link opens the Chronicle (U139, U151, U155). (More lines, each whole and the rest counted in the link: the Overview shots before it.)", function()
   ns.Since:Mark(); dev("hero Elyra level 19"); dev("hero Brannic level 20"); page("overview")
 end)
 -- What's New (the check of 1 Nov 2026, 14:32): once after an update, over the book.
-shot("news", "What's New", "Over the book on parchment in its frame: What's New in gold, the big news (Each dungeon's page, the Deadmines) in a round picture inside the gold ring, two picture cards (Room for the quests, Recommended next) with loading screens, Continue", function()
+shot("news", "What's New", "Over the book on parchment in its frame: What's New in gold, the big news (Where to stop questing, Shadowfang Keep) in a round picture inside the gold ring, two picture cards (Where to pick up quests, the Deadmines; Share at the entrance, Wailing Caverns) with loading screens, all words whole, Continue", function()
   local keep = ns.db.newsSeen
   ns.News:Show()
   ns.db.newsSeen = keep
 end)
 prep(function() hideOverlays() end)
-shot("chapter", "Chapter", "The stage track, the banner, your To do: the floor, then every dungeon as a row with what you need under it (Find group or Get ready and ⋯ at the right; a click opens its page), For later dungeons on a gold tint, If you like (U140); the level track, where the Adventurers stand, the room", function()
+shot("chapter", "Chapter", "The stage track, the banner, your To do: the floor, then every dungeon as a row with what you need under it, whole on one line (its short form, \"Nothing to get first.\", where the long one does not fit) (Find group or Get ready and ⋯ at the right; a click opens its page), For later dungeons on a gold tint, each with its next step and no countdown (\"Testing the Wells: open now.\" or \"Murloc Gills, step 2 of 10.\", U172), If you like (U140); the level track, where the Adventurers stand (no line for an empty group, U187), the room", function()
   dev("hero Corwin level 17"); page("chapter"); top(pf("chapter").lscroll)
 end)
 -- M25: everyone at the floor and online: Play now's pick is Focus now's (U139).
@@ -261,10 +261,32 @@ prep(function()
   for _, n in ipairs(PRETEND) do dev("group " .. n) end
   dev("kill dm 2")
 end, 0.5)
-shot("chapter-partial", "Chapter (a dungeon partly done)", "The Deadmines' row after two kills: how many bosses (the clears table shows only whole clears)", function()
+shot("chapter-partial", "Chapter (a dungeon partly done)", "The Deadmines' row after two kills, hovered: its tooltip says how many bosses are down so far (the row and the clears table show only whole clears) and who is ready in one line, \"0 of 4 ready\" (U186)", function()
   page("chapter"); top(pf("chapter").lscroll)
+  -- (The check of 11 Nov 2026, 23:49: the shot showed the row alone; the bosses are in its tooltip since U140.)
+  -- (The Deadmines' row, else the first dungeon's: a Horde chapter may not have it.)
+  local hover
+  for _, r in ipairs(pf("chapter").rows.items) do
+    if r:IsShown() and r.key and (r.key == "dm" or not hover) then hover = r end
+  end
+  if hover then hover:GetScript("OnEnter")(hover) end
 end)
-shot("chronicle", "Chronicle (all)", "Runs with counted / not counted; chapters unlocked in a row as one line (U15); the number tiles, the journey's dungeons so far", function() chronicle("all") end)
+-- The owner, 11 Nov 2026: a dungeon you cleared while the clear rule waits for the others (put back after the shot).
+local youCleared
+shot("chapter-you-cleared", "Chapter (a dungeon you cleared)", "Every Adventurer must clear: the first dungeon's row says \"You cleared it. Still needed by ...\" (or \"You cleared it. 3 more must clear it.\" where the names do not fit) with Find group, not Get ready; its mark still open; Recommended next on the next mandatory dungeon; your mark in the clears table", function()
+  if GameTooltip then GameTooltip:Hide() end
+  local f, J = cur(), ns.Journey
+  local x = J:ChapterList(f, J:CurrentIndex(f))[1]
+  youCleared = x and { f = f, key = x.key, runs = f.runs[x.key], mode = f.rules.clearMode }
+  if x then f.rules.clearMode, f.runs[x.key] = "all", { [ns.Me()] = time() } end
+  local p = pf("chapter"); p.sel = nil; page("chapter"); W():Refresh(); top(p.lscroll)
+end)
+prep(function()
+  local s = youCleared
+  if s then s.f.runs[s.key], s.f.rules.clearMode = s.runs, s.mode end
+  W():Refresh()
+end)
+shot("chronicle", "Chronicle (all)", "Runs with counted / not counted; chapters unlocked in a row as one line (U15); the number tiles, then the tallies: no dungeon list (U170)", function() chronicle("all") end)
 shot("chronicle-runs", "Chronicle (runs filter)", "Only runs", function()
   local p = pf("chronicle"); p.filter = "run"; W():Refresh()
 end)
@@ -359,17 +381,20 @@ prep(function()
     d = { 7848 }, ln = {}, t = time() })
 end, 0.5)
 -- The dungeons new in WoW Forever (the owner, 7 Nov 2026): City of Dalaran has quests for both sides.
-shot("quests-dungeons-new", "Dungeon page (a dungeon new in WoW Forever)", "City of Dalaran's page: no story of ours yet (WoW Forever's own), its quests for your side under 1. Prequest chains (An Alarming Request, or Blood in the Streets for the Horde) and 2. Pick up before you go, each with its level and status icon", function()
+shot("quests-dungeons-new", "Dungeon page (a dungeon new in WoW Forever)", "City of Dalaran's page: no story of ours yet (WoW Forever's own), its quests for your side under 1. Prequest chains (Heart of Disruption and Starving Arcane, one row after An Alarming Request, U171) and 2. Pick up before you go, each a short row: its status icon and word, its level, \"One chain, 2 quests\" with no step count for a chain of one quest, two lines each with a + beside the pin (U185)", function()
   page("dungeons") -- opened from the Dungeons page, so the sidebar marks Dungeons (the check of 10 Nov 2026 showed Quests)
   ns.DungeonPage:Open("dal")
 end)
 -- U123: a prequest chain, each step with where it starts.
-shot("dungeon-page-chain", "Dungeon page (a prequest chain)", "The Deadmines (Wailing Caverns for the Horde) under 1. Prequest chains: Destruction in Deadmines' ten steps from Alba Fairmoon in Westfall to the explosives found in the run (Leaders of the Fang's five, from Tonga Runetotem in the Barrens), each step with its level where known, where it starts and your status", function()
+shot("dungeon-page-chain", "Dungeon page (a prequest chain)", "The Deadmines (Wailing Caverns for the Horde) under 1. Prequest chains: Destruction in Deadmines opened: where it starts and its ten steps from Alba Fairmoon in Westfall to the explosives found in the run (Leaders of the Fang's five, from Tonga Runetotem in the Barrens), each step with its level where known, where it starts and your status", function()
   local horde = UnitFactionGroup("player") == "Horde"
   page("dungeons") -- opened from the Dungeons page, as a player would (the brand picture of 10 Nov 2026 showed Chronicle)
   ns.DungeonPage:Open(horde and "wc" or "dm")
-  -- To the quest itself: its steps are below the page's fold (the check of 8 Nov 2026 showed none of them).
+  -- To the quest itself: its steps are below the page's fold (the check of 8 Nov 2026 showed none of them), and
+  -- opened, as a row shows only how far until clicked (U185; the check of 12 Nov 2026 showed it folded).
   local p, want = pf("dungeon"), horde and 914 or 92819
+  p.opened[want] = true
+  ns.Window:Refresh()
   for _, row in ipairs(p.quests.items) do
     local _, _, _, _, y = row:GetPoint(1)
     if row.id == want and row:IsShown() and y and p.rscroll:Reveal(-y, row:GetHeight()) then return end
@@ -385,10 +410,13 @@ shot("dungeons-open", "Dungeons (Only open ones)", "Settings → Dungeons and ra
 end)
 prep(function() ns.Settings:Set("dungeonsShow", "all") end)
 -- The Dungeon page (U96-U100).
-shot("dungeon-page", "Dungeon page", "The Deadmines (Ragefire Chasm for the Horde), on one flat sheet: no spine under the title across both halves (U111). Left: its picture, our story with Read more, the bosses with how many Adventurers were there (no \"Not yet\" beside each before any fell, U161), who cleared it; Find group at the foot. Right: the room as the answer (U145), Who is ready folded to a ring for each Adventurer, \"2 of 4 ready\" and Show who (U126), then the quests under 1. Prequest chains, 2. Pick up before you go, 3. Starts inside, each title over one line: where it starts, its level, your status (U160: no map numbers; they are on the pin's tooltip), a long chain folded to its next step (U127)", function()
+shot("dungeon-page", "Dungeon page", "The Deadmines (Ragefire Chasm for the Horde), on one flat sheet: no spine under the title across both halves (U111). Left: its picture, our story with Read more, the bosses with how many Adventurers were there (no \"Not yet\" beside each before any fell, U161), who cleared it; Find group and Waypoint (to the entrance) at the foot. Right: the room as the answer (U145), Who is ready folded to a ring for each Adventurer, \"2 of 4 ready\" and Show who (U126); when every prequest is done, a line above the rings: \"Everyone has done the prequests. Only quests to pick up are left: 2 can be shared in the group.\" (U177), then the quests under 1. Prequest chains, 2. Pick up before you go, 3. Starts inside, each a short row (U185): your status first in words (\"Not yet\"; its icon once, before the name), its level with the level it opens at (\"Level 17, open from 14\"; under Starts inside its level alone, \"Level 22\"), how far along a chain (\"Step 1 of 10\"), two lines each with a + beside the pin to open the rest, no link line under them (the map numbers only on the pin's tooltip, U160); the Alliance's Red Silk Bandanas and The Defias Brotherhood one row, \"One chain, 2 quests\" (U171)", function()
   local p = pf("dungeon")
   if p then p.whoOpen = nil end
   ns.DungeonPage:Open(UnitFactionGroup("player") == "Horde" and "rfc" or "dm")
+end)
+shot("dungeon-page-forever", "Dungeon page (one of WoW Forever's own)", "The Drowned City: its picture and our own story above Read more (\"Off the coast of Stranglethorn Vale, west of Grom'gol, ...\"; U182), whole and readable; with Spoken running and no story of its own there, no Read more at all (not \"install Spoken\"); with neither addon, the line to install one; no Cleared by, as nobody can have cleared it yet (Chapter VII); its two chains short rows, \"Step 1 of 6\" each (U185)", function()
+  ns.DungeonPage:Open("drown")
 end)
 shot("dungeon-page-who", "Dungeon page (another Adventurer's quests)", "Show who opened: a row each, saying Ready or what is still missing, \"Needs 1 prequest, 2 quests to pick up\" (U163); Brannic's row chosen: the quests with Brannic's status, \"Showing Brannic's quests\"; Remind on the rows of Adventurers online and not ready (U98, U100, U126)", function()
   ns.DungeonPage:Open(UnitFactionGroup("player") == "Horde" and "rfc" or "dm")
@@ -408,13 +436,13 @@ prep(function()
   R.realChapter = R.realChapter or R.Chapter
   R.Chapter = function() return fake end
 end)
-shot("overview-room", "Overview (room for the dungeon quests)", "On Where we stand along the banner's dark foot, under its line, the answer in red: where to stop questing as level and percent (U85, U145); the stop point as a red tick on the level track (U82); the figures (the level the quests take you to, the cap level left for the mobs, the quests whose XP is not known yet) only on hover", function()
+shot("overview-room", "Overview (room for the dungeon quests)", "On Where we stand along the banner's dark foot, under its line, the answer in red: \"Stop questing at 26.1 to leave room for the dungeon quests.\", or with room to spare \"You have room for the dungeon quests: stop questing at ...\" (U85, U145, U174); the stop point as a red tick on the level track (U82); the figures (the level the quests take you to, the cap level left for the mobs, the quests whose XP is not known yet) only on hover", function()
   page("overview")
 end)
 shot("chapter-room", "Chapter (room for the dungeon quests)", "Under where the Adventurers stand: the chapter's total and, in red, where to stop questing as level and percent (U78, U85); the stop point as a red tick \"stop 26 (60%)\" on the level track (U82)", function()
   local p = pf("chapter"); p.sel = nil; page("chapter"); W():Refresh(); top(p.rscroll)
 end)
-shot("dungeon-page-room", "Dungeon page (the room, Show everyone)", "A dungeon of your chapter: the room as the answer at the top of the right page and Show everyone ticked with each Adventurer's line (U78, U145)", function()
+shot("dungeon-page-room", "Dungeon page (the room, Show everyone)", "A dungeon of your chapter: the room as the answer at the top of the right page (\"Stop questing at ... to leave room for the dungeon quests.\" or \"You have room for this dungeon's quests.\", U174) and Show everyone ticked with each Adventurer's line (U78, U145)", function()
   local f, J = cur(), ns.Journey
   local key
   for _, x in ipairs(J:ChapterList(f, J:CurrentIndex(f))) do if not (x.early or key) then key = x.key end end
@@ -463,7 +491,7 @@ end)
 shot("quests-attune-ony", "Quests (Onyxia's steps)", "A long attunement chain", function()
   pf("quests").attSel = attRow("ony"); W():Refresh()
 end)
-shot("heroes", "Adventurers", "Banner, number tiles (a gold number over an icon), the level track (each marker a class icon; Adventurers at one level: one marker with a small badge saying how many), every Adventurer with a 3D head (yours) or class crest, status and XP", function()
+shot("heroes", "Adventurers", "Banner, number tiles (a gold number over an icon), no level track (its home is the Chapter page, U168), every Adventurer with a 3D head (yours) or class crest, status and XP", function()
   ns.QuestLists.viewLevel = nil
   local p = pf("quests"); p.attSel = nil; p.tabs.buttons[1]:Click(); page("heroes")
 end)
@@ -520,6 +548,14 @@ prep(function() ns.char.inboxSeen = nil; W():HidePanels() end)
 shot("manage", "Manage: Adventurers", "Two tabs; the bar to the Rules page at the top right (U143); every Adventurer with a menu, invites", function()
   page("manage")
 end)
+-- The Leader makes a member a Friend of the fellowship and back (the owner, 10 Nov 2026): the row's menu, opened.
+shot("manage-friend-menu", "Manage: a member's menu", "Elyra's ⋯ menu open: Mark away, Make a Friend of the fellowship, Make leader, Remove in red; the menu whole, over the page", function()
+  page("manage")
+  for _, r in ipairs(W().pageFrames.manage.rows.items) do
+    if r:IsShown() and r.who == full("Elyra") then r.menu:Click() end
+  end
+end)
+prep(function() if ns.UI.menu then ns.UI.menu:Hide() end end)
 -- U51: an invite to someone offline, sent an hour ago (written straight into this copy: no whisper goes out).
 shot("manage-invite-offline", "Manage: an invite waiting for someone offline", "Jtfnobodyhere: offline: it reaches them when they log in · 23 hours left, a thin bar under it nearly full (U57); the Inbox says: The invite to Jtfnobodyhere is still open: 23 hours left (U144)", function()
   local name = full("Jtfnobodyhere")
@@ -901,6 +937,11 @@ shot("toast-dready", "Toast: ready for a dungeon", "\"Ready for The Deadmines\":
   toast("dready", L.T_READY, function() return L.T_READY_TEXT:format(ns.Dungeon("dm")[2]) end, { dungeon = "dm" }), { toast = true })
 shot("toast-dallready", "Toast: everyone is ready", "\"Everyone is ready for The Deadmines\": once per dungeon when every counted Adventurer is (U99)",
   toast("dallready", L.T_ALL_READY, function() return L.T_ALL_READY_TEXT:format(ns.Dungeon("dm")[2]) end, { dungeon = "dm" }), { toast = true })
+shot("toast-dshare", "Toast: a quest to share", "In a dungeon, \"Share Collecting Memories: Pata needs it.\" with the Deadmines' picture, Share quest and Not now; it stays until answered, then the next quest (U178)", function()
+  ns.Toasts:StopMove(); W():Close()
+  ns.Toasts:Push("dshare", L.T_SHARE, L.T_SHARE_1:format("Collecting Memories", "Pata"), nil,
+    { dungeon = "dm", actions = { { L.SHARE_QUEST, function() end }, { L.NOT_NOW, function() end } } })
+end, { toast = true })
 shot("toast-invite", "Toast: an invitation", "\"Lea invites you to Band.\" with Accept and Decline; it stays until answered (U109)", function()
   ns.Toasts:StopMove(); W():Close()
   ns.Toasts:Push("invite", L.T_INVITE, L.INBOX_INVITE:format("Lea", "Band"), nil,

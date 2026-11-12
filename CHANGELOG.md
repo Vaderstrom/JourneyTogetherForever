@@ -1,5 +1,42 @@
 # Changelog
 
+## 1.7.0 (12 November 2026)
+- Chapter page: the Dungeon clears table lists the Adventurers only, since a Friend of the fellowship's clears are never needed. The Dungeon page's Cleared by, the Raids page's count and the Discord board's count leave Friends out too, and with "One run is enough" a run only a Friend was in no longer clears a dungeon.
+- Chapter page: Recommended next moves on once you have cleared that dungeon, also while the fellowship still waits for others to clear it.
+- To do: a dungeon you have cleared while the fellowship waits for others says so, "You cleared it. Still needed by Pepsi and Duranír.", with Find group to help them instead of Get ready (where the names do not fit, how many: "You cleared it. 3 more must clear it."). Focus now picks a dungeon you still need first.
+- Chapter page: while your chapter waits for the floor, its dungeons say what to get ready meanwhile ("1 chain to start, 3 quests to pick up.") instead of repeating "Open when everyone is level 21." under the box that already says it.
+- Dungeon page: a dungeon that is not open yet (a later chapter's) no longer ends with "Cleared by: Nobody has cleared it yet."
+- Dungeon quests the game has renamed show the game's name: The Great Ezra Grimm, and Pip Quickwit, At Your Service!
+- Dungeon quests: WoW Forever's quest XP (about twice Classic's), so where to stop questing fits what the game pays. More quests for Alcaz Prison, Blackmaw Hold, Blackrock Depths, Maraudon (with its unlock chain in Shen'dralas) and Razorfen Downs, and Uldaman lists the last quest of its necklace and Platinum Discs chains.
+- What Adventurers found in play: 9 more quest chain links.
+- Dungeon page: shorter quest rows. Each says your status, its level and how far along its chain ("Not yet · Level 18, open from 9 · Step 1 of 10"); a click on the row opens where it starts and the chain's steps. Two quests from one giver after one chain say the giver once. A quest that starts inside says its level alone, without when it opens.
+- Chapter page: a dungeon row's tooltip says how many are ready for it, "0 of 4 ready", instead of listing everyone's quests; each one's quests are on the Dungeon page.
+- Chapter page: Where the Adventurers stand no longer ends with "Nobody below the floor, at the cap, over the cap or away."
+- Prequests for later dungeons (For later dungeons, Coming up, Focus now, the tracker and the toast) are chains only, shown once you reach the step's level, with no countdown. A chain you have started comes first with its step ("The Defias Brotherhood, step 3 of 6."). Quests you only pick up wait for their dungeon's own chapter: Deviate Hides no longer says "open now" two chapters before Wailing Caverns.
+- Dungeon page: each quest also says the level it opens at: "Level 17, open from 14".
+- Dungeon page: two quests after the same chain are one row (Red Silk Bandanas and The Defias Brotherhood), with a line for each quest and the steps once. They count as one chain in Who is ready and the To do.
+- Dungeon page: Waypoint is back beside Find group, to the dungeon's entrance, for every dungeon, WoW Forever's own too.
+- Overview: the level track always marks where to stop questing so the dungeon quests do not take you over the cap, not only in the last half level before it.
+- The room says what it is for: "Stop questing at 26.1 to leave room for the dungeon quests."
+- Manage: the Leader can make a member a Friend of the fellowship, and an Adventurer again, from the member's ⋯ menu.
+- Adventurers page: the level track is gone; it is on the Chapter page, and each card has the level.
+- Overview: Since last time puts the level-ups on one line: "New levels: Corwin 18 · Elyra 22".
+- Chronicle: the list of the journey's dungeons is gone; the Chapter page and the Dungeons page have the clears.
+- To do: a dungeon whose quests all start inside says so again: "Nothing to get first: its 4 quests start inside."
+- Dungeons page: opened during combat, a chapter's heading no longer shows with no pictures under it.
+- Who is ready: a quest to pick up that can be shared counts as ready when another Adventurer has it in their log: "Pata shares 2 quests at the entrance." (on the row and in the To do) When every prequest is done, a line above the rings says so: "Everyone has done the prequests. Only quests to pick up are left: 2 can be shared in the group."
+- In a dungeon: a toast reminds you to share a quest to pick up that someone in your group lacks, one quest at a time, with Share quest and Not now. Entering again reminds again until everyone has every quest. It has its own line under Dungeons in Settings.
+- Dungeon page and Raids page: the story button plays Lore Forever's narration of the place too, where it has one (Hall of Thanes, The Deadmines and the other low dungeons); a second click stops it.
+- Dungeon page: Excavation Site, The Drowned City, Alcaz Prison and Blackmaw Hold have a short story of their own.
+- The key binding has its own section in the game's Options → Keybindings, Journey Together Forever (it stood under AddOns with no name over it), and Shift+J opens the book by default when the game has nothing on that key.
+- Chapter page: a dungeon's line too long for its row takes a short form ("Nothing to get first.") instead of ending in "...".
+- Overview: Since last time shows each line whole, as many as fit above the link; the rest are counted in "2 more in the Chronicle".
+- Dungeon page: with Spoken running, Read more shows only where Spoken or Lore Forever has the place's story, and no longer says to install Spoken (The Drowned City and WoW Forever's other new places).
+- Dungeon page: each quest's status comes first on the line under its name ("Not yet · Scout Riell, Westfall · ..."), so "Not yet" no longer breaks over two lines; its icon shows once, before the name.
+- What's New shows once after this update: where to stop questing, where to pick up quests, and sharing quests at the entrance.
+- Hovering a red button (Find group, Group photo) no longer shows a Lua error when the game refuses its tooltip text; the tooltip is skipped and the error kept in the addon's log.
+- What Adventurers found in play: 2 more quest chain links (A Free Lunch leads to Visit the Herbalist, then Delivering Daffodils).
+
 ## 1.6.0 (10 November 2026)
 - Dungeon page: Pin on map sets a waypoint to where you pick the quest up, with Questie too (it only opened the map); on a prequest chain, to where its next step starts.
 - Dungeon page: the Waypoint to the entrance and the Dungeon Journal button are gone; Pin on map is the waypoint that matters. The Raids page's cards lose the Dungeon Journal button too.

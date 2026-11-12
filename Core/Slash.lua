@@ -18,6 +18,24 @@ SLASH_JOURNEYTOGETHERFOREVER1 = "/jtf"
 -- The key binding's texts in Key Bindings (Bindings.xml, U107): the game reads them as globals by these names.
 BINDING_HEADER_JOURNEYTOGETHERFOREVER = L.BIND_HEADER
 BINDING_NAME_JOURNEYTOGETHERFOREVER_OPEN = L.BIND_OPEN
+
+-- Shift+J by default (the owner, 10 Nov 2026), once per set of key bindings (the account's, or this character's when it
+-- keeps its own) and only while the game has nothing on it: a key the player gave the book, or took from it, stays
+-- theirs. A few seconds after login, when the game's own bindings are surely loaded; never in combat (tried again at
+-- the next login).
+ns.DEFAULT_KEY = "SHIFT-J"
+function ns.GiveDefaultKey()
+  if not (SetBinding and GetCurrentBindingSet) or InCombatLockdown() then return false end
+  local set = GetCurrentBindingSet()
+  local db = set == 2 and ns.char or ns.db
+  if db.keyGiven then return false end
+  db.keyGiven = true
+  if GetBindingKey("JOURNEYTOGETHERFOREVER_OPEN") or (GetBindingAction(ns.DEFAULT_KEY) or "") ~= "" then return false end
+  if not SetBinding(ns.DEFAULT_KEY, "JOURNEYTOGETHERFOREVER_OPEN") then return false end
+  SaveBindings(set)
+  return true
+end
+ns:On("LOGIN", function() C_Timer.After(5, ns.GiveDefaultKey) end)
 SlashCmdList.JOURNEYTOGETHERFOREVER = function(msg)
   local cmd, rest = (msg or ""):match("^%s*(%S*)%s*(.-)%s*$")
   cmd = cmd:lower()

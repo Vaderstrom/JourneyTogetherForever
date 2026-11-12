@@ -15,11 +15,11 @@ ns.News = N
 -- pic (U44): the item's own picture, a file in Media: NewsBig (512 x 512), NewsA and NewsB (1024 x 512), made in the
 -- Gemini app from art/prompts/news-art.json and converted by tools/convert-art.ps1 -Only news. Without the file the
 -- dungeon's loading screen shows, as before.
-N.ID = "1.2"
-N.BIG = { art = "dm", title = "NEWS_BIG_TITLE", text = "NEWS_BIG_TEXT" }
+N.ID = "1.7" -- (the owner picked the three, 11 Nov 2026)
+N.BIG = { art = "sfk", title = "NEWS_BIG_TITLE", text = "NEWS_BIG_TEXT" }
 N.CARDS = {
-  { art = "wc", title = "NEWS_A_TITLE", text = "NEWS_A_TEXT" },
-  { art = "bfd", title = "NEWS_B_TITLE", text = "NEWS_B_TEXT" },
+  { art = "dm", title = "NEWS_A_TITLE", text = "NEWS_A_TEXT" },
+  { art = "wc", title = "NEWS_B_TITLE", text = "NEWS_B_TEXT" },
 }
 
 local BOX_W, BOX_H = 800, 510

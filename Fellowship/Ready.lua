@@ -27,6 +27,17 @@ function R:Rows(f, key)
   return out
 end
 
+-- How many of the rows are ready, as Who is ready says it ("2 of 4 ready"); nil when nobody has anything to get ready.
+-- The Dungeon page and the Chapter page's dungeon row tooltip (U186).
+function R.Tally(rows)
+  local any, ready = false, 0
+  for _, x in ipairs(rows) do
+    if x.r then any = true end
+    if x.r and x.r.ready then ready = ready + 1 end
+  end
+  return any and ready or nil
+end
+
 -- How far: the share of what is ready (0 to 1), and how many quests are still to pick up or start.
 function R.Share(r)
   if not r then return 0, 0 end
@@ -44,6 +55,40 @@ function R.Line(name, r)
   if pick > 0 then need[#need + 1] = pick == 1 and L.RD_NEED_PICK_1 or L.RD_NEED_PICK_N:format(pick) end
   if #need == 0 then return who .. L.RD_READY:format("|TInterface\\RaidFrame\\ReadyCheck-Ready:12:12|t") end
   return who .. L.RD_NEEDS:format(table.concat(need, ", "))
+end
+
+-- Who shares your quests to pick up at the entrance (U177): "Pata shares 2 quests at the entrance."; nil when nobody.
+function R.Shares(r)
+  if not (r and r.shares and #r.shares > 0) then return nil end
+  local seen, names = {}, {}
+  for _, s in ipairs(r.shares) do
+    if not seen[s[2]] then seen[s[2]] = true; names[#names + 1] = ns.Short(s[2]) end
+  end
+  local n = #r.shares
+  if #names > 1 then return L.RD_SHARE_N:format(table.concat(names, L.AND), n) end
+  return n == 1 and L.RD_SHARES_1:format(names[1]) or L.RD_SHARES_N:format(names[1], n)
+end
+
+-- The line above the rings (U177, the owner, 10 Nov 2026): every prequest chain done and only quests to pick up left
+-- for someone, "Everyone has done the prequests. Only quests to pick up are left: 2 can be shared in the group." (the
+-- distinct quests someone shares). nil otherwise, or with one Adventurer counted.
+function R.PickLine(rows)
+  if #rows < 2 then return nil end
+  local chains, left, shared, n = false, false, {}, 0
+  for _, x in ipairs(rows) do
+    local r = x.r
+    if r then
+      if r.early < r.earlyOf then return nil end
+      chains = chains or r.earlyOf > 0
+      left = left or r.pick - #r.shares < r.pickOf
+      for _, s in ipairs(r.shares) do
+        if not shared[s[1]] then shared[s[1]] = true; n = n + 1 end
+      end
+    end
+  end
+  if not left then return nil end
+  local text = n > 0 and L.RD_PICK_SHARED:format(n) or L.RD_PICK_LEFT
+  return chains and L.RD_PREQ_DONE .. " " .. text or text
 end
 
 -- Every Adventurer counted for the chapter is ready (two at least: alone, your own toast says it).
@@ -190,3 +235,100 @@ ns:On("SETTING", function(key)
   if key == "toasts" and F:Current() then ns.Hero:Soon("remind", 3, function() ns.Hero:SendState() end) end
 end)
 ns:On("LOGIN", function() C_Timer.After(8, function() R:Check() end) end)
+
+---------------------------------------------------------------------------
+-- Share reminder (U178, the owner, 10 Nov 2026: "a toast reminder to share those quests when you enter the dungeon
+-- with the members missing"). In a dungeon, each Adventurer who carries a shareable quest to pick up that a member of
+-- the group lacks gets a toast for it, one quest at a time (a player answers one share at a time); Share quest shares
+-- it, as the Quests page does. Every carrier, again on each entering and for each member who comes near, until
+-- everyone has every quest. Read from the game (the group, who is on a quest, who is near) and the shared logs (who
+-- has done it, their level): no message is needed, which the instance would hold anyway.
+---------------------------------------------------------------------------
+R.SHARE_EVERY = 15
+
+local known = ns.Plain -- (a value the game may hide in an instance: nil when it is secret)
+
+-- A member of the group lacks the quest: not on it (neither their shared log, which the instance holds back, nor the
+-- game says so), not done, at or over the level it opens at, and near enough to take it (unknown counts as near).
+local function lacks(f, g, id, st)
+  if not f.members[g.name] then return false end
+  -- The level from the game when it tells: the shared one waits until they leave (review of 1.7.0: 14 on a pull).
+  local seen = g.unit and UnitLevel and known(UnitLevel(g.unit))
+  local lvl = (seen and seen > 0) and seen or ns.Hero:Level(f, g.name)
+  if lvl < (st.min or 0) then return false end
+  if ns.QuestLists.StatusOf(ns.Hero:Get(f, g.name) or {}, id) ~= "no" then return false end
+  if g.unit and C_QuestLog.IsUnitOnQuest and known(C_QuestLog.IsUnitOnQuest(g.unit, id)) == true then return false end
+  return not (g.unit and UnitIsVisible and known(UnitIsVisible(g.unit)) == false)
+end
+
+-- What I can share here: { { id, name, who = { members } } }, in the dungeon's order. keys: the dungeons here;
+-- group: { { name, unit } }.
+function R:ToShare(f, keys, group)
+  local QL, out, seen = ns.QuestLists, {}, {}
+  local mine = ns.Quests.last or ns.Quests:MyLog() or {}
+  for _, key in ipairs(keys) do
+    for _, q in ipairs(QL:DungeonQuests(f, key)) do
+      local st = QL:Start(q.id) or {}
+      local push = C_QuestLog.IsPushableQuest and known(C_QuestLog.IsPushableQuest(q.id))
+      if not seen[q.id] and st.share and QL.GroupOf(st) == "pick" and mine[q.id] and push ~= false then
+        seen[q.id] = true
+        local who = {}
+        for _, g in ipairs(group) do if lacks(f, g, q.id, st) then who[#who + 1] = g.name end end
+        if #who > 0 then out[#out + 1] = { id = q.id, name = q.name, who = who } end
+      end
+    end
+  end
+  return out
+end
+
+-- The listed dungeon you are in (its keys), or nil.
+local function dungeonHere()
+  local _, kind = IsInInstance()
+  if kind ~= "party" then return nil end
+  local iname, _, _, _, _, _, _, instID = GetInstanceInfo()
+  local keys = ns.Clears:KeysHere(instID, iname)
+  return #keys > 0 and keys or nil
+end
+
+function R:ShareStop()
+  if self.ticker then self.ticker:Cancel(); self.ticker = nil end
+end
+
+-- One toast for the first quest someone near still lacks that you were not reminded of for them since you entered.
+-- Never in combat, and never over a toast that waits for an answer (an invitation, or the last of these).
+function R:ShareCheck()
+  local f, keys = F:Current(), dungeonHere()
+  if not keys then return self:ShareStop() end
+  if not f or f.sample or not f.members[ns.Me()] or ns.Combat:InCombat() then return end
+  if ns.Toasts:Waiting() then return end
+  local group = {}
+  for i = 1, 4 do
+    local name = ns.UnitFull("party" .. i)
+    if name then group[#group + 1] = { name = name, unit = "party" .. i } end
+  end
+  self.told = self.told or {}
+  for _, s in ipairs(self:ToShare(f, keys, group)) do
+    local new, names = false, {}
+    for k, n in ipairs(s.who) do
+      new = new or not self.told[s.id .. n]
+      self.told[s.id .. n] = true
+      names[k] = ns.Short(n)
+    end
+    if new then
+      local text = (#names == 1 and L.T_SHARE_1 or L.T_SHARE_N):format(s.name, table.concat(names, L.AND))
+      ns:Toast("dshare", L.T_SHARE, text, nil, { dungeon = keys[1], actions = {
+        { L.SHARE_QUEST, function()
+          ns.Quests:Push(s.id)
+          C_Timer.After(3, function() R:ShareCheck() end) -- (the next quest, once this share is answered)
+        end }, { L.NOT_NOW, function() end } } })
+      return
+    end
+  end
+end
+
+-- Each entering of a dungeon starts over: who lacks what is asked again every SHARE_EVERY seconds while you are in it.
+ns:RegisterEvent("PLAYER_ENTERING_WORLD", function()
+  R.told = nil
+  R:ShareStop()
+  if dungeonHere() then R.ticker = C_Timer.NewTicker(R.SHARE_EVERY, function() R:ShareCheck() end) end
+end)
