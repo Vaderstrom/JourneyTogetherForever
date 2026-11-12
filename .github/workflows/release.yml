@@ -11,7 +11,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       CF_API_KEY: ${{ secrets.CF_API_KEY }}
-      GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}
     # Actions are pinned to exact commits: the packager sees the CurseForge key and can write to the repository,
     # so a later change to an action only runs here once the pin is moved by hand.
     steps:
@@ -20,18 +19,29 @@ jobs:
           fetch-depth: 0
       # CurseForge shows the whole CHANGELOG.md on each file; each GitHub release shows only its own version's section
       # ("## 0.10.0 beta (...)" for v0.10.0-beta), so GitHub's releases together hold the same history (the owner,
-      # 1 Nov 2026). The packager writes the whole file to both; the last step sets GitHub's to the section. The run
-      # stops when there is no section for this version, or when CHANGELOG.md grows past what a GitHub release can
-      # hold for that moment (125,000 characters).
+      # 1 Nov 2026). The packager uploads to CurseForge only, with the whole file; the last step makes the GitHub
+      # release with the section and the packager's files, so the whole file never has to fit in a GitHub release
+      # (125,000 characters; 1.7.0's run stopped there, 12 Nov 2026). The run stops when there is no section for this
+      # version.
       - name: Release notes
         run: |
           version="${GITHUB_REF_NAME#v}"
           version="${version/-/ }"
           awk -v h="## $version " 'index($0, h) == 1 { on = 1; print; next } on && /^## / { exit } on' CHANGELOG.md > "$RUNNER_TEMP/notes.md"
           if [ ! -s "$RUNNER_TEMP/notes.md" ]; then echo "CHANGELOG.md has no section \"## $version\""; exit 1; fi
-          if [ "$(wc -c < CHANGELOG.md)" -gt 125000 ]; then echo "CHANGELOG.md is too long for a GitHub release"; exit 1; fi
       - uses: BigWigsMods/packager@e50a250f8705041e40f2fa1ddcb280a686d65aa0 # v2.6.1
-      - name: GitHub release notes
+      - name: GitHub release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --notes-file "$RUNNER_TEMP/notes.md"
+        run: |
+          # release.json, as the packager writes it when it makes the release itself: addon managers read it.
+          zip=$(ls .release/*.zip)
+          interface=$(sed -n 's/^## Interface: *\([0-9]*\).*/\1/p' JourneyTogetherForever.toc)
+          jq -nc --arg v "$GITHUB_REF_NAME" --arg f "$(basename "$zip")" --argjson i "$interface" \
+            '{releases: [{name: "Journey Together Forever", version: $v, filename: $f, nolib: false,
+              metadata: [{flavor: "forever", interface: $i}]}]}' > .release/release.json
+          files=("$zip" .release/release.json)
+          pre=""
+          if [[ "$GITHUB_REF_NAME" == *-* ]]; then pre="--prerelease"; fi
+          gh release create "$GITHUB_REF_NAME" "${files[@]}" --repo "$GITHUB_REPOSITORY" --title "$GITHUB_REF_NAME" \
+            --notes-file "$RUNNER_TEMP/notes.md" $pre
