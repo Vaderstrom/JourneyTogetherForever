@@ -2,7 +2,6 @@
 
 ## 1.8.0 (14 November 2026)
 - Dungeon quests: Destruction in Deadmines is the quest that starts from the Extra-Destructive Explosives at the end of its chain. Five more quests for Shaper's Terrace, a new first step in the Horde's Blackrock Spire chains, and better spots for some quest givers.
-- What Adventurers found in play: 6 chain links.
 - Dungeons: the quests that come after a prequest chain you have done count as quests to pick up until you have them, on every page. The To do no longer says "Ready: your 6 quests are in your log." while two of them are still at their givers. You first get "Almost ready" ("The prequests for The Deadmines are ready. Pick up 2 quests in Westfall before the run."), then "Ready to go" once they are picked up. Another Adventurer who has one of them in their log can share it at the entrance, as with the other quests to pick up.
 - Dungeons: a quest you cannot take yet at your level counts only once you reach that level, on every page and in the toasts. Razorfen Downs' Bring the Light (from 39) no longer keeps you from being ready at 37, and "Almost ready" no longer asks you to pick it up before you can.
 - Dungeon page: the line above the rings says "Everyone is ready with the prequests.", which is also true when a step done in the run is only in the log.
@@ -19,7 +18,6 @@
 - Dungeon page: a dungeon that is not open yet (a later chapter's) no longer ends with "Cleared by: Nobody has cleared it yet."
 - Dungeon quests the game has renamed show the game's name: The Great Ezra Grimm, and Pip Quickwit, At Your Service!
 - Dungeon quests: WoW Forever's quest XP (about twice Classic's), so where to stop questing fits what the game pays. More quests for Alcaz Prison, Blackmaw Hold, Blackrock Depths, Maraudon (with its unlock chain in Shen'dralas) and Razorfen Downs, and Uldaman lists the last quest of its necklace and Platinum Discs chains.
-- What Adventurers found in play: 9 more quest chain links.
 - Dungeon page: shorter quest rows. Each says your status, its level and how far along its chain ("Not yet · Level 18, open from 9 · Step 1 of 10"); a click on the row opens where it starts and the chain's steps. Two quests from one giver after one chain say the giver once. A quest that starts inside says its level alone, without when it opens.
 - Chapter page: a dungeon row's tooltip says how many are ready for it, "0 of 4 ready", instead of listing everyone's quests; each one's quests are on the Dungeon page.
 - Chapter page: Where the Adventurers stand no longer ends with "Nobody below the floor, at the cap, over the cap or away."
@@ -46,7 +44,6 @@
 - Dungeon page: each quest's status comes first on the line under its name ("Not yet · Scout Riell, Westfall · ..."), so "Not yet" no longer breaks over two lines; its icon shows once, before the name.
 - What's New shows once after this update: where to stop questing, where to pick up quests, and sharing quests at the entrance.
 - Hovering a red button (Find group, Group photo) no longer shows a Lua error when the game refuses its tooltip text; the tooltip is skipped and the error kept in the addon's log.
-- What Adventurers found in play: 2 more quest chain links (A Free Lunch leads to Visit the Herbalist, then Delivering Daffodils).
 
 ## 1.6.0 (10 November 2026)
 - Dungeon page: Pin on map sets a waypoint to where you pick the quest up, with Questie too (it only opened the map); on a prequest chain, to where its next step starts.
@@ -84,7 +81,6 @@
 - What's New: the big news reads "Each dungeon's page".
 - Dungeon quests are built in for every dungeon, WoW Forever's new ones too (Krol'dok Stronghold, Alcaz Prison, Blackmaw Hold, Shaper's Terrace), each with where it starts, its level, its XP and its prequest chain. Everyone in the fellowship sees the same: nothing about dungeon quests is learned in play or read from Questie any more.
 - Who is ready: a step you finish in the dungeon itself (The Drowned City, before A Tale Spun Around the Fire) or one you only need to take (Rig Wars) counts once it is in your log.
-- What Adventurers found in play: 161 quest chain links (the Quest chains tab knows more of them).
 - Dungeons: a new page in the sidebar with every dungeon of the journey, chapter by chapter, as pictures, later chapters too (a chapter not yet revealed shows no name). A gold check marks the ones your fellowship has cleared; click one for its page, and Back returns.
 - Settings: Other addons is now Dungeons and raids. Dungeons page: Show all, or Only open ones (the dungeons the fellowship may run now). Raids page: Only open ones (Raids comes once the journey is complete, as before), or Show all (Raids in the sidebar from the start, to look through).
 - Report a bug: Blizzard's bug in the book's header, left of the ?, says where to report one (GitHub or the CurseForge page) with your version and the game's, the addresses ready to copy.
