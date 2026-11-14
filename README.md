@@ -121,7 +121,7 @@ fellowship).
   first quest opens to you. **Pin on map** sets a waypoint to where a quest
   starts, with Questie too.
 
-![The Deadmines' page: the story, the bosses, Who is ready, and Destruction in Deadmines' ten prequest steps](.github/screenshots/dungeon-page.jpg)
+![The Deadmines' page: the story, the bosses, Who is ready, and Destruction in Deadmines' nine prequest steps](.github/screenshots/dungeon-page.jpg)
 
 #### Nobody left behind
 - **Help runs**: a group with someone below the floor counts as a fellowship run.

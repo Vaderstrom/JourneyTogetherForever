@@ -446,11 +446,10 @@ local function statusText(QL, q, who, me)
   return QL.StatusText(q.status, who ~= me and q.status == "log" and L.DQ_IN_LOG_OF:format(ns.Short(who)) or nil)
 end
 
--- A quest's line, opened: its status first (the answer; its icon is before the name), where it starts (unless said
--- once above it), its level, and who else has it in their log.
-local function questLine(QL, q, who, me, said, inside)
-  local parts = { statusText(QL, q, who, me) }
-  if not said then parts[2] = QL.WhereText(q.start) end
+-- A quest's line, opened: its status first (the answer; its icon is before the name), where it starts, its level, and
+-- who else has it in their log.
+local function questLine(QL, q, who, me, inside)
+  local parts = { statusText(QL, q, who, me), QL.WhereText(q.start) }
   parts[#parts + 1] = levelText(q.start, inside)
   if #q.others > 0 then
     local names = {}
@@ -502,29 +501,18 @@ local function refreshQuests(pf, f, key, r)
       -- (A quest that starts inside has nothing more to open: its heading says where.)
       local canOpen = #all > 0 or not st.inside
       local open = canOpen and pf.opened[q.id]
-      local names = {}
-      for k, x in ipairs(q.quests or { q }) do names[k] = x.name end
-      p.title:SetText(table.concat(names, L.AND))
-      -- Short rows (U185, the owner, 12 Nov 2026): folded, a row says your status, its level (or how many quests after
-      -- its one chain, U171) and how far along the chain; where it starts and every step open on a click.
+      p.title:SetText(q.name)
+      -- Short rows (U185, the owner, 12 Nov 2026): folded, a row says your status, its level and how far along the
+      -- chain; where it starts and every step open on a click.
       local steps = {}
       if not open then
-        local parts = { statusText(QL, q, who, me), q.quests and L.DQ_SHARED_N:format(#q.quests) or levelText(st, inside) }
+        local parts = { statusText(QL, q, who, me), levelText(st, inside) }
         -- (A chain of one quest says nothing until it is done: "Step 1 of 1" read as noise, the check of 12 Nov 2026.)
         if #all > 1 then parts[#parts + 1] = nextK and L.DG_STEP_OF:format(nextK, #all) or L.DG_STEPS_DONE:format(#all)
         elseif #all == 1 and not nextK then parts[#parts + 1] = L.DG_STEP_1_DONE end
         p.where:SetText(table.concat(parts, "  ·  "))
-      elseif q.quests then
-        -- One chain, two quests (U171): a line for each, so both are picked up; one giver said once (U185).
-        local at = QL.WhereText(q.quests[1].start)
-        for _, x in ipairs(q.quests) do
-          if QL.WhereText(x.start) ~= at or x.start.inside or not (x.start.by or x.start.zone) then at = nil end
-        end
-        local lines = { at and L.DQ_SHARED_AT:format(#q.quests, at) or L.DQ_SHARED:format(#q.quests) }
-        for _, x in ipairs(q.quests) do lines[#lines + 1] = L.DQ_SHARED_ONE:format(x.name, questLine(QL, x, who, me, at)) end
-        p.where:SetText(table.concat(lines, "\n"))
       else
-        p.where:SetText(questLine(QL, q, who, me, nil, inside))
+        p.where:SetText(questLine(QL, q, who, me, inside))
       end
       -- The chain's steps (U123), each with where it starts.
       if open then for k, x in ipairs(all) do steps[k] = stepLine(QL, k, x, nextK) end end

@@ -227,8 +227,12 @@ local function dungeonLine(f, x, st, fl, waiting)
   local shares = ns.Ready.Shares(r)
   if shares then return L.TODO_READY_SHARED:format(shares), "find", nil, L.TODO_READY_SHARED_SHORT end
   if r then return plural(r.quests, "TODO_READY_1", "TODO_READY_N"), "find" end
-  local _, _, _, _, open = QL:Counts(f, x.key)
-  if open and open > 0 then return plural(open, "TODO_INSIDE_1", "TODO_INSIDE_N"), "find", nil, L.TODO_NOTHING end
+  -- Only the quests that start inside: the others may just not open at your level yet (the review of 14 Nov 2026).
+  local mine, open = Hr:Get(f, ns.Me()) or {}, 0
+  for _, q in ipairs(QL:DungeonQuests(f, x.key)) do
+    if QL.GroupOf(QL:Start(q.id) or {}) == "inside" and QL.StatusOf(mine, q.id) ~= "done" then open = open + 1 end
+  end
+  if open > 0 then return plural(open, "TODO_INSIDE_1", "TODO_INSIDE_N"), "find", nil, L.TODO_NOTHING end
   return L.TODO_NOTHING, "find"
 end
 

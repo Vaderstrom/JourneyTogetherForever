@@ -1,4 +1,4 @@
--- The dungeons' quests and where they start: the addon's own database (source 2.0.2), the one source for
+-- The dungeons' quests and where they start: the addon's own database (source 2.0.5), the one source for
 -- dungeon quests. Generated: do not edit by hand (docs/GAME-UPDATES.md 2.4).
 -- DUNGEON_QUESTS[key] = { { id, name, side ("A", "H" or nil for both) } } (Data/Dungeons.lua keys).
 -- QUEST_STARTS[id] = { by (quest giver or object), zone, map, x, y (0 to 100), item (starts from this item), inside
@@ -77,7 +77,7 @@ ns.DUNGEON_QUESTS = {
   dm = {
     { 214, "Red Silk Bandanas", "A" },
     { 168, "Collecting Memories", "A" },
-    { 92819, "Destruction in Deadmines", "A" },
+    { 92753, "Destruction in Deadmines", "A" },
     { 167, "Oh Brother...", "A" },
     { 2040, "Underground Assault", "A" },
     { 166, "The Defias Brotherhood", "A" },
@@ -240,6 +240,11 @@ ns.DUNGEON_QUESTS = {
   },
   shaper = {
     { 95928, "Crystalline Elements", "H" },
+    { 97049, "Essence of Seeping Slimes", "H" },
+    { 95926, "The Dark Crystal", "H" },
+    { 95924, "Panic at the Digsite", "A" },
+    { 95925, "Mapping the Way Forward", "A" },
+    { 95790, "Digestible Research", "A" },
   },
   smarm = {
     { 1048, "Into The Scarlet Monastery", "H" },
@@ -408,8 +413,8 @@ ns.QUEST_STARTS = {
     { 1052, "Down the Scarlet Path", by = "Brother Anton", zone = "Desolace", map = 1443, x = 66.4, y = 7.8, lvl = 40 },
   } },
   [1098] = { by = "High Executor Hadrec", zone = "Silverpine Forest", map = 1421, x = 43.4, y = 40.9, lvl = 25, min = 18, xp = 2000, share = true },
-  [1101] = { by = "Falfindel Waywarder", zone = "Feralas", map = 1444, x = 89, y = 46, lvl = 34, min = 29, xp = 3350, after = {
-    { 1100, "Lonebrow's Journal", by = "Henrig Lonebrow", zone = "Thousand Needles", map = 1441, x = 30, y = 24, lvl = 27 },
+  [1101] = { by = "Falfindel Waywarder", zone = "Feralas", map = 1444, x = 89.6, y = 46.6, lvl = 34, min = 29, xp = 3350, after = {
+    { 1100, "Lonebrow's Journal", by = "Henrig Lonebrow", zone = "Thousand Needles", map = 1441, x = 30.7, y = 24.4, lvl = 27 },
   } },
   [1102] = { by = "Auld Stonespire", zone = "Thunder Bluff", map = 1456, x = 36, y = 59, lvl = 34, min = 29, xp = 4050 },
   [1109] = { by = "Master Apothecary Faranell", zone = "Undercity", map = 1458, x = 48, y = 69, lvl = 33, min = 30, xp = 3300 },
@@ -431,7 +436,7 @@ ns.QUEST_STARTS = {
   [1198] = { by = "Dawnwatcher Shaedlass", zone = "Darnassus", map = 1457, x = 55, y = 24, lvl = 24, min = 18, xp = 2400, share = true },
   [1199] = { by = "Argent Guard Manados", zone = "Darnassus", map = 1457, x = 55, y = 24, lvl = 25, min = 20, xp = 2550, share = true },
   [1200] = { inside = true, lvl = 27, min = 18, xp = 3300, share = true },
-  [1221] = { by = "Mebok Mizzyrix", zone = "The Barrens", map = 1413, x = 62, y = 37, lvl = 26, min = 20, xp = 2100 },
+  [1221] = { by = "Mebok Mizzyrix", zone = "The Barrens", map = 1413, x = 62.4, y = 37.6, lvl = 26, min = 20, xp = 2100 },
   [1275] = { by = "Gershala Nightwhisper", zone = "Darkshore", map = 1439, x = 38.3, y = 43.1, lvl = 24, min = 18, xp = 2400, share = true },
   [1360] = { by = "Krom Stoutarm", zone = "Ironforge", map = 1455, x = 74.2, y = 9.8, lvl = 43, min = 33, xp = 6300 },
   [1394] = { by = "Parqual Fintallas", zone = "Undercity", map = 1458, x = 57.4, y = 65.4, lvl = 36, min = 25, xp = 4200, after = {
@@ -573,7 +578,7 @@ ns.QUEST_STARTS = {
   } },
   [4123] = { by = "Maxwort Uberglint", zone = "Burning Steppes", map = 1428, x = 65.2, y = 23.8, lvl = 55, min = 50, xp = 10450, share = true },
   [4126] = { by = "Ragnar Thunderbrew", zone = "Dun Morogh", map = 1426, x = 46.8, y = 52.4, lvl = 55, min = 50, xp = 14800, share = true },
-  [4132] = { by = "Warlord Goretooth", zone = "Badlands", map = 1418, x = 3, y = 47.6, lvl = 58, min = 52, xp = 15500, share = true, after = {
+  [4132] = { by = "Warlord Goretooth", zone = "Badlands", map = 1418, x = 5.8, y = 47.4, lvl = 58, min = 52, xp = 15500, share = true, after = {
     { 4081, "KILL ON SIGHT: Dark Iron Dwarves", by = "WANTED", zone = "Badlands", map = 1418, x = 3.8, y = 47.5, run = true, lvl = 52, xp = 9950 },
     { 4082, "KILL ON SIGHT: High Ranking Dark Iron Officials", by = "KILL ON SIGHT", zone = "Badlands", map = 1418, x = 4, y = 46.8, run = true, lvl = 54, xp = 10650 },
     { 4122, "Grark Lorkrub", by = "Lexlort", zone = "Badlands", map = 1418, x = 5.8, y = 47.4, lvl = 58 },
@@ -653,7 +658,9 @@ ns.QUEST_STARTS = {
   [4862] = { by = "Kibler", zone = "Burning Steppes", map = 1428, x = 65.8, y = 22, lvl = 59, min = 55, xp = 6400, share = true },
   [4866] = { by = "Ragged John", zone = "Burning Steppes", map = 1428, x = 65, y = 23.6, lvl = 60, min = 55, xp = 9950, share = true },
   [4867] = { inside = true, lvl = 60, min = 55, xp = 9950 },
-  [4903] = { by = "Warlord Goretooth", zone = "Badlands", map = 1418, x = 3, y = 47.6, lvl = 60, min = 55, xp = 8300 },
+  [4903] = { by = "Warlord Goretooth", zone = "Badlands", map = 1418, x = 5.8, y = 47.4, lvl = 60, min = 55, xp = 8300, after = {
+    { 98325, "Blood and Thunder", by = "Warlord Goretooth", zone = "Badlands", map = 1418, x = 5.8, y = 47.4, lvl = 60 },
+  } },
   [4981] = { by = "Lexlort", zone = "Badlands", map = 1418, x = 5.8, y = 47.4, lvl = 59, min = 55, share = true },
   [4982] = { inside = true, lvl = 59, min = 55, xp = 6400, share = true },
   [5047] = { inside = true, lvl = 60, min = 57, xp = 6600 },
@@ -765,8 +772,9 @@ ns.QUEST_STARTS = {
     { 6564, "Allegiance to the Old Gods", item = "Damp Note", lvl = 22 },
   } },
   [6602] = { by = "Rexxar", zone = "Feralas", map = 1444, x = 44.8, y = 7.4, lvl = 60, min = 55, xp = 9950, share = true, after = {
-    { 4903, "Warlord's Command", by = "Warlord Goretooth", zone = "Badlands", map = 1418, x = 3, y = 47.6, lvl = 60 },
-    { 4941, "Eitrigg's Wisdom", by = "Warlord Goretooth", zone = "Badlands", map = 1418, x = 3, y = 47.6, lvl = 60 },
+    { 98325, "Blood and Thunder", by = "Warlord Goretooth", zone = "Badlands", map = 1418, x = 5.8, y = 47.4, lvl = 60 },
+    { 4903, "Warlord's Command", by = "Warlord Goretooth", zone = "Badlands", map = 1418, x = 5.8, y = 47.4, lvl = 60 },
+    { 4941, "Eitrigg's Wisdom", by = "Warlord Goretooth", zone = "Badlands", map = 1418, x = 5.8, y = 47.4, lvl = 60 },
     { 4974, "For The Horde!", by = "Thrall", zone = "Orgrimmar", map = 1454, x = 32, y = 37.8, lvl = 60 },
     { 6566, "What the Wind Carries", by = "Thrall", zone = "Orgrimmar", map = 1454, x = 32, y = 37.8, lvl = 60 },
     { 6567, "The Champion of the Horde", by = "Thrall", zone = "Orgrimmar", map = 1454, x = 32, y = 37.8, lvl = 60 },
@@ -793,7 +801,7 @@ ns.QUEST_STARTS = {
   [7066] = { inside = true, lvl = 51, min = 39, xp = 11900 },
   [7067] = { by = "Centaur Pariah", zone = "Desolace", map = 1443, x = 43.4, y = 84.8, lvl = 48, min = 39, xp = 10650 },
   [7068] = { by = "Uthel'nay", zone = "Orgrimmar", map = 1454, x = 38.8, y = 85.4, lvl = 42, min = 39, xp = 6750, share = true },
-  [7070] = { by = "Archmage Tervosh", zone = "Dustwallow Marsh", map = 1445, x = 45.2, y = 24.4, lvl = 42, min = 39, xp = 6750, share = true },
+  [7070] = { by = "Archmage Tervosh", zone = "Dustwallow Marsh", map = 1445, x = 66.4, y = 49.3, lvl = 42, min = 39, xp = 6750, share = true },
   [7201] = { by = "Shadowmage Vivian Lagrave", zone = "Badlands", map = 1418, x = 3, y = 47.6, lvl = 54, min = 48, xp = 10100, share = true, after = {
     { 3906, "Disharmony of Flame", by = "Thunderheart", zone = "Badlands", map = 1418, x = 3.4, y = 48.2, lvl = 52 },
   } },
@@ -813,10 +821,10 @@ ns.QUEST_STARTS = {
     { 8949, "Falrin's Vendetta", lvl = 60 },
     { 8950, "The Instigator's Enchantment", lvl = 60 },
   } },
-  [92065] = { lvl = 60, min = 55, xp = 1450 },
-  [92066] = { lvl = 55, min = 50, xp = 11300 },
+  [92065] = { lvl = 60, min = 47, xp = 13200 },
+  [92066] = { lvl = 55, min = 47, xp = 11300 },
   [92069] = { by = "Ogtinc", zone = "Azshara", map = 1447, x = 42.4, y = 42.6, lvl = 58, min = 45, xp = 12400 },
-  [92070] = { item = "Feathered Charm Necklace", inside = true, lvl = 57, min = 47, xp = 11300 },
+  [92070] = { item = "Feathered Charm Necklace", inside = true, lvl = 55, min = 47, xp = 11300 },
   [92343] = { by = "Nara Wildmane", zone = "Thunder Bluff", map = 1456, x = 75.6, y = 31, lvl = 55, min = 45, xp = 11300, after = {
     { 92346, "Beneath Nordrassil", by = "Jediga", zone = "Azshara", map = 1447, x = 22.5, y = 51.4, lvl = 55 },
   } },
@@ -831,14 +839,14 @@ ns.QUEST_STARTS = {
     { 99156, "Rear Guard Patrol", by = "Deathguard Linnea", zone = "Tirisfal Glades", map = 1420, x = 65.5, y = 60.3, lvl = 13 },
   } },
   [92456] = { by = "Shylamiir", zone = "Stormwind City", map = 1453, x = 31.4, y = 62.8, lvl = 33, min = 24, xp = 3950 },
-  [92457] = { by = "Image of Archmage Modera", zone = "Alterac Mountains", map = 1416, x = 9.2, y = 60, lvl = 33, min = 30, xp = 9400, share = true, after = {
+  [92457] = { by = "Image of Archmage Modera", zone = "Alterac Mountains", map = 1416, x = 7.7, y = 58.8, lvl = 33, min = 30, xp = 9400, share = true, after = {
     { 92432, "An Alarming Request", by = "Emissary Jacques", zone = "Hillsbrad Foothills", map = 1424, x = 48.4, y = 60.2, lvl = 33 },
   } },
-  [92458] = { by = "Image of Archmage Modera", zone = "Alterac Mountains", map = 1416, x = 9.2, y = 60, lvl = 33, min = 30, xp = 9400, after = {
+  [92458] = { by = "Image of Archmage Modera", zone = "Alterac Mountains", map = 1416, x = 7.7, y = 58.8, lvl = 33, min = 30, xp = 9400, after = {
     { 92432, "An Alarming Request", by = "Emissary Jacques", zone = "Hillsbrad Foothills", map = 1424, x = 48.4, y = 60.2, lvl = 33 },
   } },
   [92489] = { by = "High Sorcerer Andromath", zone = "Stormwind City", map = 1453, x = 48.8, y = 87.6, lvl = 33, min = 24, xp = 3950 },
-  [92819] = { by = "Alba Fairmoon", zone = "Westfall", lvl = 18, min = 9, xp = 680, share = true, after = {
+  [92753] = { item = "Extra-Destructive Explosives", lvl = 18, min = 9, xp = 1350, after = {
     { 92742, "Testing the Wells", by = "Alba Fairmoon", zone = "Westfall", map = 1436, x = 53, y = 53.3, lvl = 12 },
     { 92744, "Murloc Gills", by = "Alba Fairmoon", zone = "Westfall", map = 1436, x = 53, y = 53.3, lvl = 12 },
     { 92745, "The State of the Mines", by = "Alba Fairmoon", zone = "Westfall", map = 1436, x = 53, y = 53.3, lvl = 14 },
@@ -848,14 +856,14 @@ ns.QUEST_STARTS = {
     { 92750, "Detonation at a Distance", by = "Sprite Jumpsprocket", zone = "Stormwind City", map = 1453, x = 61.9, y = 30.6, lvl = 16 },
     { 92751, "Detonation at a Distance", by = "Jasper Fel", zone = "Stormwind City", map = 1453, x = 80.3, y = 70.1, lvl = 16 },
     { 92752, "Explosive Consultation", by = "Sprite Jumpsprocket", zone = "Stormwind City", map = 1453, x = 61.9, y = 30.6, lvl = 16 },
-    { 92753, "Destruction in Deadmines", item = "Extra-Destructive Explosives", run = true, lvl = 18, xp = 1350 },
   } },
   [93404] = { by = "Woodwyrd", zone = "Shen'dralas", map = 2652, x = 53.5, y = 76, lvl = 49, min = 35, xp = 11100, after = {
     { 92914, "Strange Pylons", by = "Shen'dralar Pylon", zone = "Shen'dralas", map = 2652, x = 43.6, y = 34.2, lvl = 43 },
     { 96010, "Fragments of the Pylons", by = "Mordent Evenshade", zone = "Shen'dralas", map = 2652, x = 35, y = 46.4, lvl = 41 },
     { 96018, "Powering the Pylons", by = "Mordent Evenshade", zone = "Shen'dralas", map = 2652, x = 35, y = 46.4, lvl = 43 },
     { 93016, "A Brief History Lesson", by = "Mordent Evenshade", zone = "Shen'dralas", map = 2652, x = 35, y = 46.4, lvl = 43 },
-    { 93394, "Meeting the Magister", by = "Mordent Evenshade", zone = "Shen'dralas", map = 2652, x = 35, y = 46.4, run = true, lvl = 43, xp = 360 },
+    { 93394, "Meeting the Magister", by = "Mordent Evenshade", zone = "Shen'dralas", map = 2652, x = 35, y = 46.4, lvl = 43 },
+    { 93341, "Forlorn Gardens", by = "Mithera", zone = "Shen'dralas", map = 2652, x = 52.8, y = 76, lvl = 43 },
     { 93594, "Word of the Woods", by = "Mithera", zone = "Shen'dralas", map = 2652, x = 52.8, y = 76, lvl = 43 },
   } },
   [93604] = { by = "Kog'thug the Brave", zone = "Shen'dralas", map = 2652, x = 72.6, y = 31.4, lvl = 45, min = 35, xp = 10200, share = true, after = {
@@ -863,7 +871,8 @@ ns.QUEST_STARTS = {
     { 96010, "Fragments of the Pylons", by = "Mordent Evenshade", zone = "Shen'dralas", map = 2652, x = 35, y = 46.4, lvl = 41 },
     { 96018, "Powering the Pylons", by = "Mordent Evenshade", zone = "Shen'dralas", map = 2652, x = 35, y = 46.4, lvl = 43 },
     { 93016, "A Brief History Lesson", by = "Mordent Evenshade", zone = "Shen'dralas", map = 2652, x = 35, y = 46.4, lvl = 43 },
-    { 93394, "Meeting the Magister", by = "Mordent Evenshade", zone = "Shen'dralas", map = 2652, x = 35, y = 46.4, run = true, lvl = 43, xp = 360 },
+    { 93394, "Meeting the Magister", by = "Mordent Evenshade", zone = "Shen'dralas", map = 2652, x = 35, y = 46.4, lvl = 43 },
+    { 93341, "Forlorn Gardens", by = "Mithera", zone = "Shen'dralas", map = 2652, x = 52.8, y = 76, lvl = 43 },
     { 93594, "Word of the Woods", by = "Mithera", zone = "Shen'dralas", map = 2652, x = 52.8, y = 76, lvl = 43 },
     { 93404, "Rot and Regret", by = "Woodwyrd", zone = "Shen'dralas", map = 2652, x = 53.5, y = 76, lvl = 49 },
     { 93601, "Passing the Blame", by = "Woodwyrd", zone = "Shen'dralas", map = 2652, x = 53.5, y = 76, lvl = 45 },
@@ -952,7 +961,6 @@ ns.QUEST_STARTS = {
     { 96369, "Bad News for Folkar", inside = true, lvl = 53 },
   } },
   [95646] = { by = "Rethiel the Greenwarden", zone = "Wetlands", map = 1437, x = 56.2, y = 40.6, lvl = 31, min = 24, xp = 6150, after = {
-    { 463, "The Greenwarden", by = "First Mate Fitzsimmons", zone = "Wetlands", map = 1437, x = 10.8, y = 59.6, lvl = 21 },
     { 276, "Tramping Paws", by = "Rethiel the Greenwarden", zone = "Wetlands", map = 1437, x = 56.2, y = 40.6, lvl = 21 },
     { 277, "Fire Taboo", by = "Rethiel the Greenwarden", zone = "Wetlands", map = 1437, x = 56.2, y = 40.6, lvl = 23 },
     { 275, "Blisters on The Land", by = "Rethiel the Greenwarden", zone = "Wetlands", map = 1437, x = 56.2, y = 40.6, lvl = 26 },
@@ -970,6 +978,7 @@ ns.QUEST_STARTS = {
     { 95770, "Locating the Lost City", by = "Kin'weelay", zone = "Stranglethorn Vale", map = 1434, x = 32.3, y = 27.7, lvl = 40 },
   } },
   [95789] = { by = "Krazek", zone = "Stranglethorn Vale", map = 1434, x = 26.9, y = 77.2, lvl = 40, min = 34, xp = 10450 },
+  [95790] = { inside = true, lvl = 60, min = 55, xp = 17650 },
   [95791] = { by = "Krazek", zone = "Stranglethorn Vale", map = 1434, x = 26.9, y = 77.2, lvl = 40, min = 34, xp = 10450 },
   [95795] = { inside = true, lvl = 31, min = 24, xp = 3150 },
   [95798] = { by = "Loremaster Dibbs", zone = "Hillsbrad Foothills", map = 1424, x = 50.6, y = 57.1, lvl = 40, min = 30, xp = 2350, after = {
@@ -989,7 +998,10 @@ ns.QUEST_STARTS = {
     { 95787, "Take Two With Water", by = "Loremaster Dibbs", zone = "Hillsbrad Foothills", map = 1424, x = 50.6, y = 57.1, run = true, lvl = 40, xp = 8450 },
   } },
   [95809] = { inside = true, lvl = 31, min = 24, xp = 6150 },
-  [95928] = { by = "Mayena Earthseeker", zone = "Mulgore", map = 1412, x = 34.8, y = 22.2, lvl = 60, min = 55, xp = 17655 },
+  [95924] = { by = "Curator Thorius", zone = "Ironforge", map = 1455, x = 71.5, y = 15.7, lvl = 60, min = 55, xp = 17650, share = true },
+  [95925] = { by = "Curator Thorius", zone = "Ironforge", map = 1455, x = 71.5, y = 15.7, lvl = 60, min = 55, xp = 17650 },
+  [95926] = { by = "Master Apothecary Faranell", zone = "Undercity", map = 1458, x = 48.8, y = 69.3, lvl = 60, min = 55, xp = 17650, share = true },
+  [95928] = { by = "Mayena Earthseeker", zone = "Mulgore", map = 1412, x = 34.8, y = 22.2, lvl = 60, min = 55, xp = 17650, share = true },
   [96078] = { by = "Kin'weelay", zone = "Stranglethorn Vale", map = 1434, x = 32.3, y = 27.7, lvl = 40, min = 30, xp = 2350, share = true, after = {
     { 629, "The Vile Reef", by = "Kin'weelay", zone = "Stranglethorn Vale", map = 1434, x = 32.3, y = 27.7, lvl = 37 },
     { 95748, "The Gurubashi Legends of Old", by = "Kin'weelay", zone = "Stranglethorn Vale", map = 1434, x = 32.3, y = 27.7, lvl = 40 },
@@ -1028,7 +1040,7 @@ ns.QUEST_STARTS = {
   [96775] = { by = "Mazu'kon", zone = "Mulgore", map = 1412, x = 32.5, y = 20.6, lvl = 46, min = 42, xp = 10100 },
   [96776] = { by = "Olana Brighthoof", zone = "Mulgore", map = 1412, x = 33.8, y = 23.7, lvl = 51, min = 43, xp = 11900 },
   [96800] = { by = "Magus Olvek", zone = "Alterac Mountains", map = 1416, x = 9.7, y = 61.9, lvl = 38, min = 30, xp = 6750 },
-  [96984] = { by = "Image of Archmage Modera", zone = "Alterac Mountains", map = 1416, x = 9.2, y = 60, lvl = 33, min = 30, xp = 9400, after = {
+  [96984] = { by = "Image of Archmage Modera", zone = "Alterac Mountains", map = 1416, x = 7.7, y = 58.8, lvl = 33, min = 30, xp = 9400, after = {
     { 544, "Prison Break In", by = "Magus Wordeen Voidglare", zone = "Hillsbrad Foothills", map = 1424, x = 61.5, y = 20.7, lvl = 34 },
     { 93680, "Key to the City", by = "Magus Wordeen Voidglare", zone = "Hillsbrad Foothills", map = 1424, x = 61.5, y = 20.7, lvl = 33 },
     { 545, "Dalaran Patrols", by = "Magus Wordeen Voidglare", zone = "Hillsbrad Foothills", map = 1424, x = 61.5, y = 20.7, lvl = 35 },
@@ -1037,13 +1049,14 @@ ns.QUEST_STARTS = {
   [96986] = { by = "Melisara", zone = "Hillsbrad Foothills", map = 1424, x = 62.6, y = 20.6, lvl = 33, min = 24, xp = 3950 },
   [96987] = { inside = true, lvl = 33, min = 24, xp = 3950 },
   [96988] = { by = "Doctor Martin Felben", zone = "Undercity", map = 1458, x = 46.6, y = 74.1, lvl = 33, min = 24, xp = 3950 },
+  [97049] = { by = "Chemist Fuely", zone = "Undercity", map = 1458, x = 47.5, y = 73.3, lvl = 60, min = 55, xp = 17650, share = true },
   [97130] = { by = "Archmage Timear", zone = "Alterac Mountains", map = 1416, x = 15.4, y = 74, lvl = 40, min = 34, xp = 10450, share = true },
   [97173] = { lvl = 59, min = 52, xp = 12800 },
   [97196] = { by = "Sutara Plainstalker", zone = "Mulgore", map = 1412, x = 34.4, y = 22.8, lvl = 41, min = 34, xp = 8600, share = true },
   [97197] = { by = "Alaana Stormwalker", zone = "Mulgore", map = 1412, x = 33.4, y = 22.5, lvl = 55, min = 49, xp = 14800 },
   [97198] = { lvl = 59, min = 52, xp = 16100 },
-  [97288] = { item = "Abominable Head", inside = true, lvl = 21, min = 16, xp = 1650, share = true },
-  [97327] = { by = "Ekkal", zone = "Azshara", map = 1447, x = 41.8, y = 38.8, lvl = 60, min = 55, xp = 1450 },
+  [97288] = { item = "Abominable Head", inside = true, lvl = 21, min = 15, xp = 1650, share = true },
+  [97327] = { by = "Ekkal", zone = "Azshara", map = 1447, x = 41.8, y = 38.8, lvl = 60, min = 55, xp = 13200 },
   [98423] = { inside = true, lvl = 16, min = 9, xp = 1150 },
   [98815] = { by = "James Halloran", zone = "Wetlands", map = 1437, x = 8, y = 55, lvl = 28, min = 24, xp = 1150, after = {
     { 484, "Young Crocolisk Skins", by = "James Halloran", zone = "Wetlands", map = 1437, x = 8, y = 55, lvl = 22 },

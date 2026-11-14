@@ -294,7 +294,7 @@ local function build(pf)
       if not f or v == "attune" then return nil end
       local n = 0
       for _, x in ipairs(Q:Items(f)) do
-        if (v == "chains") == (x.chain == true) and (x.together or x.join) then n = n + 1 end
+        if (v == "chains") == (x.chain == true) and (x.together or x.join) and not Q.Finished(x, ns.Me()) then n = n + 1 end
       end
       return n
     end)
@@ -303,6 +303,7 @@ local function build(pf)
   pf.lscroll:SetPoint("TOPLEFT", 0, -34); pf.lscroll:SetPoint("BOTTOMRIGHT")
   local Lc = pf.lscroll.child
   pf.showAll = UI.TextButton(Lc, "", function() pf.all = not pf.all; W:Refresh() end, "link", 12)
+  pf.showDone = UI.TextButton(Lc, "", function() pf.history = not pf.history; W:Refresh() end, "link", 12)
   -- Questie is the recommended companion for quest chains (docs/QUEST-CHAINS.md): a note on top, until hidden;
   -- with Questie running, a short line saying where the chains come from.
   pf.questie = CreateFrame("Frame", nil, Lc)
@@ -477,13 +478,16 @@ local function refresh(pf, ctx)
   end
   -- The items of this tab: chains, or single quests (near this chapter's levels unless Show all). Only what is about
   -- playing together: quests you share with others, and quests you could join (Fellowship/Quests.lua, Classify).
-  local items, hidden = {}, 0
+  -- What you have finished waits under History (U188); each link counts only what it brings in.
+  local items, hidden, done = {}, 0, 0
   for _, x in ipairs(Q:Items(f)) do
-    if x.together or x.join then
-      if pf.tab == "chains" then
-        if x.chain then items[#items + 1] = x end
-      elseif not x.chain then
-        if pf.all or nearChapter(f, x) then items[#items + 1] = x else hidden = hidden + 1 end
+    if (x.together or x.join) and (pf.tab == "chains") == (x.chain == true) then
+      local fin = Q.Finished(x, me)
+      if x.chain or pf.all or nearChapter(f, x) then
+        if fin then done = done + 1 end
+        if pf.history or not fin then items[#items + 1] = x end
+      elseif pf.history or not fin then
+        hidden = hidden + 1
       end
     end
   end
@@ -576,6 +580,12 @@ local function refresh(pf, ctx)
     pf.showAll:SetLabel(pf.all and L.Q_SHOW_NEAR or L.Q_SHOW_ALL:format(hidden))
     s:Place(pf.showAll, 20, 4)
   end
+  -- What you have finished: History / Hide history (U188), only while this tab has some (the check of 12 Nov 23:02).
+  pf.showDone:SetShown(done > 0)
+  if done > 0 then
+    pf.showDone:SetLabel(pf.history and L.Q_HIDE_DONE or L.Q_SHOW_DONE:format(done))
+    s:Place(pf.showDone, 20, 4)
+  end
   pf.lscroll:SetContentHeight(s.y + 8)
 
   -- Right: the chosen quest or chain.
@@ -588,8 +598,12 @@ local function refresh(pf, ctx)
     pf.inviteQ:Hide(); pf.share:Hide(); pf.shareWhy:Hide(); pf.listen:Hide()
     r:Skip(60)
     local chains = pf.tab == "chains"
-    r:Place(pf.none, pf.none:Set(ns.ICONS[chains and "bn_chain" or "bn_quest"], chains and L.Q_EMPTY_CHAINS or L.Q_NONE,
-      chains and L.Q_EMPTY_CHAINS_TEXT or L.Q_EMPTY_TEXT, nil, nil, "EmptyQuests"), 4)
+    -- All of it near your level finished, under History (the ponytail audit of 13 Nov 2026: "No quest chains learned
+    -- yet" was wrong); one far from your level waits under Show all (the release review of 13 Nov 2026).
+    local fin = done > 0
+    r:Place(pf.none, pf.none:Set(ns.ICONS[chains and "bn_chain" or "bn_quest"],
+      fin and L.Q_ALL_DONE or (chains and L.Q_EMPTY_CHAINS or L.Q_NONE),
+      fin and L.Q_ALL_DONE_TEXT or (chains and L.Q_EMPTY_CHAINS_TEXT or L.Q_EMPTY_TEXT), nil, nil, "EmptyQuests"), 4)
   else
     local d = Q:Detail(pick)
     -- (A chain may have no zone: no "·" in front of its type then; seen in the tour.)

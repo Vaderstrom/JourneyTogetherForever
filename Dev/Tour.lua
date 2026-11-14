@@ -381,18 +381,18 @@ prep(function()
     d = { 7848 }, ln = {}, t = time() })
 end, 0.5)
 -- The dungeons new in WoW Forever (the owner, 7 Nov 2026): City of Dalaran has quests for both sides.
-shot("quests-dungeons-new", "Dungeon page (a dungeon new in WoW Forever)", "City of Dalaran's page: no story of ours yet (WoW Forever's own), its quests for your side under 1. Prequest chains (Heart of Disruption and Starving Arcane, one row after An Alarming Request, U171) and 2. Pick up before you go, each a short row: its status icon and word, its level, \"One chain, 2 quests\" with no step count for a chain of one quest, two lines each with a + beside the pin (U185)", function()
+shot("quests-dungeons-new", "Dungeon page (a dungeon new in WoW Forever)", "City of Dalaran's page: no story of ours yet (WoW Forever's own), its quests for your side under 1. Prequest chains (Heart of Disruption and Starving Arcane, a row each after An Alarming Request) and 2. Pick up before you go, each a short row: its status icon and word, its level, no step count for a chain of one quest, two lines each with a + beside the pin (U185)", function()
   page("dungeons") -- opened from the Dungeons page, so the sidebar marks Dungeons (the check of 10 Nov 2026 showed Quests)
   ns.DungeonPage:Open("dal")
 end)
 -- U123: a prequest chain, each step with where it starts.
-shot("dungeon-page-chain", "Dungeon page (a prequest chain)", "The Deadmines (Wailing Caverns for the Horde) under 1. Prequest chains: Destruction in Deadmines opened: where it starts and its ten steps from Alba Fairmoon in Westfall to the explosives found in the run (Leaders of the Fang's five, from Tonga Runetotem in the Barrens), each step with its level where known, where it starts and your status", function()
+shot("dungeon-page-chain", "Dungeon page (a prequest chain)", "The Deadmines (Wailing Caverns for the Horde) under 1. Prequest chains: Destruction in Deadmines opened: it starts from the Extra-Destructive Explosives, after its nine steps from Alba Fairmoon in Westfall to Sprite Jumpsprocket in Stormwind City (Leaders of the Fang's five, from Tonga Runetotem in the Barrens), each step with its level where known, where it starts and your status", function()
   local horde = UnitFactionGroup("player") == "Horde"
   page("dungeons") -- opened from the Dungeons page, as a player would (the brand picture of 10 Nov 2026 showed Chronicle)
   ns.DungeonPage:Open(horde and "wc" or "dm")
   -- To the quest itself: its steps are below the page's fold (the check of 8 Nov 2026 showed none of them), and
   -- opened, as a row shows only how far until clicked (U185; the check of 12 Nov 2026 showed it folded).
-  local p, want = pf("dungeon"), horde and 914 or 92819
+  local p, want = pf("dungeon"), horde and 914 or 92753
   p.opened[want] = true
   ns.Window:Refresh()
   for _, row in ipairs(p.quests.items) do
@@ -410,7 +410,7 @@ shot("dungeons-open", "Dungeons (Only open ones)", "Settings → Dungeons and ra
 end)
 prep(function() ns.Settings:Set("dungeonsShow", "all") end)
 -- The Dungeon page (U96-U100).
-shot("dungeon-page", "Dungeon page", "The Deadmines (Ragefire Chasm for the Horde), on one flat sheet: no spine under the title across both halves (U111). Left: its picture, our story with Read more, the bosses with how many Adventurers were there (no \"Not yet\" beside each before any fell, U161), who cleared it; Find group and Waypoint (to the entrance) at the foot. Right: the room as the answer (U145), Who is ready folded to a ring for each Adventurer, \"2 of 4 ready\" and Show who (U126); when every prequest is done, a line above the rings: \"Everyone has done the prequests. Only quests to pick up are left: 2 can be shared in the group.\" (U177), then the quests under 1. Prequest chains, 2. Pick up before you go, 3. Starts inside, each a short row (U185): your status first in words (\"Not yet\"; its icon once, before the name), its level with the level it opens at (\"Level 17, open from 14\"; under Starts inside its level alone, \"Level 22\"), how far along a chain (\"Step 1 of 10\"), two lines each with a + beside the pin to open the rest, no link line under them (the map numbers only on the pin's tooltip, U160); the Alliance's Red Silk Bandanas and The Defias Brotherhood one row, \"One chain, 2 quests\" (U171)", function()
+shot("dungeon-page", "Dungeon page", "The Deadmines (Ragefire Chasm for the Horde), on one flat sheet: no spine under the title across both halves (U111). Left: its picture, our story with Read more, the bosses with how many Adventurers were there (no \"Not yet\" beside each before any fell, U161), who cleared it; Find group and Waypoint (to the entrance) at the foot. Right: the room as the answer (U145), Who is ready folded to a ring for each Adventurer, \"2 of 4 ready\" and Show who (U126); when every prequest is done, a line above the rings: \"Everyone is ready with the prequests. Only quests to pick up are left: 2 can be shared in the group.\" (U177), then the quests under 1. Prequest chains, 2. Pick up before you go, 3. Starts inside, each a short row (U185): your status first in words (\"Not yet\"; its icon once, before the name), its level with the level it opens at (\"Level 17, open from 14\"; under Starts inside its level alone, \"Level 22\"), how far along a chain (\"Step 1 of 10\"), two lines each with a + beside the pin to open the rest, no link line under them (the map numbers only on the pin's tooltip, U160); the Alliance's Red Silk Bandanas and The Defias Brotherhood a row each after their one chain (the owner, 12 Nov 2026)", function()
   local p = pf("dungeon")
   if p then p.whoOpen = nil end
   ns.DungeonPage:Open(UnitFactionGroup("player") == "Horde" and "rfc" or "dm")
@@ -472,11 +472,20 @@ shot("quests-showall", "Quests (Show all)", "Far-off quests included, and the wa
   local p = pf("quests"); p.all = nil; p.sel = nil; W():Refresh()
   if p.showAll:IsShown() then p.showAll:Click() end
 end)
-shot("quests-chains", "Quests (Quest chains tab)", "The Questie line; learned chains as cards with a pip for each part (often empty at first)", function()
+shot("quests-chains", "Quests (Quest chains tab)", "The Questie line; learned chains as cards with a pip for each part (often empty at first); no History link while nothing is finished", function()
   ns.Quests.viewLevel = nil
-  local p = pf("quests"); p.all = nil; p.tabs.buttons[2]:Click()
+  local p = pf("quests"); p.all = nil; p.history = nil; p.tabs.buttons[2]:Click()
+end)
+-- U188: what you have finished waits under History. A stand-in, as if every chain you are on were done (a character
+-- seldom has one finished while another Adventurer is still on it); put back by the next shot, or by Finish.
+local realFinished
+shot("quests-history", "Quests (History)", "As if every chain on the tab were done (a stand-in): they wait under History, \"History (N you have finished) ›\" at the foot, and the right page says \"Nothing left to do here\" (not \"No quest chains learned yet\")", function()
+  realFinished = realFinished or ns.Quests.Finished
+  ns.Quests.Finished = function(x) return x.chain == true end
+  W():Refresh()
 end)
 shot("quests-attune-none", "Quests (Attunements, level 30)", "None open yet: when the first one opens", function()
+  if realFinished then ns.Quests.Finished = realFinished end
   ns.QuestLists.viewLevel = 30
   local p = pf("quests"); p.sel = nil; p.tabs.buttons[3]:Click()
 end)
@@ -933,8 +942,12 @@ shot("toast-dquest", "Toast: dungeon quests to pick up", "Once per dungeon of th
   toast("dquest", function() return ns.Dungeon("dm")[2] end, function()
     return L.TOAST_DQ_PICK_IN:format(L.DQ_N_QUESTS:format(3), "Westfall") .. " " .. L.TOAST_DQ_CHAIN:format("Red Silk Bandanas")
   end, { dungeon = "dm" }), { toast = true })
-shot("toast-dready", "Toast: ready for a dungeon", "\"Ready for The Deadmines\": once per dungeon of your chapter, never in combat, with its picture (U98); a click opens its page",
-  toast("dready", L.T_READY, function() return L.T_READY_TEXT:format(ns.Dungeon("dm")[2]) end, { dungeon = "dm" }), { toast = true })
+-- (The prequests done, two quests still at their givers: Almost ready, the owner, 12-13 Nov 2026.)
+local function almost()
+  return ns.Ready.ReadyToast(ns.Dungeon("dm")[2], { early = 1, earlyOf = 1, toPick = { { zone = "Westfall" }, { zone = "Westfall" } } })
+end
+shot("toast-dready", "Toast: ready for a dungeon", "Under \"Ready for a dungeon\": \"Almost ready\", \"The prequests for The Deadmines are ready. Pick up 2 quests in Westfall before the run.\" (then, once they are picked up, \"Ready to go\", \"Ready for The Deadmines\"); each once per dungeon of your chapter, never in combat, with its picture (U98); a click opens its page",
+  toast("dready", function() return (almost()) end, function() return select(2, almost()) end, { dungeon = "dm" }), { toast = true })
 shot("toast-dallready", "Toast: everyone is ready", "\"Everyone is ready for The Deadmines\": once per dungeon when every counted Adventurer is (U99)",
   toast("dallready", L.T_ALL_READY, function() return L.T_ALL_READY_TEXT:format(ns.Dungeon("dm")[2]) end, { dungeon = "dm" }), { toast = true })
 shot("toast-dshare", "Toast: a quest to share", "In a dungeon, \"Share Collecting Memories: Pata needs it.\" with the Deadmines' picture, Share quest and Not now; it stays until answered, then the next quest (U178)", function()
@@ -973,7 +986,8 @@ shot("tracker", "The tracker on the screen", "Chapter, status with the dungeons 
   ns.Settings:Set("trackerDock", false) -- (its own panel here; docked in "tracker-docked")
   ns.Toasts.frame:Hide(); W():Close(); ns.Tracker:SetFolded(false); ns.Tracker:Refresh()
   local bar = ns.Tracker.frame.bar
-  bar:GetScript("OnEnter")(bar)
+  -- Not for the README's picture: the tooltip's foot showed over its top (the check of 13 Nov 2026).
+  if not TR.brand then bar:GetScript("OnEnter")(bar) end
 end)
 shot("tracker-all", "The tracker, every line on", "Also Prequest (gold, a chain step to pick up now), shared quests, your next duel and the inbox (Settings); where to stop questing in red on its own line under your little bar, not touching it", function()
   GameTooltip:Hide()
@@ -1230,6 +1244,7 @@ function TR:Finish(keep)
   ns.Dev:WatchForget()
   ns.Dev.pretendTrial = nil
   ns.Dev.pretendNames = nil
+  if realFinished then ns.Quests.Finished = realFinished end -- (the History shot's stand-in, if the tour stopped there)
   if ns.Walkthrough then ns.Walkthrough:Stop() end
   ns.quiet = nil
   -- The pretend Heroes go, then you leave: alone, leaving ends the fellowship.

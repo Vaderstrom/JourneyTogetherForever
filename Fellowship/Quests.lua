@@ -549,6 +549,14 @@ function Q:Classify(x)
   return x.together or x.join
 end
 
+-- Finished by me (U188, the owner, 12 Nov 2026): a chain I have done to its last part, or a quest in my log with every
+-- objective met. The Quests page keeps them under History.
+function Q.Finished(x, me)
+  if not x.mine then return false end
+  if x.chain then return (x.at[me] or 0) >= #x.steps end
+  return x.goal ~= nil and (x.have[me] or 0) >= x.goal
+end
+
 -- Where I am, for sorting quests by how close they are (the owner, 6 Nov 2026: "a better way to divide between zones
 -- and close by"). here: the names of the zone and subzone I am in; near: every map on my continent (the game's map
 -- tree, from my map up to its continent). Quest log headers name a quest's zone, so names are compared, in lower case.

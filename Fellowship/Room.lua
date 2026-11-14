@@ -64,7 +64,7 @@ function R:Share(f, key, name, seen)
   end
   for _, q in ipairs(QL:DungeonQuests(f, key)) do
     count(q.id)
-    -- A step of its chain done in the run pays there too (Destruction in Deadmines' explosives, before Alba's quest).
+    -- A step of its chain done in the run pays there too (Uldaman's A Sign of Hope, before The Lost Tablets of Will).
     local st = ns.QUEST_STARTS[q.id]
     for _, s in ipairs(st and st.after or {}) do if s.run then count(s[1], s.xp) end end
   end

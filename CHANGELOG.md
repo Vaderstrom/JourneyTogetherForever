@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.8.0 (14 November 2026)
+- Dungeon quests: Destruction in Deadmines is the quest that starts from the Extra-Destructive Explosives at the end of its chain. Five more quests for Shaper's Terrace, a new first step in the Horde's Blackrock Spire chains, and better spots for some quest givers.
+- What Adventurers found in play: 6 chain links.
+- Dungeons: the quests that come after a prequest chain you have done count as quests to pick up until you have them, on every page. The To do no longer says "Ready: your 6 quests are in your log." while two of them are still at their givers. You first get "Almost ready" ("The prequests for The Deadmines are ready. Pick up 2 quests in Westfall before the run."), then "Ready to go" once they are picked up. Another Adventurer who has one of them in their log can share it at the entrance, as with the other quests to pick up.
+- Dungeons: a quest you cannot take yet at your level counts only once you reach that level, on every page and in the toasts. Razorfen Downs' Bring the Light (from 39) no longer keeps you from being ready at 37, and "Almost ready" no longer asks you to pick it up before you can.
+- Dungeon page: the line above the rings says "Everyone is ready with the prequests.", which is also true when a step done in the run is only in the log.
+- Quests page: a tab where everything is finished says "Nothing left to do here", not "No quest chains learned yet", also while a quest far from your level waits under Show all.
+- Dungeon page: two quests after the same chain sit side by side.
+- Quests page: quests and chains you have finished are hidden on Shared quests and Quest chains. "History" at the foot of the list shows them, "Hide history" hides them again; with nothing finished there is no link.
+- Dungeon page: two quests after the same chain are a row each again, each with its own status, so a chain whose steps are all done no longer reads "Not yet" for both. The chain still counts once in Who is ready and the To do.
+
 ## 1.7.0 (12 November 2026)
 - Chapter page: the Dungeon clears table lists the Adventurers only, since a Friend of the fellowship's clears are never needed. The Dungeon page's Cleared by, the Raids page's count and the Discord board's count leave Friends out too, and with "One run is enough" a run only a Friend was in no longer clears a dungeon.
 - Chapter page: Recommended next moves on once you have cleared that dungeon, also while the fellowship still waits for others to clear it.

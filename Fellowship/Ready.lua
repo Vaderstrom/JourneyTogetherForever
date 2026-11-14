@@ -70,7 +70,7 @@ function R.Shares(r)
 end
 
 -- The line above the rings (U177, the owner, 10 Nov 2026): every prequest chain done and only quests to pick up left
--- for someone, "Everyone has done the prequests. Only quests to pick up are left: 2 can be shared in the group." (the
+-- for someone, "Everyone is ready with the prequests. Only quests to pick up are left: 2 can be shared in the group." (the
 -- distinct quests someone shares). nil otherwise, or with one Adventurer counted.
 function R.PickLine(rows)
   if #rows < 2 then return nil end
@@ -116,6 +116,17 @@ function R:Watched(f)
   return out
 end
 
+-- The ready toasts' title and text (the owner, 13 Nov 2026: "two toasts"): every prequest chain done and only quests
+-- to pick up left, "Almost ready", "The prequests for The Deadmines are ready. Pick up 2 quests in Westfall before the
+-- run."; then, ready, "Ready to go", "Ready for The Deadmines". nil when neither (or no chain: nothing was done ahead).
+function R.ReadyToast(name, r)
+  if not r then return nil end
+  if r.ready then return L.T_READY, L.T_READY_TEXT:format(name) end
+  if r.earlyOf > 0 and r.early == r.earlyOf then
+    return L.T_ALMOST, L.T_READY_PICK:format(name, ns.QuestLists.PickText(r.toPick))
+  end
+end
+
 function R:Check()
   local f = F:Current()
   if not f or f.sample or not f.members[ns.Me()] then return end
@@ -129,9 +140,12 @@ function R:Check()
   for _, x in ipairs(self:Watched(f)) do
     local key, name = x.key, x.d[2]
     local mine = ns.QuestLists:Ready(f, key, ns.Me())
-    if mine and mine.ready and not seen[key] then
-      seen[key] = true
-      ns:Toast("dready", L.T_READY, L.T_READY_TEXT:format(name), function() R:Open(key) end, { dungeon = key })
+    local title, text = R.ReadyToast(name, mine)
+    -- Almost ready once, then Ready once; never Almost after Ready (a quest given up again).
+    local id = title and (mine.ready and key or "almost:" .. key)
+    if id and not seen[key] and not seen[id] then
+      seen[id] = true
+      ns:Toast("dready", title, text, function() R:Open(key) end, { dungeon = key })
     end
     if not seen["all:" .. key] and self:Everyone(f, key) then
       seen["all:" .. key] = true

@@ -173,22 +173,20 @@ local function stepReady(s, status) return status == "done" or ((s.run or s.acce
 local function groupOf(st) return leadIn(st) > 0 and "earlier" or (st.inside and "inside" or "pick") end
 QL.GroupOf = groupOf
 -- A chain as one key: quests after exactly the same chain (U171: the Deadmines' Red Silk Bandanas and The Defias
--- Brotherhood) are one row and one chain to start. The whole chain, not only its steps before the run: one that goes
--- on otherwise inside keeps its own row (The Truth Comes Crashing Down).
+-- Brotherhood) are one chain to start, each its own row (the owner, 12 Nov 2026). The whole chain, not only its steps
+-- before the run: one that goes on otherwise inside counts as its own (The Truth Comes Crashing Down).
 local function chainKey(st)
   local ids = {}
   for k, s in ipairs(st.after or {}) do ids[k] = s[1] end
   return table.concat(ids, ",")
 end
-local NEED = { no = 1, log = 2, done = 3 }
 
 -- A dungeon's quests for this fellowship's side in three groups (SPEC §4.6): pick (pick up before you go), earlier
 -- (a chain to start earlier) and inside (starts in the dungeon), each lowest level first. A quest: { id, name, start,
 -- status (yours, or who's: "done", "log" or "no"), others (other Adventurers with it in their log), steps = { { id,
--- name, lvl, start (where it starts, as a quest start), status } } }. Quests after the same chain are one row (U171, the
--- owner, 10 Nov 2026: "One row as long as it's clear that it's two quests you should pick up"): quests = { each quest },
--- the first one's start and steps, and the status that needs most (Not yet, else In your log, else Done). nil when
--- the dungeon has no list.
+-- name, lvl, start (where it starts, as a quest start), status } } }. Quests after the same chain are a row each, with
+-- their own status (the owner, 12 Nov 2026: one row said "Not yet" with all its steps done). nil when the dungeon has
+-- no list.
 function QL:Groups(f, key, who)
   local quests = self:DungeonQuests(f, key)
   if #quests == 0 then return nil end
@@ -211,69 +209,97 @@ function QL:Groups(f, key, who)
     local list = g[groupOf(st)]
     list[#list + 1] = x
   end
-  for _, list in pairs(g) do
+  -- Quests after one chain side by side, where the lowest of them would be (the owner, 12 Nov 2026: the Deadmines'
+  -- Red Silk Bandanas and The Defias Brotherhood had Destruction in Deadmines between them).
+  local first = {}
+  for _, x in ipairs(g.earlier) do
+    local c, l = chainKey(x.start), x.start.lvl or 99
+    if not first[c] or l < first[c] then first[c] = l end
+  end
+  for k, list in pairs(g) do
     table.sort(list, function(a, b)
+      if k == "earlier" then
+        local ca, cb = chainKey(a.start), chainKey(b.start)
+        if ca ~= cb then
+          if first[ca] ~= first[cb] then return first[ca] < first[cb] end
+          return ca < cb
+        end
+      end
       local la, lb = a.start.lvl or 99, b.start.lvl or 99
       if la ~= lb then return la < lb end
       return a.name < b.name
     end)
   end
-  local rows, at = {}, {}
-  for _, x in ipairs(g.earlier) do
-    local c = chainKey(x.start)
-    local r = at[c] and rows[at[c]]
-    if not r then
-      at[c] = #rows + 1
-      rows[#rows + 1] = x
-    else
-      if not r.quests then
-        r = { id = r.id, name = r.name, start = r.start, status = r.status, others = {}, steps = r.steps, quests = { r } }
-        rows[at[c]] = r
-      end
-      r.quests[#r.quests + 1] = x
-      if NEED[x.status] < NEED[r.status] then r.status = x.status end
-    end
-  end
-  g.earlier = rows
   return g
+end
+
+-- The level from which a quest can be taken: our data's, else this many under its level.
+-- shortcut: the 4 is a rule of thumb for a chain's steps, whose start level our data does not give.
+QL.TAKE_BELOW = 4
+local function opensAt(st, dungeonFrom)
+  return st.min or (st.lvl or dungeonFrom) - QL.TAKE_BELOW
 end
 
 -- Who is ready for a dungeon (U98, the owner, 8 Nov 2026): every Start-early chain ready up to the dungeon quest, or up
 -- to the run (stepReady; or the quest itself in the log or done), and every Pick-up quest in the log or done, by
--- name's shared quest log. The same on every PC: it reads only the shipped data and the shared logs.
--- { early, earlyOf (chains), pick, pickOf, quests (earlier and pick-up quests), ready, shares }; nil when there is nothing to get ready (no list, or only quests inside).
+-- name's shared quest log. A quest after a chain done to its end is one to pick up too (the owner, 13 Nov 2026: "Ready"
+-- came with Red Silk Bandanas and The Defias Brotherhood still at their givers). A quest to pick up counts from the
+-- level it opens at for name (the owner, 14 Nov 2026: Razorfen Downs' Bring the Light opens at 39, its chapter's floor
+-- is 37). The same on every PC: it reads only the shipped data, the shared logs and levels.
+-- { early, earlyOf (chains), pick, pickOf, quests (earlier and pick-up quests), ready, shares, toPick (the starts of
+-- the quests still to pick up) }; nil when there is nothing to get ready (no list, or only quests inside).
 function QL:Ready(f, key, name)
-  local h, lvl, counted = Hr:Get(f, name) or {}, Hr:Level(f, name), nil
-  local r = { early = 0, earlyOf = 0, pick = 0, pickOf = 0, shares = {}, quests = 0 }
+  -- (A level not known yet leaves nothing out: Hr:Level would say 1; the review of 14 Nov 2026.)
+  local h, counted = Hr:Get(f, name) or {}, nil
+  local lvl = tonumber(h.level or (f.members[name] or {}).level)
+  local from = (ns.Dungeon(key) or {})[3] or 0
+  local r = { early = 0, earlyOf = 0, pick = 0, pickOf = 0, shares = {}, quests = 0, toPick = {} }
   local chains = {} -- (a chain two quests share counts once, U171)
   -- A shareable quest to pick up that another Adventurer counted for the chapter has in their log is ready for you too,
-  -- shared at the entrance (U177, the owner, 10 Nov 2026): shares = { { id, by } }. Not below the level it opens at.
+  -- shared at the entrance (U177, the owner, 10 Nov 2026): shares = { { id, by } }.
   local function sharer(q, st)
-    if not st.share or lvl < (st.min or 0) then return nil end
+    if not st.share then return nil end
     counted = counted or ns.Journey:Counted(f)
     for _, n in ipairs(counted) do
       if statusOf(Hr:Get(f, n) or {}, q.id) == "log" then return n end
     end
   end
+  -- A quest to pick up: in the log or done, or shared at the entrance (U177; a quest after a chain too, the release
+  -- review of 13 Nov 2026); else still at its giver (toPick).
+  local function pickUp(q, st, ok)
+    r.pickOf = r.pickOf + 1
+    local by = not ok and sharer(q, st)
+    if by then r.shares[#r.shares + 1] = { q.id, by } end
+    if ok or by then r.pick = r.pick + 1 else r.toPick[#r.toPick + 1] = st end
+  end
   for _, q in ipairs(self:DungeonQuests(f, key)) do
     local st = self:Start(q.id) or {}
     local g = groupOf(st)
     local ok = statusOf(h, q.id) ~= "no"
-    if g ~= "inside" then r.quests = r.quests + 1 end -- (quests, not chains: the To do counts them)
+    local later = not ok and lvl ~= nil and lvl < opensAt(st, from) -- (not open to name yet: counted from its level)
+    -- (Quests, not chains: the To do counts them. A chain's own quest counts while its chain does, the review of 14 Nov
+    -- 2026: "Ready: your 0 quests are in your log."; only a quest to pick up that is not open yet is left out.)
+    if g == "earlier" or (g == "pick" and not later) then r.quests = r.quests + 1 end
     if g == "pick" then
-      r.pickOf = r.pickOf + 1
-      local by = not ok and sharer(q, st)
-      if by then r.shares[#r.shares + 1] = { q.id, by } end
-      if ok or by then r.pick = r.pick + 1 end
+      if not later then pickUp(q, st, ok) end
     elseif g == "earlier" then
+      local chain = ok
       if not ok then
-        ok = true
+        chain = true
         for k = 1, leadIn(st) do
-          if not stepReady(st.after[k], statusOf(h, st.after[k][1])) then ok = false break end
+          if not stepReady(st.after[k], statusOf(h, st.after[k][1])) then chain = false break end
         end
+        -- Its whole chain done and the quest itself still at its giver: a quest to pick up (the owner, 13 Nov 2026).
+        -- Every step, not only those before the run (Uldaman's The Lost Tablets of Will comes after A Sign of Hope, done
+        -- in the run, and four more); one that starts inside is taken in the run.
+        local allDone = chain and not st.inside
+        for _, s in ipairs(allDone and st.after or {}) do
+          if statusOf(h, s[1]) ~= "done" then allDone = false break end
+        end
+        if allDone and later then r.quests = r.quests - 1 elseif allDone then pickUp(q, st, false) end
       end
       local c = chainKey(st)
-      chains[c] = chains[c] or ok
+      chains[c] = chains[c] or chain
     end
   end
   for _, ok in pairs(chains) do
@@ -297,31 +323,6 @@ function QL.StatusText(status, word)
   local s = QL.STATUS[status] or QL.STATUS.no
   local text = word or L[s[3]]
   return s[2] and ("|cff%s%s|r"):format(ns.Theme:HexFor(s[2]), text) or text
-end
-
--- How many quests of each group you still have to pick up or start, neither in your log nor done (U98: one in your
--- log is picked up; a chain two quests share once): pick, earlier, inside; then how many of its quests start outside at all, and how many you have
--- not done (nil when the dungeon has no list). Only counted: the Dungeon quests list asks this for every dungeon of
--- the journey at each redraw, and building their groups each time was too much (code review of 1.2.0).
-function QL:Counts(f, key)
-  local quests = self:DungeonQuests(f, key)
-  if #quests == 0 then return nil end
-  local mine = Hr:Get(f, ns.Me()) or {}
-  local n = { pick = 0, earlier = 0, inside = 0 }
-  local outside, open, chains = 0, 0, {}
-  for _, q in ipairs(quests) do
-    local start = self:Start(q.id) or {}
-    local g, st = groupOf(start), statusOf(mine, q.id)
-    if g ~= "inside" then outside = outside + 1 end
-    if st ~= "done" then open = open + 1 end
-    -- (A chain two quests share once, as its one row: U171.)
-    local c = g == "earlier" and chainKey(start)
-    if st == "no" and not (c and chains[c]) then
-      n[g] = n[g] + 1
-      if c then chains[c] = true end
-    end
-  end
-  return n.pick, n.earlier, n.inside, outside, open
 end
 
 -- Where a quest starts, in words: "Scout Riell, Westfall", an item, inside, or not known yet.
@@ -390,13 +391,6 @@ function QL:Waypoint(st, map)
   return "chat"
 end
 
--- The level from which a quest can be taken: our data's, else this many under its level.
--- shortcut: the 4 is a rule of thumb for a chain's steps, whose start level our data does not give.
-QL.TAKE_BELOW = 4
-local function opensAt(st, dungeonFrom)
-  return st.min or (st.lvl or dungeonFrom) - QL.TAKE_BELOW
-end
-
 -- Steps for later dungeons (U136, U140; the owner, 10 Nov 2026): for each dungeon of a chapter after n (once, by its
 -- base key: Blackrock Depths is in two), the next step before the run of each of its prequest chains not done yet, once
 -- your level reaches that step's level and it is within chapter n's cap. A chain under way counts until it is done (its
@@ -461,6 +455,16 @@ function QL.LaterLine(e)
   return L.LATER_STEP:format(s.name, s.k, s.of)
 end
 
+-- "Pick up 2 quests in Westfall before the run.", for the quests that start at these starts (each zone once).
+function QL.PickText(starts)
+  local zones, seen = {}, {}
+  for _, st in ipairs(starts) do
+    if st.zone and not seen[st.zone] then seen[st.zone] = true; zones[#zones + 1] = st.zone end
+  end
+  local n = #starts == 1 and L.DQ_1_QUEST or L.DQ_N_QUESTS:format(#starts)
+  return #zones > 0 and L.TOAST_DQ_PICK_IN:format(n, table.concat(zones, L.AND)) or L.TOAST_DQ_PICK:format(n)
+end
+
 -- The reminder (U79, folds in U69): once per dungeon of the current or the next chapter, when its first quest to pick
 -- up opens to you (your own chapter's dungeons only) or you reach a chain's next step's level. Never in combat (it
 -- waits), never twice (ns.char.dqToasted).
@@ -482,13 +486,10 @@ function QL:Remind(level)
       local key = ns.BaseKey(x.key)
       local g = not ns.char.dqToasted[key] and self:Groups(f, x.key)
       if g then
-        local pick, zones, seen, chain = 0, {}, {}, nil
+        local starts, chain = {}, nil
         -- (Quests you only pick up: for your own chapter's dungeons, not the next one's; the owner, 10 Nov 2026.)
         for _, q in ipairs(n == cur and g.pick or {}) do
-          if q.status == "no" and level >= opensAt(q.start, x.d[3]) then
-            pick = pick + 1
-            if q.start.zone and not seen[q.start.zone] then seen[q.start.zone] = true; zones[#zones + 1] = q.start.zone end
-          end
+          if q.status == "no" and level >= opensAt(q.start, x.d[3]) then starts[#starts + 1] = q.start end
         end
         for _, q in ipairs(g.earlier) do
           if not chain and q.status == "no" then
@@ -502,13 +503,10 @@ function QL:Remind(level)
             end
           end
         end
-        if pick > 0 or chain then
+        if #starts > 0 or chain then
           ns.char.dqToasted[key] = true
           local parts = {}
-          if pick > 0 then
-            local n1 = pick == 1 and L.DQ_1_QUEST or L.DQ_N_QUESTS:format(pick)
-            parts[1] = #zones > 0 and L.TOAST_DQ_PICK_IN:format(n1, table.concat(zones, L.AND)) or L.TOAST_DQ_PICK:format(n1)
-          end
+          if #starts > 0 then parts[1] = QL.PickText(starts) end
           if chain then parts[#parts + 1] = L.TOAST_DQ_CHAIN:format(chain) end
           ns:Toast("dquest", x.d[2], table.concat(parts, " "), function() QL:Open(x.key) end, { dungeon = x.key })
         end

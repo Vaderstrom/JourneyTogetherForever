@@ -1630,7 +1630,7 @@ step("dungeon quests: a dungeon's page has its quests under three headings in th
   -- The status once (the owner, 11 Nov 2026): its icon before the name, its word first on the line under it, where it
   -- cannot break over two lines; no second icon on the line.
   local twice, notFirst = 0, 0
-  local shared, ofOther = L.DQ_SHARED:match("^(.-)%%d"), "^" .. L.DQ_IN_LOG_OF:gsub("%%s", ".-")
+  local ofOther = "^" .. L.DQ_IN_LOG_OF:gsub("%%s", ".-")
   for _, p in ipairs(pf.quests.items) do
     local w = p:IsShown() and (p.where:GetText() or "")
     if w then
@@ -1638,15 +1638,14 @@ step("dungeon quests: a dungeon's page has its quests under three headings in th
       w = w:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
       local word = w:find(ofOther) ~= nil
       for _, k in ipairs({ "DQ_NOT_YET", "DQ_DONE", "DQ_IN_LOG" }) do if w:find(L[k], 1, true) == 1 then word = true end end
-      if not word and w:find(shared, 1, true) ~= 1 then notFirst = notFirst + 1 end
+      if not word then notFirst = notFirst + 1 end
     end
   end
   c:Eq(twice, 0, "the status's icon once, before the quest's name")
   c:Eq(notFirst, 0, "the status in words first on each quest's line")
   -- The level it opens at beside its level (the owner, 10 Nov 2026: "Level 17" alone read as not before 17).
-  local one = L.DQ_SHARED_N:match("^(.-)%%d")
   for _, p in ipairs(pf.quests.items) do
-    local st = p:IsShown() and not (p.where:GetText() or ""):find(one, 1, true) and QL:Start(p.id)
+    local st = p:IsShown() and QL:Start(p.id)
     if st and st.lvl and st.min and st.min < st.lvl and not st.inside then
       c:Has(p.where:GetText() or "", L.DQ_LEVEL_FROM:format(st.lvl, st.min), "its level and the level it opens at")
       break
@@ -1678,20 +1677,11 @@ step("dungeon quests: a dungeon's page has its quests under three headings in th
   c:That(true, "the zone's map: " .. tostring(map) .. "; waypoints there: " .. tostring(can and true or false))
 end)
 
--- The list's counts are counted without building the groups, and each dungeon's quest list is made once (code review
--- of 1.2.0: both were made again for every dungeon at each redraw).
-step("dungeon quests: the counts agree with the groups; each list made once", function(c)
+-- Each dungeon's quest list is made once (code review of 1.2.0: made again for every dungeon at each redraw).
+step("dungeon quests: each list made once", function(c)
   local QL, f = ns.QuestLists, cur()
   local key = listedDungeon()
   if not key then return c:That(true, "no dungeon with a quest list in this journey") end
-  local g = QL:Groups(f, key)
-  local function open(list)
-    local n = 0
-    for _, x in ipairs(list) do if x.status == "no" then n = n + 1 end end
-    return n
-  end
-  local p, e, i = QL:Counts(f, key)
-  c:Eq(("%d %d %d"):format(p, e, i), ("%d %d %d"):format(open(g.pick), open(g.earlier), open(g.inside)), "the counts agree with the groups")
   c:That(QL:DungeonQuests(f, key) == QL:DungeonQuests(f, key), "the dungeon's list is made once")
 end)
 
@@ -1773,10 +1763,10 @@ step("dungeon quests: the game knows every quest on a dungeon's list and in the 
 end)
 
 -- U123 (the owner, 8 Nov 2026: the book tells players what to do ahead of time): a prequest chain lists its
--- steps, each with where it starts (Destruction in Deadmines' ten, Leaders of the Fang's five).
+-- steps, each with where it starts (Destruction in Deadmines' nine, Leaders of the Fang's five).
 step("dungeon quests: a prequest chain lists its steps, each with where it starts", function(c)
   local horde = UnitFactionGroup("player") == "Horde"
-  local key, id = horde and "wc" or "dm", horde and 914 or 92819
+  local key, id = horde and "wc" or "dm", horde and 914 or 92753
   ns.DungeonPage:Open(key)
   local pf = ns.Window.pageFrames.dungeon
   local row
@@ -1789,48 +1779,47 @@ step("dungeon quests: a prequest chain lists its steps, each with where it start
   local nextK
   for k, x in ipairs(found and found.steps or {}) do if not nextK and x.status ~= "done" then nextK = k end end
   c:That(not row.steps:IsShown(), "folded: the steps wait for a click")
-  if nextK then c:Has(row.where:GetText() or "", L.DG_STEP_OF:format(nextK, horde and 5 or 10), "how far along the chain, on the row") end
+  if nextK then c:Has(row.where:GetText() or "", L.DG_STEP_OF:format(nextK, horde and 5 or 9), "how far along the chain, on the row") end
   click(row)
   local text = row.steps:GetText() or ""
   c:That(row.steps:IsShown(), "its steps show")
   c:Has(text, horde and "1. The Forgotten Pools" or "1. Testing the Wells", "the first step first")
   c:Has(text, horde and "Tonga Runetotem, The Barrens" or "Alba Fairmoon, Westfall", "where each step starts")
   click(row)
-  c:Eq(found and #found.steps, horde and 5 or 10, "under Prequest chains, every step")
+  c:Eq(found and #found.steps, horde and 5 or 9, "under Prequest chains, every step")
 end)
 
 -- U123: a chain can go through the dungeon. A quest that starts inside with a step to take before the run is one to start
 -- early (The Truth Comes Crashing Down, after The Archivist, done in the run: it only has to be taken); one whose chain
 -- is all inside starts inside.
--- U171 (the owner, 10 Nov 2026: "One row as long as it's clear that it's two quests you should pick up"): two quests
--- after the same chain are one row, both named, a line for each (Sunken Temple: Into the Depths and Secret of the
--- Circle, either side).
-step("dungeon quests: two quests after one chain are one row, a line for each (U171)", function(c)
-  local row
-  for _, q in ipairs((ns.QuestLists:Groups(cur(), "st") or { earlier = {} }).earlier) do if q.quests then row = q end end
-  c:That(row ~= nil and #row.quests == 2, "Into the Depths and Secret of the Circle: one row")
-  if not row then return end
-  ns.DungeonPage:Open("st")
-  local p
-  for _, x in ipairs(ns.Window.pageFrames.dungeon.quests.items) do if x:IsShown() and x.id == row.id then p = x end end
-  c:That(p ~= nil, "on the Dungeon page")
-  if p then
-    c:Eq(p.title:GetText(), row.quests[1].name .. L.AND .. row.quests[2].name, "both names")
-    c:Has(p.where:GetText() or "", L.DQ_SHARED_N:format(2), "folded: one chain, two quests (U185)")
-    click(p)
-    local text, at = p.where:GetText() or "", ns.QuestLists.WhereText(row.quests[1].start)
-    c:Has(text, row.quests[2].name .. ": ", "a line for each quest")
-    -- Two quests from one giver say where once (U185).
-    local _, said = text:gsub((at:gsub("%p", "%%%0")), "")
-    if ns.QuestLists.WhereText(row.quests[2].start) == at then
-      c:Has(text, L.DQ_SHARED_AT:format(2, at), "two quests to pick up from one giver")
-      c:Eq(said, 1, "the giver said once")
-    else
-      c:Has(text, L.DQ_SHARED:format(2), "two quests to pick up")
-    end
-    click(p)
+-- Two quests after the same chain are a row each, with their own status (the owner, 12 Nov 2026: one row for both said
+-- "Not yet" with all its steps done; U171 made them one row), and one chain to start in Who is ready (Sunken Temple:
+-- Into the Depths and Secret of the Circle, either side).
+step("dungeon quests: two quests after one chain are a row each, one chain to start", function(c)
+  local QL, two = ns.QuestLists, {}
+  for _, q in ipairs((QL:Groups(cur(), "st") or { earlier = {} }).earlier) do
+    if q.id == 3446 or q.id == 3447 then two[#two + 1] = q end
   end
+  local key = function(q) local t = {} for k, x in ipairs(q.steps or {}) do t[k] = x.id end return table.concat(t, ",") end
+  local same = #two >= 2 and key(two[1]) == key(two[2])
+  c:That(same, "Into the Depths and Secret of the Circle: after one chain")
+  ns.DungeonPage:Open("st")
+  local rows = 0
+  for _, x in ipairs(ns.Window.pageFrames.dungeon.quests.items) do
+    for _, q in ipairs(two) do if x:IsShown() and x.id == q.id and x.title:GetText() == q.name then rows = rows + 1 end end
+  end
+  c:Eq(rows, #two, "a row each, under its own name")
+  -- Side by side (the check of 12 Nov 23:02).
+  local at = {}
+  for k, q in ipairs((QL:Groups(cur(), "st") or { earlier = {} }).earlier) do at[q.id] = k end
+  c:That(at[3446] and at[3447] and math.abs(at[3446] - at[3447]) == 1, "and side by side")
   ns.DungeonPage:Back()
+  local keys, n = {}, 0
+  for _, q in ipairs((QL:Groups(cur(), "st") or { earlier = {} }).earlier) do
+    if not keys[key(q)] then keys[key(q)] = true; n = n + 1 end
+  end
+  local r = QL:Ready(cur(), "st", ns.Me())
+  c:Eq(r and r.earlyOf, n, "one chain to start in Who is ready, not one per row")
   -- A chain of one quest (City of Dalaran's, for the Alliance): no "Step 1 of 1", no "all 1 steps" (the check of 12 Nov
   -- 2026).
   local one
@@ -1917,10 +1906,10 @@ step("dungeon page: a quest to pick up in another Adventurer's log is shared at 
   local f = { faction = "Alliance", members = { [a] = { level = 30 }, [b] = { level = 30 } }, heroes = {},
     rules = { awayNever = true } }
   local Q, QL, R = ns.Quests, ns.QuestLists, ns.Ready
-  local function log(name, ids)
+  local function log(name, ids, done)
     local q = {}
     for _, id in ipairs(ids) do q[id] = { t = "Quest " .. id, z = "", l = 1, h = 0, g = 1 } end
-    Q:Store(f, name, { q = q, d = { 92819 } })
+    Q:Store(f, name, { q = q, d = done or { 92753 } })
   end
   c:Eq(ns.QUEST_STARTS[2040].share, true, "Underground Assault can be shared (the built data)")
   log(a, { 166, 214, 2040, 168, 167 })
@@ -1930,8 +1919,20 @@ step("dungeon page: a quest to pick up in another Adventurer's log is shared at 
   c:Eq(r and r.ready, true, "so Tamsin is ready")
   c:Eq(R.Shares(r), L.RD_SHARES_N:format(ns.Short(a), 3), "who shares, on Tamsin's row")
   c:Eq(R.PickLine(R:Rows(f, "dm")), L.RD_PREQ_DONE .. " " .. L.RD_PICK_SHARED:format(3), "the line above the rings")
+  -- The release review of 13 Nov 2026: the quests after a chain done to its end are shared at the entrance too.
+  local done = { 92753 }
+  for _, s in ipairs(ns.QUEST_STARTS[214].after) do done[#done + 1] = s[1] end
+  log(b, { 2040, 168, 167 }, done)
+  r = QL:Ready(f, "dm", b)
+  c:Eq(r and #r.shares, 2, "Grok shares Red Silk Bandanas and The Defias Brotherhood, after Tamsin's finished chain")
+  c:Eq(r and r.ready, true, "so Tamsin is ready")
+  log(b, { 166, 214 })
   f.members[b].level = 13 -- (Collecting Memories opens at 14, the other two at 15)
-  c:Eq(#QL:Ready(f, "dm", b).shares, 0, "not under the level a quest opens at")
+  r = QL:Ready(f, "dm", b)
+  c:Eq(r and #r.shares, 0, "not under the level a quest opens at")
+  -- The owner, 14 Nov 2026: a quest to pick up counts from the level it opens at, so Tamsin at 13 is ready.
+  c:Eq(r and r.pickOf, 0, "the three quests to pick up do not count yet at 13")
+  c:Eq(r and r.ready, true, "ready with what opens at 13")
 end)
 
 -- U178 (the owner, 10 Nov 2026): in a dungeon, a toast for each quest a member of the group lacks that you can share.
@@ -2178,11 +2179,27 @@ step("dungeon page: ready toasts once, never in combat; a reminder once a day (U
     local n = #report().toasts
     R:Check()
     c:Eq(#report().toasts, n, "never twice")
+    -- The prequests done and quests still at their givers: Almost ready, then Ready once they are picked up (the
+    -- owner, 13 Nov 2026: two toasts).
+    local two = { { zone = "Westfall" }, { zone = "Westfall" } }
+    local title, text = R.ReadyToast("The Deadmines", { early = 1, earlyOf = 1, toPick = two })
+    c:Eq(title, L.T_ALMOST, "almost ready, with quests still to pick up")
+    c:Eq(text, L.T_READY_PICK:format("The Deadmines", L.TOAST_DQ_PICK_IN:format(L.DQ_N_QUESTS:format(2), "Westfall")),
+      "the prequests done, two quests still to pick up")
+    title, text = R.ReadyToast("The Deadmines", { early = 1, earlyOf = 1, toPick = {}, ready = true })
+    c:Eq(title .. " / " .. text, L.T_READY .. " / " .. L.T_READY_TEXT:format("The Deadmines"), "ready, all picked up")
+    c:Eq(R.ReadyToast("The Deadmines", { early = 0, earlyOf = 1, toPick = two }), nil, "a prequest still to do: no toast")
+    c:Eq(R.ReadyToast("The Deadmines", { early = 0, earlyOf = 0, toPick = two }), nil, "no chain: nothing done ahead, no toast")
   end)
   QL.Ready = ready
   ns.char.readyToasts = was
   ns.Combat:SetSimulated(false)
   if not ok then error(err) end
+  -- (The real one again:) each quest still to pick up is named once, and none starts inside.
+  local key = listedDungeon()
+  local mine = key and QL:Ready(cur(), key, ns.Me())
+  if mine then c:Eq(#mine.toPick, mine.pickOf - mine.pick, "each quest still to pick up named once") end
+  for _, st in ipairs(mine and mine.toPick or {}) do c:That(not st.inside, "a quest still to pick up starts outside") end
   -- Reminders: once per Adventurer, dungeon and day (applied here, not sent).
   local f = cur()
   local kept, other = f.reminds, nil
@@ -3503,6 +3520,55 @@ step("quests: Show all brings in far-off quests", function(c)
   else
     c:That(ns.Ready.Tally(ns.Ready:Rows(f, key)) ~= nil, (d and d[2] or key) .. " has its ready line on the Chapter page (U186)")
   end
+end)
+
+-- U188 (the owner, 12 Nov 2026): quests and chains you have finished wait under History, on both tabs.
+step("quests: History keeps what you have finished", function(c)
+  local Q, me = ns.Quests, ns.Me()
+  c:That(Q.Finished({ chain = true, mine = true, at = { [me] = 2 }, steps = { "a", "b" } }, me), "a chain done to its end")
+  c:That(not Q.Finished({ chain = true, mine = true, at = { [me] = 1 }, steps = { "a", "b" } }, me), "a chain on its last part")
+  c:That(Q.Finished({ mine = true, have = { [me] = 15 }, goal = 15 }, me), "a quest with every objective met")
+  c:That(not Q.Finished({ mine = true, have = { [me] = 6 }, goal = 15 }, me), "a quest under way")
+  c:That(not Q.Finished({ mine = false, have = {}, goal = 15 }, me), "another Adventurer's quest")
+  dev("hero Brannic quests")
+  ns.Window:ShowPage("quests")
+  local pf = ns.Window.pageFrames.quests
+  pf.all, pf.history = nil, nil
+  local function rows() local n = 0 for _, r in ipairs(pf.rows.items) do if r:IsShown() then n = n + 1 end end return n end
+  for i, tab in ipairs({ L.TAB_QUESTS, L.TAB_CHAINS }) do
+    pf.tabs.buttons[i]:Click()
+    local n = pf.showDone:IsShown() and tonumber((pf.showDone.text:GetText() or ""):match("%d+")) or 0
+    local before = rows()
+    if n > 0 then
+      pf.showDone:Click()
+      c:Eq(rows(), before + n, tab .. ": History brings in the " .. n .. " you have finished")
+      c:Eq(pf.showDone.text:GetText(), L.Q_HIDE_DONE, tab .. ": and offers to hide them again")
+      pf.showDone:Click()
+    else
+      c:That(not pf.showDone:IsShown(), tab .. ": nothing finished, no History link")
+      pf.history = true; ns.Window:Refresh()
+      c:That(not pf.showDone:IsShown(), tab .. ": nor with History shown (the check of 12 Nov 23:02)")
+      pf.history = nil; ns.Window:Refresh()
+    end
+  end
+  -- Everything finished: the page says so, not "No quest chains learned yet" (the ponytail audit of 13 Nov 2026), also
+  -- with one far from your level under Show all (the release review of 13 Nov 2026).
+  local real = Q.Finished
+  Q.Finished = function() return true end
+  local okD, errD = pcall(function()
+    for i, tab in ipairs({ L.TAB_QUESTS, L.TAB_CHAINS }) do
+      pf.tabs.buttons[i]:Click()
+      if pf.showDone:IsShown() and rows() == 0 then
+        c:Eq(pf.none.title:GetText(), L.Q_ALL_DONE, tab .. ": all of it finished, and the page says so")
+      else
+        c:That(pf.none.title:GetText() ~= L.Q_ALL_DONE, tab .. ": nothing here, or not all finished: the page's own words")
+      end
+    end
+  end)
+  Q.Finished = real
+  pf.history = nil
+  pf.tabs.buttons[1]:Click()
+  if not okD then error(errD) end
 end)
 
 -- One Chronicle with three tabs (U142): The journey, Moments and The fellowship (History until the rebuild); the lines
