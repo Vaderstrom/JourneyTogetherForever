@@ -2,10 +2,10 @@
 -- part is for, with Back, Next and Skip; that part has a gold frame with sparks (UI/Glow.lua) and the rest of the book
 -- is dimmed and cannot be clicked. The book shows a sample fellowship meanwhile (Fellowship/Sample.lua), drawn as
 -- you with the tour's rank (Watch.demo), so every page has something to show and nothing real changes.
--- Two tours: Leader and Adventurer (two ranks since 27 Oct 2026). Offered once after the setup guide as a short first
--- tour (the Overview and what you see first; the owner, 8 Nov 2026: the whole book at once was too long); a page's
--- own help is its "?" (About this page). Settings runs the whole tour; a promotion offers a short tour of only what is
--- new for you.
+-- Two tours: Leader and Adventurer (two ranks since 27 Oct 2026). The tour is short: the Overview and what you see
+-- first (the owner, 8 Nov 2026: the whole book at once was too long), offered once after the setup guide and in
+-- Settings; a page's own help is its "?" (About this page; U200, 14 Nov 2026: the whole tour's page steps said the
+-- same). A promotion offers a short tour of only what is new for you.
 local _, ns = ...
 local L = ns.L
 local UI = ns.UI
@@ -29,27 +29,8 @@ WK.STEPS = {
   { id = "SINCE", ranks = ALL, page = "overview", target = function() return pf("overview").since end },
   { id = "COMING", ranks = ALL, page = "overview", target = function() return pf("overview").coming end },
   { id = "STAND", ranks = ALL, page = "overview", target = function() return pf("overview").pic, pf("overview").stand end },
-  -- Your To do: its heading to the first dungeon.
-  { id = "CHAPTER", ranks = ALL, page = "chapter", target = function()
-    local p = pf("chapter")
-    return p.todoHead, p.rows.items[1]
-  end },
-  { id = "CLEARS", ranks = ALL, page = "chapter", target = function() return pf("chapter").matrix end },
-  -- A dungeon's page: the chapter's first.
-  { id = "DUNGEON", ranks = ALL, page = "dungeon", before = function()
-    local x = (pf("chapter").rows.items[1] or {}).key
-    if x then W().dungeon = x end
-  end, target = function() return pf("dungeon").right end },
-  { id = "QUESTS", ranks = ALL, page = "quests", target = function() return pf("quests").left end },
-  { id = "HISTORY", ranks = ALL, page = "chronicle", target = function() return pf("chronicle").left end },
-  { id = "COMPANIONS", ranks = ALL, page = "heroes", target = function() return pf("heroes").listR end },
-  { id = "YOURSELF", ranks = ALL, page = "heroes", before = function() pf("heroes").sel = ns.Me() end,
-    target = function() return pf("heroes").insR end },
-  { id = "GATHERINGS", ranks = ALL, page = "gatherings", target = function() return pf("gatherings").left end },
-  { id = "INVITE", ranks = ALL, page = "heroes", before = function() pf("heroes").invOpen = true end, target = function() return pf("heroes").invHead, pf("heroes").send end },
-  -- The rulebook (where the Leader edits it, U143), then the Leader's Manage; Journey Admin last before the end (the
-  -- tour went back and forth between them; 28 Oct 2026).
-  { id = "RULES", ranks = ALL, page = "rules", target = function() return pf("rules").left end },
+  -- (The pages' own steps went with U200, 14 Nov 2026: each page's "?" says it.) The Leader's two pages, for the tour
+  -- after a promotion; Journey Admin last before the end (the tour went back and forth between them; 28 Oct 2026).
   { id = "MANAGE", ranks = { leader = true }, page = "manage", target = function() return pf("manage").left end },
   { id = "HEADER", ranks = ALL, target = function()
     local h = W().frame.header
@@ -69,7 +50,7 @@ WK.STEPS = {
 -- WALK_PG_<PAGE>_R. A flat sheet of parts (the Overview) goes part by part instead: WK.PARTS, WALK_PG_<PAGE>_<PART>.
 WK.PAGES = { welcome = true, create = true, join = true, overview = true, chapter = true, quests = true,
   chronicle = true, moments = true, raids = true, heroes = true, gatherings = true, rules = true, history = true,
-  tourney = true, settings = true, manage = true, managefellowship = true, rulesadmin = true, admin = true,
+  tourney = true, settings = true, manage = true, rulesadmin = true, admin = true,
   dungeon = true, dungeons = true }
 WK.PARTS = {
   overview = { { "", function(p) return p.pic, p.stand end }, { "_FOCUS", function(p) return p.focus end },
@@ -77,9 +58,9 @@ WK.PARTS = {
   dungeons = { { "", function(p) return p.scroll end } },
 }
 
--- The first tour: these steps of the whole tour, then its own end (WALK_FIRSTDONE). No page shows you around by
--- itself any more (U146): help is this short tour and the ?.
-WK.FIRST = { INTRO = true, NAV = true, FOCUS = true, SINCE = true, COMING = true, STAND = true, HEADER = true, TRACKER = true }
+-- The tour: these steps, then its own end (WALK_FIRSTDONE). No page shows you around by itself (U146): help is this
+-- short tour and the ?.
+WK.TOUR = { INTRO = true, NAV = true, FOCUS = true, SINCE = true, COMING = true, STAND = true, HEADER = true, TRACKER = true }
 
 -- Your rank in your own fellowship: "leader" or "member" (nil outside one).
 function WK:MyRank()
@@ -87,16 +68,16 @@ function WK:MyRank()
   return f and ns.Permissions.Rank(f, ns.Me()) or nil
 end
 
--- The steps of a tour: every step of that rank, or (since = an earlier rank) only what is new since that rank, or
--- (first) the first tour's.
-function WK:Steps(rank, since, first)
+-- The steps of a tour: the tour (WK.TOUR and its own end), or (since = an earlier rank) only what is new since that
+-- rank.
+function WK:Steps(rank, since)
   local out = {}
   for _, s in ipairs(self.STEPS) do
-    local new = not since or not s.ranks[since] or s.id == "DONE"
-    if s.ranks[rank] and new and (not first or self.FIRST[s.id]) then out[#out + 1] = s end
+    local new = since and (not s.ranks[since] or s.id == "DONE")
+    if s.ranks[rank] and (new or not since and self.TOUR[s.id]) then out[#out + 1] = s end
   end
-  if first then out[#out + 1] = { id = "DONE", key = "FIRSTDONE", ranks = ALL } end
-  if since then table.insert(out, 1, { id = "NEW", ranks = ALL, page = "overview" }) end
+  if since then table.insert(out, 1, { id = "NEW", ranks = ALL, page = "overview" })
+  else out[#out + 1] = { id = "DONE", key = "FIRSTDONE", ranks = ALL } end
   return out
 end
 
@@ -277,15 +258,14 @@ local function later(fn)
   return true
 end
 
--- rank: the tour's rank (default: yours); since: only what is new since that rank (after a promotion); first: the
--- first tour.
-function WK:Start(rank, since, first)
+-- rank: the tour's rank (default: yours); since: only what is new since that rank (after a promotion).
+function WK:Start(rank, since)
   if not ns.Fellowship:Current() then return false end
-  if later(function() WK:Start(rank, since, first) end) then return false end
+  if later(function() WK:Start(rank, since) end) then return false end
   rank = rank or self:MyRank() or "member"
   build()
-  self.rank, self.since, self.first = rank, since, first
-  self.steps = self:Steps(rank, since, first)
+  self.rank, self.since = rank, since
+  self.steps = self:Steps(rank, since)
   self.page = nil
   self.i, self.on, self.offer = 1, true, nil
   self.card.back:SetLabel(L.WALK_BACK)
@@ -308,7 +288,7 @@ function WK:StartPage(id)
   if later(function() if W().frame:IsShown() then WK:StartPage() end end) then return false end
   build()
   local key = "PG_" .. id:upper()
-  self.rank, self.since, self.first, self.page = self:MyRank() or "member", nil, nil, id
+  self.rank, self.since, self.page = self:MyRank() or "member", nil, id
   self.steps = {
     { id = key, target = function() return pf(id) and pf(id).left end },
     { id = key .. "_R", target = function() return pf(id) and pf(id).right end },
@@ -362,7 +342,7 @@ function WK:Go(i)
   C_Timer.After(0, function() if WK.on then place() end end)
 end
 
-function WK:Next() if self.offer then return self:Start(self.offer.rank, self.offer.since, self.offer.first) end self:Go(self.i + 1) end
+function WK:Next() if self.offer then return self:Start(self.offer.rank, self.offer.since) end self:Go(self.i + 1) end
 function WK:Back() if self.offer then return self:Later() end self:Go(math.max(1, self.i - 1)) end
 
 -- Ends the tour (done = it went to the end; false = Skip); your own fellowship shows again.
@@ -381,11 +361,7 @@ function WK:Stop(done)
     ns.char.walk[self.rank or "member"] = done and "done" or "skipped"
   end
   if was and page and W():IsOpen() then W():Refresh() end
-  if was and not page and W():IsOpen() then
-    local hp = pf("heroes")
-    if hp then hp.sel, hp.invOpen = nil, nil end -- (the Invite step opened its box)
-    W():ShowPage("overview")
-  end
+  if was and not page and W():IsOpen() then W():ShowPage("overview") end
   -- What's New waited for the tour (UI/News.lua).
   if was and W():IsOpen() then ns.News:ShowIfDue() end
 end
@@ -394,10 +370,10 @@ end
 -- Offers
 ---------------------------------------------------------------------------
 -- The card alone: "Show me around?" with Show me around / Later.
-function WK:Offer(rank, since, first)
+function WK:Offer(rank, since)
   if self.on or not ns.Fellowship:Current() or not W():IsOpen() then return false end
   build()
-  self.offer = { rank = rank, since = since, first = first }
+  self.offer = { rank = rank, since = since }
   local step = { id = since and "OFFER_NEW" or "OFFER" }
   fill(step, nil, 1, rank)
   local c = self.card
@@ -422,12 +398,12 @@ function WK:Later()
   if W():IsOpen() then ns.News:ShowIfDue() end
 end
 
--- After the setup guide: the first tour, once per character and rank. Until it is answered (Show me around, Later),
+-- After the setup guide: the tour, once per character and rank. Until it is answered (Show me around, Later),
 -- the book asks again each time it opens (walkOffer; it was lost when the book closed or the game reloaded first).
 function WK:OfferOnce()
   local rank = self:MyRank()
   if not rank or (ns.char.walk and ns.char.walk[rank]) then ns.char.walkOffer = nil return false end
-  ns.char.walkOffer = self:Offer(rank, nil, true) or ns.char.walkOffer
+  ns.char.walkOffer = self:Offer(rank) or ns.char.walkOffer
   return ns.char.walkOffer == true and self.offer ~= nil
 end
 

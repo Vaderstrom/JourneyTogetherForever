@@ -262,17 +262,6 @@ function C:Entries(f, filter)
   return list
 end
 
--- Totals: runs that counted, runs that did not, leader changes, over the cap.
-function C:Totals(f)
-  local t = { 0, 0, 0, 0 }
-  for _, e in ipairs(f.history) do
-    if e.type == "run" then t[e.ok and 1 or 2] = t[e.ok and 1 or 2] + 1
-    elseif e.type == "leader" then t[3] = t[3] + 1
-    elseif e.type == "cap" then t[4] = t[4] + 1 end
-  end
-  return t
-end
-
 -- A chapter unlocks when it becomes the current chapter.
 function C:CheckChapter(f)
   local cur = J:CurrentIndex(f)

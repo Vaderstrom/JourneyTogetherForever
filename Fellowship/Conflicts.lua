@@ -272,15 +272,6 @@ function Cf:Items(c)
   return out
 end
 
--- The whole sentence that says what was found (the chat and the tests).
-function Cf:Says(c)
-  local names = {}
-  for _, x in ipairs(self:Names(c)) do names[#names + 1] = x.text end
-  local list = table.concat(names, ", ")
-  if c.kind == "impossible" then return L.CONFLICT_IMPOSSIBLE:format(list) end
-  return L.CONFLICT_DISAGREE:format(ns.Short(c.with or "?"), list)
-end
-
 -- The report to copy: plain lines, the same in every language the addon may get.
 function Cf:Report(c)
   local lines = {

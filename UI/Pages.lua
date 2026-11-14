@@ -16,12 +16,12 @@ P.ART_HORDE = {
   council = { "HordeCouncil", 4 }, arena = { "HordeArena", 4 }, board = { "HordeBoard", 4 },
 }
 P.PAGE_ART = { chronicle = "board", moments = "board", history = "hall", gatherings = "board", overview = "land", chapter = "land", quests = "board", heroes = "heroes", manage = "council",
-  managefellowship = "council", tourney = "arena", raids = "land", dungeons = "land", setup = "hall", since = "land", admin = "board", rules = "council",
+  tourney = "arena", raids = "land", dungeons = "land", setup = "hall", since = "land", admin = "board", rules = "council",
   rulesadmin = "council", create = "hall", welcome = "land", join = "heroes", settings = "hall" }
 
 -- Pages register themselves: { id, label, icon, title = function(ctx) return title, sub end, build, refresh }.
 -- build(page) gets the page frame with .left and .right; refresh(page, ctx) runs when it is shown.
--- parent: a tab of another page (Manage's tabs): in the sidebar as that page, which stays marked. A function gives it
+-- parent: a tab or part of another page (the Chronicle's tabs, editing the rules): in the sidebar as that page, which stays marked. A function gives it
 -- when the page is drawn (the Dungeon page: the page it was opened from).
 function P:Register(def)
   def.icon = def.icon or def.id
@@ -74,7 +74,7 @@ function P:Nav(ctx)
     { label = L.NAV_JOURNEY, items = journey },
     { label = L.NAV_FELLOWSHIP, items = fellowship },
   }
-  -- The Leader's Admin: Manage (Adventurers, the fellowship and the rules as tabs; 28 Oct 2026) and
+  -- The Leader's Admin: Manage (the Adventurers and the fellowship on one spread since U197) and
   -- Journey Admin. The journey and the rules are each edited as a draft and published.
   if ctx.isLeader then nav[#nav + 1] = { label = L.NAV_ADMIN_GROUP, items = { "manage", "admin" } } end
   return nav

@@ -22,9 +22,10 @@ function OA:HasLore() return self:LoreCommand() ~= nil end
 -- The name Lore Forever knows a place by: ours shortens Scarlet Monastery's wings ("SM: Library").
 function OA.LoreName(name) return (name:gsub("^SM: ", "Scarlet Monastery ")) end
 
--- Lore Forever's pages with a recording (its zone: entries), by our key. The story button plays it too (the owner,
--- 10 Nov 2026: "Play it for you"), the way Lore Forever's own Listen link in chat does: an addon:LoreForever: link
--- passed to the game's SetItemRef callbacks. Nothing plays for a place not listed; again while it plays stops it.
+-- Lore Forever's pages with a recording (its zone: entries), by our key. The story button only plays it (the owner,
+-- 10 Nov 2026: "Play it for you"; 14 Nov 2026: better if "the Loreforever UI did not open. It just played"), the way
+-- Lore Forever's own Listen link in chat does: an addon:LoreForever: link passed to the game's SetItemRef callbacks.
+-- A place not listed has nothing to play: its page opens to read. Again while it plays stops it.
 OA.LORE_VOICED = { hot = "hallofthanes", rol = "ruinsoflordaeron", dm = "deadmines", wc = "wailing",
   sfk = "shadowfang", bfd = "blackfathom", stocks = "stockade", rfk = "razorfenkraul", gnomer = "gnomeregan",
   rfc = "ragefire", smlib = "scarlet", smgy = "scarlet", smarm = "scarlet", smcath = "scarlet" }
@@ -58,14 +59,34 @@ end
 
 function OA:HasSpokenStory(key) return spokenStory(key) ~= nil end
 
--- Opens Spoken's story of the place: "open", "locked" (Spoken tells it once this character has found the place) or
--- nil (Spoken has none).
+-- Spoken runs on this character, but its Places part, which tells the stories, is not loaded or is switched off (the
+-- owner's "Spoken does not work", 14 Nov 2026: Spoken_Places was off on that character at character select).
+function OA:SpokenPlacesOff()
+  if type(Spoken) ~= "table" then return false end
+  if type(SpokenPlaces) ~= "table" then return true end
+  if type(Spoken.IsPartOn) ~= "function" then return false end
+  local ok, on = pcall(Spoken.IsPartOn, Spoken, "places")
+  return ok and on == false
+end
+
+-- Plays Spoken's story of the place without its window (the owner, 14 Nov 2026: "Both play only"), with SpokenPlaces'
+-- PlayLore, StopLore and IsPlayingLore (docs/places/ADDON.md in Spoken): "playing", "stopped" (again while it plays),
+-- "open" (no recording: its window opens to read), "locked" (Spoken tells it once this character has found the place)
+-- or nil (Spoken has none).
 function OA:SpokenLore(key)
   local places, map, area = spokenStory(key)
   if not places then return nil end
   if type(places.IsLocked) == "function" then
     local ok, locked = pcall(places.IsLocked, places, map, area)
     if ok and locked then return "locked" end
+  end
+  if type(places.IsPlayingLore) == "function" and type(places.StopLore) == "function" then
+    local ok, on = pcall(places.IsPlayingLore, places, map, area)
+    if ok and on and pcall(places.StopLore, places) then return "stopped" end
+  end
+  if type(places.PlayLore) == "function" then
+    local ok, played = pcall(places.PlayLore, places, map, area)
+    if ok and played then return "playing" end
   end
   return pcall(places.ShowLoreFor, places, map, area) and "open" or nil
 end
@@ -80,29 +101,34 @@ function OA:StoryFrom(key)
   return spoken and "spoken" or (lore and "lore") or nil
 end
 
--- The story button's tooltip: who tells it.
+-- The story button's tooltip: who tells it; with Spoken picked and its Places part off, why Lore Forever tells it.
 function OA:StoryTip(key)
   local from = self:StoryFrom(key)
+  if from == "lore" and ns.Settings:Get("storyFrom") ~= "lore" and self:SpokenPlacesOff() then return L.SPOKEN_PLACES_OFF end
   return from == "spoken" and L.LORE_TIP_SPOKEN or (from == "lore" and L.LORE_TIP) or L.LORE_TIP_NONE
 end
 
--- Opens a dungeon's or a raid's story, in Spoken or Lore Forever (Settings: Stories from); with neither, a toast
--- says to install one. Returns true when one was asked.
+-- Plays a dungeon's or a raid's story, in Spoken or Lore Forever (Settings: Stories from), or opens it to read where
+-- there is no recording; with neither, a toast says to install one. With Spoken chosen and its Places part off, a toast
+-- says so, once a session, and Lore Forever tells it. Returns true when one was asked.
 function OA:Lore(key)
   local d = key and ns.Dungeon(key)
   if not d then return false end
   local function forever()
     local ask = self:LoreCommand()
     if not ask then return false end
-    ask(self.LoreName(d[2]))
-    OA.LoreListen(key)
+    if not OA.LoreListen(key) then ask(self.LoreName(d[2])) end
     return true
   end
   local first = self:StoryFrom(key)
+  if first == "lore" and ns.Settings:Get("storyFrom") ~= "lore" and not self.placesTold and self:SpokenPlacesOff() then
+    self.placesTold = true
+    ns:Toast(nil, L.SPOKEN, L.SPOKEN_PLACES_OFF)
+  end
   if first == "lore" then return forever() end
   if first == "spoken" then
     local got = self:SpokenLore(key)
-    if got == "open" then return true end
+    if got and got ~= "locked" then return true end
     -- Not found yet: Spoken keeps it to itself (no spoilers); Lore Forever tells it when it is there.
     if got == "locked" then
       if forever() then return true end

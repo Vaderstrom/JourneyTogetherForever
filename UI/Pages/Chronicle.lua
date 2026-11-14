@@ -283,24 +283,16 @@ local function build(pf)
   pf.rscroll = UI.Scroll(pf.right)
   pf.rscroll:SetAllPoints()
   local R = pf.rscroll.child
-  pf.head = UI.Heading(R, width, L.HIST_HOW, nil, 20)
+  -- The right page is the tallies (SPEC §8): who has fallen most, run most dungeons, turned in most quests. How clears
+  -- are counted, and that the Leader's changes to them are written here, are behind the "?" by its title (U203, the
+  -- owner, 14 Nov 2026: two headings and a line between them).
+  pf.head = UI.Heading(R, width, L.HIST_TALLIES, nil, 20)
   pf.head:SetHelp("") -- the "?" made now, not during combat
-  pf.rule = UI.WrapText(R, 14, "ink", width, "book")
-  -- Number tiles (U6, UI.NumberTile): runs that counted, that did not (the same icon, grey), Leader changes, over the
-  -- cap.
-  pf.stats = {}
-  for i, icon in ipairs({ "hist_run", "hist_run", "manage", "hist_cap" }) do
-    pf.stats[i] = UI.NumberTile(R, (width - 8) / 2, 58, L["HIST_STAT_" .. i], ns.ICONS[icon])
-  end
-  pf.stats[2].icon:SetDesaturated(true)
-  pf.div = UI.Divider(R)
-  pf.note = UI.WrapText(R, 12, "ink2", width, "book")
-  pf.note:SetText(L.HIST_NOTE)
-  -- (The journey's dungeons so far left this page on 10 Nov 2026, U170: who cleared what is on the Chapter page
-  -- and the Dungeons page.)
-  -- The tallies (SPEC §8): who has fallen most, run most dungeons, turned in most quests.
-  pf.tHead = UI.SectionHeader(R, width)
-  pf.tHead:SetText(L.HIST_TALLIES)
+  -- (No number tiles since U198, the owner, 14 Nov 2026: each count is on its filter on the left, "Runs 1", and each
+  -- run says whether it counted. The journey's dungeons so far left this page on 10 Nov 2026, U170: who cleared what
+  -- is on the Chapter page and the Dungeons page.)
+  pf.none = UI.WrapText(R, 12, "ink2", width, "book")
+  pf.none:SetText(L.HIST_TALLIES_NONE)
   pf.tRows = UI.Pool(function()
     local d = CreateFrame("Frame", nil, R)
     d:SetSize(width, 42)
@@ -340,7 +332,6 @@ end
 local function refresh(pf, ctx)
   local f = ctx.f
   if not f then return end
-  local width = ns.Window.PAGE_W - 8
 
   pf.tabs:Refresh()
   -- Opened at a filter (the session recap's toast: "chronicle#session").
@@ -397,29 +388,13 @@ local function refresh(pf, ctx)
   pf.lscroll:SetContentHeight(s.y + 8)
 
   local r = UI.Stack(pf.rscroll.child)
-  -- How clears are counted: behind the "?" by the title (a paragraph of rules on the page; seen in the tour).
-  pf.head:SetHelp(L.HIST_RULE:format(f.rules.minHeroes))
-  pf.rule:Hide()
+  pf.head:SetHelp(L.HIST_HOW .. "\n" .. L.HIST_RULE:format(f.rules.minHeroes) .. "\n\n" .. L.HIST_NOTE)
   r:Place(pf.head, pf.head:GetHeight(), 8)
-  local totals = Cl:Totals(f)
-  local y = r.y
-  for i, tile in ipairs(pf.stats) do
-    tile:Set(totals[i])
-    tile:ClearAllPoints()
-    tile:SetPoint("TOPLEFT", pf.rscroll.child, "TOPLEFT", ((i - 1) % 2) * ((width - 8) / 2 + 8), -(y + math.floor((i - 1) / 2) * 66))
-    tile:Show()
-  end
-  r:Skip(132 + 6)
-  pf.div:ClearAllPoints()
-  pf.div:SetPoint("TOPLEFT", pf.rscroll.child, "TOPLEFT", 0, -r.y); pf.div:SetPoint("TOPRIGHT", pf.rscroll.child, "TOPRIGHT", 0, -r.y)
-  r:Skip(20)
-  r:Place(pf.note, pf.note:GetStringHeight(), 4)
   -- The tallies, once someone has a count.
   local tallies = ns.Firsts:Tallies(f)
-  pf.tHead:SetShown(#tallies > 0)
+  pf.none:SetShown(#tallies == 0)
+  if #tallies == 0 then r:Place(pf.none, pf.none:GetStringHeight(), 4) end
   if #tallies > 0 then
-    r:Skip(10)
-    r:Place(pf.tHead, 29, 6)
     local light = Theme:Current().light
     for i, t in ipairs(tallies) do
       local row = pf.tRows:Get(i)

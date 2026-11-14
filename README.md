@@ -147,7 +147,7 @@ fellowship).
 - **Inspect**: their gear around the character in 3D, item level, XP, this chapter's dungeons, roles, Whisper and
   Invite to group. Someone who is not near you shows a card with their class, role, item level and their gear as a
   list in its quality colours.
-- **Invite Adventurers**: everyone can invite; the name box fills in names as you type, like the game's mail: friends,
+- **Invite Adventurers**: everyone can invite, here on the Adventurers page; the name box fills in names as you type, like the game's mail: friends,
   Battle.net friends, guild members, your group and the people you played with lately.
   Someone without the addon? **Share it** gives you the addon's page to whisper them. The invitation reaches them
   as a toast with **Accept** and **Decline**.
@@ -244,10 +244,8 @@ Five steps, and you can change everything later except the challenges:
 ![Journey Admin: the ruler, the chapters with their dungeons, and the chosen chapter](.github/screenshots/journey-editor.jpg)
 
 #### Manage the fellowship
-The Leader's **Manage** page has two tabs:
-- **Adventurers**: every Adventurer with **Make leader**, **Mark away** and **Remove** (each asks first), and the
-  invite box with the invites still waiting for an answer.
-- **The fellowship**: its name and banner, as the Adventurers see it in the book, and leaving.
+The Leader's **Manage** page: every Adventurer with **Make leader**, **Mark away** and **Remove** (each asks first),
+and the fellowship's name, banner colour and emblem. Invites are on the Adventurers page.
 
 What needs the Leader's attention is in the inbox; the rules are edited on [the Rules page](#the-rulebook-and-votes).
 
@@ -340,7 +338,7 @@ log out; the app reads it from your saved data and posts nothing you have not ch
   and frames). Drag the corner to resize it (80% to 120%), or go **full screen**, edge to edge.
 - **Themes**: Journal, Night, and Faction (Alliance blue or Horde red).
 - A **setup guide** the first time (it asks where you want the tracker), then **Show me around**: a short first tour
-  of the Overview, the sidebar, the buttons at the top and the tracker. The whole tour is in Settings, and the **?** in
+  of the Overview, the sidebar, the buttons at the top and the tracker. Settings starts it again, and the **?** in
   the header walks you through the page you are on.
 - Settings for every toast (under three headings, each with a tick for its whole group), the tracker's lines, chat
   messages, the cap warning, sounds, reduced effects and the minimap button. A **key**, Shift+J unless the game uses it already, opens the book at the page you

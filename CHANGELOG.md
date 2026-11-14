@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.9.0 (14 November 2026)
+- What's New shows once after this update: Show on map, class quests, and easier pages.
+- Dungeon page: Pin on map and the entrance button (now "Show on map") open the world map at the spot with the fellowship's crest on it. Click the mark to set a waypoint and follow it, or right-click to take it away. In combat the place goes to chat.
+- Dungeon page: Destruction in Deadmines has a pin once its chain is done. It goes to Sprite Jumpsprocket in Stormwind City, who hands out the explosives.
+- Dungeon page: class quests. Under their own heading, the quests of the dungeon only your class may take, such as the Paladin's The Test of Righteousness in The Deadmines, Shadowfang Keep and Blackfathom Deeps. A tick shows the other Adventurers' class quests, each naming who can take it. They are a guide only and never count for ready.
+- Stories: Spoken now tells a place's story when Stories from is set to Spoken, and the Dungeon page says "Hear its story in Spoken". Lore Forever plays its recording without opening its window. A place with no recording opens in Lore Forever to read. If Spoken's Places part is turned off on a character, a toast says so once.
+- Picture moment: it comes once the fight is over, not while adds are still left after the final boss.
+- Quests page: a quest's detail says your part once. The badge "In your quest log", the line "You are on part 1 of 2" and the line on how parts are learned are gone.
+- Quests page: an empty part shows neither its heading nor "Nothing here right now." while the tab's other part has something, and there is no line about Questie while it runs.
+- Dungeon page: a quest's line no longer runs under the + and the pin.
+- Adventurers page: the three number boxes are gone (the count is under the banner), and there is no tournament line while it is off.
+- Dungeon page: a boss shows "3 of 4 there" only when someone was missing. The tick alone means everyone was there.
+- Chapter page: the chapter's own rows no longer name it ("Mandatory · 17-20"), and the next chapter's rows say "Chapter III" instead of "From the next chapter".
+- Gatherings page: answer Yes, Maybe or No in a Gathering's detail or in the inbox. The list keeps the time, the name and the answers so far.
+- Adventurers page: every Adventurer's card is on the left page, under the roles and above Leave and Group photo. The right page holds Invite Adventurers, the Friends of the fellowship and the Fallen. Invite Adventurers is open at first; a click folds it, and it stays folded.
+- Manage: one page without tabs. The left page lists the Adventurers, the right page the fellowship's name, banner colour and emblem. Invites are only on the Adventurers page, where an offline invite still shows its thin bar for the time left.
+- Chronicle: the four count boxes on the right page are gone. Each count shows once, on its filter ("Runs 1").
+- Adventurers page: Friends of the fellowship and the Fallen are open at first while there are three or fewer, so a single Fallen's memorial is in sight. A click still folds them, and that is kept.
+- Settings: Start the tour runs the short tour of the Overview, the same one offered after the setup guide. Each page's ? explains the page.
+- Adventurers page: no title over the right page; Invite Adventurers heads it. The count is under the banner: "4 Adventurers · Alliance · led by Brannic".
+- Chronicle: the right page is headed Tallies. How clears are counted is behind its ?.
+- Adventurers page: an invite to someone offline says "Offline · 23 hours left". That it reaches them when they log in is in its tooltip.
+
 ## 1.8.0 (14 November 2026)
 - Dungeon quests: Destruction in Deadmines is the quest that starts from the Extra-Destructive Explosives at the end of its chain. Five more quests for Shaper's Terrace, a new first step in the Horde's Blackrock Spire chains, and better spots for some quest givers.
 - Dungeons: the quests that come after a prequest chain you have done count as quests to pick up until you have them, on every page. The To do no longer says "Ready: your 6 quests are in your log." while two of them are still at their givers. You first get "Almost ready" ("The prequests for The Deadmines are ready. Pick up 2 quests in Westfall before the run."), then "Ready to go" once they are picked up. Another Adventurer who has one of them in their log can share it at the entrance, as with the other quests to pick up.

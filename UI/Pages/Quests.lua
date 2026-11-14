@@ -1,7 +1,7 @@
 -- Quests (SPEC §4.6). Left: Your quests (in your log) and Other Heroes' quests (they have it, you do not); in
 -- each, quest chains first, then single quests by zone; your rows have a coloured edge. Right: the chosen quest or
--- chain: type, badge, your progress (bar, or the chain's parts with You are here), the other Heroes' progress, What
--- you can do, and Ask to group up.
+-- chain: type, your progress (bar, or the chain's parts with You are here), the other Heroes' progress, What you can
+-- do, and Ask to group up.
 local _, ns = ...
 local L = ns.L
 local UI, Theme = ns.UI, ns.Theme
@@ -374,17 +374,11 @@ local function build(pf)
   local R = pf.rscroll.child
   pf.none = UI.EmptyState(R, width)
   pf.head = UI.Heading(R, width, "", nil, 20)
-  pf.badge = UI.Box(R, 1, nil, nil, nil, nil)
-  pf.badge:SetHeight(18)
-  pf.badge.text = UI.Text(pf.badge, 11, "white", "body", "CENTER")
-  pf.badge.text:SetPoint("CENTER")
   pf.youHead = UI.SectionHeader(R, width)
   pf.youHead:SetText(L.Q_YOUR_PROGRESS)
   pf.youText = UI.WrapText(R, 13, "ink", width, "book")
   pf.youBar = bar(R)
   pf.youCount = UI.Text(R, 12, "ink2", "body", "RIGHT")
-  pf.partsHint = UI.WrapText(R, 12, "ink2", width)
-  pf.partsHint:SetText(L.Q_PARTS_HINT)
   pf.parts = UI.Pool(function()
     local p = CreateFrame("Frame", nil, R)
     p:SetWidth(width)
@@ -502,12 +496,12 @@ local function refresh(pf, ctx)
   -- the zone you are in first, then the ones on your continent, then the rest (the owner, 6 Nov 2026).
   local s = UI.Stack(pf.lscroll.child)
   local state = Q:QuestieState()
-  local note = pf.tab == "chains" and (state == "on" and L.Q_QUESTIE_ON
-    or (not ns.db.questieHintHidden and (state == "off" and L.Q_QUESTIE_OFF or L.Q_QUESTIE_GET)))
+  -- (No line while Questie runs, U195, the owner, 14 Nov 2026: it only filled the tab.)
+  local note = pf.tab == "chains" and state ~= "on" and not ns.db.questieHintHidden
+    and (state == "off" and L.Q_QUESTIE_OFF or L.Q_QUESTIE_GET)
   pf.questie:SetShown(note ~= nil and note ~= false)
   if note then
     pf.questie.text:SetText(note)
-    pf.questie.hide:SetShown(state ~= "on")
     local h = math.max(22, pf.questie.text:GetStringHeight())
     pf.questie:SetHeight(h)
     s:Place(pf.questie, h, 10)
@@ -516,6 +510,9 @@ local function refresh(pf, ctx)
   local RANK = { here = 0, near = 1 }
   local nRows, nLabels = 0, 0
   pf.zoneOrder = {}
+  -- "Nothing here right now." only when both sections are empty (U195, the owner, 14 Nov 2026: Short rows, an empty
+  -- group says nothing beside one that has something): not even its heading (the check of 14 Nov 2026, shots 81, 211).
+  local any = #items > 0
   for i, sec in ipairs(pf.secs) do
     local groups, byZone, count = {}, {}, 0
     for _, x in ipairs(items) do
@@ -534,10 +531,14 @@ local function refresh(pf, ctx)
       if ra ~= rb then return ra < rb end
       return a.label < b.label
     end)
-    sec.head:SetText((i == 1 and L.Q_SECTION_MINE or L.Q_SECTION_OTHERS) .. (count > 0 and ("  ·  " .. count) or ""))
-    s:Place(sec.head, 29, 6)
-    sec.empty:SetShown(#groups == 0)
-    if #groups == 0 then s:Place(sec.empty, 16, 10) end
+    local shown = #groups > 0 or not any
+    sec.head:SetShown(shown)
+    if shown then
+      sec.head:SetText((i == 1 and L.Q_SECTION_MINE or L.Q_SECTION_OTHERS) .. (count > 0 and ("  ·  " .. count) or ""))
+      s:Place(sec.head, 29, 6)
+    end
+    sec.empty:SetShown(#groups == 0 and not any)
+    if sec.empty:IsShown() then s:Place(sec.empty, 16, 10) end
     for _, g in ipairs(groups) do
       local lab = pf.groupLabels:Get(nLabels + 1)
       if not lab then break end
@@ -569,7 +570,7 @@ local function refresh(pf, ctx)
       end
       s:Skip(4)
     end
-    s:Skip(10)
+    if shown then s:Skip(10) end
   end
   pf.rows:HideFrom(nRows + 1)
   pf.groupLabels:HideFrom(nLabels + 1)
@@ -592,7 +593,7 @@ local function refresh(pf, ctx)
   local r = UI.Stack(pf.rscroll.child)
   local show = pick ~= nil
   pf.none:SetShown(not show)
-  for _, w in ipairs({ pf.head, pf.badge, pf.youHead, pf.youText, pf.youBar, pf.youCount, pf.partsHint, pf.othersHead, pf.tipsHead, pf.ask }) do w:SetShown(show) end
+  for _, w in ipairs({ pf.head, pf.youHead, pf.youText, pf.youBar, pf.youCount, pf.othersHead, pf.tipsHead, pf.ask }) do w:SetShown(show) end
   local nParts, nOthers, nTips = 0, 0, 0
   if not show then
     pf.inviteQ:Hide(); pf.share:Hide(); pf.shareWhy:Hide(); pf.listen:Hide()
@@ -609,30 +610,23 @@ local function refresh(pf, ctx)
     -- (A chain may have no zone: no "·" in front of its type then; seen in the tour.)
     pf.head:Set(d.title, ((d.line or "") ~= "" and (d.line .. "  ·  ") or "") .. d.type)
     r:Place(pf.head, pf.head:GetHeight(), 2)
-    pf.badge.text:SetText(d.badge)
-    pf.badge:SetWidth(pf.badge.text:GetStringWidth() + 16)
-    pf.badge:SetBackdropColor(ns.Hex(d.mine and "2E7A3E" or "7A6A55"))
-    r:Place(pf.badge, 18, 10, (width - pf.badge:GetWidth()) / 2)
-    -- Your progress.
-    local you = d.mine and d.youText ~= nil
-    pf.youHead:SetShown(you); pf.youText:SetShown(you)
+    -- Your progress: a quest's bar, or a chain's parts with You are here (U189: said once).
+    local you = d.mine and (d.youText ~= nil or d.chain)
+    pf.youHead:SetShown(you); pf.youText:SetShown(you and not d.chain)
     pf.youBar:SetShown(you and not d.chain); pf.youCount:SetShown(you and not d.chain)
-    if you then
-      r:Place(pf.youHead, 29, 4)
+    if you then r:Place(pf.youHead, 29, 4) end
+    if you and not d.chain then
       pf.youText:SetText(d.youText)
       r:Place(pf.youText, pf.youText:GetStringHeight(), 6)
-      if not d.chain then
-        pf.youBar:Set(width - 70, d.youPct, d.youPct >= 1, d.youGoal)
-        pf.youCount:SetText(d.youCount)
-        r:Place(pf.youBar, 10, 10)
-        -- The count level with the bar (it sat lower, under the bar's end; seen in the check).
-        pf.youCount:ClearAllPoints(); pf.youCount:SetPoint("RIGHT", pf.youBar, "RIGHT", 70, 0)
-      end
+      pf.youBar:Set(width - 70, d.youPct, d.youPct >= 1, d.youGoal)
+      pf.youCount:SetText(d.youCount)
+      r:Place(pf.youBar, 10, 10)
+      -- The count level with the bar (it sat lower, under the bar's end; seen in the check).
+      pf.youCount:ClearAllPoints(); pf.youCount:SetPoint("RIGHT", pf.youBar, "RIGHT", 70, 0)
     end
-    -- A chain's parts.
-    pf.partsHint:SetShown(d.chain)
+    -- A chain's parts (under the title when it is not yours: no Your progress over them).
     if d.chain then
-      r:Place(pf.partsHint, pf.partsHint:GetStringHeight(), 6)
+      if not you then r:Skip(10) end
       local light = Theme:Current().light
       for i, part in ipairs(d.parts) do
         local p = pf.parts:Get(i)

@@ -1,5 +1,5 @@
 -- Gatherings (SPEC §6): its own page since 27 Oct 2026 (the Overview's section was crowded; the Overview keeps one
--- line about the next one). Left: Schedule and the upcoming Gatherings, each answered with Yes / Maybe / No. Right:
+-- line about the next one). Left: Schedule and the upcoming Gatherings, each with its time, name and answer count. Right:
 -- the chosen Gathering: its picture, who set it up, who is coming, who has not answered, and how the reminder and
 -- the invites work. The data and ops are in Fellowship/Gatherings.lua.
 local _, ns = ...
@@ -61,9 +61,7 @@ local function build(pf)
     r.what = UI.WrapText(r, 13, "ink", width - 84, "title")
     r.what:SetPoint("TOPLEFT", 70, -10)
     r.line = UI.Text(r, 11, "ink2")
-    r.answer = UI.Choice(r, { { L.G_YES, "yes" }, { L.G_MAYBE, "maybe" }, { L.G_NO, "no" } },
-      function() return r.g and r.g.answers[ns.Me()] end,
-      function(v) if r.g then G:Answer(r.g.id, v) end end)
+    -- (Yes, Maybe and No only in the detail, U193, the owner, 14 Nov 2026: they were on each row too.)
     local hl = r:CreateTexture(nil, "HIGHLIGHT")
     hl:SetPoint("TOPLEFT", 3, -3); hl:SetPoint("BOTTOMRIGHT", -3, 3); hl:SetColorTexture(1, 0.9, 0.6, 0.08)
     -- The chosen one: a gold glow and a gold bar on the left (the card's own selected border hides under the
@@ -177,9 +175,7 @@ local function refresh(pf, ctx)
     local top = 10 + r.what:GetStringHeight() + 2
     r.line:ClearAllPoints(); r.line:SetPoint("TOPLEFT", 70, -top)
     r.line:SetText(G.Line(g))
-    r.answer:ClearAllPoints(); r.answer:SetPoint("TOPLEFT", 70, -(top + 16))
-    r.answer:Refresh()
-    local h = math.max(68, top + 16 + 26 + 8)
+    local h = math.max(68, top + 16 + 8)
     r:SetHeight(h)
     s:Place(r, h, 8)
   end

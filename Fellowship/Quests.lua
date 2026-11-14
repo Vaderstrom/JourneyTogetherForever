@@ -615,12 +615,13 @@ local function nameList(list)
 end
 Q.NameList = nameList
 
--- The detail of an item (the mockup's qd): { title, line, type, badge, mine, youText, youPct, youCount, youGoal,
--- parts, others = { { name, text, rel, pct, goal } }, tips }. (goal: how many to collect or kill, for the pips.)
+-- The detail of an item (the mockup's qd): { title, line, type, mine, youText, youPct, youCount, youGoal, parts,
+-- others = { { name, text, rel, pct, goal } }, tips }. (goal: how many to collect or kill, for the pips.) Each fact once
+-- (U189, the owner, 14 Nov 2026): a chain's parts list says where you are ("You are here"), so it has no youText, and
+-- no badge says whether it is in your log (What you can do says so when it is not).
 function Q:Detail(x)
   local me = ns.Me()
   local d = { title = x.name, mine = x.mine, chain = x.chain, others = {}, tips = {}, parts = {} }
-  d.badge = x.mine and L.Q_IN_LOG or L.Q_NOT_IN_LOG
   if x.chain then
     local my, n = x.at[me], #x.steps
     d.line, d.type = x.zone, L.Q_CHAIN_TYPE:format(n)
@@ -648,7 +649,6 @@ function Q:Detail(x)
       for _, name in ipairs(x.others) do
         if x.at[name] < n then d.tips[#d.tips + 1] = L.TIP_CHAIN_HELP:format(ns.Short(name), x.steps[x.at[name] + 1]) end
       end
-      d.youText = L.Q_YOU_FINISHED_CHAIN
     else
       local same, behind, ahead = {}, {}, {}
       for _, name in ipairs(x.others) do
@@ -658,7 +658,6 @@ function Q:Detail(x)
       if #same > 0 then d.tips[#d.tips + 1] = L.TIP_CHAIN_SAME:format(x.steps[my + 1], nameList(same)) end
       for _, name in ipairs(behind) do d.tips[#d.tips + 1] = L.TIP_CHAIN_BEHIND:format(ns.Short(name), x.steps[my], x.steps[my + 1]) end
       if #ahead > 0 then d.tips[#d.tips + 1] = (#ahead == 1 and L.TIP_CHAIN_AHEAD_1 or L.TIP_CHAIN_AHEAD_N):format(nameList(ahead), x.steps[my + 1]) end
-      d.youText = L.Q_YOU_ON_PART:format(my + 1, n, x.steps[my + 1])
     end
     return d
   end

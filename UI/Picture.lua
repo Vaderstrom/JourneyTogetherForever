@@ -42,11 +42,18 @@ function P:Build()
   return f
 end
 
--- Shown for the dungeon whose final boss just died (key), unless turned off in Settings.
+-- Shown for the dungeon whose final boss just died (key), unless turned off in Settings; once the fight is over (the
+-- owner, 14 Nov 2026: it came up mid-fight while adds were still left after the final boss).
 function P:Offer(key)
   if not Settings:Get("picture") then return false end
   local f = self.frame
   if not f then return false end
+  if Combat:InCombat() then
+    self.waiting = key
+    Combat:AfterCombat(function() if P.waiting == key then P.waiting = nil; P:Offer(key) end end)
+    return true
+  end
+  self.waiting = nil
   local d = ns.Dungeon(key)
   self.key, self.taken, self.token = key, 0, (self.token or 0) + 1
   f.text:SetText(L.PIC_TEXT:format(d and d[2] or key))
@@ -97,8 +104,10 @@ end
 
 ns:On("LOGIN", function() Combat:AfterCombat(function() P:Build() end) end)
 ns:RegisterEvent("PLAYER_REGEN_ENABLED", function() if P.frame and P.frame:IsShown() then P:Refresh() end end)
--- Out of the dungeon: the moment has passed.
+-- Out of the dungeon: the moment has passed. One still waiting for the fight to end goes at any loading screen (the
+-- review of 14 Nov 2026: through a portal into another instance it came up there).
 ns:RegisterEvent("PLAYER_ENTERING_WORLD", function()
+  P.waiting = nil
   local _, kind = IsInInstance()
   if P.frame and P.frame:IsShown() and kind ~= "party" and kind ~= "raid" then P:Hide() end
 end)

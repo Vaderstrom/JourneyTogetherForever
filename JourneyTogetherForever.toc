@@ -67,6 +67,7 @@ UI\JourneyEditor.lua
 UI\CharacterList.lua
 UI\Models.lua
 UI\OtherAddons.lua
+UI\MapMark.lua
 UI\Pages.lua
 UI\Pages\Welcome.lua
 UI\Pages\Create.lua

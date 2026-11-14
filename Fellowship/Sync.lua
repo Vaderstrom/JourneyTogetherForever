@@ -197,7 +197,7 @@ function S:InviteLeft(f, name)
   return t and math.max(0, self.EXPIRE - (time() - t)) or nil
 end
 
--- "offline: it reaches them when they log in  ·  23 hours left" (Manage, the Adventurers page).
+-- "Offline  ·  23 hours left" (the Adventurers page; that it reaches them at login is in the row's tooltip, U204).
 function S:OfflineText(f, name)
   local left = self:InviteLeft(f, name)
   return left and (L.INV_OFFLINE .. "  ·  " .. L.INV_LEFT:format(ns.TimeLeft(left))) or L.INV_OFFLINE

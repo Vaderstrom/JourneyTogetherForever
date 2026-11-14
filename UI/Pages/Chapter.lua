@@ -706,11 +706,14 @@ local function refresh(pf, ctx)
         tip[#tip + 1] = L.CH_ROW_LATER -- (a later dungeon's page has no Who is ready, SPEC §4.5b)
       else
         tip = rowTip(f, x, st, roleText, counted)
+        -- U192 (the owner, 14 Nov 2026): the next chapter's row names its chapter, not "From the next chapter" too.
+        if it.kind == "early" then label = L.CHAPTER_ROMAN:format(J.Roman(x.early or view + 1)) end
         if x.key == nextKey then label = L.CH_ROW_NEXT; table.insert(tip, #tip, L.CH_ROW_NEXT_TIP) end
       end
       c.tip, c.roleText = tip, roleText
       local function line(levels) return ("|cff%s%s|r%s"):format(Theme:HexFor(color), label, levels and ("  ·  " .. levels) or "") end
-      local levels = it.kind ~= "later" and L.CH_ROW_LEVELS:format(J.Roman(x.early or view), x.d[3], x.d[4]) or nil
+      -- (No chapter name on this chapter's own rows, U192: the page is the chapter.)
+      local levels = it.kind ~= "later" and L.CH_ROW_LEVELS:format(x.d[3], x.d[4]) or nil
       c.sub:SetText(line(levels))
       c.brief:SetText(it.line or "")
       c.brief:SetShown(true)

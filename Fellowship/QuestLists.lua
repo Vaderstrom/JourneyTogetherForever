@@ -24,6 +24,7 @@ function QL:AllIDs()
     for _, st in ipairs(a.steps) do for _, id in ipairs(st[1]) do add(id) end end
   end
   for _, quests in pairs(ns.DUNGEON_QUESTS) do for _, q in ipairs(quests) do add(q[1]) end end
+  for _, quests in pairs(ns.DUNGEON_CLASS_QUESTS) do for _, q in ipairs(quests) do add(q[1]) end end
   -- (The steps of a chain to start earlier too: the Dungeons tab shows who has done each.)
   for _, st in pairs(ns.QUEST_STARTS) do for _, s in ipairs(st.after or {}) do add(s[1]) end end
   self.all = list
@@ -181,6 +182,20 @@ local function chainKey(st)
   return table.concat(ids, ",")
 end
 
+-- A quest as a Dungeon page row, with name's status: { id, name, start, status, others, steps }.
+local function questRow(f, q, name, others)
+  local h = Hr:Get(f, name) or {}
+  local st = QL:Start(q.id) or {}
+  local x = { id = q.id, name = q.name, start = st, status = statusOf(h, q.id), others = others or {} }
+  if st.after then
+    x.steps = {}
+    for _, s in ipairs(st.after) do
+      x.steps[#x.steps + 1] = { id = s[1], name = ns.Quests.Name(s[1], s[2]), lvl = s.lvl, start = s, status = statusOf(h, s[1]) }
+    end
+  end
+  return x
+end
+
 -- A dungeon's quests for this fellowship's side in three groups (SPEC §4.6): pick (pick up before you go), earlier
 -- (a chain to start earlier) and inside (starts in the dungeon), each lowest level first. A quest: { id, name, start,
 -- status (yours, or who's: "done", "log" or "no"), others (other Adventurers with it in their log), steps = { { id,
@@ -191,22 +206,15 @@ function QL:Groups(f, key, who)
   local quests = self:DungeonQuests(f, key)
   if #quests == 0 then return nil end
   local me = who or ns.Me()
-  local mine = Hr:Get(f, me) or {}
   local g = { pick = {}, earlier = {}, inside = {} }
   for _, q in ipairs(quests) do
-    local st = self:Start(q.id) or {}
-    local x = { id = q.id, name = q.name, start = st, status = statusOf(mine, q.id), others = {} }
+    local others = {}
     for _, n in ipairs(F:Members(f)) do
       local h = n ~= me and Hr:Get(f, n)
-      if h and h.quests and h.quests[q.id] then x.others[#x.others + 1] = n end
+      if h and h.quests and h.quests[q.id] then others[#others + 1] = n end
     end
-    if st.after then
-      x.steps = {}
-      for _, s in ipairs(st.after) do
-        x.steps[#x.steps + 1] = { id = s[1], name = ns.Quests.Name(s[1], s[2]), lvl = s.lvl, start = s, status = statusOf(mine, s[1]) }
-      end
-    end
-    local list = g[groupOf(st)]
+    local x = questRow(f, q, me, others)
+    local list = g[groupOf(x.start)]
     list[#list + 1] = x
   end
   -- Quests after one chain side by side, where the lowest of them would be (the owner, 12 Nov 2026: the Deadmines'
@@ -231,6 +239,53 @@ function QL:Groups(f, key, who)
     end)
   end
   return g
+end
+
+-- Class quests with a part in the dungeon, for this fellowship's side (the owner, 14 Nov 2026): { { id, name, class } },
+-- made once per side like DungeonQuests. A guide only: Who is ready, the To do and the toasts never count them.
+function QL:ClassQuests(f, key)
+  local s, base = side(f), ns.BaseKey(key)
+  local id = "class:" .. (s or "-") .. ":" .. tostring(base)
+  if self.made[id] then return self.made[id] end
+  local list = {}
+  for _, q in ipairs(ns.DUNGEON_CLASS_QUESTS[base] or {}) do
+    if forSide({ side = q[3] }, s) then list[#list + 1] = { id = q[1], name = ns.Quests.Name(q[1], q[2]), class = q[4] } end
+  end
+  self.made[id] = list
+  return list
+end
+
+-- The class quests the Dungeon page shows for who: those of who's class, and with all those of the fellowship's other
+-- classes (the owner, 14 Nov 2026: "Yours + a toggle"). Rows as in Groups, with class, mine and names (the Adventurers
+-- of that class, who first), the status that of names[1]; who's class first, then by class and level. Also how many
+-- there are of the other Adventurers' classes, shown or not (the tick shows where there are some).
+function QL:ClassRows(f, key, who, all)
+  local byClass, mineClass = {}, select(2, Hr:ClassName(f, who))
+  for _, n in ipairs(F:Members(f)) do
+    local _, token = Hr:ClassName(f, n)
+    if token then
+      byClass[token] = byClass[token] or {}
+      table.insert(byClass[token], n == who and 1 or #byClass[token] + 1, n)
+    end
+  end
+  local rows, others = {}, 0
+  for _, q in ipairs(self:ClassQuests(f, key)) do
+    local names, mine = byClass[q.class], q.class == mineClass
+    if names and not mine then others = others + 1 end
+    if names and (mine or all) then
+      local x = questRow(f, q, names[1])
+      x.class, x.mine, x.names = q.class, mine, names
+      rows[#rows + 1] = x
+    end
+  end
+  table.sort(rows, function(a, b)
+    if a.mine ~= b.mine then return a.mine end
+    if a.class ~= b.class then return a.class < b.class end
+    local la, lb = a.start.lvl or 99, b.start.lvl or 99
+    if la ~= lb then return la < lb end
+    return a.name < b.name
+  end)
+  return rows, others
 end
 
 -- The level from which a quest can be taken: our data's, else this many under its level.
@@ -354,21 +409,24 @@ function QL:MapOf(st)
   return QL.maps[zone] or nil
 end
 
--- Pin on map: a waypoint at the quest giver, after asking, wherever its spot is known, with Questie running too (the
--- owner, 10 Nov 2026: it only opened the map); with Questie running and no spot, the zone's world map, where Questie
--- marks the quest giver. True when there is something to pin.
+-- Show on map (the owner, 14 Nov 2026: "Click the cross", in our own look): wherever the spot is known, the world map
+-- opens at its zone with our mark on it, and a click on the mark sets the waypoint (ns.MapMark), with Questie running
+-- too (the owner, 10 Nov 2026); with Questie running and no spot, the zone's world map, where Questie marks the quest
+-- giver. True when there is something to show.
 function QL:CanPin(st)
   if st.x and st.y then return true end
   return ns.Quests:QuestieState() == "on" and self:MapOf(st) ~= nil
 end
 
--- st: where it starts (a quest's start, or a chain step's; a dungeon's entrance with its own ask).
-function QL:Pin(st, ask)
+-- st: where it starts (a quest's start, or a chain step's; a dungeon's entrance); title: what the mark names (the
+-- quest). In combat the map does not open: the place goes to chat.
+function QL:Pin(st, title)
   st = st or {}
   local map = self:MapOf(st)
   if st.x and st.y then
-    ns.Window:Confirm(ask or L.DQ_PIN_ASK, L.DQ_PIN_OK, function() QL:Waypoint(st, map) end)
-    return "ask"
+    if map and ns.MapMark:Show(st, map, title) then return "mark" end
+    ns:Print(QL.PlaceLine(st))
+    return "chat"
   end
   if ns.Quests:QuestieState() == "on" and map and OpenWorldMap and not InCombatLockdown() then
     OpenWorldMap(map)
@@ -379,8 +437,11 @@ end
 
 -- The game's own map pin, followed (WoW Forever allows it: the check of 10 Nov 2026, Westfall).
 -- shortcut: no TomTom; where the game allows no waypoint on that map, the place goes to chat.
+-- Who and where, with the spot: "Scout Riell, Westfall 56.7, 47.4" (chat and the map mark's tooltip).
+function QL.PlaceLine(st) return L.DQ_PIN_WHERE:format(st.by or st.zone or "", st.zone or "", st.x, st.y) end
+
 function QL:Waypoint(st, map)
-  local where = L.DQ_PIN_WHERE:format(st.by or st.zone or "", st.zone or "", st.x, st.y)
+  local where = QL.PlaceLine(st)
   if map and C_Map.CanSetUserWaypointOnMap and C_Map.CanSetUserWaypointOnMap(map) and UiMapPoint then
     C_Map.SetUserWaypoint(UiMapPoint.CreateFromCoordinates(map, st.x / 100, st.y / 100))
     if C_SuperTrack and C_SuperTrack.SetSuperTrackedUserWaypoint then C_SuperTrack.SetSuperTrackedUserWaypoint(true) end

@@ -1424,7 +1424,7 @@ end
 
 -- Places frames below each other: stack:Place(frame, height, gapAfter, x).
 function UI.Stack(parent)
-  local s = { y = 0 }
+  local s = { y = 0, parent = parent }
   function s:Place(f, h, gap, x)
     f:ClearAllPoints()
     f:SetPoint("TOPLEFT", parent, "TOPLEFT", x or 0, -self.y)
@@ -1655,7 +1655,7 @@ function UI.Autocomplete(box, width, source, onPick, rows)
   return list
 end
 
--- The invite box of the Adventurers page and Manage (one, so a change reaches both; ponytail audit, 6 Nov 2026): the
+-- The invite box of the Adventurers page (Manage had one too until U197; ponytail audit, 6 Nov 2026): the
 -- name box with names filled in as you type, Send invite, Invite as a Friend of the fellowship (SPEC §1.1) and the share
 -- window for friends without the addon (M25). Fills pf.invite, pf.suggest, pf.send, pf.asFriend and pf.share; the
 -- page places them.

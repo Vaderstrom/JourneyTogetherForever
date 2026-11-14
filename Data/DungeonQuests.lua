@@ -7,6 +7,8 @@
 -- first step first: { { id, name, the same fields, run (done in the dungeon: only has to be in the log; its xp counts
 -- with the dungeon's quests), accept (only has to be taken) } } }.
 -- DUNGEON_ENTRANCES[key] = { zone, map, x, y }: where the dungeon's entrance is.
+-- DUNGEON_CLASS_QUESTS[key] = { { id, name, side, class (the game's class token) } }: class quests with a part in
+-- the dungeon, a guide only (they never count for ready); where they start is in QUEST_STARTS too.
 local _, ns = ...
 
 ns.DUNGEON_QUESTS = {
@@ -469,6 +471,31 @@ ns.QUEST_STARTS = {
   [1491] = { by = "Mebok Mizzyrix", zone = "The Barrens", map = 1413, x = 62.8, y = 36.7, lvl = 18, min = 13, xp = 1350, share = true, after = {
     { 865, "Raptor Horns", by = "Mebok Mizzyrix", zone = "The Barrens", map = 1413, x = 62.8, y = 36.7, lvl = 18 },
   } },
+  [1740] = { by = "Doan Karhan", zone = "The Barrens", map = 1413, x = 49.3, y = 57.2, lvl = 25, min = 20, xp = 2550, share = true },
+  [1782] = { by = "Furen Longbeard", zone = "Stormwind City", map = 1453, x = 58, y = 16.8, lvl = 28, min = 20, xp = 3400, after = {
+    { 1699, "The Rethban Gauntlet", by = "Yorus Barleybrew", zone = "Redridge Mountains", map = 1433, x = 21.5, y = 44.7, lvl = 22 },
+    { 1702, "The Shieldsmith", by = "Yorus Barleybrew", zone = "Redridge Mountains", map = 1433, x = 21.5, y = 44.7, lvl = 22 },
+    { 1701, "Fire Hardened Mail", by = "Furen Longbeard", zone = "Stormwind City", map = 1453, x = 58, y = 16.8, run = true, lvl = 28, xp = 2300 },
+  } },
+  [1806] = { by = "Jordan Stilwell", zone = "Dun Morogh", map = 1426, x = 52.6, y = 36.8, lvl = 22, min = 20, xp = 5500, after = {
+    { 1651, "The Tome of Valor", by = "Daphne Stilwell", zone = "Westfall", map = 1436, x = 42.2, y = 88.6, lvl = 25 },
+    { 1652, "The Tome of Valor", by = "Daphne Stilwell", zone = "Westfall", map = 1436, x = 41.7, y = 89.2, lvl = 25 },
+    { 1653, "The Test of Righteousness", by = "Duthorian Rall", zone = "Stormwind City", map = 1453, x = 50.5, y = 47.5, lvl = 21 },
+    { 1654, "The Test of Righteousness", by = "Jordan Stilwell", zone = "Dun Morogh", map = 1426, x = 52.6, y = 36.8, run = true, lvl = 22 },
+  } },
+  [1848] = { by = "Thun'grim Firegaze", zone = "The Barrens", map = 1413, x = 57, y = 30, lvl = 30, min = 20, xp = 3050, after = {
+    { 1824, "Trial at the Field of Giants", by = "Ruga Ragetotem", zone = "The Barrens", map = 1413, x = 45, y = 59, lvl = 20 },
+    { 1825, "Speak with Thun'grim", by = "Ruga Ragetotem", zone = "The Barrens", map = 1413, x = 45, y = 59, lvl = 20 },
+    { 1838, "Brutal Armor", by = "Thun'grim Firegaze", zone = "The Barrens", map = 1413, x = 57, y = 30, run = true, lvl = 30, xp = 3650 },
+  } },
+  [1951] = { by = "Magus Tirth", zone = "Thousand Needles", map = 1441, x = 78.2, y = 75.8, lvl = 40, min = 30, xp = 6300, after = {
+    { 1949, "Hidden Secrets", by = "Tabetha", zone = "Dustwallow Marsh", map = 1445, x = 46, y = 57, lvl = 38 },
+    { 1950, "Get the Scoop", by = "Magus Tirth", zone = "Thousand Needles", map = 1441, x = 78.2, y = 75.8, lvl = 30 },
+  } },
+  [1956] = { by = "Tabetha", zone = "Dustwallow Marsh", map = 1445, x = 46, y = 57, lvl = 40, min = 35, xp = 7800, after = {
+    { 1954, "The Infernal Orb", by = "Tabetha", zone = "Dustwallow Marsh", map = 1445, x = 46, y = 57, lvl = 40 },
+    { 1955, "The Exorcism", by = "Tabetha", zone = "Dustwallow Marsh", map = 1445, x = 46, y = 57, lvl = 40 },
+  } },
   [2040] = { by = "Shoni the Shilent", zone = "Stormwind City", map = 1453, x = 63, y = 34, lvl = 20, min = 15, xp = 1550, share = true },
   [2202] = { by = "Jarkal Mossmeld", zone = "Badlands", map = 1418, x = 2.4, y = 46, lvl = 42, min = 36, xp = 6750, after = {
     { 2258, "Badlands Reagent Run", by = "Jarkal Mossmeld", zone = "Badlands", map = 1418, x = 2.4, y = 46, lvl = 39 },
@@ -807,20 +834,125 @@ ns.QUEST_STARTS = {
   } },
   [7441] = { by = "Azj'Tordin", zone = "Feralas", map = 1444, x = 76.8, y = 37.4, lvl = 58, min = 54, xp = 7750, share = true },
   [7461] = { inside = true, lvl = 60, min = 56, xp = 9950, share = true },
+  [7463] = { inside = true, lvl = 60, min = 60, xp = 6600, share = true },
   [7481] = { by = "Sage Korolusk", zone = "Feralas", map = 1444, x = 74.4, y = 44, lvl = 60, min = 54, xp = 8300, share = true },
   [7482] = { by = "Scholar Runethorn", zone = "Feralas", map = 1444, x = 31, y = 44.2, lvl = 60, min = 54, xp = 8300, share = true },
   [7488] = { by = "Latronicus Moonspear", zone = "Feralas", map = 1444, x = 30.4, y = 46, lvl = 57, min = 54, xp = 7550, share = true },
   [7489] = { by = "Talo Thornhoof", zone = "Feralas", map = 1444, x = 76, y = 43.8, lvl = 57, min = 54, xp = 7550, share = true },
+  [7498] = { item = "Garona: A Study on Stealth and Treachery", inside = true, lvl = 60, min = 54, xp = 6600 },
+  [7499] = { item = "Codex of Defense", inside = true, lvl = 60, min = 54, xp = 6600 },
+  [7500] = { item = "The Arcanist's Cookbook", inside = true, lvl = 60, min = 54, xp = 6600 },
+  [7501] = { item = "The Light and How to Swing It", inside = true, lvl = 60, min = 54, xp = 6600 },
+  [7502] = { item = "Harnessing Shadows", inside = true, lvl = 60, min = 54, xp = 6600 },
+  [7503] = { item = "The Greatest Race of Hunters", inside = true, lvl = 60, min = 54, xp = 6600 },
+  [7504] = { item = "Holy Bologna: What the Light Won't Tell You", inside = true, lvl = 60, min = 54, xp = 6600 },
+  [7505] = { item = "Frost Shock and You", inside = true, lvl = 60, min = 54, xp = 6600 },
+  [7506] = { item = "The Emerald Dream", inside = true, lvl = 60, min = 54, xp = 6600 },
   [7507] = { inside = true, lvl = 60, min = 60 },
+  [7629] = { by = "Gorzeeki Wildeyes", zone = "Burning Steppes", map = 1428, x = 12.4, y = 31.4, lvl = 60, min = 60, xp = 6600, after = {
+    { 7563, "Rage of Blood", by = "Mor'zul Bloodbringer", zone = "Burning Steppes", map = 1428, x = 12.6, y = 31.4, lvl = 58 },
+    { 7564, "Wildeyes", by = "Mor'zul Bloodbringer", zone = "Burning Steppes", map = 1428, x = 12.6, y = 31.4, lvl = 58 },
+    { 7623, "Lord Banehollow", by = "Gorzeeki Wildeyes", zone = "Burning Steppes", map = 1428, x = 12.4, y = 31.4, lvl = 58 },
+    { 7624, "Ulathek the Traitor", by = "Lord Banehollow", zone = "Felwood", map = 1448, x = 36, y = 44.4, lvl = 58 },
+    { 7625, "Xorothian Stardust", by = "Lord Banehollow", zone = "Felwood", map = 1448, x = 36, y = 44.4, lvl = 60 },
+  } },
+  [7631] = { by = "Mor'zul Bloodbringer", zone = "Burning Steppes", map = 1428, x = 12.6, y = 31.4, lvl = 60, min = 60, xp = 6600, after = {
+    { 7563, "Rage of Blood", by = "Mor'zul Bloodbringer", zone = "Burning Steppes", map = 1428, x = 12.6, y = 31.4, lvl = 58 },
+    { 7564, "Wildeyes", by = "Mor'zul Bloodbringer", zone = "Burning Steppes", map = 1428, x = 12.6, y = 31.4, lvl = 58 },
+    { 7623, "Lord Banehollow", by = "Gorzeeki Wildeyes", zone = "Burning Steppes", map = 1428, x = 12.4, y = 31.4, lvl = 58 },
+    { 7624, "Ulathek the Traitor", by = "Lord Banehollow", zone = "Felwood", map = 1448, x = 36, y = 44.4, lvl = 58 },
+    { 7625, "Xorothian Stardust", by = "Lord Banehollow", zone = "Felwood", map = 1448, x = 36, y = 44.4, lvl = 60 },
+    { 7626, "Bell of Dethmoora", by = "Mor'zul Bloodbringer", zone = "Burning Steppes", map = 1428, x = 12.6, y = 31.4, lvl = 60 },
+    { 7627, "Wheel of the Black March", by = "Mor'zul Bloodbringer", zone = "Burning Steppes", map = 1428, x = 12.6, y = 31.4, lvl = 60 },
+    { 7628, "Doomsday Candle", by = "Mor'zul Bloodbringer", zone = "Burning Steppes", map = 1428, x = 12.6, y = 31.4, lvl = 60 },
+    { 7629, "Imp Delivery", by = "Gorzeeki Wildeyes", zone = "Burning Steppes", map = 1428, x = 12.4, y = 31.4, lvl = 60 },
+    { 7630, "Arcanite", by = "Gorzeeki Wildeyes", zone = "Burning Steppes", map = 1428, x = 12.4, y = 31.4, lvl = 60 },
+  } },
+  [7643] = { by = "Lord Grayson Shadowbreaker", zone = "Stormwind City", map = 1453, x = 49.4, y = 47.6, lvl = 60, min = 60, xp = 4950, after = {
+    { 7637, "Emphasis on Sacrifice", by = "Lord Grayson Shadowbreaker", zone = "Stormwind City", map = 1453, x = 49.4, y = 47.6, lvl = 60 },
+    { 7639, "To Show Due Judgment", by = "High Priest Rohan", zone = "Ironforge", map = 1455, x = 23.4, y = 6.4, lvl = 60 },
+    { 7640, "Exorcising Terrordale", by = "Lord Grayson Shadowbreaker", zone = "Stormwind City", map = 1453, x = 49.4, y = 47.6, lvl = 60 },
+    { 7641, "The Work of Grimand Elmore", by = "Lord Grayson Shadowbreaker", zone = "Stormwind City", map = 1453, x = 49.4, y = 47.6, lvl = 60 },
+    { 7642, "Collection of Goods", by = "Grimand Elmore", zone = "Stormwind City", map = 1453, x = 51.6, y = 12.2, lvl = 60 },
+    { 7648, "Grimand's Finest Work", by = "Grimand Elmore", zone = "Stormwind City", map = 1453, x = 51.6, y = 12.2, lvl = 60 },
+    { 7645, "Manna-Enriched Horse Feed", by = "Merideth Carlson", zone = "Hillsbrad Foothills", map = 1424, x = 52, y = 55.6, lvl = 60 },
+  } },
+  [7647] = { by = "Lord Grayson Shadowbreaker", zone = "Stormwind City", map = 1453, x = 49.4, y = 47.6, lvl = 60, min = 60, xp = 9950, after = {
+    { 7637, "Emphasis on Sacrifice", by = "Lord Grayson Shadowbreaker", zone = "Stormwind City", map = 1453, x = 49.4, y = 47.6, lvl = 60 },
+    { 7639, "To Show Due Judgment", by = "High Priest Rohan", zone = "Ironforge", map = 1455, x = 23.4, y = 6.4, lvl = 60 },
+    { 7640, "Exorcising Terrordale", by = "Lord Grayson Shadowbreaker", zone = "Stormwind City", map = 1453, x = 49.4, y = 47.6, lvl = 60 },
+    { 7641, "The Work of Grimand Elmore", by = "Lord Grayson Shadowbreaker", zone = "Stormwind City", map = 1453, x = 49.4, y = 47.6, lvl = 60 },
+    { 7642, "Collection of Goods", by = "Grimand Elmore", zone = "Stormwind City", map = 1453, x = 51.6, y = 12.2, lvl = 60 },
+    { 7648, "Grimand's Finest Work", by = "Grimand Elmore", zone = "Stormwind City", map = 1453, x = 51.6, y = 12.2, lvl = 60 },
+    { 7645, "Manna-Enriched Horse Feed", by = "Merideth Carlson", zone = "Hillsbrad Foothills", map = 1424, x = 52, y = 55.6, lvl = 60 },
+    { 7643, "Ancient Equine Spirit", by = "Lord Grayson Shadowbreaker", zone = "Stormwind City", map = 1453, x = 49.4, y = 47.6, lvl = 60 },
+    { 7644, "Blessed Arcanite Barding", inside = true, lvl = 60 },
+    { 7646, "The Divination Scryer", by = "Lord Grayson Shadowbreaker", zone = "Stormwind City", map = 1453, x = 49.4, y = 47.6, lvl = 60 },
+  } },
+  [7668] = { by = "Sagorne Creststrider", zone = "Orgrimmar", map = 1454, x = 38.4, y = 36, lvl = 60, min = 58, xp = 9950, after = {
+    { 7667, "Material Assistance", by = "Sagorne Creststrider", zone = "Orgrimmar", map = 1454, x = 38.4, y = 36, lvl = 60 },
+  } },
   [7703] = { inside = true, lvl = 60, min = 56, xp = 8300 },
   [7761] = { item = "Blackhand's Command", lvl = 60, min = 55, xp = 6600 },
   [7848] = { by = "Lothos Riftwaker", zone = "Blackrock Mountain", lvl = 60, min = 55, xp = 6600 },
+  [8232] = { by = "Ogtinc", zone = "Azshara", map = 1447, x = 42.4, y = 42.6, lvl = 52, min = 50, xp = 12400, after = {
+    { 8153, "Courser Antlers", by = "Ogtinc", zone = "Azshara", map = 1447, x = 42.4, y = 42.6, lvl = 52 },
+    { 8231, "Wavethrashing", by = "Ogtinc", zone = "Azshara", map = 1447, x = 42.4, y = 42.6, lvl = 52 },
+  } },
+  [8236] = { by = "Archmage Xylem", zone = "Azshara", map = 1447, x = 29.2, y = 40.2, lvl = 52, min = 50, xp = 12400, after = {
+    { 8234, "Sealed Azure Bag", by = "Lord Jorach Ravenholdt", zone = "Alterac Mountains", map = 1416, x = 86, y = 79, lvl = 52 },
+    { 8235, "Encoded Fragments", by = "Archmage Xylem", zone = "Azshara", map = 1447, x = 29.2, y = 40.2, lvl = 52 },
+  } },
+  [8253] = { by = "Archmage Xylem", zone = "Azshara", map = 1447, x = 29.2, y = 40.2, lvl = 52, min = 50, xp = 12400, after = {
+    { 8251, "Magic Dust", by = "Archmage Xylem", zone = "Azshara", map = 1447, x = 29.2, y = 40.2, lvl = 52 },
+    { 8252, "The Siren's Coral", by = "Archmage Xylem", zone = "Azshara", map = 1447, x = 29.2, y = 40.2, lvl = 52 },
+  } },
+  [8257] = { by = "Ogtinc", zone = "Azshara", map = 1447, x = 42.4, y = 42.6, lvl = 52, min = 50, xp = 12400, after = {
+    { 8255, "Of Coursers We Know", by = "Ogtinc", zone = "Azshara", map = 1447, x = 42.4, y = 42.6, lvl = 52 },
+    { 8256, "The Ichor of Undeath", by = "Ogtinc", zone = "Azshara", map = 1447, x = 42.4, y = 42.6, lvl = 52 },
+  } },
+  [8413] = { by = "Bath'rah the Windwatcher", zone = "Alterac Mountains", map = 1416, x = 80.4, y = 66.8, lvl = 52, min = 50, xp = 12400, after = {
+    { 8410, "Elemental Mastery", by = "Beram Skychaser", zone = "Thunder Bluff", map = 1456, x = 22.2, y = 19, lvl = 52 },
+    { 8412, "Spirit Totem", by = "Bath'rah the Windwatcher", zone = "Alterac Mountains", map = 1416, x = 80.4, y = 66.8, lvl = 52 },
+  } },
+  [8418] = { by = "Commander Ashlam Valorfist", zone = "Western Plaguelands", map = 1422, x = 42.8, y = 84, lvl = 52, min = 50, xp = 12400, share = true, after = {
+    { 8414, "Dispelling Evil", by = "Commander Ashlam Valorfist", zone = "Western Plaguelands", map = 1422, x = 42.8, y = 84, lvl = 52 },
+    { 8416, "Inert Scourgestones", by = "High Priest Thel'danis", zone = "Western Plaguelands", map = 1422, x = 51.8, y = 82.4, lvl = 52 },
+  } },
+  [8422] = { by = "Impsy", zone = "Felwood", map = 1448, x = 41.4, y = 44.8, lvl = 52, min = 50, xp = 12400, after = {
+    { 8419, "An Imp's Request", lvl = 52 },
+    { 8420, "Hot and Itchy", by = "Impsy", zone = "Felwood", map = 1448, x = 41.4, y = 44.8, lvl = 52 },
+    { 8421, "The Wrong Stuff", by = "Impsy", zone = "Felwood", map = 1448, x = 41.4, y = 44.8, lvl = 52 },
+  } },
+  [8425] = { by = "Fallen Hero of the Horde", zone = "Swamp of Sorrows", map = 1435, x = 34.2, y = 66, lvl = 52, min = 50, xp = 12400, after = {
+    { 8423, "Warrior Kinship", by = "Fallen Hero of the Horde", zone = "Swamp of Sorrows", map = 1435, x = 34.2, y = 66, lvl = 52 },
+    { 8424, "War on the Shadowsworn", by = "Fallen Hero of the Horde", zone = "Swamp of Sorrows", map = 1435, x = 34.2, y = 66, lvl = 52 },
+  } },
   [8945] = { by = "Anthion Harmon", zone = "Eastern Plaguelands", map = 1423, x = 26.1, y = 11.3, lvl = 60, min = 58, xp = 8300, share = true },
   [9015] = { lvl = 60, min = 58, xp = 1450, after = {
     { 8948, "Anthion's Old Friend", by = "Anthion Harmon", zone = "Eastern Plaguelands", lvl = 60 },
     { 8949, "Falrin's Vendetta", lvl = 60 },
     { 8950, "The Instigator's Enchantment", lvl = 60 },
   } },
+  [9053] = { by = "Torwa Pathfinder", zone = "Un'Goro Crater", map = 1449, x = 71.6, y = 76, lvl = 52, min = 50, xp = 12400, after = {
+    { 9052, "Bloodpetal Poison", by = "Torwa Pathfinder", zone = "Un'Goro Crater", map = 1449, x = 71.6, y = 76, lvl = 52 },
+    { 9051, "Toxic Test", by = "Torwa Pathfinder", zone = "Un'Goro Crater", map = 1449, x = 71.6, y = 76, lvl = 52 },
+  } },
+  [78307] = { by = "Dead Drop", zone = "Silverpine Forest", map = 1421, x = 47.1, y = 71.1, lvl = 23, min = 20, xp = 6900, after = {
+    { 78261, "The Horn of Xelthos", by = "Dead Drop", zone = "Silverpine Forest", map = 1421, x = 47.1, y = 71.1, run = true, lvl = 23, xp = 1850 },
+  } },
+  [78699] = { by = "Dead Drop", zone = "Silverpine Forest", map = 1421, x = 47.1, y = 71.1, lvl = 35, min = 25, xp = 6900, after = {
+    { 78261, "The Horn of Xelthos", by = "Dead Drop", zone = "Silverpine Forest", map = 1421, x = 47.1, y = 71.1, lvl = 23 },
+    { 78307, "The Horn of Xelthos", by = "Dead Drop", zone = "Silverpine Forest", map = 1421, x = 47.1, y = 71.1, lvl = 23 },
+    { 78676, "The Eye of Bhossca", by = "Dead Drop", zone = "Silverpine Forest", map = 1421, x = 47.1, y = 71.1, run = true, lvl = 35, xp = 3450 },
+  } },
+  [79442] = { by = "Prate Cloudseer", zone = "Thousand Needles", map = 1441, x = 53, y = 42, lvl = 40, min = 30, after = {
+    { 79360, "Elemental Aid", by = "Rau Cliffrunner", zone = "Thousand Needles", map = 1441, x = 46, y = 51.6, run = true, lvl = 33 },
+    { 79364, "Eyes on the Sky", by = "Rau Cliffrunner", zone = "Thousand Needles", map = 1441, x = 46, y = 51.6 },
+    { 79361, "Storm, Earth, and Fire", by = "Prate Cloudseer", zone = "Thousand Needles", map = 1441, x = 53, y = 42 },
+    { 79366, "Heed My Call", by = "Prate Cloudseer", zone = "Thousand Needles", map = 1441, x = 53, y = 42, lvl = 40 },
+  } },
+  [82084] = { by = "Garion Wendell", zone = "Stormwind City", map = 1453, x = 48.8, y = 86.6, lvl = 45, min = 42, xp = 3900 },
   [92065] = { lvl = 60, min = 47, xp = 13200 },
   [92066] = { lvl = 55, min = 47, xp = 11300 },
   [92069] = { by = "Ogtinc", zone = "Azshara", map = 1447, x = 42.4, y = 42.6, lvl = 58, min = 45, xp = 12400 },
@@ -937,6 +1069,19 @@ ns.QUEST_STARTS = {
     { 94983, "Twilight Mementos", by = "Sergeant Riftan", zone = "Riverglades", map = 2548, x = 30.6, y = 49, run = true, lvl = 42, xp = 10200 },
     { 94997, "Lingering Essence", by = "Sergeant Riftan", zone = "Riverglades", map = 2548, x = 30.6, y = 49, lvl = 42 },
   } },
+  [95140] = { by = "Lumina Windsinger", zone = "Silverpine Forest", map = 1421, x = 43.3, y = 41, lvl = 26, min = 20, xp = 2650, after = {
+    { 91858, "Diplomatic Incident", by = "Danitha Morr", zone = "Tirisfal Glades", map = 1420, x = 22, y = 44.6, lvl = 22 },
+    { 91859, "A Curious Pair", by = "Trevan Rol", zone = "Silverpine Forest", map = 1421, x = 43.4, y = 41, lvl = 22 },
+    { 91860, "A Grim Fate", by = "Deathguard Baldren", zone = "Silverpine Forest", map = 1421, x = 45.6, y = 41.8, lvl = 22 },
+    { 91861, "Into Fenris Keep", by = "Charred Remains", zone = "Silverpine Forest", map = 1421, x = 65, y = 34.2, lvl = 22 },
+    { 91862, "Lumina Windsinger", by = "Lumina Windsinger", zone = "Silverpine Forest", map = 1421, x = 65.7, y = 27.4, lvl = 22 },
+    { 96204, "The Windshaper's Wrath", by = "Lumina Windsinger", zone = "Silverpine Forest", map = 1421, x = 65.7, y = 27.4, lvl = 22 },
+    { 95034, "The Debt", by = "Lumina Windsinger", zone = "Silverpine Forest", map = 1421, x = 43.3, y = 41, lvl = 24 },
+    { 95036, "A Moon-Kissed Blade", by = "Lumina Windsinger", zone = "Silverpine Forest", map = 1421, x = 43.3, y = 41, run = true, lvl = 25 },
+    { 95111, "An Underrated Talent", by = "Trevan Rol", zone = "Silverpine Forest", map = 1421, x = 43.4, y = 41, lvl = 25 },
+    { 95125, "Ott's Masterwork", by = "Ott", zone = "Hillsbrad Foothills", map = 1424, x = 60.4, y = 26.2, lvl = 25 },
+    { 95126, "The Moonsilver Blade", by = "Ott", zone = "Hillsbrad Foothills", map = 1424, x = 60.4, y = 26.2, lvl = 25 },
+  } },
   [95189] = { item = "Crest of Lordaeron", inside = true, lvl = 22, min = 16, xp = 2600, share = true },
   [95195] = { item = "Bloodied Insignia", inside = true, lvl = 22, min = 16, xp = 2600, share = true },
   [95204] = { item = "Crest of Lordaeron", inside = true, lvl = 22, min = 16, xp = 2600, share = true },
@@ -1002,6 +1147,11 @@ ns.QUEST_STARTS = {
   [95925] = { by = "Curator Thorius", zone = "Ironforge", map = 1455, x = 71.5, y = 15.7, lvl = 60, min = 55, xp = 17650 },
   [95926] = { by = "Master Apothecary Faranell", zone = "Undercity", map = 1458, x = 48.8, y = 69.3, lvl = 60, min = 55, xp = 17650, share = true },
   [95928] = { by = "Mayena Earthseeker", zone = "Mulgore", map = 1412, x = 34.8, y = 22.2, lvl = 60, min = 55, xp = 17650, share = true },
+  [96016] = { by = "Veyric Thunderhame", zone = "Arathi Highlands", map = 1417, x = 59.6, y = 27.6, lvl = 40, min = 30, xp = 3900, after = {
+    { 96264, "Elemental Aid", by = "Veyric Thunderhame", zone = "Arathi Highlands", map = 1417, x = 59.6, y = 27.6, run = true, lvl = 33, xp = 6950 },
+    { 79358, "Storm, Earth, and Fire", by = "Veyric Thunderhame", zone = "Arathi Highlands", map = 1417, x = 59.6, y = 27.6 },
+    { 96135, "Heed My Call", by = "Veyric Thunderhame", zone = "Arathi Highlands", map = 1417, x = 59.6, y = 27.6, lvl = 40 },
+  } },
   [96078] = { by = "Kin'weelay", zone = "Stranglethorn Vale", map = 1434, x = 32.3, y = 27.7, lvl = 40, min = 30, xp = 2350, share = true, after = {
     { 629, "The Vile Reef", by = "Kin'weelay", zone = "Stranglethorn Vale", map = 1434, x = 32.3, y = 27.7, lvl = 37 },
     { 95748, "The Gurubashi Legends of Old", by = "Kin'weelay", zone = "Stranglethorn Vale", map = 1434, x = 32.3, y = 27.7, lvl = 40 },
@@ -1104,4 +1254,75 @@ ns.DUNGEON_ENTRANCES = {
   ulda = { zone = "Badlands", map = 1418, x = 44.3, y = 12 },
   wc = { zone = "The Barrens", map = 1413, x = 46, y = 36.4 },
   zf = { zone = "Tanaris", map = 1446, x = 38.7, y = 20 },
+}
+
+ns.DUNGEON_CLASS_QUESTS = {
+  bfd = {
+    { 1806, "The Test of Righteousness", "A", "PALADIN" },
+    { 95140, "Old Fire-Eye", "H", "PALADIN" },
+    { 1740, "The Orb of Soran'ruk", nil, "WARLOCK" },
+  },
+  dm = {
+    { 1806, "The Test of Righteousness", "A", "PALADIN" },
+    { 95140, "Old Fire-Eye", "H", "PALADIN" },
+  },
+  dme = {
+    { 7463, "Arcane Refreshment", nil, "MAGE" },
+  },
+  dmn = {
+    { 7506, "The Emerald Dream...", nil, "DRUID" },
+    { 7503, "The Greatest Race of Hunters", nil, "HUNTER" },
+    { 7500, "The Arcanist's Cookbook", nil, "MAGE" },
+    { 7501, "The Light and How To Swing It", "A", "PALADIN" },
+    { 7504, "Holy Bologna: What the Light Won't Tell You", nil, "PRIEST" },
+    { 7498, "Garona: A Study on Stealth and Treachery", nil, "ROGUE" },
+    { 7505, "Frost Shock and You", "H", "SHAMAN" },
+    { 7502, "Harnessing Shadows", nil, "WARLOCK" },
+    { 7499, "Codex of Defense", nil, "WARRIOR" },
+  },
+  dmw = {
+    { 7643, "Ancient Equine Spirit", "A", "PALADIN" },
+    { 7631, "Dreadsteed of Xoroth", nil, "WARLOCK" },
+  },
+  rfk = {
+    { 96016, "The Tempest's Weapons", "A", "SHAMAN" },
+    { 79442, "The Tempest's Weapons", "H", "SHAMAN" },
+    { 1782, "Furen's Armor", "A", "WARRIOR" },
+    { 1848, "Brutal Hauberk", "H", "WARRIOR" },
+  },
+  scholo = {
+    { 7629, "Imp Delivery", nil, "WARLOCK" },
+    { 7647, "Judgment and Redemption", "A", "PALADIN" },
+    { 7668, "The Darkreaver Menace", "H", "SHAMAN" },
+  },
+  sfk = {
+    { 1740, "The Orb of Soran'ruk", nil, "WARLOCK" },
+    { 1806, "The Test of Righteousness", "A", "PALADIN" },
+    { 95140, "Old Fire-Eye", "H", "PALADIN" },
+    { 78307, "The Horn of Xelthos", nil, "ROGUE" },
+  },
+  smgy = {
+    { 78699, "The Eye of Bhossca", nil, "ROGUE" },
+  },
+  smlib = {
+    { 78699, "The Eye of Bhossca", nil, "ROGUE" },
+    { 1951, "Rituals of Power", nil, "MAGE" },
+  },
+  st = {
+    { 9053, "A Better Ingredient", nil, "DRUID" },
+    { 8232, "The Green Drake", nil, "HUNTER" },
+    { 8253, "Destroy Morphaz", nil, "MAGE" },
+    { 8418, "Forging the Mightstone", "A", "PALADIN" },
+    { 8257, "Blood of Morphaz", nil, "PRIEST" },
+    { 8236, "The Azure Key", nil, "ROGUE" },
+    { 8413, "Da Voodoo", "H", "SHAMAN" },
+    { 8422, "Trolls of a Feather", nil, "WARLOCK" },
+    { 8425, "Voodoo Feathers", nil, "WARRIOR" },
+  },
+  ulda = {
+    { 1956, "Power in Uldaman", nil, "MAGE" },
+  },
+  zf = {
+    { 82084, "A Lesson in Literacy", nil, "MAGE" },
+  },
 }

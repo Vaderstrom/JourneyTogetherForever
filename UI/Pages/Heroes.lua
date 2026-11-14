@@ -1,5 +1,6 @@
--- Heroes (SPEC §4.8). List view: left the fellowship's banner, numbers, chronicle and Leave; right every Hero with
--- status, level and XP. Click a Hero to inspect: left their gear, right XP, facts, this chapter's dungeons, roles,
+-- Heroes (SPEC §4.8). List view: left the fellowship's banner, its roles, every Adventurer's card (status, level, XP)
+-- and Leave (U196, the owner, 14 Nov 2026); right Invite Adventurers, the Friends of the fellowship and the Fallen.
+-- Click a Hero to inspect: left their gear, right XP, facts, this chapter's dungeons, roles,
 -- I'm away / I'm back and Play another character (yourself).
 local _, ns = ...
 local L = ns.L
@@ -9,6 +10,9 @@ local F, P, Hr, J = ns.Fellowship, ns.Permissions, ns.Hero, ns.Journey
 
 local PORTRAIT = 56 -- the 3D head (or class crest) on a Companion card
 local CARD_X = 8 + PORTRAIT + 8 -- where the card's text starts
+local COMP_Y = 74 -- the roles under the banner (U190: where the number tiles were)
+local CARDS_Y = COMP_Y + 52 -- the cards under the roles and their line (U196)
+local FEW = 3 -- the Friends of the fellowship or the Fallen open at first up to this many (U199)
 local OLD = "C8762E" -- an old addon: the orange of "2 to the floor"
 local FALLEN_BG = { Hr.FALLEN, 0.16 } -- a Fallen's card: muted violet over the page, in every theme
 
@@ -47,18 +51,14 @@ local function buildList(pf, width)
   pf.fname:SetWidth(width - 64)
   pf.fline = UI.Text(left, 12, "ink2")
   pf.fline:SetPoint("TOPLEFT", pf.fname, "BOTTOMLEFT", 0, -4)
-  -- Number tiles (U6, UI.NumberTile).
-  pf.stats = {}
-  for i, s in ipairs({ { L.STAT_HEROES, "heroes" }, { L.STAT_CHAPTER, "chapter" }, { L.STAT_CLEARED, "toast_clear" } }) do
-    local tile = UI.NumberTile(left, (width - 16) / 3, 54, s[1], ns.ICONS[s[2]])
-    tile:SetPoint("TOPLEFT", (i - 1) * ((width - 16) / 3 + 8), -74)
-    pf.stats[i] = tile
-  end
+  pf.fline:SetWidth(width - 64); pf.fline:SetWordWrap(false) -- (a long Leader's name ends in "...", not past the page)
+  -- (No number tiles since U190, the owner, 14 Nov 2026: the count is in the line under the name (U201), the chapter in
+  -- the header's chip, the clears on the Dungeons page.)
   pf.comp = {}
   for i, role in ipairs({ "Tank", "Healer", "DPS" }) do
     local f = CreateFrame("Frame", nil, left)
     f:SetSize((width - 16) / 3, 30)
-    f:SetPoint("TOPLEFT", (i - 1) * ((width - 16) / 3 + 8), -136)
+    f:SetPoint("TOPLEFT", (i - 1) * ((width - 16) / 3 + 8), -COMP_Y)
     local icon = UI.RoleIcon(f, 22)
     icon:SetPoint("LEFT")
     UI.SetRole(icon, role)
@@ -111,7 +111,7 @@ local function buildList(pf, width)
   UI.Tooltip(fr, L.COMP_FRIEND_TIP)
   pf.compFriend = fr
   local div = UI.Divider(left)
-  div:SetPoint("TOPLEFT", 0, -176); div:SetPoint("TOPRIGHT", 0, -176)
+  div:SetPoint("TOPLEFT", 0, -(COMP_Y + 40)); div:SetPoint("TOPRIGHT", 0, -(COMP_Y + 40))
   pf.tourney = UI.WrapText(left, 12, "ink2", width)
   -- (The level track left this page on 10 Nov 2026, U168: its home is the Chapter page, and each card has its level.)
   pf.leave = UI.TextButton(left, L.LEAVE, function()
@@ -123,14 +123,17 @@ local function buildList(pf, width)
   pf.photo = UI.TextButton(left, L.GROUP_PHOTO, function() ns.Photo:Open() end, "primary", 13)
   pf.photo:SetPoint("BOTTOMRIGHT", 0, 0)
   UI.Tooltip(pf.photo, L.GROUP_PHOTO_TIP)
+  -- Every Adventurer's card under the roles, above Leave and Group photo (U196); placed by refreshList.
+  pf.lscroll = UI.Scroll(left)
 
-  -- Right page: one card per Hero.
+  -- Right page: Invite Adventurers, then the Friends of the fellowship and the Fallen.
   pf.scroll = UI.Scroll(pf.right)
   pf.scroll:SetAllPoints()
   pf.art = UI.PageArt(pf.scroll, "Companions")
   pf.listR = pf.scroll
+  -- One pool for both pages: each card goes to the page it is placed on (refreshList).
   pf.cards = UI.Pool(function()
-    local c = UI.Card(pf.scroll.child, "line", "Button")
+    local c = UI.Card(pf.lscroll.child, "line", "Button")
     c:SetSize(width - 8, 72)
     -- Their face in 3D (UI/Models.lua) once the game has drawn them this session; else their class crest.
     c.portrait = CreateFrame("Frame", nil, c)
@@ -206,16 +209,21 @@ local function buildList(pf, width)
     c:SetScript("OnLeave", function() GameTooltip:Hide() end)
     return c
   end)
-  -- Invite an Adventurer, for everyone (27 Oct 2026: Adventurers invite; the Leader also does it on Manage, in Admin).
-  -- Above the cards: the name box with friends and guild members as you type, Send invite, and the open invites.
+  -- Invite an Adventurer, for everyone (27 Oct 2026: Adventurers invite; only here since U197, the owner, 14 Nov 2026).
+  -- On top of the right page: the name box with friends and guild members as you type, Send invite, the open invites.
   local R = pf.scroll.child
   -- Your addon is older than another Adventurer's: a line at the very top until you update (28 Oct 2026).
   pf.oldNote = UI.Card(R, OLD)
   pf.oldNote:SetWidth(width - 8)
   pf.oldNote.text = UI.WrapText(pf.oldNote, 12, "ink", width - 32)
   pf.oldNote.text:SetPoint("TOPLEFT", 12, -9)
-  -- Folded at first (U108): a click on the heading opens the name box; open invites show either way.
-  pf.invHead = UI.FoldHeader(R, width - 8, function() pf.invOpen = not pf.invOpen; ns.Window:Refresh() end)
+  -- Open at first (U196, the owner, 14 Nov 2026; U108 had it folded): a click on the heading folds the name box, and
+  -- that is kept for the character; open invites show either way.
+  pf.invHead = UI.FoldHeader(R, width - 8, function()
+    ns.char.heroesOpen = ns.char.heroesOpen or {}
+    ns.char.heroesOpen.inviteShut = pf.invite:IsShown() or nil
+    ns.Window:Refresh()
+  end)
   pf.invHead:SetText(L.INVITE_HEROES)
   UI.InviteBox(pf, R, width - 118, width - 8)
   pf.invRows = UI.Pool(function()
@@ -230,16 +238,23 @@ local function buildList(pf, width)
     -- (Its width set in refresh, as on Manage: two lines were read as one; the check of 8 Nov 2026.)
     r.wait:SetPoint("LEFT", r.name, "RIGHT", 6, 0)
     r.wait:SetWordWrap(true); r.wait:SetJustifyH("LEFT")
+    -- The time an offline invite still waits, as a thin bar that empties over its day (U57; from Manage, U197).
+    r.left = UI.Bar(r, 4)
+    r.left:SetPoint("BOTTOMLEFT", 0, 2)
+    -- "Offline · 23 hours left" on the row; that it reaches them at login in its tooltip (U204, the owner, 14 Nov 2026).
+    r:EnableMouse(true)
+    UI.Tooltip(r, function() return r.offline and L.INVITE_OFFLINE:format(ns.Short(r.who)) end)
     return r
   end)
-  -- The Friends of the fellowship and the Fallen under headings of their own, closed at first (U108: a fellowship
-  -- with many Friends scrolled a long way); what you open is kept for the character.
+  -- The Friends of the fellowship and the Fallen under headings of their own: open at first while there are a few, closed
+  -- above that (U199, the owner, 14 Nov 2026: closed at first, U108, hid a single Fallen's memorial; U108 came from a
+  -- fellowship with many Friends scrolling a long way). A click opens or folds it, kept for the character.
   pf.folds = {}
   for g, x in ipairs({ { "friends", L.FOLD_FRIENDS }, { "fallen", L.FOLD_FALLEN } }) do
     local id = x[1]
     pf.folds[g] = UI.FoldHeader(R, width - 8, function()
       ns.char.heroesOpen = ns.char.heroesOpen or {}
-      ns.char.heroesOpen[id] = not ns.char.heroesOpen[id] or nil
+      ns.char.heroesOpen[id] = not pf.folds[g].open
       ns.Window:Refresh()
     end)
     pf.folds[g].id, pf.folds[g].label = id, x[2]
@@ -248,7 +263,7 @@ end
 
 local function tourneyLine(f)
   local state, guild = F:TournamentState(f)
-  if state == "off" then return L.TOURNEY_OFF end
+  if state == "off" then return nil end -- (U190: nothing while it is off)
   if state == "on" then return L.TOURNEY_ON:format(guild or "") end
   return state == "paused-gm" and L.TOURNEY_PAUSED_GM or L.TOURNEY_PAUSED_GUILD
 end
@@ -262,18 +277,21 @@ local function roleLine(f, name)
   return Hr:ClassName(f, name) .. "  ·  " .. roleName .. (note and ("  ·  " .. note) or "")
 end
 
+-- "4 Adventurers and 1 Friend": the Friends of the fellowship counted apart (SPEC §1.1).
+local function countLine(ctx)
+  local n, fr = ctx.heroes or 0, ctx.friends or 0
+  local s = n == 1 and L.HEROES_1 or L.HEROES_N:format(n)
+  if fr == 1 then return L.AND_FRIEND:format(s) end
+  return fr > 1 and L.AND_FRIENDS:format(s, fr) or s
+end
+
 local function refreshList(pf, ctx, width)
   local f = ctx.f
   pf.crest:Set(f.color, f.emblem)
   pf.fname:SetText(f.name)
-  pf.fline:SetText(L.FELLOWSHIP_LINE:format(f.faction or "", ns.Short(f.leader)))
-  local ch = ctx.chapter
-  -- The Adventurers, without the Friends of the fellowship (they have their own column below).
-  pf.stats[1]:Set(F:Adventurers(f))
-  pf.stats[2]:Set(ch and (ch.n .. " / " .. ch.of) or "-")
-  local cleared = 0
-  for key in pairs(f.journey.place) do if J:Cleared(f, key) then cleared = cleared + 1 end end
-  pf.stats[3]:Set(cleared)
+  -- The count beside the banner and the roles it adds up (U201, the owner, 14 Nov 2026: it was the right page's title,
+  -- over the invite and away from the cards).
+  pf.fline:SetText(L.FELLOWSHIP_LINE:format(countLine(ctx), f.faction or "", ns.Short(f.leader)))
   -- The roles of the Adventurers who play on; the Friends of the fellowship (SPEC §1.1) and the Fallen (SPEC §9)
   -- counted apart, each in a column after Damage when there are any.
   local counts, fallenN, friendN, living = { Tank = 0, Healer = 0, DPS = 0 }, 0, 0, 0
@@ -289,7 +307,7 @@ local function refreshList(pf, ctx, width)
   local extraW = extra > 0 and (width - 3 * (roleW + 8) - 8 * (extra - 1)) / extra or 0
   pf.compShort = short
   for i, c in ipairs(pf.comp) do
-    c:ClearAllPoints(); c:SetPoint("TOPLEFT", (i - 1) * (roleW + 8), -136); c:SetWidth(roleW)
+    c:ClearAllPoints(); c:SetPoint("TOPLEFT", (i - 1) * (roleW + 8), -COMP_Y); c:SetWidth(roleW)
     c.n:SetText(counts[c.role])
     c.label:SetText(counts[c.role] == 1 and c.one or c.many) -- "1 Tank", not "1 Tanks" (seen in the UI tour)
     c.label:SetShown(not short)
@@ -303,16 +321,19 @@ local function refreshList(pf, ctx, width)
     local fr, n = it[1], it[2]
     fr:SetShown(n > 0)
     if n > 0 then
-      fr:ClearAllPoints(); fr:SetPoint("TOPLEFT", x, -136); fr:SetWidth(extraW)
+      fr:ClearAllPoints(); fr:SetPoint("TOPLEFT", x, -COMP_Y); fr:SetWidth(extraW)
       fr.n:SetText(n)
       x = x + extraW + 8
     end
   end
   pf.compFriend.label:SetText(friendN == 1 and L.COMP_FRIEND or L.COMP_FRIENDS)
   -- (Recent history left this page in the rebuild: Since last time and the Chronicle hold it, SPEC §4.8.)
-  local y = 188
-  pf.tourney:SetText(tourneyLine(f))
-  pf.tourney:ClearAllPoints(); pf.tourney:SetPoint("TOPLEFT", 0, -(y + 8))
+  local line = tourneyLine(f)
+  pf.tourney:SetShown(line ~= nil)
+  pf.tourney:SetText(line or "")
+  pf.tourney:ClearAllPoints(); pf.tourney:SetPoint("TOPLEFT", 0, -CARDS_Y)
+  local top = line and CARDS_Y + pf.tourney:GetStringHeight() + 10 or CARDS_Y
+  pf.lscroll:ClearAllPoints(); pf.lscroll:SetPoint("TOPLEFT", 0, -top); pf.lscroll:SetPoint("BOTTOMRIGHT", 0, 38)
   -- The leader too: leaving hands the fellowship over. Not while watching an alt's fellowship (Fellowship/Watch.lua).
   pf.leave:SetShown(not ctx.watching)
   pf.photo:SetShown(not ctx.watching)
@@ -339,7 +360,8 @@ local function refreshList(pf, ctx, width)
   -- Invite an Adventurer, on top (28 Oct 2026; it was under the cards). Not while following another character's
   -- fellowship; the walkthrough's veil keeps the sample's box from being used.
   local canInvite = not ctx.watching and P.Can(f, ctx.me, "invite")
-  local boxOpen = canInvite and pf.invOpen == true
+  local opened = ns.char and ns.char.heroesOpen or {}
+  local boxOpen = canInvite and not opened.inviteShut
   pf.invHead:SetShown(canInvite)
   for _, w in ipairs({ pf.invite, pf.send, pf.asFriend, pf.share }) do w:SetShown(boxOpen) end
   if not boxOpen then pf.suggest:Hide() end
@@ -365,25 +387,37 @@ local function refreshList(pf, ctx, width)
       r.who = name
       r.name:SetText(ns.Short(name) .. (f.inviteFriend and f.inviteFriend[name] and L.INV_AS_FRIEND or ""))
       local st = ns.Sync:InviteStatus(name)
+      r.offline = st == "offline"
       r.wait:SetText(st == "received" and L.INV_RECEIVED or (st == "offline" and ns.Sync:OfflineText(f, name))
         or (st == "sending" and L.INV_SENDING or L.WAITING_ANSWER))
       r.wait:SetTextColor(Theme:RGBA(st == "received" and "3E7A3A" or "ink2"))
       r.cancel:SetShown(P.Can(f, ctx.me, "uninvite", name))
       r:SetWidth(width - 8)
       r.wait:SetWidth(math.max(60, width - 8 - r.name:GetStringWidth() - 6 - (r.cancel:IsShown() and r.cancel:GetWidth() + 8 or 0)))
-      local h = math.max(28, math.ceil(r.wait:GetStringHeight() or 0) + 10)
+      local left = st == "offline" and ns.Sync:InviteLeft(f, name)
+      r.left:SetShown(left ~= nil and left ~= false)
+      if left then
+        r.left:SetColor(left < 3 * 3600 and "B0321E" or "B8742A")
+        r.left:Set(width - 8 - (r.cancel:IsShown() and (r.cancel:GetWidth() + 8) or 0), left / ns.Sync.EXPIRE)
+      end
+      local h = math.max(28, math.ceil(r.wait:GetStringHeight() or 0) + 10) + (left and 6 or 0)
       r:SetHeight(h)
       stack:Place(r, h, 2)
     end
     stack:Skip(10)
   end
   pf.invRows:HideFrom(nInv + 1)
-  -- The cards: the Adventurers, then the Friends of the fellowship and the Fallen, each under its folding heading.
+  -- The cards: the Adventurers on the left page, the Friends of the fellowship and the Fallen on the right, each under
+  -- its folding heading.
   local shown = 0
-  local function place(name)
+  local function place(name, into)
     local c = pf.cards:Get(shown + 1)
     if not c then return end
     shown = shown + 1
+    if c:GetParent() ~= into.parent then
+      c:SetParent(into.parent)
+      c.fallenMark:SetFrameLevel(c:GetFrameLevel() + 8); c.ringMark:SetFrameLevel(c:GetFrameLevel() + 8)
+    end
     local m = f.members[name]
     c.who = name
     UI.SetRole(c.role, m.role)
@@ -436,26 +470,29 @@ local function refreshList(pf, ctx, width)
     if fallen then c.tip = { { text, 0.75, 0.65, 0.9 }, { L.FALLEN_CARD_TIP, 1, 1, 1 } } end
     c:SetAlpha(fallen and 1 or (kind == "away" and 0.6 or (kind == "offline" and 0.8 or 1)))
     c:SetWidth(width - 8)
-    stack:Place(c, 72, 6)
+    into:Place(c, 72, 6)
   end
   local groups = { [0] = {}, {}, {} }
   for _, name in ipairs(names) do local g = groups[group(name)]; g[#g + 1] = name end
-  for _, name in ipairs(groups[0]) do place(name) end
-  local opened = ns.char and ns.char.heroesOpen or {}
+  local ls = UI.Stack(pf.lscroll.child)
+  for _, name in ipairs(groups[0]) do place(name, ls) end
+  pf.lscroll:SetContentHeight(ls.y + 4)
   for g = 1, 2 do
     local h, list = pf.folds[g], groups[g]
     h:SetShown(#list > 0)
     if #list > 0 then
       h:SetText(h.label:format(#list))
-      h:SetOpen(opened[h.id])
+      local open = opened[h.id]
+      if open == nil then open = #list <= FEW end
+      h:SetOpen(open)
       stack:Skip(4)
       stack:Place(h, 29, 6)
-      if opened[h.id] then for _, name in ipairs(list) do place(name) end end
+      if open then for _, name in ipairs(list) do place(name, stack) end end
     end
   end
   pf.cards:HideFrom(shown + 1)
   pf.scroll:SetContentHeight(stack.y + 4)
-  pf.art:Fit(stack.y) -- a small fellowship: the road ahead under the cards
+  pf.art:Fit(stack.y) -- the road ahead under what the right page holds
 end
 
 ---------------------------------------------------------------------------
@@ -1022,13 +1059,7 @@ local function refresh(pf, ctx)
   if inspecting then refreshInspect(pf, ctx, width) else refreshList(pf, ctx, width) end
 end
 
+-- No title (U201, the owner, 14 Nov 2026): Invite Adventurers heads the right page, the count is under the banner, and
+-- inspect has its own headings.
 ns.Pages:Register({ id = "heroes", label = L.NAV_HEROES, build = build, refresh = refresh, news = { quests = true, gear = true },
-  -- The title "The Heroes" sits on the right page in the list; inspect has its own headings.
-  header = function(pf) return pf and pf.sel and "none" or "right" end,
-  -- "3 Adventurers of Ashen Oath and 1 Friend": the Friends of the fellowship counted apart (SPEC §1.1).
-  title = function(ctx)
-    local n, fr = ctx.heroes or 0, ctx.friends or 0
-    local sub = n == 1 and L.SUB_HEROES_1:format(ctx.name or "") or L.SUB_HEROES:format(n, ctx.name or "")
-    if fr == 1 then sub = L.SUB_AND_FRIEND:format(sub) elseif fr > 1 then sub = L.SUB_AND_FRIENDS:format(sub, fr) end
-    return L.TITLE_HEROES, sub
-  end })
+  header = "none" })

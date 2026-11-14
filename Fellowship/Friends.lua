@@ -1,5 +1,5 @@
 -- People to invite: in-game friends, Battle.net friends playing WoW (this game and faction) and guild members.
--- Used by the invite boxes (Adventurers and Manage pages) to suggest names while typing.
+-- Used by the invite box (the Adventurers page) to suggest names while typing.
 -- The same lists (and your group) tell the presence marks what the game itself says: online, or AFK (Fr:Status).
 local _, ns = ...
 local Fr = { FRESH = 5, ASK_EVERY = 60 }
