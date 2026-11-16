@@ -206,10 +206,10 @@ function QL:Groups(f, key, who)
   local quests = self:DungeonQuests(f, key)
   if #quests == 0 then return nil end
   local me = who or ns.Me()
-  local g = { pick = {}, earlier = {}, inside = {} }
+  local g, members = { pick = {}, earlier = {}, inside = {} }, F:Members(f)
   for _, q in ipairs(quests) do
     local others = {}
-    for _, n in ipairs(F:Members(f)) do
+    for _, n in ipairs(members) do
       local h = n ~= me and Hr:Get(f, n)
       if h and h.quests and h.quests[q.id] then others[#others + 1] = n end
     end
@@ -219,15 +219,17 @@ function QL:Groups(f, key, who)
   end
   -- Quests after one chain side by side, where the lowest of them would be (the owner, 12 Nov 2026: the Deadmines'
   -- Red Silk Bandanas and The Defias Brotherhood had Destruction in Deadmines between them).
-  local first = {}
+  -- (Each row's chain key made once, not in every comparison of the sort: the tracker asks on every redraw.)
+  local first, keyOf = {}, {}
   for _, x in ipairs(g.earlier) do
     local c, l = chainKey(x.start), x.start.lvl or 99
+    keyOf[x] = c
     if not first[c] or l < first[c] then first[c] = l end
   end
   for k, list in pairs(g) do
     table.sort(list, function(a, b)
       if k == "earlier" then
-        local ca, cb = chainKey(a.start), chainKey(b.start)
+        local ca, cb = keyOf[a], keyOf[b]
         if ca ~= cb then
           if first[ca] ~= first[cb] then return first[ca] < first[cb] end
           return ca < cb
@@ -366,6 +368,60 @@ function QL:Ready(f, key, name)
   return r
 end
 
+-- The dungeon quest log (U213, the owner, 15 Nov 2026: "a quest log of all of the Dungeon Quests. So you clearly see
+-- that you should work towards X quest chain"). A Dungeon page row (Groups: a chain to start or a quest to pick up; not
+-- done, nor one that starts inside) as a log row: { q, status (the icon's), what, k, step, started }. what: "step" (k,
+-- step: the next step to do), "pick" (the quest itself, at its giver), "log" (the quest in the log: done in the run),
+-- "run" (the steps before the run are ready; the rest is done in it). nil when who has not started it and cannot yet
+-- at their level (the owner: "Only open now"; one under way stays).
+local function logRow(q, from, lvl)
+  if q.status == "done" then return nil end
+  local steps, started, k = q.steps or {}, q.status == "log", nil
+  for i, s in ipairs(steps) do
+    if s.status ~= "no" then started = true end
+    if not k and s.status ~= "done" then k = i end
+  end
+  local s = k and steps[k]
+  local row = { q = q, started = started, status = s and s.status or q.status }
+  if q.status == "log" then row.what = "log"
+  elseif s and (s.start.inside or stepReady(s.start, s.status)) then row.what = "run"
+  elseif s then row.what, row.k, row.step = "step", k, s
+  elseif q.start.inside then row.what = "run"
+  else row.what = "pick" end
+  if not started and lvl < opensAt((s or q).start, from) then return nil end
+  return row
+end
+
+-- who's log: the dungeons of the journey open in the game and not cleared yet, in chapters who may read, in the journey's order and each
+-- dungeon's in its page's order. Two parts, what to do next first: under (started: a step or the quest in the log or
+-- done) and open (can be started at who's level now). Each row also has key (the dungeon) and n (its chapter). A
+-- dungeon placed twice (Blackrock Depths in chapters XII and XIII) once, at its first placement not cleared; a quest on
+-- several dungeons' lists (In the Name of the Light, Elven Legends) once, at the first of them.
+function QL:Log(f, who)
+  local J = ns.Journey
+  local me = who or ns.Me()
+  local lvl, top = levelOf(f, me), J:MaxView(f, me)
+  local out, seen = { under = {}, open = {} }, {}
+  for _, x in ipairs(ns.DungeonPage.List(f)) do
+    local base = ns.BaseKey(x.key)
+    local g = not seen[base] and x.n <= top and ns.IsOpen(x.key, f) and not J:Cleared(f, x.key) and self:Groups(f, x.key, me)
+    if g then seen[base] = true end
+    local from = (ns.Dungeon(x.key) or {})[3] or 0
+    for _, list in ipairs(g and { g.earlier, g.pick } or {}) do
+      for _, q in ipairs(list) do
+        local row = not seen[q.id] and logRow(q, from, lvl)
+        if row then
+          seen[q.id] = true
+          row.key, row.n = x.key, x.n
+          local part = row.started and out.under or out.open
+          part[#part + 1] = row
+        end
+      end
+    end
+  end
+  return out
+end
+
 -- A quest's status as an icon and a coloured word (U101): Done in green, In your log in gold, Not yet in grey. The icon
 -- stands before the quest's name, the word first on the line under it (the owner, 11 Nov 2026: at the line's end, a
 -- second icon and "Not" / "yet" broke over two lines).
@@ -409,27 +465,63 @@ function QL:MapOf(st)
   return QL.maps[zone] or nil
 end
 
--- Show on map (the owner, 14 Nov 2026: "Click the cross", in our own look): wherever the spot is known, the world map
--- opens at its zone with our mark on it, and a click on the mark sets the waypoint (ns.MapMark), with Questie running
--- too (the owner, 10 Nov 2026); with Questie running and no spot, the zone's world map, where Questie marks the quest
--- giver. True when there is something to show.
+-- Show on map's marks for a Dungeon page row (the owner, 14 Nov 2026: "display where the quest starts. Also where each
+-- of the steps starts if it's a chain"): each step with a spot, numbered as the book numbers them, and the quest's own
+-- start (a dungeon's entrance: q = { start = entrance }); quests that start on one spot share its mark. done: all of a
+-- mark's quests done (faded); next: the next to do, the first step not done or else the quest (it glows). focus: the
+-- mark whose zone opens: the next; else the first not done; else the last step's, who hands out the item a quest
+-- starts from.
+function QL:Marks(q)
+  local items, nextK = {}, nil
+  for k, x in ipairs(q.steps or {}) do
+    if not nextK and x.status ~= "done" then nextK = k end
+    items[#items + 1] = { st = x.start, k = k, name = x.name, status = x.status, next = nextK == k }
+  end
+  items[#items + 1] = { st = q.start or {}, name = q.name, status = q.status, next = not nextK and q.status ~= "done" }
+  local out, last = {}, nil
+  for _, it in ipairs(items) do
+    local st = it.st
+    local map = st.x and st.y and self:MapOf(st)
+    if map then
+      local m
+      for _, o in ipairs(out) do
+        if o.map == map and math.abs(o.st.x - st.x) < 1 and math.abs(o.st.y - st.y) < 1 then m = o break end
+      end
+      if not m then m = { st = st, map = map, items = {}, done = true }; out[#out + 1] = m end
+      last = m
+      m.items[#m.items + 1] = it
+      m.done = m.done and it.status == "done"
+      m.next = m.next or it.next
+    end
+  end
+  for i, m in ipairs(out) do if m.next then out.focus = i end end
+  if not out.focus then for i, m in ipairs(out) do if not m.done then out.focus = i break end end end
+  if not out.focus then for i, m in ipairs(out) do if m == last then out.focus = i end end end
+  return out
+end
+
+-- Show on map (the owner, 14 Nov 2026: "Click the cross", in our own look): wherever a spot is known, the world map
+-- opens with our marks, and a click on a mark sets the waypoint (ns.MapMark), with Questie running too (the owner,
+-- 10 Nov 2026); with Questie running and no spot, the zone's world map, where Questie marks the quest giver. True when
+-- there is something to show.
 function QL:CanPin(st)
   if st.x and st.y then return true end
   return ns.Quests:QuestieState() == "on" and self:MapOf(st) ~= nil
 end
 
--- st: where it starts (a quest's start, or a chain step's; a dungeon's entrance); title: what the mark names (the
--- quest). In combat the map does not open: the place goes to chat.
-function QL:Pin(st, title)
+-- st: where it starts (a quest's start; a dungeon's entrance); title: what the marks name (the quest); marks: the row's
+-- (QL:Marks), else st's alone. In combat the map does not open: the place goes to chat.
+function QL:Pin(st, title, marks)
   st = st or {}
+  marks = marks or self:Marks({ start = st })
   local map = self:MapOf(st)
-  if st.x and st.y then
-    if map and ns.MapMark:Show(st, map, title) then return "mark" end
-    ns:Print(QL.PlaceLine(st))
+  if #marks > 0 or (st.x and st.y) then
+    if #marks > 0 and ns.MapMark:Show(marks, title) then return "mark" end
+    ns:Print(QL.PlaceLine(marks[marks.focus] and marks[marks.focus].st or st))
     return "chat"
   end
-  if ns.Quests:QuestieState() == "on" and map and OpenWorldMap and not InCombatLockdown() then
-    OpenWorldMap(map)
+  if ns.Quests:QuestieState() == "on" and map and WorldMapFrame and OpenWorldMap and not InCombatLockdown()
+    and ns.MapMark:Open(map) then
     return "map"
   end
   return nil

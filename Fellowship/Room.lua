@@ -82,7 +82,9 @@ function R:Chapter(f, name)
   if not (ch and level) then return nil end
   local quests, unknown, seen = 0, 0, {}
   for _, x in ipairs(J:ChapterList(f, ch.n)) do
-    if not x.early then
+    -- A dungeon the fellowship has cleared has no run to come (the check of 15 Nov 2026: with Everyone to the cap
+    -- first holding the chapter after its dungeons, the book still said "Stop questing now").
+    if not x.early and not J:Cleared(f, x.key) then
       local s = self:Share(f, x.key, name, seen)
       quests, unknown = quests + s.quests, unknown + s.unknown
     end

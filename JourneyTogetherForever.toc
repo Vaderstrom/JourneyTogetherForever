@@ -97,6 +97,7 @@ UI\News.lua
 UI\Picture.lua
 UI\Photo.lua
 UI\Tracker.lua
+UI\QuestLog.lua
 UI\Minimap.lua
 UI\Pages\Settings.lua
 UI\Walkthrough.lua

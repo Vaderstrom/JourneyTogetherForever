@@ -3,7 +3,8 @@
 --               left page the rules as numbered articles in plain sentences, the values in colour; right page
 --               "Change a rule": the open votes with Yes / No, Propose a change (a rule and a new value; everyone
 --               votes) and the votes decided this week. The Leader votes too, and edits the rules here (U143): a bar
---               at the top of the left page with Edit the rules. Following another character's fellowship: read only.
+--               at the top of the left page with Edit the rules. Following another character's fellowship: no Propose or votes to
+--               cast (the bar at the top says read only, U207).
 --   rulesadmin  the Leader's editing of the Rules page (parent = "rules"): the form on a draft, then Publish
 --               (everyone gets a toast and a line in the Chronicle's The fellowship) or Discard, which end the
 --               editing. Like Journey Admin.
@@ -181,9 +182,6 @@ local function chalBlock(parent, width)
   return b
 end
 
--- The challenges' tiles on the right page (UI.NumberTile), two to a row; an odd last one fills its row (U46).
-local TILE_H, TILE_GAP = 58, 8
-
 local function buildBook(pf)
   local W = ns.Window
   local width = W.PAGE_W - 10
@@ -246,17 +244,11 @@ local function buildBook(pf)
   pf.now = UI.Text(Rc, 12, "ink2")
   pf.pNote = UI.WrapText(Rc, 12, "B0321E", width)
   pf.pNote:SetText(L.PROPOSE_OPEN)
-  -- Following another character: read only.
-  pf.watchText = UI.WrapText(Rc, 12, "ink2", width)
-  pf.watchText:SetText(L.PROPOSE_WATCH)
+  -- A Friend of the fellowship: why they cannot propose.
+  pf.friendText = UI.WrapText(Rc, 12, "ink2", width)
+  pf.friendText:SetText(L.PROPOSE_FRIEND)
   pf.dHead = UI.SectionHeader(Rc, width)
   pf.dHead:SetText(L.DECIDED_VOTES)
-  -- Under Propose a change, while a challenge is on: where the challenges stand, as number tiles.
-  pf.tilesHead = UI.SectionHeader(Rc, width)
-  pf.tilesHead:SetText(L.CHAL_TILES)
-  pf.tiles = {}
-  pf.tileW, pf.tileFull = math.floor((width - TILE_GAP) / 2), width
-  for i = 1, 4 do pf.tiles[i] = UI.NumberTile(Rc, pf.tileW, TILE_H) end
 end
 
 local function refreshBook(pf, ctx)
@@ -280,7 +272,8 @@ local function refreshBook(pf, ctx)
     pf.editBar:SetHeight(h)
     s:Place(pf.editBar, h, 10)
   end
-  pf.who:SetText(follow and L.BOOK_WHO_WATCH:format(ns.TimeAgo(ns.Watch:AsOf(f))) or L.BOOK_WHO:format(ns.Short(f.leader)))
+  -- (Viewing from another character: who sets the rules; the bar at the top says read only and how fresh, U207.)
+  pf.who:SetText((follow and L.BOOK_WHO_WATCH or L.BOOK_WHO):format(ns.Short(f.leader)))
   s:Place(pf.who, pf.who:GetStringHeight(), 8)
   local count, made = F:Count(f), R.SizeOf(f.rules)
   local size = made == "custom" and L.BOOK_SIZE_CUSTOM:format(count) or L.BOOK_SIZE:format(hl(R.SizeWord(made)), count)
@@ -352,20 +345,20 @@ local function refreshBook(pf, ctx)
   t:Skip(10)
 
   -- Adventurers propose; the Leader edits the rules on the left page (Edit the rules), so their Propose a change goes
-  -- (it was an empty heading, the brand pictures of 10 Nov 2026); a follower and a Friend are told why they cannot.
+  -- (it was an empty heading, the brand pictures of 10 Nov 2026); a Friend is told why they cannot. A follower has no
+  -- heading or line (U207: the bar at the top says read only).
   -- The walkthrough's sample shows the form, but Propose does nothing there (its proposal would go to your own
   -- fellowship). A Friend of the fellowship reads the votes (SPEC §1.1): the rules are the counted Adventurers'.
   local friend = ctx.isFriend and not follow
   local showForm = not follow and not ctx.isLeader and not friend
-  local head = not ctx.isLeader or follow
+  local head = not ctx.isLeader and not follow
   pf.pHead:SetShown(head)
   if head then t:Place(pf.pHead, 29, 6) end
   pf.canPropose = showForm and not ctx.demo
   local form = { pf.ruleLabel, pf.rule, pf.valueLabel, pf.value, pf.propose, pf.now }
   for _, w in ipairs(form) do w:SetShown(showForm) end
   pf.pNote:Hide()
-  pf.watchText:SetShown(follow or friend)
-  pf.watchText:SetText(friend and L.PROPOSE_FRIEND or L.PROPOSE_WATCH)
+  pf.friendText:SetShown(friend)
   if showForm then
     local key, now = pf.pkey, f.rules[pf.pkey]
     local opts, keep = {}, false
@@ -393,30 +386,7 @@ local function refreshBook(pf, ctx)
       t:Place(pf.pNote, pf.pNote:GetStringHeight(), 4)
     end
   elseif head then
-    t:Place(pf.watchText, pf.watchText:GetStringHeight(), 4)
-  end
-
-  -- Where the challenges stand: the lives left, the race clock, the Ring, the rules broken.
-  local tiles = ns.Challenges:Tiles(f) or {}
-  pf.tilesHead:SetShown(#tiles > 0)
-  if #tiles > 0 then
-    t:Skip(10)
-    t:Place(pf.tilesHead, 29, 8)
-    for i, tile in ipairs(pf.tiles) do
-      local x = tiles[i]
-      tile:SetShown(x ~= nil)
-      if x then
-        tile.key = x.key
-        tile:SetWidth(i == #tiles and i % 2 == 1 and pf.tileFull or pf.tileW)
-        tile:Set(x.value); tile:SetLabel(x.label); tile:SetIcon(x.icon)
-        tile:ClearAllPoints()
-        tile:SetPoint("TOPLEFT", pf.rscroll.child, "TOPLEFT", ((i - 1) % 2) * (pf.tileW + TILE_GAP),
-          -(t.y + math.floor((i - 1) / 2) * (TILE_H + TILE_GAP)))
-      end
-    end
-    t:Skip(math.ceil(#tiles / 2) * (TILE_H + TILE_GAP))
-  else
-    for _, tile in ipairs(pf.tiles) do tile:Hide() end
+    t:Place(pf.friendText, pf.friendText:GetStringHeight(), 4)
   end
 
   pf.dHead:SetShown(#done > 0)
@@ -509,12 +479,7 @@ local function buildAdmin(pf)
     return f and shown(pf, f) or R.New()
   end
 
-  pf.yourPart = UI.Card(Lc, "gold")
-  pf.yourPart:SetWidth(width)
-  pf.yourPart.text = UI.WrapText(pf.yourPart, 13, "ink", width - 24, "book")
-  pf.yourPart.text:SetPoint("TOPLEFT", 12, -9)
-  pf.yourPart.text:SetText(L.RULES_YOU_ADMIN)
-  -- The draft: what changed.
+  -- The draft: what changed. (No box over the form saying the changes are a draft: the bar says it, U228.)
   pf.draftBox = UI.Card(Lc, "gold")
   pf.draftBox:SetWidth(width)
   pf.draftText = UI.WrapText(pf.draftBox, 13, "ink", width - 24, "book")
@@ -606,16 +571,14 @@ local function refreshAdmin(pf, ctx)
   local f = ctx.f
   if not f then return end
   local s = UI.Stack(pf.lscroll.child)
-  local yh = pf.yourPart.text:GetStringHeight() + 18
-  pf.yourPart:SetHeight(yh)
-  s:Place(pf.yourPart, yh, 10)
+  s:Skip(2)
   prune(pf, f) -- (a late rules op brought them, or a vote chose the same)
   local keys = changed(pf, f)
   pf.draftBox:SetShown(#keys > 0)
   pf.propose:SetShown(#keys > 0)
   pf.undo:SetLabel(#keys > 0 and L.DISCARD or L.RULES_DONE)
   pf.bar:SetSelected(#keys > 0)
-  pf.barText:SetText(#keys == 0 and L.PUBLISHED or (#keys == 1 and L.RULES_BAR_1 or L.RULES_BAR_N:format(#keys)))
+  pf.barText:SetText(#keys == 0 and L.RULES_BAR_0 or (#keys == 1 and L.RULES_BAR_1 or L.RULES_BAR_N:format(#keys)))
   if #keys > 0 then
     local parts = {}
     for i, k in ipairs(keys) do parts[i] = L.V_CHANGE:format(R.Name(k), R.ValueText(k, pf.picks[k])) end

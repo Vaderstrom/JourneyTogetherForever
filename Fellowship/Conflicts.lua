@@ -43,7 +43,7 @@ function Cf:Parts(f)
   local members = {}
   for name, m in pairs(f.members) do members[name] = { m.role, m.second or "", m.away or "", m.friend and 1 or 0, m.joined or 0 } end
   return {
-    ring = hash(n(f.ring)), leader = hash({ f.leader, f.lv or 0 }), members = hash(members), rules = hash(n(f.rules)),
+    ring = hash(n(f.ring)), leader = hash({ f.leader, f.lv or 0 }), members = hash(members), rules = hash(n(ns.Rules.Shared(f.rules))),
     journey = hash(n(f.journey)), banner = hash({ f.name, f.color, f.emblem }),
     invites = hash({ n(f.invites), n(f.inviteFrom), n(f.inviteFriend) }),
     challenges = hash({ n(f.challenges), n(f.challengesOff), n(f.falls), n(f.broken), n(f.race) }),

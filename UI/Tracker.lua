@@ -76,7 +76,8 @@ function TK:Build()
   f.lines = {}
   -- ("stop": where to stop questing, red, under your little bar and in line with your words; no icon of its own.)
   for i, spec in ipairs({ { "status", 12, nil, "chapter" }, { "you", 12, "toastText", "overview" }, { "stop", 12, nil, "overview" },
-    { "next", 12, "toastText", "overview" }, { "early", 11, "goldText", "dungeon" }, { "clears", 11, "toastText", "chapter" }, { "run", 12, "goldText", "chapter" },
+    { "next", 12, "toastText", "overview" }, { "early", 11, "goldText", "dungeon" }, { "early2", 11, "goldText", "dungeon" },
+    { "early3", 11, "goldText", "dungeon" }, { "clears", 11, "toastText", "chapter" }, { "run", 12, "goldText", "chapter" },
     { "quests", 11, "toastText", "quests" }, { "online", 11, "muted", "heroes" }, { "gather", 11, "muted", "gatherings" },
     { "duel", 11, "goldText", "tourney" }, { "inbox", 11, "goldText", "inbox" } }) do
     local b = CreateFrame("Button", nil, f)
@@ -84,9 +85,11 @@ function TK:Build()
     -- Each line's small round icon in front (U13, 31 Oct 2026: the tracker read as a block of small text).
     b.icon = UI.Round(b, "ARTWORK", TK.ICON)
     b.icon:SetPoint("TOPLEFT", 0, -1)
-    b.hasIcon = spec[1] ~= "stop" and UI.SetIcon(b.icon, ns.ICONS[TK.LINE_ICONS[spec[1]] or "toast_default"])
+    -- (Where to stop and For the journey's second and third lines stand in line with the words above them.)
+    local inLine = spec[1] == "stop" or spec[1] == "early2" or spec[1] == "early3"
+    b.hasIcon = not inLine and UI.SetIcon(b.icon, ns.ICONS[TK.LINE_ICONS[spec[1]] or "toast_default"])
     b.icon:SetShown(b.hasIcon)
-    local indent = (b.hasIcon or spec[1] == "stop") and TK.ICON + 6 or 0
+    local indent = (b.hasIcon or inLine) and TK.ICON + 6 or 0
     b.indent = indent
     b.text = UI.WrapText(b, spec[2], spec[3], self.WIDTH - 20 - indent, "body")
     b.text:SetPoint("TOPLEFT", indent, 0)
@@ -95,7 +98,10 @@ function TK:Build()
     hl:SetAllPoints(); hl:SetColorTexture(1, 0.85, 0.45, 0.08)
     b:SetScript("OnClick", function()
       if b.page == "inbox" then ns.Window:OpenPanel("inbox")
-      elseif b.page == "dungeon" then if TK.earlyKey then ns.DungeonPage:Open(TK.earlyKey) end
+      elseif b.page == "dungeon" then
+        -- For the journey: a dungeon quest opens on its Dungeon page, a goal on the Chapter page.
+        local t = TK.journey and TK.journey[b.key == "early" and 1 or b.key == "early2" and 2 or 3]
+        if t and t.key then ns.DungeonPage:Open(t.key, t.id) elseif t then ns.Window:Open("chapter") end
       else ns.Window:Open(b.page) end
     end)
     TK:Draggable(b)
@@ -331,9 +337,10 @@ function TK:Content(f)
   -- complete (the tour showed it four times): the status points at the Endgame instead, and there is no next step.
   local status, nextText = banner.title, ch and T:Focus(f).head or nil
   if not ch then status = L.TOAST_ENDGAME end
-  -- Prequest (U124): the next chain step your level reaches; a click opens its dungeon's page.
-  local early = ch and T:StartEarly(f)
-  TK.earlyKey = early and early.key or nil
+  -- For the journey (U217, the owner, 15 Nov 2026; it was one Prequest line, U124): up to three things to do next for
+  -- your dungeon quests and this chapter's goals.
+  local journey = ch and Settings:TrackerLineOn("early") and T:ForJourney(f) or {}
+  TK.journey = journey
   local me = ns.Me()
   -- Where to stop questing for the dungeon quests (U85), in red on its own line under your little bar (it ran into
   -- the bar under the game's tracker), and "now" once you are past it, as the Overview says (the owner's check, 9 Nov
@@ -365,10 +372,13 @@ function TK:Content(f)
       end
     end
   end
-  -- Quests you share with others now.
-  local together = {}
-  for _, x in ipairs(ns.Quests:Items(f)) do if x.together and not x.chain and not x.dungeon then together[#together + 1] = x.name end end
-  local quests = #together > 0 and L.TRACK_QUESTS:format(#together, together[1]) or nil
+  -- Quests you share with others now: only for its line (off by default; the whole quest list was most of a redraw).
+  local quests
+  if Settings:TrackerLineOn("quests") then
+    local together = {}
+    for _, x in ipairs(ns.Quests:Items(f)) do if x.together and not x.chain and not x.dungeon then together[#together + 1] = x.name end end
+    quests = #together > 0 and L.TRACK_QUESTS:format(#together, together[1]) or nil
+  end
   -- The tournament: your next duel.
   local duel
   if f.tourney and f.tourney.phase == "running" then
@@ -394,7 +404,8 @@ function TK:Content(f)
   return {
     title = ch and L.TRACKER_TITLE:format(ns.Journey.Roman(cur), ch.name) or L.BN_JOURNEY_DONE,
     status = status, statusColor = banner.color, stage = banner.stage,
-    you = you.head, stop = stop, next = nextText, early = early and early.text or nil, clears = clears, run = run, quests = quests,
+    you = you.head, stop = stop, next = nextText, clears = clears, run = run, quests = quests,
+    early = journey[1] and journey[1].text, early2 = journey[2] and journey[2].text, early3 = journey[3] and journey[3].text,
     online = #online > 0 and L.TRACK_ONLINE:format(#online, table.concat(online, ", ")) or L.TRACK_NOBODY,
     gather = gather, duel = duel, inbox = waiting > 0 and (waiting == 1 and L.TRACK_INBOX_1 or L.TRACK_INBOX_N:format(waiting)) or nil,
     xp = pct, color = f.color, emblem = f.emblem, bar = bar,
@@ -414,7 +425,8 @@ end
 TK.PEEK = 6 -- seconds the hidden tracker shows itself after a change
 
 -- A line Settings shows (where to stop goes with your line).
-local function lineOn(key) return Settings:TrackerLineOn(key == "stop" and "you" or key) end
+local ALIAS = { stop = "you", early2 = "early", early3 = "early" }
+local function lineOn(key) return Settings:TrackerLineOn(ALIAS[key] or key) end
 
 function TK:Refresh()
   local fr = self.frame
@@ -522,11 +534,25 @@ function TK:RefreshSoon()
   C_Timer.After(ns.Window.SOON, function() self.soon = nil; self:Refresh() end)
 end
 
-for _, event in ipairs({ "FELLOWSHIP", "JOINED" }) do ns:On(event, function() TK:Refresh() end) end
+-- A change from another Adventurer's message draws once a second, like the book (U74): the changes of four
+-- Adventurers come in one burst after a dungeon, and a redraw for each, a few ms apiece, made the game stutter. Your
+-- own changes show at once.
+for _, event in ipairs({ "FELLOWSHIP", "JOINED" }) do
+  ns:On(event, function() if ns.Comm.receiving then TK:RefreshSoon() else TK:Refresh() end end)
+end
 ns:On("HEROES", function(now) if now then TK:Refresh() else TK:RefreshSoon() end end)
 ns:On("SETTING", function(key) if key == "theme" or key == "toasts" or tostring(key):find("^tracker") then TK:Refresh() end end)
--- Combat, entering and leaving dungeons (hide there), and XP and the inbox (its lines).
-for _, event in ipairs({ "PLAYER_REGEN_DISABLED", "PLAYER_REGEN_ENABLED", "PLAYER_ENTERING_WORLD", "ZONE_CHANGED_NEW_AREA",
-  "PLAYER_XP_UPDATE" }) do
+-- Entering and leaving dungeons (hide there), and XP and the inbox (its lines). Combat only when it hides then: else
+-- the start of every fight brought a redraw a second in, for nothing. And when docking was turned on in combat: the
+-- dock is made after it.
+for _, event in ipairs({ "PLAYER_ENTERING_WORLD", "ZONE_CHANGED_NEW_AREA", "PLAYER_XP_UPDATE" }) do
   ns:RegisterEvent(event, function() TK:RefreshSoon() end)
+end
+for _, event in ipairs({ "PLAYER_REGEN_DISABLED", "PLAYER_REGEN_ENABLED" }) do
+  ns:RegisterEvent(event, function()
+    local fr = TK.frame
+    if Settings:Get("trackerHideCombat") or (Settings:Get("trackerDock") and fr and not fr.dock and not fr.noDock) then
+      TK:RefreshSoon()
+    end
+  end)
 end

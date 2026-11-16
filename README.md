@@ -68,18 +68,19 @@ The **Overview** answers "what now?" at a glance, all of it in view without scro
 - The chapter's picture and **Where we stand**: the level track with every Adventurer from the floor to the cap, one
   line on where the fellowship is, and where to stop questing so the dungeon quests still fit under the cap (a red
   tick on the track; the figures on hover). A quest's XP comes from the game itself. Two toasts warn you half a
-  level before that point and at it.
+  level before that point and at it. **Your dungeon quests** opens your dungeon quest log at the book's side.
 - **Focus now**: the one thing to do next, why, and one button (Find group, Invite to group, Get ready).
 - **Since last time**: who levelled and the Chronicle's newest lines since you last looked.
 - **Coming up**: the next dungeon to get ready for, the next two Gatherings and the next chapter.
 
 #### Chapters and dungeons
-- A **stage track** for the chapter: Everyone at the floor, Run the dungeons, Milestones, Complete. While someone is
-  below the floor, a waiting box says who, how far, and about how long at their pace.
-- **Your To do**, in the order you act: reach the floor, then every dungeon as a row with its picture, role, levels
+- A **stage track** for the chapter: Everyone at the floor, Run the dungeons, Milestones, Complete. The right page's
+  **Below the floor** says who is below it and how far.
+- **Your To do**, in the order you act: reach the floor ("about 10 hours at your pace"), then every dungeon as a row with its picture, role, levels
   and what you need for it ("2 quests to pick up", "Ready: your quests are in your log"), with **Find group** (it
   invites the Adventurers online who still need it, a tank and a healer first) or **Get ready**. The mandatory ones
-  come first, lowest levels first; the first one not cleared says **Recommended next**. Then the chapter's Required
+  come first, lowest levels first; the first one not cleared says **Recommended next**, and once they are all cleared
+  they fold into one ticked line. Then the chapter's Required
   **milestones**, with **Tick off** for the Leader. Then **For later dungeons**: a prequest chain to start now for a
   dungeon of a later chapter, once you reach its first step's level (a chain you have started comes first, with its step). Then **If you like**: the next chapter's dungeons that may be run now (From the next
   chapter) and the Optional milestones. A click on a row opens [the dungeon's page](#the-dungeon-pages).
@@ -118,8 +119,8 @@ fellowship).
   chain share one row.
   Every dungeon's quests, where they start and the chains before them are built in, the same for everyone in the
   fellowship. A toast tells you when a dungeon's
-  first quest opens to you. **Pin on map** sets a waypoint to where a quest
-  starts, with Questie too.
+  first quest opens to you. **Show on map** opens the world map with a gold ring where a quest starts, and a numbered
+  ring for each step of its chain (the next one glows). Click a ring to set a waypoint and follow it.
 
 ![The Deadmines' page: the story, the bosses, Who is ready, and Destruction in Deadmines' nine prequest steps](.github/screenshots/dungeon-page.jpg)
 
@@ -160,13 +161,18 @@ fellowship).
 ![The Adventurers page](.github/screenshots/adventurers.jpg)
 
 #### Quests and attunements
-The **Quests** page has three tabs:
+The **Quests** page has four tabs:
 - **Shared quests**: quests you and other Adventurers have (**Together now**) and quests they have that you could
   pick up (**Pick up and join**), grouped by zone with the zone you are in first, with everyone's progress and what you can do: **Ask to group up**, Invite to group, or
   the game's **Share quest**.
 - **Quest chains** learned as the fellowship plays, or all of them from the start with Questie installed.
+- **Dungeon quests**: your dungeon quest log. **Under way** lists the chains and quests you have started, **Open now**
+  the ones you can start at your level, in the order of the journey, each with your next step and where it starts.
 - **Attunements and keys** up to 60 (Onyxia, Upper Blackrock Spire, Scholomance,
   Blackrock Depths, Stratholme, Dire Maul and more): a grid of who has done what, and each one's steps.
+
+The game's quest log marks each quest that matters to the journey (a dungeon quest, a step of its chain or a goal),
+and its tooltip names the dungeon and chapter, or the goal.
 
 ![Quests: the quests you share, by zone, with everyone's progress](.github/screenshots/quests.jpg)
 
@@ -237,7 +243,10 @@ Five steps, and you can change everything later except the challenges:
   more than one chapter (Blackrock Depths in three, for its parts).
 - Each dungeon is Mandatory, From the next chapter or Optional, and you can choose **which bosses** a clear needs.
 - **Milestones**, up to ten per chapter, Required or Optional: a quest everyone has handed in, a level everyone
-  reaches, an attunement or key, or one the Leader ticks off by hand.
+  reaches, an attunement or key, or one the Leader ticks off by hand. A new journey comes with WoW Forever's own goals
+  as Optional milestones: Cozy Sleeping Bag, Night Watchman's Torch and Friend of the Library.
+- **Back to this chapter** takes the fellowship back to an earlier chapter. It asks first; clears and the Chronicle
+  stay, and everyone gets a message.
 - **Export** the journey as a string to share with another fellowship, or **Import** one. Changes are a draft until
   you press **Publish**, in a bar at the bottom that never scrolls; everyone gets a toast.
 
@@ -256,7 +265,8 @@ What needs the Leader's attention is in the inbox; the rules are edited on [the 
   Adventurers are not counted), or ends after 3 days.
 - The Leader presses **Edit the rules** on the Rules page, changes them on a draft and presses **Publish**, in a bar
   at the foot of the page that never scrolls; everyone gets a toast and a line in the Chronicle.
-- The rules: floor and cap allowance, XP from fellowship runs past the cap, Adventurers needed for a run, how many
+- The rules: floor and cap allowance, **Everyone to the cap first** (the next chapter opens only once the dungeons
+  are cleared and every Adventurer has reached the cap), XP from fellowship runs past the cap, Adventurers needed for a run, how many
   must clear each dungeon, away after N days, takeover after N days, which chapters Adventurers can see, and the
   tournament.
 
@@ -319,15 +329,15 @@ log out; the app reads it from your saved data and posts nothing you have not ch
   banner. Each can be turned off, and you can drag them where you like, or hold Ctrl and drag one while it shows.
   Click one to open the page it is about.
 - **The tracker**: the chapter, where you stand (with a little bar to the floor or the cap and where to stop
-  questing), Focus now, a prequest to pick up, dungeons cleared, who is online, the next Gathering, shared quests, your next duel and
+  questing), Focus now, **For the journey** (up to three next steps for your dungeon quests and the chapter's goals), dungeons cleared, who is online, the next Gathering, shared quests, your next duel and
   your inbox, each line with its icon. It starts as a panel you drag anywhere, which can hide until you point at it;
   or put it under the game's quest tracker, as one more section in the game's own look that moves and folds with the
   game's list. Hold Ctrl to drag it by any line, or out from under the game's list.
 - **Picture after a final boss**: Take a picture (with or without the interface) or open the group photo, right
   there in the dungeon.
 - The **inbox** in the header: invitations, votes, Gatherings, asks to group up, the tournament, and for the Leader
-  what needs their attention. A notice that asks no answer has a button to where it is handled, and **Seen** takes it
-  off the count.
+  what needs their attention. Its count is only what waits for your answer; a notice that asks none is listed after
+  them, dimmed, with a button to where it is handled.
 
 ![A big banner: Chapter IV unlocked](.github/screenshots/chapter-unlocked.jpg)
 

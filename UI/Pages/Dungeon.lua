@@ -31,8 +31,34 @@ DP.GROUPS = {
 local READY_TEX = "Interface\\RaidFrame\\ReadyCheck-Ready"
 local CLASS_ICON = "|TInterface\\Icons\\INV_Misc_Book_09:16:16|t" -- (a tome, as class trainers give)
 
--- Opens the page at a dungeon or raid; Back returns to the page shown before (kept as it was).
-function DP:Open(key)
+-- A quest row's pin at its top right (the Dungeon page's rows, and the dungeon quest log's, U213): the map with a mark
+-- where the quest and each of its chain's steps start (the owner, 14 Nov 2026); p.qname names them.
+function DP.NewPin(p)
+  p.marks = {}
+  p.pin = UI.RoundButton(p, 22, "quests", function() if p.st then ns.QuestLists:Pin(p.st, p.qname, p.marks) end end)
+  p.pin:SetPoint("TOPRIGHT")
+  -- The spot's numbers only here (U160: they filled the page's lines).
+  UI.Tooltip(p.pin, function()
+    if #p.marks > 1 then return L.DQ_PIN_TIP_MARKS:format(#p.marks) end
+    return p.spot and L.DQ_PIN_TIP_AT:format(p.spot) or L.DQ_PIN_TIP_QUESTIE
+  end)
+end
+
+-- The pin for quest q, open at the next to do (the owner, 10 Nov 2026: "Waypoint to where you pickup quests"). A quest
+-- that starts from an item with no spot of its own: at its chain's last step, who hands the item out (Sprite
+-- Jumpsprocket gives Destruction in Deadmines' explosives).
+function DP.SetPin(p, q)
+  local QL = ns.QuestLists
+  p.marks = QL:Marks(q)
+  local focus = p.marks[p.marks.focus]
+  p.st = focus and focus.st or q.start
+  p.spot = p.st.zone and p.st.x and L.DQ_AT:format(p.st.zone, p.st.x, p.st.y) or nil
+  p.pin:SetShown(#p.marks > 0 or QL:CanPin(p.st))
+end
+
+-- Opens the page at a dungeon or raid; Back returns to the page shown before (kept as it was). id: a quest whose row
+-- opens (the dungeon quest log's rows, U213).
+function DP:Open(key, id)
   local W = ns.Window
   -- (Journey Admin's rows open it too while a fellowship is being founded: there is no page yet.)
   if not ns.Dungeon(key) or not ns.Fellowship:Current() then return end
@@ -40,7 +66,7 @@ function DP:Open(key)
   if from and from ~= "dungeon" then W.dungeonBack = from end
   W.dungeon = key
   local pf = W.pageFrames and W.pageFrames.dungeon
-  if pf then pf.who = nil; pf.opened = {}; UI.ScrollsToTop(pf) end -- (its rows folded each time, U185)
+  if pf then pf.who = nil; pf.opened = id and { [id] = true } or {}; UI.ScrollsToTop(pf) end -- (its rows folded each time, U185)
   if W:IsOpen() then
     local turned = W.current ~= "dungeon"
     W.page = "dungeon"
@@ -129,14 +155,9 @@ local function questCard(pf, R, width)
   -- Folded, its status, level and how far; opened, where it starts too (U160: on one line, they were two).
   p.where = UI.WrapText(p, 11, "ink2", width - 70)   -- clear of the fold and the pin, like the title
   p.steps = UI.WrapText(p, 11, "ink2", width - 30)
-  p.pin = UI.RoundButton(p, 22, "quests", function() if p.st then ns.QuestLists:Pin(p.st, p.qname) end end)
-  p.pin:SetPoint("TOPRIGHT")
+  DP.NewPin(p)
   p.fold = p:CreateTexture(nil, "ARTWORK")
   p.fold:SetSize(14, 14); p.fold:SetPoint("TOPRIGHT", p.pin, "TOPLEFT", -6, -1)
-  -- The spot's numbers only here (U160: they filled the page's lines).
-  UI.Tooltip(p.pin, function()
-    return p.spot and L.DQ_PIN_TIP_AT:format(p.spot) or L.DQ_PIN_TIP_QUESTIE
-  end)
   return p
 end
 
@@ -331,10 +352,14 @@ local function refreshLeft(pf, f, key, ctx)
   if pf.group:IsShown() then pf.way:SetPoint("LEFT", pf.group, "RIGHT", 6, 0) else pf.way:SetPoint("BOTTOMLEFT", 0, 2) end
 end
 
--- The room for its quests as the answer (U145; the figures on hover), for a dungeon of your chapter; Show everyone
--- (each other Adventurer's line, away ones left out).
-local function refreshRoom(pf, f, me, r, ours)
+-- The chapter's room as the answer (U145; the figures on hover), on the page of a dungeon of your chapter (key) that
+-- has quests for your side and is not cleared (U237, the owner, 16 Nov 2026: Shadowfang Keep's page told the Alliance
+-- to stop questing, with no quests there for them; "It should say where to stop to not reach the cap for the chapter
+-- based on the available dungeon quests in the chapter"). Show everyone: each other Adventurer's line, away ones left
+-- out; the box only with something under it.
+local function refreshRoom(pf, f, me, r, key)
   local Room = ns.Room
+  local ours = key ~= nil and not ns.Journey:Cleared(f, key) and #ns.QuestLists:DungeonQuests(f, key) > 0
   local mine = ours and Room:Chapter(f, me) or nil
   local others = {}
   if ours and pf.everyone then
@@ -346,7 +371,7 @@ local function refreshRoom(pf, f, me, r, ours)
       end
     end
   end
-  local show = mine ~= nil or (ours and pf.everyone)
+  local show = mine ~= nil or #others > 0
   -- (No heading: the answer is the heading, GLOSSARY "Stop questing".)
   pf.roomAll:SetShown(show)
   pf.room:SetShown(show and mine ~= nil)
@@ -523,14 +548,7 @@ local function refreshQuests(pf, f, key, r)
     p.fold:SetShown(canOpen)
     p.fold:SetTexture(UI.FOLD_ICON[not open])
     p.tip = canOpen and (open and L.DG_HIDE_STEPS or label) or nil
-    -- The pin: where you pick up first, a chain's next step where its spot is known, else the quest's own giver
-    -- (the owner, 10 Nov 2026: "Waypoint to where you pickup quests"). A quest that starts from an item with no spot
-    -- of its own: where its chain's last step starts, who hands the item out (the owner, 14 Nov 2026: Destruction in
-    -- Deadmines had none; Sprite Jumpsprocket gives its explosives).
-    local nx = nextK and all[nextK] or (st.item and not st.x and all[#all])
-    p.st = nx and nx.start.x and nx.start.y and nx.start or st
-    p.spot = p.st.zone and p.st.x and L.DQ_AT:format(p.st.zone, p.st.x, p.st.y) or nil
-    p.pin:SetShown(QL:CanPin(p.st))
+    DP.SetPin(p, q)
     p.where:ClearAllPoints(); p.where:SetPoint("TOPLEFT", p.title, "BOTTOMLEFT", 0, -2)
     p.steps:ClearAllPoints(); p.steps:SetPoint("TOPLEFT", p.where, "BOTTOMLEFT", 0, -3)
     local h = p.title:GetStringHeight() + p.where:GetStringHeight() + 4
@@ -590,7 +608,7 @@ local function refresh(pf, ctx)
     pf.later:SetText(text)
     r:Place(pf.later, pf.later:GetStringHeight(), 8)
   end
-  refreshRoom(pf, f, ctx.me, r, x ~= nil and x.n == ns.Journey:CurrentIndex(f))
+  refreshRoom(pf, f, ctx.me, r, x ~= nil and x.n == ns.Journey:CurrentIndex(f) and x.key or nil)
   if later then pf.readyHead:Hide(); pf.rings:Hide(); pf.pickLine:Hide(); pf.readyRows:HideFrom(1)
   else refreshReady(pf, f, key, ctx, r) end
   refreshQuests(pf, f, key, r)

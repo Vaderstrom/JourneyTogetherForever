@@ -79,6 +79,11 @@ function F:Log(f, text, t, k, who)
   table.insert(f.chronicle, 1, { text = text, time = t or time(), k = k, who = who })
   while #f.chronicle > self.CHRONICLE_MAX do table.remove(f.chronicle) end
 end
+-- The fellowship goes back to chapter n (Undo clear, Back to this chapter), with its Chronicle line.
+function F:Reopen(f, n, t, by)
+  ns.Journey:Reopen(f, n)
+  self:Log(f, L.CHR_REOPENED:format(ns.Journey.Roman(n), f.journey.chapters[n].name), t, "reopened", by)
+end
 
 -- The chronicle as the pages show it: the same line in a row once, with a count ("× 4"). (Seen in the UI tour.)
 -- { { text, time, n, k } }, newest first, at most max; group: only the lines of that History filter.
@@ -333,7 +338,7 @@ function F:ApplyChange(f, op, by, t)
   elseif k == "rules" then
     -- Rules Admin publishes the rules (the leader); a passed vote changes one rule (Fellowship/Votes.lua).
     if not P.Can(f, by, "rules") or type(op.rules) ~= "table" then return false end
-    f.rules = R.Clean(op.rules)
+    f.rules = R.Clean(R.KeepNewer(op.rules, f.rules))
     self:Log(f, L.CHR_RULES:format(ns.Short(by)), t, "rules", by)
     if by ~= ns.Me() and not f.sample then ns:Toast(nil, L.RULES_PUBLISHED_T, L.RULES_PUBLISHED:format(ns.Short(by)), "rules") end
   elseif k == "disband" then
@@ -350,6 +355,15 @@ function F:ApplyChange(f, op, by, t)
     self:Log(f, L.CHR_JOURNEY, t, "journey", by)
     -- The Adventurers hear of it (they did not; seen in game).
     if by ~= ns.Me() and not f.sample then ns:Toast(nil, L.JOURNEY_NEW_T, L.JOURNEY_NEW:format(ns.Short(by)), "overview") end
+  elseif k == "back" then
+    -- Journey Admin's Back to this chapter (U231, the owner, 16 Nov 2026): the leader takes the fellowship back to an
+    -- earlier chapter, which counts again by its own clears and levels (J:Reopen; the furthest chapter is lowered).
+    local J, back = ns.Journey, tonumber(op.n)
+    if not P.Can(f, by, "journey") or not back or back % 1 ~= 0 or back < 1 or back >= J:Reached(f) then return false end
+    self:Reopen(f, back, t, by)
+    if by ~= ns.Me() and not f.sample then
+      ns:Toast(nil, L.BACK_T:format(J.Roman(back)), L.BACK_TOAST:format(ns.Short(by), J.Roman(back), f.journey.chapters[back].name), "chapter")
+    end
   elseif k == "role" then
     -- Role and secondary role ("" for none); the secondary role cannot be the same as the role.
     local second = op.second or ""

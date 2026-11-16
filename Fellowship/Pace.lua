@@ -91,6 +91,7 @@ local function now() return { level = UnitLevel("player"), xp = UnitXP("player")
 
 function Pa:OnXP()
   local cur = now()
+  if ns.Secret(cur.level) or ns.Secret(cur.xp) or ns.Secret(cur.max) then return end -- (kept secret: measured next time)
   local last = self.last
   if last and last.max and last.max > 0 then
     local gain = 0
@@ -102,7 +103,10 @@ function Pa:OnXP()
 end
 
 function Pa:Tick()
-  if UnitIsAFK and UnitIsAFK("player") then return end
+  -- (In an instance the game may keep it secret, 12.0: no test on it then, and the minute is not counted. The owner's
+  -- BugGrabber of 15 Nov 2026.)
+  local afk = UnitIsAFK and UnitIsAFK("player")
+  if ns.Secret(afk) or afk then return end
   self:Add(0, self.TICK)
 end
 

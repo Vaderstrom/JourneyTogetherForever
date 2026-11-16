@@ -140,7 +140,7 @@ Lab.SCENARIOS = {
   { "The setup guide", "The three steps a new fellowship shows once: Look, While you play, Reminders.", function()
     if fresh(true) and ns.SetupGuide then ns.SetupGuide:Open("overview") end
   end },
-  { "Waiting for the floor", "Corwin at 13, the rest at 16: the stage track at its first stage, the waiting box.", function()
+  { "Waiting for the floor", "Corwin at 13, the rest at 16: the stage track at its first stage, Below the floor on the right page.", function()
     if fresh() then levels(16, { Corwin = 13 }); open("chapter") end
   end },
   { "Dungeons open", "Everyone at 17: the dungeons open, Find group on each row.", function()

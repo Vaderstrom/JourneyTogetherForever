@@ -836,31 +836,3 @@ function C:Book(f, hl)
   return { title = L.CHAL_BOOK, intro = L.CHAL_BOOK_INTRO, items = items, after = after, text = table.concat(parts, " ") }
 end
 
--- The rulebook's tiles (the Rules page's right page, UI.NumberTile): what stands now, at a glance. { { key, value,
--- label, icon } }: the shared lives left, the race clock, the Ring and the rules broken (always, with any challenge
--- on). nil when none is on.
-function C:Tiles(f)
-  local broken, on = 0, false
-  for _, k in ipairs(self.LIST) do
-    if self:Has(f, k) then on, broken = true, broken + #self:BrokenBy(f, k) end
-  end
-  if not on then return nil end
-  local out = {}
-  local total = self:SharedLives(f)
-  if total then
-    out[#out + 1] = { key = "shared", value = L.TILE_OF:format(self:SharedLeft(f), total), label = L.TILE_LIVES, icon = self:Icon("shared") }
-  end
-  local start = self:Has(f, "race") and self:RaceStart(f)
-  if f.race or start then
-    out[#out + 1] = { key = "race", value = C.Span(f.race and f.race.secs or time() - start),
-      label = f.race and L.TILE_RACE_DONE or L.TILE_RACE, icon = self:Icon("race") }
-  end
-  if self:Has(f, "ring") then
-    local r = f.ring
-    local held = r and not r.state
-    local v = held and ns.Short(r.who) or (not r and L.TILE_RING_NONE) or (r.state == "done" and L.TILE_RING_DONE) or L.TILE_RING_LOST
-    out[#out + 1] = { key = "ring", value = v, label = held and L.CARD_RING_BEARER or L.TILE_RING, icon = self:Icon("ring") }
-  end
-  out[#out + 1] = { key = "broken", value = broken, label = L.TILE_BROKEN, icon = ns.ICONS.hist_broke }
-  return out
-end

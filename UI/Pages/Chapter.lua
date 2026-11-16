@@ -1,9 +1,8 @@
 -- Chapter (SPEC §4.5, U140). Left: chapter number with previous/next, name, levels, the stage track, All chapters,
--- a waiting box while below the floor, an over-the-cap warning and Your To do: the new Leader's first steps, reach
--- the floor, the chapter's dungeons (Find group or Get ready, Mark cleared, Undo clear), steps for later dungeons and
--- the next chapter's dungeons you may run now; the chapter's picture when it has no dungeons. Right: where the
--- Adventurers stand, the room for the dungeon quests as the answer, and the Dungeon clears table (the Leader clicks a
--- cell to change it).
+-- an over-the-cap warning and Your To do: the new Leader's first steps, reach the floor (with your estimate), the
+-- chapter's dungeons (Find group or Get ready, Mark cleared, Undo clear), steps for later dungeons and the next
+-- chapter's dungeons you may run now; the chapter's picture when it has no dungeons. Right: where the Adventurers
+-- stand (the room's stop tick on the track) and the Dungeon clears table (the Leader clicks a cell to change it).
 local _, ns = ...
 local L = ns.L
 local UI, Theme = ns.UI, ns.Theme
@@ -107,31 +106,8 @@ local function build(pf)
     b:SetScript("OnClick", function() pf.sel = b.n; W:Refresh() end)
     return b
   end)
-  -- While waiting for the floor: a box in the middle with who is below it, their level and how far they have to go.
-  pf.wait = UI.Card(Lc, "B8742A")
-  pf.wait:SetWidth(width)
-  pf.wait.title = UI.Text(pf.wait, 16, "B8742A", "title", "CENTER")
-  pf.wait.title:SetPoint("TOP", 0, -10)
-  pf.wait.title:SetText(L.BN_WAITING)
-  pf.wait.rows = UI.Pool(function()
-    local r = CreateFrame("Frame", nil, pf.wait)
-    r:SetSize(width - 40, 36)
-    r.name = UI.Text(r, 13, "ink", "title")
-    r.name:SetPoint("TOPLEFT", 0, 0)
-    r.lvl = UI.Text(r, 12, "ink2", "body", "RIGHT")
-    r.lvl:SetPoint("TOPRIGHT", 0, -1)
-    r.bar = UI.Bar(r, 8)
-    r.bar:SetPoint("TOPLEFT", 0, -16)
-    r.bar:SetColor("D88A2E")
-    r.far = UI.Text(r, 11, "ink2")
-    r.far:SetPoint("TOPLEFT", 0, -26)
-    r.far:SetWidth(width - 40); r.far:SetWordWrap(false)
-    return r
-  end)
-  pf.wait.more = UI.Text(pf.wait, 12, "ink2", "body", "CENTER")
-  pf.wait.help = UI.WrapText(pf.wait, 12, "ink2", width - 40, "book")
-  pf.wait.help:SetJustifyH("CENTER")
-  pf.wait.help:SetText(L.CH_WAIT_HELP)
+  -- (No waiting box since U232: the right page's Below the floor says who and how far, the To do's floor line your own
+  -- estimate.)
   pf.div = UI.Divider(Lc)
   pf.todoHead = UI.SectionHeader(Lc, width)
   pf.todoHead:SetText(L.TODO_HEAD)
@@ -151,9 +127,14 @@ local function build(pf)
     r.text:SetWidth(width - 30); r.text:SetWordWrap(false)
     local hl = r:CreateTexture(nil, "HIGHLIGHT")
     hl:SetAllPoints(); hl:SetColorTexture(1, 0.9, 0.6, 0.08)
-    r:SetScript("OnClick", function() if r.page then W:ShowPage(r.page) end end)
+    -- (The cleared dungeons' line, U227, shows or hides their rows.)
+    r:SetScript("OnClick", function()
+      if r.fold then pf.unfold[r.fold] = not pf.unfold[r.fold]; W:Refresh() elseif r.page then W:ShowPage(r.page) end
+    end)
+    UI.Tooltip(r, function() return r.tip end)
     return r
   end)
+  pf.unfold = {}
   -- A dungeon as one row (28 Oct 2026: the picture cards took a page each and the dungeons had to be scrolled): a
   -- small picture, name, kind and levels, and at the right its state or Find group. The rest is in the tooltip.
   pf.rows = UI.Pool(function()
@@ -253,19 +234,23 @@ local function build(pf)
   pf.none.text:SetPoint("BOTTOMLEFT", 14, 12)
   pf.none.text:SetShadowOffset(1, -1); pf.none.text:SetShadowColor(0, 0, 0, 1)
   -- Milestones in the To do (Rules/Milestones.lua): each with its mark, Required or Optional, how far, and Tick off.
+  -- Framed like the dungeon rows (U224, the check of 15 Nov 2026): its role's colour down the left edge and its border.
   pf.msRows = UI.Pool(function()
-    local r = CreateFrame("Frame", nil, Lc)
+    local r = UI.Card(Lc)
     r:SetSize(width, 40)
+    r.stripe = r:CreateTexture(nil, "ARTWORK", nil, 3)
+    r.stripe:SetPoint("TOPLEFT", 1, -1); r.stripe:SetPoint("BOTTOMLEFT", 1, 1); r.stripe:SetWidth(4)
     r.mark = UI.Mark(r, 14)
-    r.mark:SetPoint("TOPLEFT", 2, -3)
-    r.name = UI.WrapText(r, 13, "ink", width - 120, "title")
-    r.name:SetPoint("TOPLEFT", 22, 0)
+    r.mark:SetPoint("TOPLEFT", 12, -10)
+    r.name = UI.WrapText(r, 13, "ink", width - 130, "title")
+    r.name:SetPoint("TOPLEFT", 32, -8)
     r.sub = UI.Text(r, 11, "ink2")
+    r.sub:SetWidth(width - 130); r.sub:SetWordWrap(false) -- (clear of Tick off: "ticked off by" a long Forever name)
     r.tick = UI.TextButton(r, L.MS_TICK, function()
       local f = ns.Fellowship:Current()
       if f and r.id then ns.Fellowship:Tick(r.id, not r.done) end
     end, "plain", 12)
-    r.tick:SetPoint("TOPRIGHT", 0, 0)
+    r.tick:SetPoint("RIGHT", -8, 0)
     return r
   end)
 
@@ -276,12 +261,6 @@ local function build(pf)
   -- The level track above the list (U5, 31 Oct 2026): the chapter's floor and cap with everyone on one line.
   pf.levelTrack = UI.LevelTrack(R, width)
   pf.stand = UI.Standings(R, width)
-  -- Room for the dungeon quests (U78) as the answer (U145), the figures on hover.
-  pf.room = CreateFrame("Frame", nil, R)
-  pf.room:SetWidth(width)
-  pf.room.text = UI.WrapText(pf.room, 13, "ink", width, "book")
-  pf.room.text:SetPoint("TOPLEFT")
-  UI.Tooltip(pf.room, function() return pf.room.tip end)
 
   -- Dungeon clears: a card with a header row (Hero, dungeons) and one row per Hero.
   pf.mTitle = UI.SectionHeader(R, width)
@@ -444,8 +423,11 @@ local function refreshMatrix(pf, ctx, list, r, width)
   end
   pf.mKey:HideFrom(nKey + 1)
   r:Skip(4)
-  pf.mHelp:SetText(can and L.MATRIX_HELP or (ctx.watching and L.MATRIX_HELP_WATCH or L.MATRIX_HELP_NO))
-  r:Place(pf.mHelp, pf.mHelp:GetStringHeight(), 4)
+  -- (Viewing from another character: no line; the bar at the top says read only, U207.)
+  local help = can and L.MATRIX_HELP or (not ctx.watching and L.MATRIX_HELP_NO) or nil
+  pf.mHelp:SetText(help or "")
+  pf.mHelp:SetShown(help ~= nil)
+  if help then r:Place(pf.mHelp, pf.mHelp:GetStringHeight(), 4) end
 end
 
 -- The stage track: nodes spread across the page, centred, joined by lines.
@@ -487,46 +469,6 @@ local function layoutTrack(pf, nodes, color, width)
   end
   pf.nodes:HideFrom(n + 1)
   pf.links:HideFrom(math.max(1, n))
-end
-
--- The waiting box: who is below the floor (two with a bar and how far they are, the rest on one line).
--- Returns its height.
-local function fillWait(pf, f, ch, below, width)
-  local box = pf.wait
-  local fl = J:FloorLevel(f, ch)
-  local y, shown = 34, 0
-  for i, name in ipairs(below) do
-    if i > 2 then break end
-    local r = box.rows:Get(i)
-    if not r then break end
-    shown = i
-    local h = Hr:Get(f, name) or {}
-    local lvl = Hr:Level(f, name)
-    local part = (tonumber(h.xp) and tonumber(h.xpMax) and h.xpMax > 0) and (h.xp / h.xpMax) or 0
-    r.name:SetText(name == ns.Me() and (L.NAME_YOU:gsub("^%l", string.upper)) or ns.Short(name))
-    r.lvl:SetText(L.CH_WAIT_LEVEL:format(lvl, fl))
-    r.bar:Set(width - 40, ns.Clamp((lvl + part) / fl, 0, 1))
-    r.far:SetText(ns.Together.HowFar(f, name, fl, name == ns.Me()))
-    r:ClearAllPoints(); r:SetPoint("TOP", box, "TOP", 0, -y)
-    r:Show()
-    y = y + 40
-  end
-  box.rows:HideFrom(shown + 1)
-  box.more:SetShown(#below > 2)
-  if #below > 2 then
-    local rest = {}
-    for i = 3, #below do
-      local name = below[i]
-      rest[#rest + 1] = ("%s (%d)"):format(name == ns.Me() and L.NAME_YOU or ns.Short(name), Hr:Level(f, name))
-    end
-    box.more:SetText(L.CH_WAIT_MORE:format(table.concat(rest, ", ")))
-    box.more:ClearAllPoints(); box.more:SetPoint("TOP", box, "TOP", 0, -y)
-    y = y + 20
-  end
-  box.help:ClearAllPoints(); box.help:SetPoint("TOP", box, "TOP", 0, -(y + 2))
-  y = y + 2 + box.help:GetStringHeight() + 10
-  box:SetHeight(y)
-  return y
 end
 
 -- A dungeon's short state for its row ("4 of 7 bosses", "2 still need it") and the lines of its tooltip.
@@ -573,8 +515,10 @@ local function refresh(pf, ctx)
   pf.name:SetText(ch and ch.name or "")
   s:Place(pf.name, 26, 2)
   local unlocked = J:Unlocked(f)
-  -- (A chapter without dungeons, such as the Prologue, said "Dungeons open"; seen in the check run.)
-  local open = #J:InChapter(f, view) > 0 and L.CH_STATE_OPEN or L.CH_STATE_LEVEL
+  local banner = J:Banner(f, view)
+  -- (A chapter without dungeons, such as the Prologue, said "Dungeons open"; seen in the check run. So did one whose
+  -- dungeons are cleared while Everyone to the cap first holds it, the check of 15 Nov 2026.)
+  local open = (#J:InChapter(f, view) > 0 and banner.stage ~= "level") and L.CH_STATE_OPEN or L.CH_STATE_LEVEL
   local state = view == cur and (unlocked and open or L.CH_STATE_WAIT) or (view < cur and L.CH_STATE_DONE or L.CH_STATE_NOT)
   -- (The run rule moved to the dungeons' heading: the line wrapped to two in game and pushed the rows down.)
   pf.line:SetText(ch and (L.CH_LEVELS:format(ch.floor, ch.cap) .. state) or "")
@@ -583,7 +527,7 @@ local function refresh(pf, ctx)
   local nodes = J:Stages(f, view)
   pf.track:SetShown(#nodes > 0)
   if #nodes > 0 then
-    layoutTrack(pf, nodes, J:Banner(f, view).color, width)
+    layoutTrack(pf, nodes, banner.color, width)
     s:Place(pf.track, TRACK_H, 6)
   end
   local items = ch and ns.Together:ToDo(f, view) or {}
@@ -618,11 +562,6 @@ local function refresh(pf, ctx)
   end
   pf.toc:HideFrom(shownToc + 1)
   if shownToc > 0 then s:Skip(6) end
-  -- While anyone is below the floor: the waiting box with who and how far.
-  local b = J:Banner(f, view)
-  local waiting = b.stage == "floor" and ch ~= nil
-  pf.wait:SetShown(waiting)
-  if waiting then s:Place(pf.wait, fillWait(pf, f, ch, b.below or {}, width), 8) end
   local over = view == cur and J:OverCap(f) or {}
   pf.over:SetShown(#over > 0)
   if #over > 0 then
@@ -645,7 +584,29 @@ local function refresh(pf, ctx)
   local canTick = P.Can(f, ns.Me(), "clears") and not ctx.watching
   local nSimple, nMs, shown, subs = 0, 0, 0, {}
   pf.subLater:Hide(); pf.subLike:Hide()
-  for _, it in ipairs(items) do
+  -- U227 (the check of 15 Nov 2026, 22:42): once every Mandatory dungeon is cleared their rows fold into one ticked
+  -- line, its tooltip naming them; a click shows the rows again (with the Leader's ⋯ Undo clear).
+  -- (The chapter's goal's own list, J:Required: a dungeon the game does not offer yet keeps its row.)
+  local req, mand, todo, key = {}, {}, items, f.id .. ":" .. view
+  for _, x in ipairs(J:Required(f, view)) do req[x.key] = true end
+  for _, it in ipairs(items) do if it.kind == "dungeon" and req[it.x.key] then mand[#mand + 1] = it end end
+  local fold, floor = #mand > 0, nil
+  for _, it in ipairs(mand) do fold = fold and it.done end
+  -- U234 (the check of 16 Nov 2026): the floor reached joins the line, "Done: the floor and the 3 dungeons".
+  for _, it in ipairs(items) do if it.kind == "floor" and it.done then floor = it end end
+  if fold then
+    local names, n = {}, #mand
+    for i, it in ipairs(mand) do names[i] = it.x.d[2] end
+    todo = {}
+    for _, it in ipairs(items) do
+      if it == (floor or mand[1]) then
+        todo[#todo + 1] = { kind = "fold", done = true, tip = L.TODO_CLEARED_TIP:format(table.concat(names, ", ")),
+          text = floor and (n == 1 and L.TODO_DONE_1 or L.TODO_DONE_N:format(n)) or (n == 1 and L.TODO_CLEARED_1 or L.TODO_CLEARED_N:format(n)) }
+      end
+      if not (it == floor or (it.kind == "dungeon" and req[it.x.key])) or pf.unfold[key] then todo[#todo + 1] = it end
+    end
+  end
+  for _, it in ipairs(todo) do
     local like = it.kind == "early" or (it.kind == "milestone" and not it.req)
     local sub = it.kind == "later" and pf.subLater or (like and pf.subLike or nil)
     if sub and not subs[sub] then
@@ -654,14 +615,18 @@ local function refresh(pf, ctx)
       s:Skip(4)
       s:Place(sub, 14, 4)
     end
-    if it.kind == "start" or it.kind == "floor" then
+    if it.kind == "start" or it.kind == "floor" or it.kind == "cap" or it.kind == "fold" then
       nSimple = nSimple + 1
       local r = pf.simple:Get(nSimple)
       if r then
         r.mark:SetMark(it.done and "cleared" or "open")
         r.text:SetText(it.text)
+        -- Cut to the short line where it does not fit; the whole line on hover then.
+        local cut = it.short and r.text:GetStringWidth() > r.text:GetWidth() + 1
+        if cut then r.text:SetText(it.short) end
         r.text:SetTextColor(Theme:RGBA(it.done and "ink2" or "ink"))
         r.page = not it.done and it.page or nil
+        r.fold, r.tip = it.kind == "fold" and key or nil, cut and it.text or it.tip
         s:Place(r, 24, 2)
       end
     elseif it.kind == "milestone" then
@@ -676,9 +641,12 @@ local function refresh(pf, ctx)
         r.sub:ClearAllPoints(); r.sub:SetPoint("TOPLEFT", r.name, "BOTTOMLEFT", 0, -2)
         r.tick:SetShown(m.kind == "tick" and canTick)
         r.tick:SetLabel(it.done and L.MS_UNTICK or L.MS_TICK)
-        local h = r.name:GetStringHeight() + 18
+        local color = J.ROLE_COLOR[m.req and "m" or "o"][1]
+        r.stripe:SetColorTexture(ns.Hex(color))
+        r.borderRole = color; r:Paint()
+        local h = r.name:GetStringHeight() + 34
         r:SetHeight(h)
-        s:Place(r, h, 6)
+        s:Place(r, h, 4)
       end
     else
       local c = pf.rows:Get(shown + 1)
@@ -745,7 +713,7 @@ local function refresh(pf, ctx)
       -- No picture of its own (only the game's blurry default tile): the chapter's illustration instead.
       if default then ns.Pages:SetChapterArt(c.pic.tex, ns.Pages:ArtOf(f, it.e and it.e.chapter or view), THUMB_W - 2 * UI.PIC_INSET, THUMB_H - 2 * UI.PIC_INSET, 0.6); ok = true end
       c.pic.tex:SetShown(ok)
-      -- Rows that wait for the floor are dimmed: the waiting box above is what matters now.
+      -- Rows that wait for the floor are dimmed: the floor line above is what matters now.
       c:SetAlpha(it.wait and 0.6 or 1)
       c:SetHeight(ROW_H + BRIEF_H)
       s:Place(c, ROW_H + BRIEF_H, 4)
@@ -769,15 +737,7 @@ local function refresh(pf, ctx)
   local th = pf.levelTrack:Set(f, view, 6, room and room.stop)
   if th > 0 then r:Place(pf.levelTrack, th, 12) end
   pf.stand:Set(f, view, r)
-  pf.room:SetShown(room ~= nil)
-  if room then
-    local text, color, tip = ns.Room.Answer(room)
-    pf.room.text:SetText(("|cff%s%s|r"):format(color, text))
-    pf.room.tip = tip
-    local h = pf.room.text:GetStringHeight()
-    pf.room:SetHeight(h)
-    r:Place(pf.room, h, 12)
-  end
+  -- (The room's answer is on the Overview, U235: only its stop tick on the track here.)
   refreshMatrix(pf, ctx, list, r, width)
   pf.rscroll:SetContentHeight(r.y + 8)
 end

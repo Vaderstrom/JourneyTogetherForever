@@ -9,7 +9,9 @@
 -- The report goes to JourneyTogetherForeverDB.selftest; it reaches the disk with the next /reload or logout.
 local _, ns = ...
 local L = ns.L
-local ST = { WAIT = 0.6 }
+-- Between steps (U210, the owner, 14 Nov 2026): at least MIN_WAIT, then as soon as nothing is on its way (the send
+-- queue empty, no pretend Hero about to answer), and never longer than WAIT, the fixed pause until then.
+local ST = { WAIT = 0.6, MIN_WAIT = 0.15, POLL = 0.05 }
 ns.SelfTest = ST
 
 local PRETEND = { "Brannic", "Elyra", "Corwin" }
@@ -651,6 +653,10 @@ step("getting started (the leader of a new fellowship)", function(c)
   c:Eq(open, 1, "only Invite Heroes is left")
   ns.Window:ShowPage("overview")
   c:Eq(ns.Window.pageFrames.overview.focus.what:GetText(), L.START_INVITE, "on the Overview")
+  -- In the Prologue (floor level 1, always reached), Where we stand says nothing of the floor (U236).
+  if ns.Journey:FloorLevel(f, f.journey.chapters[ns.Journey:CurrentIndex(f)]) <= 1 then
+    c:That(not (ns.Window.pageFrames.overview.stand.line:GetText() or ""):find(L.WS_AT_FLOOR, 1, true), "no Everyone is at the floor in the Prologue")
+  end
   -- Each step fits Focus now's two-line headline (the check of 10 Nov 2026 cut the bosses' step).
   local what = ns.Window.pageFrames.overview.focus.what
   for _, s in ipairs(list or {}) do
@@ -687,6 +693,16 @@ step("pretend Heroes accept", function(c)
 end)
 
 step("levels: below the floor, Focus now says how far (catch-up)", function(c)
+  -- Still in the Prologue: Focus now's Level to 15 says it has no dungeons, not that they are done (the check of 16
+  -- Nov 2026).
+  if ns.Journey:CurrentIndex(cur()) == 1 then
+    dev("level 5")
+    local playNow = ns.Together.PlayNow
+    ns.Together.PlayNow = function() return nil end -- (online pretend Adventurers would ask to play together first)
+    local ok, fo = pcall(function() return ns.Together:Focus(cur()) end)
+    ns.Together.PlayNow = playNow
+    c:That(ok and (fo.head ~= L.FOCUS_LEVEL:format(15) or fo.why == L.CH_NO_DUNGEONS_PIC:format(15)), "Focus now in the Prologue: no dungeons in this chapter")
+  end
   -- Everyone past the Prologue (levels 1-15), then you fall back below the floor of Chapter II (15-21).
   for _, n in ipairs(PRETEND) do dev("hero " .. n .. " level 15") end
   dev("level 16")
@@ -757,7 +773,10 @@ step("level track: where you stand and where the Adventurers stand", function(c)
   local markers = 0
   for _, d in ipairs(s.track.markers.items) do if d:IsShown() then markers = markers + 1 end end
   c:That(s.track:IsShown() and markers >= 1, "Where we stand: the level track with its markers")
-  c:Has(s.line:GetText(), L.WS_BELOW_YOU, "one line: you are below the floor")
+  -- You are below the floor: Focus now says so just under the strip ("Reach level 15"), so the strip does not (U239).
+  c:That(ns.Together:Focus(cur()).namesBelow, "Focus now: you, to the floor, and who else is in the same spot")
+  local line, n = s.line:GetText() or "", #ns.Journey:Below(cur(), ns.Journey:CurrentIndex(cur()))
+  c:That(not line:find(L.WS_BELOW_YOU, 1, true) and not line:find(L.WS_BELOW_N:format(n), 1, true), "the strip does not say it again (U239)")
   c:That(s.who:IsShown(), "Who stands where, a link to the Chapter page")
   -- U139: one large headline and at most one button in Focus now.
   c:That(select(2, pf.focus.what:GetFont()) >= 20, "Focus now: the headline is large")
@@ -772,6 +791,7 @@ step("overview look: the banner, three cards on their pictures, faces and the op
   W:ShowPage("overview")
   local pf = W.pageFrames.overview
   c:That(pf.pic:GetParent() == pf.banner and pf.stand:GetParent() == pf.banner, "the chapter's banner, Where we stand along its foot")
+  c:That(pf.pic.levels == nil and pf.stand.track:IsShown(), "no floor and cap under the chapter's name: the level track marks them (U229)")
   c:That(pf.focus.art:GetTexture() ~= nil, "Focus now: a picture behind it")
   c:That(select(2, pf.focus.what:GetFont()) >= 24, "its headline large")
   if pf.focus.btn:IsShown() then c:Eq(math.floor(pf.focus.btn:GetHeight() + 0.5), 34, "its button larger") end
@@ -1175,9 +1195,10 @@ step("chapter page: a dungeon's picture shows large on hover", function(c)
   c:That(not (tip and tip:IsShown()), "gone when the mouse leaves")
 end)
 
--- The Chapter page (28 Oct 2026): while someone is below the floor, the track stands at the floor and a box in the
--- middle says who, at what level and how far.
-step("chapter page: waiting for the floor, the box in the middle", function(c)
+-- The Chapter page (28 Oct 2026): while someone is below the floor, the track stands at the floor. Since U232 (the
+-- check of 16 Nov 2026) no box in the middle: the right page's Below the floor says who, the To do's floor line your
+-- own estimate.
+step("chapter page: waiting for the floor, who on the right page, no waiting box (U232)", function(c)
   local f, J = cur(), ns.Journey
   local n = J:CurrentIndex(f)
   local floor = J:FloorLevel(f, f.journey.chapters[n])
@@ -1188,12 +1209,29 @@ step("chapter page: waiting for the floor, the box in the middle", function(c)
   local nodes, b = J:Stages(f, n)
   c:Eq(b.stage, "floor", "the chapter waits for the floor")
   c:Eq(nodes[1] and nodes[1].state, "current", "the track stands at its first stage")
-  c:That(pf.wait:IsShown(), "the waiting box")
+  c:That(pf.wait == nil, "no waiting box (U232)")
   local named = false
-  for _, r in ipairs(pf.wait.rows.items) do if r:IsShown() and r.name:GetText() == "Corwin" then named = true end end
-  c:That(named, "it names Corwin, with level and how far")
+  for _, r in ipairs(pf.stand.rows.items) do if r:IsShown() and r.name:GetText() == "Corwin" then named = true end end
+  c:That(named, "the right page names Corwin below the floor")
+  -- Your floor line takes your estimate when your pace is known (U232).
+  local me = ns.Me()
+  local h = ns.Hero:Get(f, me) or {}
+  local _, sec = ns.Pace.ToLevel(ns.Hero:Level(f, me), h.xp, h.xpMax, floor, h.pace)
+  for _, it in ipairs(ns.Together:ToDo(f, n)) do
+    if it.kind == "floor" and not it.done then
+      c:Eq(it.text, sec and ns.L.TODO_FLOOR_ETA:format(floor, ns.TimeLeft(sec)) or ns.L.TODO_FLOOR:format(floor),
+        "your floor line, with your estimate when your pace is known")
+    end
+  end
+  -- Your floor line on one line, also with your estimate (it does not wrap).
+  for _, r in ipairs(pf.simple.items) do
+    local t = r:IsShown() and r.text:GetText() or ""
+    if t:find(L.TODO_FLOOR:format(floor), 1, true) and inGame() then
+      c:That(r.text:GetStringWidth() <= r.text:GetWidth() + 1, "the floor line fits: " .. t)
+    end
+  end
   -- Its dungeons, dimmed and without a button, say what to get ready meanwhile, not "Open when everyone is level N."
-  -- (the check of 11 Nov 2026, 23:49: the box already says it).
+  -- (the check of 11 Nov 2026, 23:49: the floor line already says it).
   local wait, rows = L.TODO_WAIT:format(floor), {}
   for _, r in ipairs(pf.rows.items) do if r:IsShown() and r.key then rows[r.key] = r end end
   for _, it in ipairs(ns.Together:ToDo(f, n, true)) do
@@ -1206,7 +1244,70 @@ step("chapter page: waiting for the floor, the box in the middle", function(c)
   end
   dev("hero Corwin level " .. math.max(was, floor))
   ns.Window:Refresh()
-  c:That(not pf.wait:IsShown(), "gone when everyone is at the floor")
+end)
+
+-- Everyone to the cap first (U226, the owner, 15 Nov 2026): the rule, Corwin's level and the clears are put back after
+-- (every dungeon counts as cleared only inside the check, so nothing is marked).
+step("chapter page: everyone to the cap first, the dungeons cleared and the chapter waits for the cap", function(c)
+  local f, J = cur(), ns.Journey
+  local n = J:CurrentIndex(f)
+  local ch = f.journey.chapters[n]
+  if not ch or #J:Required(f, n) == 0 then c:That(true, "no dungeons in this chapter: nothing to check"); return end
+  local was, corwin, cleared = f.rules.capFirst, ns.Hero:Level(f, full("Corwin")), J.Cleared
+  f.rules.capFirst = true
+  dev("hero Corwin level " .. (ch.cap - 1))
+  local keys = {}
+  for _, x in ipairs(J:Stages(f, n)) do keys[#keys + 1] = x.key end
+  c:Has(table.concat(keys, ","), "run,level", "Level to the cap after Run the dungeons")
+  J.Cleared = function() return true end
+  local chap = ns.Window.pageFrames.chapter
+  local nreq = #J:Required(f, n)
+  local ok, b, there, of, held, off, line, room, todo = pcall(function()
+    local banner = J:Banner(f, n)
+    local at, counted = J:AtCap(f, ch)
+    local wait = not J:GoalDone(f, n)
+    -- (The check of 15 Nov 2026: the page still said Dungeons open, and Stop questing now.)
+    chap.sel, chap.unfold[f.id .. ":" .. n] = nil, nil
+    ns.Window:ShowPage("chapter")
+    local words, left = chap.line:GetText() or "", ns.Room:Chapter(f, ns.Me())
+    -- U227: the cleared dungeons in one ticked line, then the cap; a click shows their rows again.
+    local seen = { rows = 0 }
+    for _, r in ipairs(chap.simple.items) do
+      if r:IsShown() then seen[r.text:GetText()] = r end
+    end
+    for _, r in ipairs(chap.rows.items) do
+      if r:IsShown() and r.key and (f.journey.place[r.key] or {}).ch == n and f.journey.place[r.key].role ~= "o" then seen.rows = seen.rows + 1 end
+    end
+    -- (U234: with your floor reached, "Done: the floor and the 3 dungeons", the floor line folded in too.)
+    local fl = ns.Hero:Level(f, ns.Me()) >= J:FloorLevel(f, ch) and not ns.Fellowship:IsFriend(f, ns.Me())
+    seen.floorIn = fl
+    local fold = seen[fl and (nreq == 1 and L.TODO_DONE_1 or L.TODO_DONE_N:format(nreq)) or (nreq == 1 and L.TODO_CLEARED_1 or L.TODO_CLEARED_N:format(nreq))]
+    seen.floorLine = seen[L.TODO_FLOOR:format(J:FloorLevel(f, ch))] ~= nil
+    if fold then
+      fold:Click()
+      for _, r in ipairs(chap.rows.items) do if r:IsShown() and r.key and (f.journey.place[r.key] or {}).ch == n then seen.open = (seen.open or 0) + 1 end end
+      fold:Click()
+    end
+    seen.fold = fold
+    f.rules.capFirst = false
+    return banner, at, counted, wait, J:GoalDone(f, n), words, left, seen
+  end)
+  J.Cleared, f.rules.capFirst = cleared, was
+  dev("hero Corwin level " .. corwin)
+  ns.Window:Refresh()
+  c:That(ok, "no error: " .. tostring(ok or b))
+  if not ok then return end
+  c:Eq(b.stage, "level", "every dungeon cleared: the chapter waits for the cap")
+  c:Eq(b.text, L.BN_CAPFIRST_TEXT:format(ch.cap, there, of), "the banner says so, and how many are there")
+  c:Has(line, L.CH_STATE_LEVEL, "the page says Level together, not Dungeons open")
+  c:That(room == nil, "no Stop questing: the cleared dungeons' quests leave the count")
+  c:That(todo.fold ~= nil, "Your To do: the cleared dungeons in one ticked line (U227)" .. (todo.floorIn and ", the floor in it (U234)" or ""))
+  if todo.floorIn then c:That(not todo.floorLine, "the floor line folded into it") end
+  c:Eq(todo.rows, 0, "their rows folded")
+  c:That((todo.open or 0) >= nreq, "a click on the line shows their rows again")
+  c:That(todo[L.TODO_CAP_N:format(ch.cap, there, of)] ~= nil or todo[L.TODO_CAP:format(ch.cap)] ~= nil, "then Reach level " .. ch.cap .. ", with how many are there")
+  c:Eq(held, there < of, ("held while not everyone is at the cap (%d of %d)"):format(there, of))
+  c:That(off, "with the rule off the dungeons complete it")
 end)
 
 -- Your To do (U140, U136): a new Leader's first steps, reach the floor, the chapter's dungeons, the steps for later
@@ -1529,7 +1630,7 @@ step("quests: tabs and attunements", function(c)
   local pf = ns.Window.pageFrames.quests
   -- At this character's own level first (low levels see none yet), then as a level 60 sees them.
   ns.QuestLists.viewLevel = nil
-  pf.tabs.buttons[3]:Click()
+  pf.tabs.buttons[4]:Click()
   c:That(pf.alscroll:IsShown(), "Attunements tab")
   local open = #ns.QuestLists:Attunements(cur(), ns.Me())
   c:That(open > 0 and pf.aRows.items[1]:IsShown() or pf.aNone:IsShown(), ("%d open at level %d"):format(open, UnitLevel("player") or 0))
@@ -1551,6 +1652,48 @@ step("quests: tabs and attunements", function(c)
 end)
 
 shot("quests, attunements")
+
+-- U214 (the owner, 15 Nov 2026: "Build it for attunements"): the chosen attunement's steps as boxes joined by lines,
+-- as the Attune addon draws a chain.
+step("attunements: each step a box joined to the next by a line; done in green, yours in gold, the rest plain (U214)", function(c)
+  local QL, W, Theme = ns.QuestLists, ns.Window, ns.Theme
+  QL.viewLevel = 60
+  W:ShowPage("quests")
+  local pf = W.pageFrames.quests
+  pf.tabs.buttons[4]:Click()
+  local list, sel = QL:Attunements(cur(), ns.Me()), nil
+  for i, a in ipairs(list) do if not a.drop and #a.steps > 1 then sel = i; break end end
+  if not sel then
+    QL.viewLevel = nil
+    c:That(true, "no attunement with steps in this game")
+    return
+  end
+  pf.attSel = sel; W:Refresh()
+  local a = list[sel]
+  local mine = QL:Progress(cur(), a, ns.Me())
+  local gold = Theme:Current().light and "B8742A" or "D8A850"
+  local function near(r, g, b, hex)
+    local R, G, B = Theme:RGBA(hex)
+    return r and math.abs(r - R) + math.abs(g - G) + math.abs(b - B) < 0.03
+  end
+  local bad = {}
+  for i = 1, #a.steps do
+    local p = pf.aSteps.items[i]
+    local ok, here = mine.steps[i], mine.at == i
+    if not (p and p:IsShown()) then bad[#bad + 1] = i .. " not shown"
+    else
+      local r, g, b = p:GetBackdropBorderColor()
+      if not near(r, g, b, here and gold or (ok and "3E7A3A" or "line")) then bad[#bad + 1] = i .. " border" end
+      if p.link:IsShown() ~= (i < #a.steps) then bad[#bad + 1] = i .. " line" end
+      if p:GetHeight() < p.title:GetStringHeight() + 12 then bad[#bad + 1] = i .. " no room inside" end
+    end
+  end
+  c:Eq(table.concat(bad, ", "), "", #a.steps .. " steps of " .. a.name .. ": a box each, a line to the next but the last")
+  QL.viewLevel = nil
+  pf.attSel = nil
+  pf.tabs.buttons[1]:Click()
+end)
+
 
 -- The Quests tab (6 Nov 2026): two bold sections with their counts; each by zone, the zone you are in first (You are
 -- here), then your continent's (Nearby); quests as cards with an icon and your progress.
@@ -1598,9 +1741,9 @@ local function listedDungeon()
   end
 end
 
-step("dungeon quests: three Quests tabs; the To do says what each dungeon needs, Get ready where quests wait", function(c)
+step("dungeon quests: four Quests tabs; the To do says what each dungeon needs, Get ready where quests wait", function(c)
   ns.Window:ShowPage("quests")
-  c:Eq(#ns.Window.pageFrames.quests.tabs.buttons, 3, "three tabs: Quests, Quest chains, Attunements & keys")
+  c:Eq(#ns.Window.pageFrames.quests.tabs.buttons, 4, "four tabs: Quests, Quest chains, Dungeon quests, Attunements & keys")
   local f, QL = cur(), ns.QuestLists
   local n, bad = 0, {}
   for _, it in ipairs(ns.Together:ToDo(f, ns.Journey:CurrentIndex(f))) do
@@ -1622,6 +1765,88 @@ step("dungeon quests: three Quests tabs; the To do says what each dungeon needs,
     ns.DungeonPage:Back()
     c:Eq(ns.Window.current, "chapter", "Back returns to the Chapter page")
   end
+end)
+
+step("dungeon quests: the Dungeon quests tab is their log, Under way and Open now, a row each opening its Dungeon page (U213)", function(c)
+  local f, QL, J, me = cur(), ns.QuestLists, ns.Journey, ns.Me()
+  local log = QL:Log(f, me)
+  ns.Window:ShowPage("quests")
+  local pf = ns.Window.pageFrames.quests
+  pf.tabs.buttons[3]:Click()
+  c:That(pf.log[1].scroll:IsShown() and pf.log[2].scroll:IsShown() and not pf.lscroll:IsShown(), "the log on both pages")
+  local bad = {}
+  for i, list in ipairs({ log.under, log.open }) do
+    local part, shown = pf.log[i], 0
+    for _, r in ipairs(part.rows.items) do if r:IsShown() then shown = shown + 1 end end
+    c:Eq(shown, #list, (i == 1 and "Under way" or "Open now") .. ": a row each")
+    c:Eq(part.none:IsShown(), #list == 0, "the empty line only when empty")
+    -- U230: a heading per dungeon, its name and chapter once; the rows without them.
+    local keys, nk, heads = {}, 0, 0
+    for _, row in ipairs(list) do if not keys[row.key] then keys[row.key], nk = true, nk + 1 end end
+    for _, hd in ipairs(part.heads.items) do if hd:IsShown() then heads = heads + 1 end end
+    c:Eq(heads, nk, (i == 1 and "Under way" or "Open now") .. ": one heading per dungeon (U230)")
+    c:That(part.rows.items[1] == nil or part.rows.items[1].place == nil, "no dungeon line on the rows")
+    for _, row in ipairs(list) do
+      local placed = ns.DungeonPage.Placed(f, row.key)
+      if row.q.status == "done" or J:Cleared(f, row.key) or row.started ~= (i == 1) or not placed or placed.n ~= row.n then
+        bad[#bad + 1] = row.q.name
+      end
+    end
+  end
+  c:Eq(table.concat(bad, ", "), "", "none done, none of a cleared dungeon, each under its chapter, started ones under way")
+  local first = pf.log[1].rows.items[1]
+  if not (first and first:IsShown()) then first = pf.log[2].rows.items[1] end
+  if first and first:IsShown() then
+    local id, key = first.id, first.key
+    first:Click()
+    c:Eq(ns.Window.current, "dungeon", "a row opens its Dungeon page")
+    c:Eq(ns.Window.dungeon, key, "at its dungeon")
+    c:That(ns.Window.pageFrames.dungeon.opened[id], "with its row open")
+    ns.DungeonPage:Back()
+    c:Eq(ns.Window.current, "quests", "Back returns to the log")
+  end
+  local hd = pf.log[1].heads.items[1]
+  if not (hd and hd:IsShown()) then hd = pf.log[2].heads.items[1] end
+  if hd and hd:IsShown() then
+    local key = hd.key
+    hd:Click()
+    c:Eq(ns.Window.dungeon, key, "a dungeon's heading opens its Dungeon page")
+    ns.DungeonPage:Back()
+  end
+  pf.tabs.buttons[1]:Click()
+end)
+
+-- U215 (the owner, 15 Nov 2026: "a 'right side' menu on the overview page"): the same log in a side panel.
+step("dungeon quests: the Overview's Your dungeon quests opens the log at the book's side; a row opens its Dungeon page (U215)", function(c)
+  local f, me, W = cur(), ns.Me(), ns.Window
+  local log = ns.QuestLists:Log(f, me)
+  W:ShowPage("overview")
+  local ov = W.pageFrames.overview
+  c:That(ov.dq:IsShown(), "the link on the banner")
+  ov.dq:Click()
+  c:Eq(W.openPanel, "dquests", "it opens the side panel")
+  ov.dq:Click()
+  c:Eq(W.openPanel, nil, "a second click closes it")
+  ov.dq:Click()
+  local p = W.panels.dquests
+  for i, list in ipairs({ log.under, log.open }) do
+    local part, shown = p.parts[i], 0
+    for _, r in ipairs(part.rows.items) do if r:IsShown() then shown = shown + 1 end end
+    c:Eq(shown, #list, (i == 1 and "Under way" or "Open now") .. ": a row each, as on the tab")
+    c:Eq(part.none:IsShown(), #list == 0, "the empty line only when empty")
+  end
+  local first = p.parts[1].rows.items[1]
+  if not (first and first:IsShown()) then first = p.parts[2].rows.items[1] end
+  if first and first:IsShown() then
+    local key = first.key
+    first:Click()
+    c:Eq(W.current, "dungeon", "a row opens its Dungeon page")
+    c:Eq(W.dungeon, key, "at its dungeon")
+    c:Eq(W.openPanel, nil, "and the panel closes (it would cover the page)")
+    ns.DungeonPage:Back()
+    c:Eq(W.current, "overview", "Back returns to the Overview")
+  end
+  W:HidePanels()
 end)
 
 step("dungeon quests: a dungeon's page has its quests under three headings in the order you act, Pin on map", function(c)
@@ -1708,13 +1933,14 @@ step("dungeon quests: a dungeon's page has its quests under three headings in th
   -- without the map (in combat, or a zone the game has no map for) the spot goes to chat.
   for _, p in ipairs(pf.quests.items) do
     if p:IsShown() and p.spot then
-      local want = WorldMapFrame and QL:MapOf(p.st) and not InCombatLockdown() and "mark" or "chat"
-      c:Eq(QL:Pin(p.st, p.qname), want, "the pin shows " .. p.spot .. " on the map (Questie " .. ns.Quests:QuestieState() .. ")")
-      local m = ns.MapMark.mark
+      local want = WorldMapFrame and #p.marks > 0 and not InCombatLockdown() and "mark" or "chat"
+      c:Eq(QL:Pin(p.st, p.qname, p.marks), want, "the pin shows " .. p.spot .. " on the map (Questie " .. ns.Quests:QuestieState() .. ")")
+      local m = ns.MapMark.marks[p.marks.focus or 1]
       if want == "mark" then
         c:That(m and m:IsShown() and m:GetParent() == WorldMapFrame:GetCanvas(), "our mark on the map's canvas, on the spot's zone")
         c:That(m and math.abs(m:GetScale() * WorldMapFrame:GetCanvasScale() - 1) < 0.01, "the same size at any zoom")
-        report().mapMark = { map = WorldMapFrame:GetMapID(), want = QL:MapOf(p.st) }
+        c:That(m and m.crest == nil and m.dot == nil and m.mark:GetTexture() ~= nil, "a ring on the spot, the map seen through its middle, no dot (U238)")
+        report().mapMark = { map = WorldMapFrame:GetMapID(), want = p.marks[p.marks.focus].map }
       end
       closeMap()
       c:That(not (m and m:IsShown()), "the mark goes with the map")
@@ -1884,6 +2110,61 @@ step("dungeon quests: a prequest chain lists its steps, each with where it start
   c:Eq(found and #found.steps, horde and 5 or 9, "under Prequest chains, every step")
 end)
 
+-- Show on map (the owner, 14 Nov 2026: "display where the quest starts. Also where each of the steps starts if it's a
+-- chain. Then with an option to track with a waypoint"): a mark for each place, numbered as the steps; the book steps
+-- aside until the map closes; a click on a mark sets the waypoint, and the marks stay with that one ringed.
+step("dungeon quests: Show on map marks where the quest and each chain step start; the book steps aside", function(c)
+  local QL, MM = ns.QuestLists, ns.MapMark
+  -- Made-up marks: steps 1 and 2 on one spot share a mark; done ones fade; the next glows and its zone opens.
+  local function at(x, map) return { by = "Giver", zone = "Zone", x = x, y = x, map = map } end
+  local mk = QL:Marks({ name = "Quest", status = "no", start = at(20, 1453), steps = {
+    { name = "One", status = "done", start = at(50, 1436) }, { name = "Two", status = "no", start = at(50.4, 1436) },
+    { name = "Three", status = "no", start = at(70, 1436) } } })
+  c:Eq(#mk, 3, "a mark per place: steps 1 and 2 share one")
+  c:Eq(mk[1] and #mk[1].items == 2 and mk[1].items[1].k .. "," .. mk[1].items[2].k, "1,2", "numbered as the book numbers the steps")
+  c:That(mk[1] and mk[1].next and not mk[1].done and not mk[2].next and mk.focus == 1, "the next step's mark glows; the map opens at its zone")
+  c:That(mk[3] and mk[3].map == 1453 and not mk[3].items[1].k, "the quest's own start: on its own zone's map, no number")
+  local item = QL:Marks({ name = "Item quest", status = "no", start = { item = "Explosives" }, steps = {
+    { name = "One", status = "done", start = at(50, 1436) }, { name = "Two", status = "done", start = at(70, 1436) } } })
+  c:That(item.focus == 2 and item[1].done and item[2].done and not item[2].next, "every step done and the quest from an item: the map opens at the last step, who hands it out")
+  -- The real chain on the map.
+  local horde = UnitFactionGroup("player") == "Horde"
+  ns.DungeonPage:Open(horde and "wc" or "dm")
+  local row
+  for _, p in ipairs(ns.Window.pageFrames.dungeon.quests.items) do if p:IsShown() and p.id == (horde and 914 or 92753) then row = p end end
+  c:That(row and #row.marks > 1, (horde and "Leaders of the Fang" or "Destruction in Deadmines") .. ": " .. (row and #row.marks or 0) .. " marks")
+  if not (row and WorldMapFrame and not InCombatLockdown()) then return end
+  click(row.pin)
+  local m = MM.marks[row.marks.focus]
+  c:That(m and m:IsShown() and WorldMapFrame:GetMapID() == row.marks[row.marks.focus].map, "the map opens at the next place's zone with its mark")
+  c:That(not ns.Window:IsOpen(), "the book steps aside for the map")
+  local nums = 0
+  for i, x in ipairs(row.marks) do
+    if MM.marks[i].num:GetText() == MM.Label(x.items) then nums = nums + 1 end
+  end
+  c:Eq(nums, #row.marks, "each mark has its steps' numbers")
+  c:Eq(MM.Label({ { k = 1 }, { k = 2 }, { k = 3 }, { k = 5 } }), "1-3,5", "a run of three or more as 1-3 (it ran across the crest)")
+  -- Nothing else on the map draws over our marks (another addon's pin did; the check of 15 Nov 2026).
+  local above = 0
+  if m and m.GetParent and m:GetParent().GetChildren then
+    for _, ch in ipairs({ m:GetParent():GetChildren() }) do
+      if ch:IsShown() and ch:GetFrameStrata() == m:GetFrameStrata() and ch:GetFrameLevel() > m:GetFrameLevel() then above = above + 1 end
+    end
+  end
+  c:Eq(above, 0, "no other pin on the map draws over our marks")
+  -- A click on the mark: the waypoint, followed; the marks stay. (The player's own waypoint is put back after.)
+  local had = C_Map.HasUserWaypoint and C_Map.HasUserWaypoint() and C_Map.GetUserWaypoint()
+  local Super = C_SuperTrack
+  local followed = Super and Super.IsSuperTrackingUserWaypoint and Super.IsSuperTrackingUserWaypoint()
+  if m then m:GetScript("OnClick")(m, "LeftButton") end
+  local can = m and C_Map.CanSetUserWaypointOnMap and C_Map.CanSetUserWaypointOnMap(m.at.map)
+  c:That(m and m:IsShown() and m.ring:IsShown() == (can == true), "a click sets the waypoint; the marks stay, that one ringed (where the game allows one)")
+  if had then C_Map.SetUserWaypoint(had) elseif C_Map.ClearUserWaypoint then C_Map.ClearUserWaypoint() end
+  if Super and Super.SetSuperTrackedUserWaypoint then Super.SetSuperTrackedUserWaypoint(followed == true) end
+  closeMap()
+  c:That(ns.Window:IsOpen(), "the book comes back when the map closes")
+end)
+
 -- U123: a chain can go through the dungeon. A quest that starts inside with a step to take before the run is one to start
 -- early (The Truth Comes Crashing Down, after The Archivist, done in the run: it only has to be taken); one whose chain
 -- is all inside starts inside.
@@ -1988,10 +2269,17 @@ step("dungeon quests: a step that is only taken is ready once it is in the log",
     Q:Store(f, name, { q = q, d = done })
     return QL:Ready(f, "gnomer", name).early
   end
+  -- (The quest data left Rig Wars out of the chain on 16 Nov 2026, source 2.0.9, and no chain has such a step now:
+  -- one is put in for this step only, so the rule stays checked.)
+  local st = ns.QUEST_STARTS[2843]
+  local was = st.after
+  st.after = { { 2841, "Rig Wars", accept = true }, was[1] }
+  QL.made = {}
   local none = early({}, { 2842 })
-  c:Eq(ns.QUEST_STARTS[2843].after[1].accept, true, "Rig Wars only has to be taken")
   c:Eq(early({ 2841 }, { 2842 }), none + 1, "Rig Wars in the log and Chief Engineer Scooty done: ready")
   c:Eq(early({ 2841 }, {}), none, "Rig Wars in the log, Chief Engineer Scooty not done: not ready")
+  st.after = was
+  QL.made = {}
 end)
 
 -- U177 (the owner, 10 Nov 2026): a shareable quest to pick up in another Adventurer's log is ready for you too,
@@ -2203,9 +2491,9 @@ step("dungeon page: the story, the bosses with the kills, who cleared it, the fo
   -- Show on map (the owner, 14 Nov 2026): the entrance's zone opens on the map with our mark at the entrance.
   if e and pf.way:IsShown() then
     click(pf.way)
-    local m = ns.MapMark.mark
+    local m = ns.MapMark.marks[1]
     if WorldMapFrame and not InCombatLockdown() and ns.QuestLists:MapOf(e) then
-      c:That(m and m:IsShown() and ns.MapMark.at.x == e.x, "the map opens with our mark at the entrance: " .. L.DQ_AT:format(e.zone, e.x, e.y))
+      c:That(m and m:IsShown() and m.at.st.x == e.x, "the map opens with our mark at the entrance: " .. L.DQ_AT:format(e.zone, e.x, e.y))
     else
       c:That(true, "no map here: the entrance went to chat")
     end
@@ -2553,7 +2841,7 @@ step("room: two warnings, half a level before the stop point and at it, once eac
   c:Eq(#report().toasts, before + 2, "only once")
 end)
 
-step("room: the Overview's answer, the Chapter page's total, the Dungeon page's answer with Show everyone", function(c)
+step("room: the Overview's answer, none on the Chapter page (U235), the Dungeon page's where it has quests for you (U237) with Show everyone", function(c)
   local R, W, J = ns.Room, ns.Window, ns.Journey
   local fake = fakeRoom(c)
   local undo = c.undo
@@ -2565,14 +2853,26 @@ step("room: the Overview's answer, the Chapter page's total, the Dungeon page's 
   c:That((room.tip or ""):find((R.Lines(fake)), 1, true) ~= nil, "the figures on hover")
   W:ShowPage("chapter")
   W.pageFrames.chapter.sel = nil; W:Refresh()
-  c:That(W.pageFrames.chapter.room:IsShown(), "the Chapter page: the total under where the Adventurers stand")
-  local f, key = cur(), nil
-  for _, x in ipairs(J:ChapterList(f, J:CurrentIndex(f))) do if not (x.early or key) then key = x.key end end
-  if not key then return c:That(true, "no dungeon in this chapter") end
+  c:That(W.pageFrames.chapter.room == nil, "no answer on the Chapter page: the Overview says it (U235)")
+  -- The Dungeon page says the chapter's answer where it has quests for your side (U237): one with, one without.
+  local f, key, none = cur(), nil, nil
+  for _, x in ipairs(J:ChapterList(f, J:CurrentIndex(f))) do
+    if not x.early then
+      if #ns.QuestLists:DungeonQuests(f, x.key) > 0 then key = key or x.key else none = none or x.key end
+    end
+  end
+  local pf
+  if none then
+    ns.DungeonPage:Open(none)
+    pf = W.pageFrames.dungeon
+    c:That(not pf.room:IsShown() and not pf.roomAll:IsShown(), "no quests for your side in " .. none .. ": no room line (U237)")
+  end
+  if not key then return c:That(true, "no dungeon with quests for your side in this chapter") end
   ns.DungeonPage:Open(key)
-  local pf = W.pageFrames.dungeon
+  pf = W.pageFrames.dungeon
   pf.everyone = nil; W:Refresh()
   c:That(pf.room:IsShown(), "the Dungeon page: the answer for your chapter's dungeon")
+  c:Has(pf.room.text:GetText(), (R.Answer(fake)), "the chapter's, as on the Overview")
   c:That(not pf.roomHeroes:IsShown(), "yours only, until Show everyone")
   pf.roomAll.box:Click()
   c:That(pf.everyone and pf.roomHeroes:IsShown(), "Show everyone: the other Adventurers' too")
@@ -2638,6 +2938,13 @@ step("heroes and inspect", function(c)
   c:That(pf.ilvlBox.tip ~= nil and pf.ilvlBox.tip ~= "", "the item level box says what it is: " .. tostring(pf.ilvlBox.tip))
   if pf.ilvlBox.tip == L.ILVL_NONE_TIP:format(ns.Short(full("Brannic"))) then c:Eq(pf.iIlvl:GetText(), "–", "no gear shared: a dash") end
   c:That(pf.inviteBtn:IsShown(), "Invite button")
+  -- U205 (the owner, 14 Nov 2026): no number tiles; the level and presence are in the line on the left, and only what
+  -- the line does not say is a line on the right (where he stands, or away by the Leader).
+  c:That(pf.facts == nil, "Inspect: no number tiles")
+  c:Has(pf.iLine:GetText(), tostring(ns.Hero:Level(cur(), full("Brannic"))), "his level in the line on the left")
+  local away = ns.Journey:Away(cur(), full("Brannic"))
+  local stand = away == "forced" and L.STATUS_AWAY_FORCED or (not away and ns.Hero:Standing(cur(), full("Brannic"))) or nil
+  c:Eq(pf.iStand:IsShown() and pf.iStand:GetText() or "none", stand or "none", "where he stands, only when there is something to say")
   -- U3: someone not near is a card (class crest, class and role, item level, gear as a list), no empty model box.
   c:That(pf.card:IsShown() and not pf.modelBox:IsShown() and not pf.gear[1]:IsShown(), "Inspect a pretend Adventurer: the card, no empty model box")
   c:That(pf.card.who:GetText() ~= "" and pf.card.ilvl:GetText():find(pf.iIlvl:GetText(), 1, true), "the card: class, role and item level")
@@ -2766,37 +3073,40 @@ shot("rules and votes")
 
 step("needs attention", function(c)
   dev("hero Corwin level 13")
-  local items = ns.Attention:Gather(cur())
-  c:That(#items > 0, #items .. " items")
+  -- Who is below the floor is no notice (U240): Focus now, the tracker and the Chapter page say it.
+  local behind = false
+  for _, it in ipairs(ns.Attention:Gather(cur())) do behind = behind or it.text:find(ns.Short(full("Corwin")) .. " is below", 1, true) ~= nil end
+  c:That(not behind, "no notice that Corwin is below the floor (U240)")
   ns.Window:ShowPage("manage")
-  c:Eq(ns.Window.frame.header.inbox.badge:IsShown(), true, "counted on the Inbox button (U144)")
+  c:Eq(ns.Window.frame.header.inbox.badge:IsShown(), ns.Inbox:Count() > 0, "the Inbox button counts only what waits for an answer (U212)")
 end)
 
-step("needs attention: each in the Inbox, with where it is handled and Seen (U106, U144)", function(c)
+-- U212 (the owner, 15 Nov 2026: "I get a lot of notifications in my inbox. Very annoying"): notices never count; with
+-- Seen, each new level brought one back on the badge.
+step("needs attention: each in the Inbox with where it is handled, never on its count (U106, U144, U212)", function(c)
   local W, I = ns.Window, ns.Inbox
-  local kept = ns.char.inboxSeen
-  ns.char.inboxSeen = nil
-  local prefix = "behind:" .. full("Corwin") .. ":"
+  -- Corwin not seen for 4 days (put back after).
+  local h = ns.Hero:Get(cur(), full("Corwin"))
+  local heard = h and h.heard
+  if h then h.heard = time() - 4 * 86400 end
   local function corwin()
-    for _, it in ipairs(I:Items()) do if it.key and it.key:sub(1, #prefix) == prefix then return it end end
+    local text = L.NA_QUIET:format(ns.Short(full("Corwin")), 4)
+    for _, it in ipairs(I:Items()) do if it.text == text then return it end end
   end
   local it, n = corwin(), I:Count()
-  c:That(it and it.actions[1][1] == L.NA_CARD and it.actions[2][1] == L.NOTICE_SEEN, "Corwin behind: Their card and Seen")
+  c:That(it and it.notice and #it.actions == 1 and it.actions[1][1] == L.NA_CARD, "Corwin not seen: a notice with Their card, no Seen")
   W:OpenPanel("inbox")
   local row
   for _, r in ipairs(W.panels.inbox.rows.items) do if it and r:IsShown() and r.text:GetText() == it.text then row = r end end
-  c:That(row and row.buttons[1]:IsShown() and row.buttons[2]:IsShown(), "in the Inbox, two buttons")
+  c:That(row and row.buttons[1]:IsShown() and not row.buttons[2]:IsShown(), "in the Inbox, one button")
   if it then
     it.actions[1][2]()
     c:Eq(W.current, "heroes", "Their card opens the Adventurers page"); c:Eq(W.pageFrames.heroes.sel, full("Corwin"), "at Corwin's card")
     W.pageFrames.heroes.sel = nil
-    I:See(it.key)
-    c:Eq(I:Count(), n - 1, "Seen: one fewer on the Inbox button")
-    dev("hero Corwin level 14")
-    local again = corwin()
-    c:That(again and not again.seen, "a new level: it counts again")
   end
-  ns.char.inboxSeen = kept
+  dev("hero Corwin level 14")
+  c:Eq(I:Count(), n, "a new level: still not on the Inbox button")
+  if h then h.heard = heard end
   W:HidePanels()
   W:ShowPage("manage")
 end)
@@ -2809,29 +3119,27 @@ step("inbox", function(c)
   c:That(ns.Window.panels.inbox:IsShown(), "inbox open")
 end)
 
-step("inbox: a notice has its button and Seen, and Seen takes it off the count (U105)", function(c)
-  local I, kept = ns.Inbox, ns.char.inboxSeen
-  ns.char.inboxSeen = nil
-  -- A notice made for the check: the tournament's sign-up (no other answer is asked).
+step("inbox: only what waits for an answer counts; a notice comes after, dimmed, with its button (U105, U212)", function(c)
+  local I = ns.Inbox
+  -- A notice made for the check, put first: the tournament's sign-up (it asks no answer).
   local gather = I.Gather
+  local made = { notice = true, text = L.INBOX_T_SIGNUP, actions = { { L.INBOX_OPEN_TOURNEY, function() end, "primary" } } }
   I.Gather = function(self)
     local items = gather(self)
-    items[#items + 1] = { key = "tsign:selftest", text = L.INBOX_T_SIGNUP, actions = { { L.INBOX_OPEN_TOURNEY, function() end, "primary" } } }
+    table.insert(items, 1, made)
     return items
   end
   local ok, err = pcall(function()
-    local n = I:Count()
-    local it
-    for _, x in ipairs(I:Items()) do if x.key == "tsign:selftest" then it = x end end
-    c:That(it and it.actions[1][1] == L.INBOX_OPEN_TOURNEY and it.actions[2][1] == L.NOTICE_SEEN, "Open the tournament and Seen")
-    if it then it.actions[2][2]() end
-    c:Eq(I:Count(), n - 1, "Seen: one fewer on the Inbox button")
-    local last = I:Items()[#I:Items()]
-    c:That(last.key == "tsign:selftest" and last.seen and #last.actions == 1, "listed last, dimmed, without Seen")
+    local answers, at = 0, nil
+    for _, x in ipairs(gather(I)) do if not x.notice then answers = answers + 1 end end
+    c:Eq(I:Count(), answers, "the Inbox button counts " .. answers .. " answers, no notice")
+    local items = I:Items()
+    for k, x in ipairs(items) do if x == made then at = k end end
+    c:Eq(at, answers + 1, "the notice after every answer")
+    c:That(#made.actions == 1, "its button, no Seen")
     ns.Window:OpenPanel("inbox")
   end)
   I.Gather = gather
-  ns.char.inboxSeen = kept
   ns.Window:Refresh()
   if not ok then error(err) end
 end)
@@ -2978,6 +3286,27 @@ step("quests: Together never suggests a dungeon's quest (U110)", function(c)
   local x = { id = "q:166", chain = false, mine = true, others = { full("Brannic") }, name = "The Defias Brotherhood" }
   ns.Quests:Classify(x)
   c:That(x.dungeon, "marked as one: Play now and the tracker leave it out")
+end)
+
+-- The owner's BugGrabber of 15 Nov 2026: "script ran too long" on the tracker, Links() once per chain and Adventurer.
+step("quests: Together asks for the chain links once per list, not once per chain and Adventurer", function(c)
+  local Q, calls = ns.Quests, 0
+  local links = Q.Links
+  Q.Links = function(self) calls = calls + 1; return links(self) end
+  local ok = pcall(Q.Items, Q, cur())
+  Q.Links = links
+  c:That(ok, "the list is made")
+  c:That(calls <= 2, "Links asked " .. calls .. " times")
+end)
+
+-- The owner, 15 Nov 2026: "I don't want this addon to cause any stuttering". With Questie's thousands of links the
+-- chains were walked again on every look.
+step("quests: Together's chains are worked out once, and again only after a link or a title changes", function(c)
+  local Q = ns.Quests
+  local chains = Q:Chains()
+  c:That(Q:Chains() == chains, "asked again: the same list, nothing walked twice")
+  Q:Stale()
+  c:That(Q:Chains() ~= chains, "after a change: made again")
 end)
 
 step("settings and themes: the key binding opens the chosen page and closes the book (U107)", function(c)
@@ -3183,7 +3512,9 @@ step("rules editing: Publish in sight, and only your changes go out", function(c
   pf.picks = nil
   W:Refresh()
   c:That(pf.bar:IsShown() and not pf.propose:IsShown(), "the bar, without Publish while nothing changed")
-  c:Eq(pf.barText:GetText(), L.PUBLISHED, "everything is published")
+  c:Eq(pf.barText:GetText(), L.RULES_BAR_0, "the bar says changes stay a draft until you publish (U228)")
+  c:Eq(pf.form.items[1].frames[1]:GetText(), L.H_LEVELING, "no summary above the rules: Leveling together first (U222)")
+  c:That(pf.yourPart == nil, "no box over the form saying the changes are a draft (U228)")
   local pick = other()
   click(pick)
   c:Eq(pf.barText:GetText(), L.RULES_BAR_1, "one change waits")
@@ -3203,7 +3534,7 @@ step("rules editing: Publish in sight, and only your changes go out", function(c
   c:Eq(f.rules.floorTol, pick.value, "your change is published")
   c:Eq(f.rules.runXp, rules.runXp, "the rule changed meanwhile stays")
   W:ShowPage("rulesadmin")
-  c:Eq(pf.barText:GetText(), L.PUBLISHED, "everything is published again")
+  c:Eq(pf.barText:GetText(), L.RULES_BAR_0, "nothing waits again")
   -- A size picks all its numbers: after a vote on one of them it still goes out whole.
   local size = R.SizeOf(f.rules) == "large" and 1 or 4
   click(pf.size.buttons[size])
@@ -3215,7 +3546,7 @@ step("rules editing: Publish in sight, and only your changes go out", function(c
   pick = other()
   click(pick)
   vote("floorTol", pick.value)
-  c:Eq(pf.barText:GetText(), L.PUBLISHED, "a change that came is no change")
+  c:Eq(pf.barText:GetText(), L.RULES_BAR_0, "a change that came is no change")
   c:That(pf.picks == nil and not pf.propose:IsShown(), "the draft starts afresh")
   -- A new size replaces the last one's keys: Large then Party leaves no Large-only rule behind.
   click(pf.size.buttons[4]); click(pf.size.buttons[3])
@@ -3225,7 +3556,7 @@ step("rules editing: Publish in sight, and only your changes go out", function(c
   click(other())
   pf.pickKey = "another fellowship"
   W:Refresh()
-  c:That(pf.picks == nil and pf.barText:GetText() == L.PUBLISHED, "another fellowship's draft is not this one's")
+  c:That(pf.picks == nil and pf.barText:GetText() == L.RULES_BAR_0, "another fellowship's draft is not this one's")
   -- Discard throws a draft away.
   click(other())
   click(pf.undo)
@@ -3519,6 +3850,38 @@ step("Journey Admin: each dungeon of the chapter with its picture", function(c)
     c:That(card and (not inGame() or card.bosses:GetRight() <= card:GetRight() + 0.5), "inside its card")
     A.sel = 2; W:Refresh()
   end
+end)
+
+-- U231 (the owner, 16 Nov 2026): Back to this chapter on a chapter before the current one, greyed with the reason when
+-- it would not hold or a draft waits; it asks first. Only the question opens here: going back would change the check's
+-- fellowship (the two-client test in tests/test_journey.lua goes back and forth).
+step("Journey Admin: Back to this chapter on an earlier chapter, greyed with the reason, asks first (U231)", function(c)
+  local f, A, W, J = cur(), ns.AdminDraft, ns.Window, ns.Journey
+  W:ShowPage("admin")
+  local pf = W.pageFrames.admin
+  local now = J:CurrentIndex(f)
+  A.sel = now; W:Refresh()
+  c:That(not pf.back:IsShown(), "not on the current chapter")
+  if now < 2 then c:That(true, "no earlier chapter: nothing more to check"); return end
+  local n = now - 1
+  A.sel = n; W:Refresh()
+  c:That(pf.back:IsShown(), "on chapter " .. J.Roman(n))
+  local why = pf.backBlocked(f, n)
+  c:Eq(pf.back:IsEnabled(), why == nil, "greyed exactly when it would not hold")
+  c:Eq(pf.backWhy:IsShown(), why ~= nil, "the reason under it when greyed")
+  if why then c:Eq(pf.backWhy:GetText(), why, "it says why") end
+  A:Edit(f, function(j) j.chapters[n].name = j.chapters[n].name end)
+  c:That(not pf.back:IsEnabled(), "a draft waits: greyed")
+  c:Eq(pf.backWhy:GetText(), L.ADMIN_BACK_DRAFT, "publish or discard first")
+  A:Discard(); A.sel = n; W:Refresh()
+  if pf.back:IsEnabled() then
+    pf.back:Click()
+    c:That(W.confirm:IsShown(), "it asks first")
+    c:Has(W.confirm.text:GetText(), f.journey.chapters[n].name, "naming the chapter")
+    W.confirm:Hide()
+  end
+  c:Eq(J:CurrentIndex(f), now, "nothing changed")
+  A.sel = now; W:Refresh()
 end)
 
 -- U11: the chosen chapter enlarged on the ruler where the parts are too narrow for its number.
@@ -4023,7 +4386,9 @@ step("challenges: Hardcore and shared lives, the Fallen honoured", function(c)
   c:Eq(hp.memorial.title:GetText(), L.MEMORIAL_TITLE:format(ns.Short(b)), "the memorial's title")
   c:Eq(hp.memorial.line:GetText(), Ch:Memorial(f, b).line, "where, when and fighting whom")
   c:That(hp.memHead:IsShown() and not hp.chHead:IsShown(), "his journey in place of this chapter")
-  c:Eq(hp.facts[2].k:GetText(), L.FACT_DAYS, "the days he was in the fellowship")
+  -- U205: no tiles; the days he was in the fellowship are a row of his journey.
+  c:Eq(hp.memRows[3].label:GetText(), L.MEMORIAL_DAYS, "the days he was in the fellowship: a row of his journey")
+  c:Eq(hp.memRows[3].value:GetText(), tostring(Ch:Memorial(f, b).days or "-"), "and how many")
   c:That(not hp.inviteBtn:IsShown() and not hp.iBar:IsShown(), "no Invite to group, no XP")
   -- U41: candles. Two pretend Adventurers light one each (a second from one of them counts once); the stone, who lit
   -- them, Light a candle for you; the Chronicle says so.
@@ -4086,16 +4451,11 @@ step("challenges: the rulebook, Turn off in Manage, shared lives alone", functio
     end
   end
   c:That(rp.chal.after:IsShown(), "the Fallen and starting anew after the blocks")
-  -- The right page: where the challenges stand, as number tiles.
-  local tiles = {}
-  for _, t in ipairs(rp.tiles) do if t:IsShown() then tiles[t.key] = t end end
-  c:That(rp.tilesHead:IsShown() and tiles.shared ~= nil and tiles.broken ~= nil, "the right page: the challenges as tiles")
-  if tiles.shared then
-    c:Eq(tiles.shared.v:GetText(), L.TILE_OF:format(Ch:SharedLeft(f), Ch:SharedLives(f)), "the lives left, in a tile")
-  end
-  if tiles.shared and tiles.broken and inGame() then
-    c:That(math.abs(tiles.shared:GetTop() - tiles.broken:GetTop()) < 1, "two to a row")
-  end
+  -- U206 (the owner, 14 Nov 2026): no tiles on the right page; the article says where each challenge stands.
+  c:That(rp.tiles == nil and rp.tilesHead == nil, "the right page: no tiles of where the challenges stand")
+  local out = Ch:LivesOut(f)
+  c:Has(Ch:Book(f).text, out and L.CHAL_BOOK_OUT:format(Ch.Day(out.t), ns.Short(out.who), out.lvl or 0)
+    or L.CHAL_BOOK_LEFT:format(Ch:SharedLeft(f), Ch:SharedLives(f)), "the lives left (or when they ran out), in the article")
   -- Manage → Rules: Turn off asks first, then it is gone for good and the Chronicle says so.
   W:ShowPage("rulesadmin")
   local ap = W.pageFrames.rulesadmin
@@ -4190,14 +4550,6 @@ step("challenges: a broken rule, marked in the Chronicle, the card and the ruleb
   c:Has(Ch:BreakText(Ch:Broke(f, b, "fellowfound")), L.DEV_BREAK_X, "the trade names who it was with")
   ns.Window:ShowPage("rules")
   c:Has(ns.Window.pageFrames.rules.chal:Text(), L.CHAL_BOOK_BROKEN:format(ns.Short(b)), "the rulebook: Broken by Brannic")
-  -- The rulebook's tiles: the last one fills its row when it stands alone (U46).
-  local rp, shownT = ns.Window.pageFrames.rules, {}
-  for _, t in ipairs(rp.tiles) do if t:IsShown() then shownT[#shownT + 1] = t end end
-  if #shownT > 0 then
-    -- (Rounded: the game reads a width back as 473.99997.)
-    c:Eq(math.floor(shownT[#shownT]:GetWidth() + 0.5), #shownT % 2 == 1 and rp.tileFull or rp.tileW,
-      #shownT .. " tiles: the last one's width")
-  end
   -- Your own, as Fellowship/ChallengeWatch.lua records it.
   dev("break gear")
   local mine = Ch:Broke(f, ns.Me(), "white")
@@ -4230,9 +4582,6 @@ step("challenges: Lord of the Rings, found, carried, lost", function(c)
   withChallenges(f, { ring = true, race = true })
   ns.Window:ShowPage("rules")
   c:Has(ns.Window.pageFrames.rules.chal:Text(), L.CHAL_BOOK_RING_NONE, "the rulebook: nobody has found it yet")
-  local ringTile
-  for _, t in ipairs(ns.Window.pageFrames.rules.tiles) do if t:IsShown() and t.key == "ring" then ringTile = t end end
-  c:Eq(ringTile and ringTile.v:GetText(), L.TILE_RING_NONE, "its tile: Not found")
   local b, before = full("Brannic"), #report().toasts
   dev("hero Brannic ring")
   c:That(f.ring ~= nil and f.ring.who == b, "Brannic found the Ring")
@@ -4358,9 +4707,6 @@ step("challenges: Race to 60, the clock and the account's best", function(c)
   local f, Ch = cur(), ns.Challenges
   ns.Window:ShowPage("rules")
   c:Has(ns.Window.pageFrames.rules.chal:Text(), L.CHAL_BOOK_RACE:match("^(.-)%%s"), "the rulebook's clock")
-  local raceTile
-  for _, t in ipairs(ns.Window.pageFrames.rules.tiles) do if t:IsShown() and t.key == "race" then raceTile = t end end
-  c:Eq(raceTile and raceTile.k:GetText(), L.TILE_RACE, "and its tile, the race clock")
   local keep = ns.db.raceRecord
   ns.Fellowship:Do({ k = "raced" })
   c:That(f.race ~= nil, "everyone at 60: the race is done")
@@ -4739,6 +5085,33 @@ end)
 
 shot("quests, together and could join")
 
+-- U218 (the owner, 15 Nov 2026: "mile stones to the journey that is unique to WoW forever such as sleeping bag Touch
+-- etc."; picked "Optional goals", the bag in chapter III).
+step("milestones: WoW Forever's own goals are Optional quest milestones in the chapter of their level (U218)", function(c)
+  local j = ns.BuildJourney("forever", UnitFactionGroup("player"))
+  local where = {}
+  for n, ch in ipairs(j.chapters) do for _, m in ipairs(ch.milestones or {}) do where[m.value] = { n = n, m = m } end end
+  local bad = {}
+  for _, g in ipairs(ns.FOREVER_GOALS) do
+    local w = where[g.quest]
+    local ch = w and j.chapters[w.n]
+    if not (w and w.m.req == false and ch and g.level >= ch.floor and g.level < ch.cap and ns.Milestones.Clean({ w.m })) then
+      bad[#bad + 1] = g.id
+    end
+  end
+  c:Eq(table.concat(bad, ", "), "", #ns.FOREVER_GOALS .. " goals, each Optional in the chapter of its level")
+  c:Eq(where[79976] and where[79976].n, 3, "the Cozy Sleeping Bag in chapter III (21-25)")
+  local scratch = ns.BuildJourney("scratch")
+  c:Eq(scratch.chapters[1].milestones, nil, "none in Start from scratch")
+  -- Does this game know the quests by their IDs? (Names come when the game has them; for the check's report.)
+  local names = {}
+  for _, g in ipairs(ns.FOREVER_GOALS) do
+    local t = C_QuestLog and C_QuestLog.GetTitleForQuestID and C_QuestLog.GetTitleForQuestID(g.quest)
+    names[#names + 1] = g.quest .. " " .. tostring(t or "not known yet")
+  end
+  c:That(true, "the game's names: " .. table.concat(names, "; "))
+end)
+
 step("milestones: Required holds the chapter, a tick reaches it", function(c)
   local f = cur()
   local J, M = ns.Journey, ns.Milestones
@@ -4753,6 +5126,12 @@ step("milestones: Required holds the chapter, a tick reaches it", function(c)
   c:Has(M:ProgressText(f, M:List(f, n)[1]), ns.Short(ns.Me()), "ticked off by you")
   ns.Window:ShowPage("chapter")
   ns.Window.pageFrames.chapter.sel = nil
+  -- U224 (the check of 15 Nov 2026): framed like the dungeon rows, in its role's colour.
+  ns.Window:Refresh()
+  local row = ns.Window.pageFrames.chapter.msRows.items[1]
+  c:Eq(row and row.borderRole, J.ROLE_COLOR.m[1], "the Required one framed like a mandatory dungeon row")
+  row = ns.Window.pageFrames.chapter.msRows.items[2]
+  c:Eq(row and row.borderRole, J.ROLE_COLOR.o[1], "the Optional one like an optional dungeon")
 end)
 
 shot("chapter, milestones")
@@ -4887,16 +5266,17 @@ step("the tracker on the screen", function(c)
     c:Eq(lineText("clears"), nil, "and no line of their own")
   end
   c:Eq(content.next, ns.Together:Focus(cur()).head, "the Overview's Focus now (U139)")
-  local early = ns.Together:StartEarly(cur())
-  c:Eq(content.early, early and early.text or nil, "Prequest (U124): " .. tostring(early and early.text or "nothing now"))
+  local j = ns.Together:ForJourney(cur())
+  c:Eq(content.early, j[1] and j[1].text or nil, "For the journey (U217): " .. tostring(j[1] and j[1].text or "nothing now"))
+  c:Eq(content.early3, j[3] and j[3].text or nil, "up to three lines")
   -- And with a chain step open (made up: your log may have none; the review of 9 Nov 2026 found this compared nil
   -- with nil).
   local QL, groups = ns.QuestLists, ns.QuestLists.Groups
   QL.Groups = ns.Dev.FakeChain
-  local made = ns.Together:StartEarly(cur())
+  local made = ns.Together:ForJourney(cur())[1]
   local shownEarly = TK:Content(cur()).early
   QL.Groups = groups
-  c:That(made ~= nil and shownEarly == made.text, "Prequest on the tracker: " .. tostring(shownEarly))
+  c:That(made ~= nil and shownEarly == made.text, "For the journey on the tracker: " .. tostring(shownEarly))
   TK:SetFolded(true)
   -- The game scales sizes to screen pixels: 30 comes back as 29.999996.
   local h = TK.frame:GetHeight()
@@ -4915,6 +5295,60 @@ step("the tracker on the screen", function(c)
   ns.Settings:Set("tracker", false)
   c:That(not TK.frame:IsShown(), "off in Settings")
   for k, v in pairs(was) do S0:Set(k, v) end
+end)
+
+-- U216 (the owner, 15 Nov 2026: "tagg quests in the wow questlog that are important to the journey").
+step("the tracker: journey marks in the game's quest log for your dungeon quests and goals (U216)", function(c)
+  local QM, f, me = ns.QuestLogMarks, cur(), ns.Me()
+  local map = QM:Map(f)
+  local miss = {}
+  for _, ch in ipairs(f.journey.chapters) do
+    for _, m in ipairs(ch.milestones or {}) do
+      if m.kind == "quest" and not ns.Milestones:HeroDone(f, m, me) and not map[m.value] then miss[#miss + 1] = m.name end
+    end
+  end
+  local log = ns.QuestLists:Log(f, me)
+  for _, list in ipairs({ log.under, log.open }) do
+    for _, r in ipairs(list) do if not map[r.q.id] then miss[#miss + 1] = r.q.name end end
+  end
+  c:Eq(table.concat(miss, ", "), "", "each goal and dungeon quest of the journey has its tooltip line")
+  -- What this game's quest log has (WoW Forever's may differ from retail's), for the check's report.
+  local p = QM:Probe()
+  report().questLog = p
+  c:That(true, ("the game's quest log: QuestLogQuests_Update %s, QuestScrollFrame %s, its pool %s, hooked %s")
+    :format(tostring(p.update), tostring(p.list), tostring(p.pool), tostring(p.hooked)))
+  -- Two made-up title buttons: a journey quest gets the mark, another quest none.
+  local id = next(map)
+  if id then
+    local a, b = CreateFrame("Button", nil, UIParent), CreateFrame("Button", nil, UIParent)
+    a.questID, b.questID = id, 1
+    local fake = { titleFramePool = { EnumerateActive = function()
+      local i, t = 0, { a, b }
+      return function() i = i + 1; return t[i] end
+    end } }
+    QM.map = nil
+    QM:Update(fake)
+    c:That(QM.marks[a] ~= nil and QM.marks[a]:IsShown(), "a journey quest has the mark")
+    c:That(not (QM.marks[b] and QM.marks[b]:IsShown()), "another quest none")
+    a:Hide(); b:Hide()
+  end
+  -- The game's own quest log: every title of a journey quest marked once it has drawn.
+  if p.hooked and ToggleQuestLog and QuestScrollFrame then
+    -- (Opened here unless it is open already: a toggle would close it and leave nothing to look at.)
+    local opened = not (WorldMapFrame and WorldMapFrame:IsShown())
+    if opened then ToggleQuestLog() end
+    QM.map = nil
+    QM:Update()
+    local n, bad = 0, 0
+    for _, t in ipairs(QM.Titles(QuestScrollFrame)) do
+      if t:IsShown() and type(t.questID) == "number" and map[t.questID] then
+        n = n + 1
+        if not (QM.marks[t] and QM.marks[t]:IsShown()) then bad = bad + 1 end
+      end
+    end
+    c:Eq(bad, 0, n .. " journey quests in your quest log, each marked")
+    if opened and WorldMapFrame and WorldMapFrame:IsShown() and HideUIPanel then HideUIPanel(WorldMapFrame) end
+  end
 end)
 
 -- Under the game's quest tracker (Settings; the owner, 2 Nov 2026). Only looked at, never changed: folding the game's
@@ -4985,6 +5419,41 @@ end)
 -- Ctrl and drag (the owner, 7 Nov 2026, "like Questie"). Ctrl cannot be pressed from here: a drag without it moves
 -- nothing, and a drop (as after a drag with Ctrl) is made by hand. Your settings and the tracker's place are put back.
 -- U92 (the check of 7 Nov 2026, 20:46): pointing at the title says how to move it; docked, the Ctrl part only.
+-- The owner, 15 Nov 2026 (no stuttering): after a dungeon the changes of several Adventurers arrive in one frame.
+step("the tracker: changes in other Adventurers' messages redraw it and the book once a second, your own at once", function(c)
+  local TK, W, Co, n, book = ns.Tracker, ns.Window, ns.Comm, 0, 0
+  local refresh, draw = TK.Refresh, W.Refresh
+  TK.Refresh = function() n = n + 1 end
+  W.Refresh = function() book = book + 1 end
+  Co.receiving = true
+  local ok = pcall(function() for _ = 1, 5 do ns:Fire("FELLOWSHIP") end end)
+  Co.receiving = false
+  local held, heldBook = n, book
+  local ok2 = pcall(ns.Fire, ns, "FELLOWSHIP")
+  TK.Refresh, W.Refresh = refresh, draw
+  c:That(ok and ok2, "the changes were handled")
+  c:Eq(held, 0, "five changes in messages: no redraw at once")
+  c:Eq(heldBook, 0, "nor of the book")
+  c:That(TK.soon == true or not TK.frame, "one redraw within a second (when the tracker is built)")
+  c:Eq(n, 1, "your own change: at once")
+  c:Eq(book, 1, "the book too")
+end)
+
+step("the tracker: the shared quest list is made only for its line", function(c)
+  local S, Q, TK = ns.Settings, ns.Quests, ns.Tracker
+  local was, items, n = S:TrackerLineOn("quests"), Q.Items, 0
+  Q.Items = function(...) n = n + 1; return items(...) end
+  local off, on
+  local ok = pcall(function()
+    S:SetTrackerLine("quests", false); n = 0; TK:Content(cur()); off = n
+    S:SetTrackerLine("quests", true); n = 0; TK:Content(cur()); on = n
+  end)
+  Q.Items = items
+  S:SetTrackerLine("quests", was)
+  c:That(ok, "the tracker was made both ways")
+  c:Eq((on or 0) - (off or 0), 1, "the line on: the list once more (Play now may ask too)")
+end)
+
 step("the tracker: pointing at its title says how to move it", function(c)
   local fr = ns.Tracker.frame
   -- (The game's tooltip keeps its first line in GameTooltipTextLeft1; the harness's in the tooltip itself.)
@@ -5358,7 +5827,7 @@ step("history: the chapters so far", function(c)
 end)
 
 -- U6: the number tiles (a gold number over its label and icon) on every page that has them.
-step("number tiles: Inspect, History and the Chronicle; none on the Adventurers page (U190)", function(c)
+step("number tiles: History and the Chronicle; none on the Adventurers page or in Inspect (U190, U205)", function(c)
   local function tiles(where, list)
     local ok, icons = 0, 0
     for _, t in ipairs(list or {}) do
@@ -5377,7 +5846,7 @@ step("number tiles: Inspect, History and the Chronicle; none on the Adventurers 
   c:That(hp.tourney:IsShown() == (ns.Fellowship:TournamentState(cur()) ~= "off"), "the tournament line only while it is on")
   hp.sel = full("Brannic")
   ns.Window:Refresh()
-  tiles("Inspect", hp.facts)
+  c:That(hp.facts == nil, "Inspect has no number tiles (U205)")
   hp.sel = nil
   ns.Window:ShowPage("history")
   tiles("History", ns.Window.pageFrames.history.stats)
@@ -5506,13 +5975,17 @@ step("watch: live and read-only", function(c)
   c:That(ns.Pages:InNav("rules", ctx), "the Rules page, to read")
   Win:ShowPage("rules")
   local rp = Win.pageFrames.rules
-  c:Has(rp.who:GetText(), "Read only", "the rulebook says read only, as of when")
+  -- U207 (the owner, 14 Nov 2026): only the bar says read only; the rulebook, the votes and the clears do not again.
+  c:Eq(Win.watchBar.title:GetText(), L.WATCH_TITLE:format(ns.Short(W.as)):upper(), "the bar says read only")
+  c:Eq(rp.who:GetText(), L.BOOK_WHO_WATCH:format(ns.Short(f.leader)), "the rulebook: who sets the rules, not read only again")
   c:That(not rp.editBar:IsShown() and not rp.propose:IsShown(), "no Propose, no Edit the rules")
+  c:That(not rp.pHead:IsShown() and not rp.friendText:IsShown(), "no Propose a change heading or line over the votes")
   Win:ShowPage("heroes")
   c:That(not Win.pageFrames.heroes.leave:IsShown(), "no Leave")
   Win:ShowPage("chapter")
   local card = Win.pageFrames.chapter.rows.items[1]
   c:That(card and not card.group:IsShown() and not card.menu:IsShown(), "no Find group or Mark cleared")
+  c:That(not Win.pageFrames.chapter.mHelp:IsShown(), "no read-only line under the clears")
   dev("watch level")
 end, 2)
 
@@ -5635,6 +6108,10 @@ step("walkthrough: the first tour is short; no page tours by itself; What's New 
   c:That(N:Busy(), "What's New waits while a tour runs")
   WK:Go(#WK.steps)
   c:Eq(WK.card.title:GetText(), L.WALK_FIRSTDONE_T, "its own end")
+  -- U208 (the owner, 14 Nov 2026): one end for both ranks, saying Settings starts the tour again.
+  c:Eq(WK.card.text:GetText(), L.WALK_FIRSTDONE, "the same end for the Leader and an Adventurer")
+  c:That(ns.Watch.demo ~= nil and L.WALK_FIRSTDONE:find(L.WALK_FINISH, 1, true) ~= nil,
+    "the end says Done brings your own fellowship back: the sample still shows behind it")
   WK:Next()
   c:That(not WK.on, "over")
   c:That(not N:Busy(), "then What's New may come")
@@ -5706,11 +6183,38 @@ step("settings and themes", function(c)
   local pf = ns.Window.pageFrames.settings
   pf:Fold("tracker", true)
   c:That(pf.sections.tracker.body:IsShown() and not pf.sections.toasts.body:IsShown(), "the tracker opens, the toasts fold")
+  -- Each tick's words end before the next column (the check of 15 Nov 2026: For the journey ran into Dungeons cleared).
+  local function inColumn(rows, what)
+    if not inGame() then return end
+    for kind, box in pairs(rows) do
+      local tick = box:GetParent()
+      local r, limit = tick.label:GetRight(), tick:GetRight()
+      if r and limit and r > limit + 1 then c:That(false, what .. " " .. kind .. ": its words run past its column") end
+    end
+  end
+  inColumn(pf.trackerRows, "the tracker's line")
   c:That((pf.sections.toasts.head.sum:GetText() or "") ~= "", "the folded toasts say how many are on")
   -- (The layout check looks under open headings only: the check of 10 Nov 2026 called the folded Dungeons and raids empty.)
   c:That(not pf.sections.toasts.head.layoutHeading and pf.sections.tracker.head.layoutHeading, "the layout check skips a folded heading")
   pf:Fold("toasts", true)
   c:That(pf.sections.toasts.body:IsShown() and not pf.sections.tracker.body:IsShown(), "and back")
+  -- U233 (the check of 16 Nov 2026): each toast group folds to its tick and how many are on; a click on its words
+  -- shows its lines. All open for the checks below; put back as they were at the end.
+  local G, keptFold = ns.Settings.TOAST_GROUPS, {}
+  for gi = 1, #G do keptFold[gi] = ns.char.setFold and ns.char.setFold["toasts" .. gi] end
+  local undo = c.undo
+  c.undo = function() -- (also when a check fails on the way)
+    if undo then undo() end
+    for gi = 1, #G do ns.char.setFold["toasts" .. gi] = keptFold[gi] end
+    pf.layout()
+  end
+  pf:FoldToasts(1, false)
+  local h1, first = pf.toastHeads[1], pf.toastRows[G[1][2][1]]:GetParent()
+  c:That(not first:IsShown() and h1.box:IsShown() and (h1.sum:GetText() or "") ~= "",
+    "a toast group folds to its tick and how many are on (U233): " .. tostring(h1.sum:GetText()))
+  h1.click:Click()
+  c:That(first:IsShown() and (h1.sum:GetText() or "") == "", "a click on its words shows its lines")
+  for gi = 1, #G do pf:FoldToasts(gi, true) end
   -- U86: the toast lines under three headings, each line under one.
   c:Eq(#pf.toastHeads, 3, "the toasts under three headings")
   c:Eq(pf.toastHeads[1]:GetText(), L.TOAST_GROUP_JOURNEY:upper(), "Your journey first")
@@ -5738,6 +6242,7 @@ step("settings and themes", function(c)
   end
   for k, v in pairs(kept) do Set:SetToast(k, v) end
   ns.Window:Refresh()
+  inColumn(pf.toastRows, "the toast")
   -- (The check of 8 Nov 2026: "Time to leave room for the dungeon quests" ran past the sheet.)
   if inGame() then
     for kind, box in pairs(pf.toastRows) do
@@ -5826,6 +6331,17 @@ step("prologue: the journey starts at level 1 with the Prologue and its picture"
   c:That(ch and ch.floor == 1 and ch.cap == 15, "levels 1-15")
   c:Eq(#ns.Journey:InChapter(f, 1), 0, "no dungeons")
   c:Eq(ns.Pages:ArtOf(f, 1), "prologue", "its own picture")
+  -- Its floor is level 1, always reached: no stage and no To do line for it (U236).
+  local floorStage, floorLine = false, false
+  for _, x in ipairs(ns.Journey:Stages(f, 1)) do floorStage = floorStage or x.key == "floor" end
+  for _, it in ipairs(ns.Together:ToDo(f, 1, true)) do floorLine = floorLine or it.kind == "floor" end
+  c:That(not floorStage, "no Everyone at 1 stage (U236)")
+  c:That(not floorLine, "no Reach the floor, level 1 (U236)")
+  -- Nor a floor mark on the Chapter page's level track (when the Prologue is the chapter shown).
+  local cp = ns.Window.pageFrames.chapter
+  if cp and cp.levelTrack and cp.levelTrack:IsShown() and ns.Journey:CurrentIndex(f) == 1 then
+    c:That(not cp.levelTrack.marks[1]:IsShown(), "no floor 1 mark on the level track (U236)")
+  end
 end)
 
 step("catching up: a newcomer far below the floor does not hold the fellowship", function(c)
@@ -6465,8 +6981,25 @@ function ST:Finish(keep)
   if done then C_Timer.After(1, done) end
 end
 
+-- The next step, once the last one's messages and the pretend Heroes' answers are through (U210).
+local function settle(fn)
+  local t0 = GetTime()
+  local function poll()
+    if (ns.Comm:Pending() == 0 and (ns.Dev.answering or 0) == 0) or GetTime() - t0 >= ST.WAIT then
+      -- How long the pauses took, for the report (tools/check-report.lua): the proof U210 saves time in the game.
+      local p = ns.db.selftest and ns.db.selftest.pauses
+      if p then p.n, p.secs = p.n + 1, p.secs + (GetTime() - t0) end
+      return fn()
+    end
+    C_Timer.After(ST.POLL, poll)
+  end
+  C_Timer.After(ST.MIN_WAIT, poll)
+end
+ST.Settle = settle -- (for tests/test_check.lua)
+
 -- opts.onDone: runs after the self-test has cleaned up (/jtf check goes on with the tour). opts.only (a set of area
--- keys that stand alone, Dev/Areas.lua): only their steps.
+-- keys that stand alone, Dev/Areas.lua): only their steps. opts.areas (a set of area keys, U209): the run ends after
+-- their last step; the steps before it set up what theirs need.
 function ST:Run(arg, opts)
   if self.running then return end
   if ns.Combat:InCombat() then ns:Print(L.SELFTEST_COMBAT, true) return end
@@ -6478,7 +7011,8 @@ function ST:Run(arg, opts)
   -- Not seen, so founding shows the setup guide (checked in "found"); as it was afterwards.
   self.savedSetup = ns.char.setupDone
   ns.char.setupDone = nil
-  ns.db.selftest = { started = time(), passed = 0, failed = 0, steps = {}, shots = {}, toasts = {}, env = ST.Env() }
+  ns.db.selftest = { started = time(), passed = 0, failed = 0, steps = {}, shots = {}, toasts = {}, env = ST.Env(),
+    pauses = { n = 0, secs = 0 } }
   -- Every toast during the run is noted (kind, title, text, the page a click opens), so the report shows which ones
   -- fired. (The page is passed on: without it, a click on a toast opened nothing during the self-test; so is a clear's
   -- picture and who was there.)
@@ -6491,7 +7025,19 @@ function ST:Run(arg, opts)
       framed = more and more.framed or nil, sound = more and more.sound or nil, big = more and more.big or nil }
     return ST.push(t, kind, title, text, page, more)
   end
-  ns:Print(L.SELFTEST_START:format(#steps), true)
+  -- U209 (the owner, 14 Nov 2026): a check of some areas ends after their last step; ST:Finish cleans up as always.
+  local last = #steps
+  if opts and opts.areas and not only then
+    last = 0
+    for k, s in ipairs(steps) do
+      for _, key in ipairs(ns.CheckAreas:ForStep(s.name)) do if opts.areas[key] then last = k end end
+    end
+  end
+  local toRun = 0
+  for k, s in ipairs(steps) do
+    if k <= last and (not only or only[ns.CheckAreas:ForStep(s.name)[1] or ""]) then toRun = toRun + 1 end
+  end
+  ns:Print(L.SELFTEST_START:format(toRun), true)
   local i = 0
   local nextStep
   -- A step runs as a coroutine, so c:Yield() can spread it over several frames; its longest part is timed (ms in the
@@ -6517,14 +7063,15 @@ function ST:Run(arg, opts)
       if not okUndo then c.bad = true; c.lines[#c.lines + 1] = "ERROR: " .. tostring(eUndo) end
       add(s.name, not c.bad, table.concat(c.lines, "\n"), slowest > 0 and math.floor(slowest + 0.5) or nil)
       if c.stop then return ST:Finish(keep) end
-      C_Timer.After(s.wait or ST.WAIT, nextStep)
+      if s.wait then return C_Timer.After(s.wait, nextStep) end
+      settle(nextStep)
     end
     part()
   end
   nextStep = function()
     i = i + 1
     local s = steps[i]
-    if not s then return ST:Finish(keep) end
+    if not s or i > last then return ST:Finish(keep) end
     if only and not only[ns.CheckAreas:ForStep(s.name)[1] or ""] then return nextStep() end
     run(s)
   end

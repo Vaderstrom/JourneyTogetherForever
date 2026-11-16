@@ -137,17 +137,24 @@ local function build(pf)
   UI.SetGradient(fade, "VERTICAL", { 0.055, 0.03, 0.01, 0.88 }, { 0.055, 0.03, 0.01, 0 })
   local hl = pf.pic:CreateTexture(nil, "HIGHLIGHT")
   hl:SetAllPoints(); hl:SetColorTexture(1, 0.9, 0.6, 0.12)
-  pf.pic.levels = UI.Text(pf.pic, 13, "chipText", "body")
-  pf.pic.levels:SetPoint("BOTTOMLEFT", 16, 10)
+  -- (No floor and cap under the name: the level track just below marks them, U229.)
   pf.pic.title = UI.Text(pf.pic, 26, "goldText", "fancy")
-  pf.pic.title:SetPoint("BOTTOMLEFT", pf.pic.levels, "TOPLEFT", 0, 2)
+  pf.pic.title:SetPoint("BOTTOMLEFT", 16, 10)
   pf.pic.title:SetWidth(width - 2 * inset - 200); pf.pic.title:SetWordWrap(true); maxLines(pf.pic.title, 2)
   -- The name of the strip below, at the picture's lower right.
   pf.pic.stand = UI.Text(pf.pic, 11, "chipText", "title", "RIGHT")
   pf.pic.stand:SetPoint("BOTTOMRIGHT", -16, 8)
   pf.pic.stand:SetText(L.WHERE_WE_STAND:upper())
-  shadow(pf.pic.title, pf.pic.levels, pf.pic.stand)
+  shadow(pf.pic.title, pf.pic.stand)
   pf.pic:SetScript("OnClick", function() W:ShowPage("chapter") end)
+  -- Your dungeon quests in the side panel, on the picture's top right (U215, the owner, 15 Nov 2026: "a 'right side'
+  -- menu on the overview page").
+  pf.dq = UI.TextButton(banner, L.OV_DQUESTS, function() W:TogglePanel("dquests") end, "link", 13)
+  pf.dq:SetFrameLevel(lvl + 6)
+  pf.dq:SetPoint("TOPRIGHT", -16, -12)
+  Theme:TextColor(pf.dq.text, "chipText")
+  shadow(pf.dq.text)
+  UI.Tooltip(pf.dq, L.OV_DQUESTS_TIP)
   pf.pic.edge = UI.Box(banner, inset, nil, nil, "gold", 0.85)
   pf.pic.edge:SetAllPoints(); pf.pic.edge:SetFrameLevel(lvl + 5)
 
@@ -302,22 +309,27 @@ local function build(pf)
   ns:On("SETTING", function(key, on) if key == "reduce" and on then pf.drift:Stop() end end)
 end
 
--- Where we stand's line: who is below the floor (or that everyone is at the floor or the cap), and the clears.
-local function standLine(f, cur)
+-- Where we stand's line: who is below the floor (or that everyone is at the floor or the cap), and the clears. A floor
+-- of level 1, the Prologue's, is always reached: nothing said of it (U236; the check of 16 Nov 2026, 21:00).
+-- quiet: Focus now just under the strip names everyone below the floor ("Help Corwin to the floor", "Reach level 15",
+-- "Wait for the floor"): nothing of the floor here, it is said once (U239).
+local function standLine(f, cur, quiet)
   local c = J:Counts(f, cur)
   local below = J:Below(f, cur)
-  local first
-  if #below == 1 then first = below[1] == ns.Me() and L.WS_BELOW_YOU or L.WS_BELOW_1:format(ns.Short(below[1]))
-  elseif #below > 1 then first = L.WS_BELOW_N:format(#below)
-  elseif c[2] and c[2][2] == 0 and (c[3][2] + c[4][2]) > 0 then first = L.WS_AT_CAP
-  else first = L.WS_AT_FLOOR end
+  local parts = {}
+  if not quiet then
+    if #below == 1 then parts[1] = below[1] == ns.Me() and L.WS_BELOW_YOU or L.WS_BELOW_1:format(ns.Short(below[1]))
+    elseif #below > 1 then parts[1] = L.WS_BELOW_N:format(#below)
+    elseif c[2] and c[2][2] == 0 and (c[3][2] + c[4][2]) > 0 then parts[1] = L.WS_AT_CAP
+    elseif J:FloorLevel(f, f.journey.chapters[cur]) > 1 then parts[1] = L.WS_AT_FLOOR end
+  end
   local req, done = J:Required(f, cur), 0
   for _, x in ipairs(req) do if J:Cleared(f, x.key) then done = done + 1 end end
-  if #req == 0 then return first end
-  return first .. " " .. L.WS_CLEARED:format(done, #req)
+  if #req > 0 then parts[#parts + 1] = L.WS_CLEARED:format(done, #req) end
+  return table.concat(parts, " ")
 end
 
-local function refreshStand(pf, f, cur, ch, watching)
+local function refreshStand(pf, f, cur, ch, watching, focus)
   local st = pf.stand
   local y = 6
   -- A Friend of the fellowship never holds anyone back (SPEC §1.1): that, with how to count again, in the room's place.
@@ -328,9 +340,11 @@ local function refreshStand(pf, f, cur, ch, watching)
   local th = st.track:Set(f, cur, 0, room and (room.stopAt or room.stop))
   st.track:ClearAllPoints(); st.track:SetPoint("TOPLEFT", 12, -y)
   y = y + th + 2
-  st.line:SetText(standLine(f, cur))
+  local line = standLine(f, cur, focus.namesBelow)
+  st.line:SetText(line)
   st.line:ClearAllPoints(); st.line:SetPoint("TOPLEFT", 16, -y)
-  st.who:ClearAllPoints(); st.who:SetPoint("LEFT", st.line, "RIGHT", 10, 0)
+  -- (No line, the Prologue's: Who stands where at the strip's edge, not after a gap.)
+  st.who:ClearAllPoints(); st.who:SetPoint("LEFT", st.line, "RIGHT", line == "" and -2 or 10, 0)
   st.line:SetWidth(math.min(st.line:GetStringWidth() + 2, st.w - st.who:GetWidth() - 46))
   y = y + 22
   st.room:SetShown(room ~= nil or friend)
@@ -365,17 +379,16 @@ local function refreshStand(pf, f, cur, ch, watching)
   end
 end
 
-local function refreshFocus(pf, f, cur, watching)
+local function refreshFocus(pf, f, cur, watching, focus)
   local fo = pf.focus
-  local x = ns.Together:Focus(f)
-  fo.what:SetText(x.head)
-  fo.why:SetText(x.why or "")
+  fo.what:SetText(focus.head)
+  fo.why:SetText(focus.why or "")
   local y = fo.top
   fo.what:ClearAllPoints(); fo.what:SetPoint("TOPLEFT", PAD, -y)
   y = y + fo.what:GetStringHeight() + 8
   fo.why:ClearAllPoints(); fo.why:SetPoint("TOPLEFT", PAD, -y)
   y = y + fo.why:GetStringHeight() + 14
-  local b = not watching and x.button or nil
+  local b = not watching and focus.button or nil
   pf.focusButton = b
   fo.btn:SetShown(b ~= nil)
   if b then
@@ -385,7 +398,7 @@ local function refreshFocus(pf, f, cur, watching)
     fo.btn:SetSize(math.max(150, fo.btn.text:GetStringWidth() + 56), 34)
     fo.btn:ClearAllPoints(); fo.btn:SetPoint("TOPLEFT", PAD, -y)
   end
-  pf.focusLink = x.link or { page = "chapter", text = L.FOCUS_LINK_CHAPTER }
+  pf.focusLink = focus.link or { page = "chapter", text = L.FOCUS_LINK_CHAPTER }
   fo.link:SetLabel(pf.focusLink.text)
   pf.focusArtOf = { key = pf.focusLink.key, chapter = ns.Pages:ArtOf(f, cur) }
   focusArt(pf)
@@ -493,13 +506,15 @@ local function refresh(pf, ctx)
   local count = #f.journey.chapters
   local cur = math.min(J:CurrentIndex(f), count)
   local ch = J:Current(f)
+  -- (The side panels stay yours while watching another character's fellowship: its log would not be this page's.)
+  pf.dq:SetShown(not ctx.watching)
   ns.Pages:SetChapterArt(pf.pic.art, ns.Pages:ArtOf(f, cur), pf.pic.artW, pf.pic.artH, 0.45)
   pan(pf)
   local shownCh = f.journey.chapters[cur]
   pf.pic.title:SetText(ch and L.CHAPTER_N_NAME:format(J.Roman(cur), shownCh.name) or L.BN_JOURNEY_DONE)
-  pf.pic.levels:SetText(L.OV_PIC_LEVELS:format(J:FloorLevel(f, shownCh), shownCh.cap))
-  refreshStand(pf, f, cur, ch, ctx.watching)
-  refreshFocus(pf, f, cur, ctx.watching)
+  local focus = ns.Together:Focus(f)
+  refreshStand(pf, f, cur, ch, ctx.watching, focus)
+  refreshFocus(pf, f, cur, ctx.watching, focus)
   refreshSince(pf, f)
   refreshComing(pf, f, cur, J:MaxView(f, ctx.me))
   -- (Again here: the board is the Horde's own for a Horde character, and the tour's Horde shots switch it.)

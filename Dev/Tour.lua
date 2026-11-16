@@ -20,6 +20,11 @@ local function dev(cmd) ns.Dev:Command(cmd) end
 local function full(name) return ns.FullName(name) end
 local function page(id) W():ShowPage(id) end
 local function pf(id) return W().pageFrames[id] end
+-- Show on map's world map goes before the next picture and when the tour ends; the book comes back with it. (Not a
+-- prep step: a rerun of only some areas skips those.)
+local function closeMap()
+  if WorldMapFrame and WorldMapFrame:IsShown() and HideUIPanel then HideUIPanel(WorldMapFrame) end
+end
 
 -- Scrolls a scroll frame to its end. Returns "same" when there is nothing to scroll (the shot would repeat the one
 -- before it, which looked like a skipped picture; seen in a review).
@@ -52,7 +57,7 @@ local shots = {}
 TR.shots = shots -- for /jtf check and tests/test_check.lua (every shot belongs to a feature area: Dev/Areas.lua)
 local function shot(id, title, what, fn, opts)
   opts = opts or {}
-  shots[#shots + 1] = { id = id, title = title, what = what, fn = fn, toast = opts.toast, wait = opts.wait }
+  shots[#shots + 1] = { id = id, title = title, what = what, fn = fn, toast = opts.toast, wait = opts.wait, game = opts.game }
 end
 -- A step without a screenshot (setting things up).
 local function prep(fn, wait) shots[#shots + 1] = { fn = fn, wait = wait, prep = true } end
@@ -165,8 +170,8 @@ end)
 shot("setup-3", "Setup guide: Reminders", "Cap warning, picture moment, minimap button; Start the journey", function()
   ns.SetupGuide.step = 3; W():Refresh()
 end)
-shot("leader-overview-new", "Overview (new fellowship)", "Alone: the title Overview with no line under it (U162); the chapter's banner across the sheet with Where we stand on its dark foot in light words (U158), Focus now on its picture with your first step (Invite your Adventurers), Since last time on the notice board and Coming up (no Gatherings) on the road ahead, three cards alike with light headings; all in view (U139, U148, U149, U155)", function() page("overview") end)
-shot("leader-chapter-new", "Chapter (new fellowship)", "The Prologue: your To do starts with your first steps, then the floor (U140); the stage track and its picture in place of dungeons", function() page("chapter") end)
+shot("leader-overview-new", "Overview (new fellowship)", "Alone: the title Overview with no line under it (U162); the chapter's banner across the sheet with Where we stand on its dark foot in light words (U158), the Prologue's level track with the cap only and no word of the floor (U236), Focus now on its picture with your first step (Invite your Adventurers), Since last time on the notice board and Coming up (no Gatherings) on the road ahead, three cards alike with light headings; all in view (U139, U148, U149, U155)", function() page("overview") end)
+shot("leader-chapter-new", "Chapter (new fellowship)", "The Prologue: your To do starts with your first steps, then Reach level 15, no floor line (its floor is level 1, U236); the stage track Level to 15, Complete (no Everyone at 1) and its picture in place of dungeons; on the right, the level track with the cap only, no floor 1 mark", function() page("chapter") end)
 shot("leader-quests-empty", "Quests (alone)", "No shared quests", function() page("quests") end)
 -- The Chronicle at All (the self-test leaves it at Sessions; seen in the check of 29 Oct 2026).
 local function chronicle(filter) page("chronicle"); pf("chronicle").filter = filter; W():Refresh() end
@@ -199,14 +204,14 @@ prep(function()
   for _, n in ipairs(PRETEND) do dev("hero " .. n .. " level 17") end
   dev("pace 1800"); dev("level 18")
 end, 0.5)
-shot("overview-ready", "Overview (ready)", "The chapter's banner across the sheet, its name in gold Morpheus whole; along its dark foot, in light words, Where we stand (U158): the level track with a class face on each marker (a small badge where several share a level), the red stop tick where to stop questing when the room is known, with room to spare too (U179), one line, Who stands where, the room; Focus now on its dungeon's picture: a gold headline, why in light words, one larger button, all readable; Since last time on the Chronicle's notice board and Coming up on the road ahead, the three cards alike, their headings light with a gold rule, Coming up's later dungeon in its small gold frame; all in view, nothing to scroll (U139, U148, U149, U151, U152, U155)", function() page("overview") end)
-shot("overview-catchup", "Overview (catch-up)", "You below the floor: Focus now says Reach level 15, how far and about how long at your pace; the line under the track says you are below the floor", function()
+shot("overview-ready", "Overview (ready)", "The chapter's banner across the sheet, its name in gold Morpheus whole, no floor and cap under it (U229); along its dark foot, in light words, Where we stand (U158): the level track with a class face on each marker (a small badge where several share a level), the red stop tick where to stop questing when the room is known, with room to spare too (U179), one line, Who stands where, the room; Focus now on its dungeon's picture: a gold headline, why in light words, one larger button, all readable; Since last time on the Chronicle's notice board and Coming up on the road ahead, the three cards alike, their headings light with a gold rule, Coming up's later dungeon in its small gold frame; all in view, nothing to scroll (U139, U148, U149, U151, U152, U155)", function() page("overview") end)
+shot("overview-catchup", "Overview (catch-up)", "You below the floor: Focus now says Reach level 15, how far and about how long at your pace; the line under the track does not say it again, only the dungeons cleared (U239)", function()
   dev("level 13"); page("overview")
 end)
-shot("chapter-waiting", "Chapter (waiting for the floor)", "The stage track; the waiting box with who is below the floor and how far; the dungeons dimmed below, without a button, each saying what to get ready meanwhile (\"1 chain to start, 3 quests to pick up.\"), not when it opens", function()
+shot("chapter-waiting", "Chapter (waiting for the floor)", "The stage track, no waiting box under it (U232): Your To do's floor line with your estimate, \"Reach the floor, level 15  ·  about 10 hours at your pace\" (once the game knows your pace), on one line; who is below the floor and how far on the right page; the dungeons dimmed below, without a button, each saying what to get ready meanwhile (\"1 chain to start, 3 quests to pick up.\"), not when it opens", function()
   page("chapter"); top(pf("chapter").lscroll)
 end)
-shot("overview-behind", "Overview (someone behind)", "Focus now: Help Corwin to the floor, with Invite to group; the line under the track names him", function()
+shot("overview-behind", "Overview (someone behind)", "Focus now: Help Corwin to the floor, with Invite to group; the line under the track does not name him again, only the dungeons cleared (U239)", function()
   dev("level 19"); dev("hero Corwin level 12"); page("overview")
 end)
 shot("overview-since", "Overview: Since last time", "On the Chronicle's notice board in light words: Elyra and Brannic levelled, on one line with the level's icon (U169), the only news since the book was marked just before; how long ago at the right; its link opens the Chronicle (U139, U151, U155). (More lines, each whole and the rest counted in the link: the Overview shots before it.)", function()
@@ -318,12 +323,23 @@ shot("share-window", "Share the addon (no answer)", "Kim did not answer: the add
   page("heroes")
   ns.Share:Open(full("Kim"), true)
 end)
-shot("chapter-unlocked", "Chapter unlocked (big moment)", "The large banner over the book", function()
+-- Everyone to the cap first (U226, the owner, 15 Nov 2026): the chapter's dungeons cleared with the rule on, so it waits
+-- for the cap; chapter-unlocked turns it off again, which opens the next chapter.
+shot("chapter-capfirst", "Chapter (everyone to the cap first)", "Everyone to the cap first on (U226): every dungeon row cleared, and the stage track has Level to 21 after Run the dungeons, the current step (Run the dungeons done); the line under the name says Level together, and Where the Adventurers stand has no Stop questing; Your To do has the floor and the cleared dungeons in one ticked line, \"Done: the floor and the 3 dungeons\" (U227, U234), then Reach level 21 with how many are there; the chapter stays, nothing opens yet", function()
   hideOverlays()
   pf("chronicle").filter = "all"
-  dev("kill dm")
   local f = cur()
+  f.rules.capFirst = true
+  dev("kill dm")
   for _, x in ipairs(ns.Journey:Required(f, ns.Journey:CurrentIndex(f))) do if not ns.Journey:Cleared(f, x.key) then ns.Clears:Mark(x.key) end end
+  ns.Picture:Hide() -- it has its own shot later
+  pf("chapter").sel = nil; page("chapter")
+end)
+shot("chapter-unlocked", "Chapter unlocked (big moment)", "The large banner over the book", function()
+  hideOverlays()
+  local f = cur()
+  f.rules.capFirst = false
+  ns.Progress:Check(f)
   dev("group off")
   ns.Picture:Hide() -- it has its own shot later
   page("overview")
@@ -401,8 +417,20 @@ shot("dungeon-page-chain", "Dungeon page (a prequest chain)", "The Deadmines (Wa
   end
   return bottom(p.rscroll)
 end)
+-- Show on map (the owner, 14 Nov 2026): the chain's pin opens the world map with a mark where the quest and each step
+-- start, and the book steps aside. game: the picture is the game's own window, so no check for a window over the book.
+shot("dungeon-map", "Show on map (a prequest chain)", "The world map alone, no book over it, open at Westfall (the Barrens for the Horde): a gold ring on the spot, the map seen through its middle (no crest, no dot: U238), where each step of Destruction in Deadmines (Leaders of the Fang) starts there, the step's number at its corner (several numbers where steps start on one spot), steps done faded, the next one glowing", function()
+  local horde = UnitFactionGroup("player") == "Horde"
+  page("dungeons")
+  ns.DungeonPage:Open(horde and "wc" or "dm")
+  local want = horde and 914 or 92753
+  for _, row in ipairs(pf("dungeon").quests.items) do
+    if row.id == want and row:IsShown() and row.pin:IsShown() then return row.pin:GetScript("OnClick")(row.pin) end
+  end
+  error("no pin on the chain's row")
+end, { game = true, wait = 0.4 })
 -- Class quests (the owner, 14 Nov 2026): a guide after the dungeon's own quests; the Sunken Temple has one for every
--- class. (Show on map has no shot: the world map over the book stops the tour; its self-test steps check the mark.)
+-- class.
 shot("dungeon-page-class", "Dungeon page (class quests)", "The Sunken Temple under its last heading, Class quests with a tome: your class's quest first (\"Paladin quest\" for a Paladin, the class in its colour), then, with Show the other Adventurers' class quests ticked, each other class's in the fellowship naming who (\"Rogue quest, for Brannic\"); each a short row with its status, its level and a pin", function()
   page("dungeons")
   ns.DungeonPage:Open("st")
@@ -451,13 +479,15 @@ end)
 shot("overview-room", "Overview (room for the dungeon quests)", "On Where we stand along the banner's dark foot, under its line, the answer in red: \"Stop questing at 26.1 to leave room for the dungeon quests.\", or with room to spare \"You have room for the dungeon quests: stop questing at ...\" (U85, U145, U174); the stop point as a red tick on the level track (U82); the figures (the level the quests take you to, the cap level left for the mobs, the quests whose XP is not known yet) only on hover", function()
   page("overview")
 end)
-shot("chapter-room", "Chapter (room for the dungeon quests)", "Under where the Adventurers stand: the chapter's total and, in red, where to stop questing as level and percent (U78, U85); the stop point as a red tick \"stop 26 (60%)\" on the level track (U82)", function()
+shot("chapter-room", "Chapter (room for the dungeon quests)", "The stop point as a red tick \"stop 26 (60%)\" on the level track (U82); no Stop questing line under where the Adventurers stand: the Overview answers it (U235)", function()
   local p = pf("chapter"); p.sel = nil; page("chapter"); W():Refresh(); top(p.rscroll)
 end)
-shot("dungeon-page-room", "Dungeon page (the room, Show everyone)", "A dungeon of your chapter: the room as the answer at the top of the right page (\"Stop questing at ... to leave room for the dungeon quests.\" or \"You have room for this dungeon's quests.\", U174) and Show everyone ticked with each Adventurer's line (U78, U145)", function()
+shot("dungeon-page-room", "Dungeon page (the room, Show everyone)", "A dungeon of your chapter with quests for your side: the chapter's room as the answer at the top of the right page, as on the Overview (\"Stop questing at ... to leave room for the dungeon quests.\" or \"You have room for this dungeon's quests.\", U174); none on a dungeon with no quests for your side (U237) and Show everyone ticked with each Adventurer's line (U78, U145)", function()
   local f, J = cur(), ns.Journey
   local key
-  for _, x in ipairs(J:ChapterList(f, J:CurrentIndex(f))) do if not (x.early or key) then key = x.key end end
+  for _, x in ipairs(J:ChapterList(f, J:CurrentIndex(f))) do
+    if not (x.early or key) and #ns.QuestLists:DungeonQuests(f, x.key) > 0 then key = x.key end
+  end
   ns.DungeonPage:Open(key or "dm")
   pf("dungeon").everyone = true; W():Refresh(); top(pf("dungeon").rscroll)
 end)
@@ -496,20 +526,47 @@ shot("quests-history", "Quests (History)", "As if every chain on the tab were do
   ns.Quests.Finished = function(x) return x.chain == true end
   W():Refresh()
 end)
-shot("quests-attune-none", "Quests (Attunements, level 30)", "None open yet: when the first one opens", function()
+-- U213: the dungeon quest log. A stand-in: the first step of your first chain to start earlier done (a character seldom
+-- has one under way); put back by the next shot, or by Finish.
+local logDone
+local function logBack()
+  if logDone then logDone.h.questsDone[logDone.id] = logDone.was; logDone = nil end
+end
+shot("quests-dungeon-log", "Quests (Dungeon quests tab)", "The dungeon quest log as a level 20 sees it (U213): Under way on the left (a stand-in: the first step of the first chain done, so its rows say Step 2 and where it starts), Open now on the right, in the journey's order; each dungeon's name and chapter once as a heading in the accent colour (U230), then a row each: the quest, the next step and a pin", function()
   if realFinished then ns.Quests.Finished = realFinished end
-  ns.QuestLists.viewLevel = 30
+  ns.QuestLists.viewLevel = 20
+  local f, me = cur(), ns.Me()
+  local h = ns.Hero:Get(f, me)
+  -- (A chain's first step in the log itself, Open now: the check of 16 Nov 2026 picked the Deadmines' chain, cleared
+  -- by then, and Under way stayed empty.)
+  for _, row in ipairs(h and ns.QuestLists:Log(f, me).open or {}) do
+    if not logDone and row.step and row.k == 1 then
+      h.questsDone = h.questsDone or {}
+      logDone = { h = h, id = row.step.id, was = h.questsDone[row.step.id] }
+      h.questsDone[logDone.id] = true
+    end
+  end
   local p = pf("quests"); p.sel = nil; p.tabs.buttons[3]:Click()
+end)
+shot("overview-dquests", "Overview (Your dungeon quests)", "Your dungeon quests › on the banner's top right opens the dungeon quest log at the book's right side, like the Inbox (U215): Under way (the same stand-in, Step 2) above Open now, a heading per dungeon with its chapter (U230), then a short row each with the quest, the next step and a pin", function()
+  page("overview"); W():OpenPanel("dquests")
+end)
+shot("quests-attune-none", "Quests (Attunements, level 30)", "None open yet: when the first one opens", function()
+  logBack()
+  W():HidePanels()
+  ns.QuestLists.viewLevel = 30
+  page("quests")
+  local p = pf("quests"); p.sel = nil; p.tabs.buttons[4]:Click()
 end)
 -- The row of an attunement on the Attunements tab, by its key (the list is sorted by start level).
 local function attRow(key)
   for i, a in ipairs(ns.QuestLists:Attunements(ns.Fellowship:Current(), ns.Me())) do if a.key == key then return i end end
 end
-shot("quests-attune", "Quests (Attunements & keys tab)", "The grid with an icon on each row and every other row banded; Molten Core's steps (as seen at level 60)", function()
+shot("quests-attune", "Quests (Attunements & keys tab)", "The grid with an icon on each row and every other row banded; the chosen one's steps as boxes joined by lines, as the Attune addon draws a chain (U214): done in green, the step you are on in gold with You are here, the rest plain; who is on each step under it (as seen at level 60)", function()
   ns.QuestLists.viewLevel = 60
   pf("quests").attSel = attRow("mc") or 1; W():Refresh() -- (WoW Forever has not announced Molten Core: the first)
 end)
-shot("quests-attune-ony", "Quests (Onyxia's steps)", "A long attunement chain", function()
+shot("quests-attune-ony", "Quests (Onyxia's steps)", "A long attunement chain: a box per step, the line between them green up to the step you are on (U214), none under the last", function()
   pf("quests").attSel = attRow("ony"); W():Refresh()
 end)
 shot("heroes", "Adventurers", "Banner with the count under its name (\"4 Adventurers · Alliance · led by\", U201), the roles right under it (no number tiles: U190), no title over the right page: Invite Adventurers heads it (U201), no tournament line while it is off, no level track (its home is the Chapter page, U168), every Adventurer with a 3D head (yours) or class crest, status and XP", function()
@@ -535,7 +592,7 @@ prep(function()
   for _, name in ipairs(PRETEND) do dev("hero " .. name .. " online") end
   W():Refresh()
 end)
-shot("inspect", "Inspect an Adventurer", "Someone not near (pretend Adventurers cannot be drawn): a card with the class crest, class and role, item level and the worn gear as a list in quality colours, when last near (U3); no empty model box. Right: XP, the number tiles, Whisper / Invite", function()
+shot("inspect", "Inspect an Adventurer", "Someone not near (pretend Adventurers cannot be drawn): a card with the class crest, class and role, item level and the worn gear as a list in quality colours, when last near (U3); no empty model box. Right: XP, Whisper / Invite, then This chapter (no number tiles: the level and online are in the line on the left, U205)", function()
   -- Brannic shares gear (your items as a stand-in), so the slots and their tooltips (Shift compares) show.
   dev("hero Brannic gear")
   local p = pf("heroes"); p.sel = full("Brannic"); W():Refresh()
@@ -557,15 +614,10 @@ shot("inspect-friend", "Inspect a Friend of the fellowship", "Friend of the fell
 end)
 prep(function() dev("hero Elyra friend off"); pf("heroes").sel = nil; ns.char.heroesOpen = nil end)
 -- Needs attention is in the Inbox since U144 (on Manage until the rebuild).
-shot("inbox-attention", "Inbox: what needs attention (Leader)", "Corwin below the floor, Brannic on an older addon: each on a row with Their card and Seen; the count on the Inbox button (U144, U106)", function()
-  pf("heroes").sel = nil; dev("hero Corwin level 18"); ns.char.inboxSeen = nil; page("manage"); W():OpenPanel("inbox")
+shot("inbox-attention", "Inbox: what needs attention (Leader)", "Brannic on an older addon: a dimmed row after the answers, with Their card; no row for Corwin below the floor (U240); the Inbox button counts only the answers (U144, U106, U212)", function()
+  pf("heroes").sel = nil; dev("hero Corwin level 18"); page("manage"); W():OpenPanel("inbox")
 end)
-shot("inbox-attention-seen", "Inbox: a row seen", "Corwin's row after Seen: dimmed, last, without Seen; one fewer on the Inbox button (U105, U106)", function()
-  for _, it in ipairs(ns.Inbox:Items()) do
-    if it.key and it.key:find("^behind:") then ns.Inbox:See(it.key) break end
-  end
-end)
-prep(function() ns.char.inboxSeen = nil; W():HidePanels() end)
+prep(function() W():HidePanels() end)
 shot("manage", "Manage", "One spread (U197): every Adventurer with a menu on the left; on the right the bar to the Rules page (U143), then The fellowship: name, banner colour, every emblem", function()
   page("manage")
 end)
@@ -610,7 +662,7 @@ prep(function()
   p.invite:SetText(""); p.invite.edit:ClearFocus(); p.suggest:Hide()
 end)
 -- Editing the rules, from the Rules page's Edit the rules (U143; a tab of Manage until the rebuild).
-shot("rules-edit", "Rules: editing (Leader)", "Rules marked in the sidebar; the rules as a draft: size, play style, every rule; at the left page's foot the bar says Everything is published, with Done", function()
+shot("rules-edit", "Rules: editing (Leader)", "Rules marked in the sidebar; the rules as a draft: size, play style, every rule, from Leveling together with no summary box above it (U222); at the left page's foot the bar says Changes stay a draft until you publish, with Done; no box over the form saying so (U228)", function()
   local p = pf("rulesadmin")
   if p then p.picks = nil end
   page("rules"); pf("rules").editBar.btn:Click()
@@ -644,7 +696,7 @@ shot("heroes-fallen", "Adventurers (a Fallen Adventurer)", "Hardcore: Brannic's 
   -- Open at first with one Fallen (U199: closed at first, U108, hid this card; check of 14 Nov 2026, 14:51).
   pf("heroes").sel = nil; ns.char.heroesOpen = nil; page("heroes"); top(pf("heroes").scroll); top(pf("heroes").lscroll)
 end)
-shot("inspect-fallen", "Inspect a Fallen Adventurer (his memorial)", "In memory of Brannic: his greyed crest with a skull on the dimmed stage, where, when and fighting whom, honoured in the Chronicle; at the foot Guild Together's memorial stone with its candle, \"Candles lit by Elyra, Corwin.\" and Light a candle (U41, U48); no gear. Right: Days together, Fallen, his journey (joined, fell, dungeons, firsts), no XP or Invite", function()
+shot("inspect-fallen", "Inspect a Fallen Adventurer (his memorial)", "In memory of Brannic: his greyed crest with a skull on the dimmed stage, where, when and fighting whom, honoured in the Chronicle; at the foot Guild Together's memorial stone with its candle, \"Candles lit by Elyra, Corwin.\" and Light a candle (U41, U48); no gear. Right: his journey (joined, fell, days together, dungeons, firsts), no number tiles (U205), no XP or Invite", function()
   -- U41: two pretend Adventurers light a candle (once each; they go with the falls when the challenges are put back).
   local f = cur()
   ns.Fellowship:Apply(f, { k = "candle", name = full("Brannic") }, full("Elyra"), time() - 120)
@@ -663,9 +715,7 @@ shot("overview-lives", "Overview (shared lives)", "On the banner's picture, top 
   ns.char.livesSeen[cur().id] = 10
   page("overview")
 end)
--- (The tiles had shots of their own, the same pictures as these: they are in sight beside the article; check of
--- 1 Nov 2026, 15:23.)
-shot("rules-challenges", "Rules (the challenges)", "The rulebook's last article: a block for Hardcore and one for Shared lives, each with its icon in a gold ring, the lives left on their own line and the candles under it; the Fallen and starting anew after them. Right, under Propose a change: Where the challenges stand, tiles two to a row: Lives left 9 / 10, Rules broken 0", function()
+shot("rules-challenges", "Rules (the challenges)", "The rulebook's last article: a block for Hardcore and one for Shared lives, each with its icon in a gold ring, the lives left on their own line and the candles under it; the Fallen and starting anew after them. Right, under Propose a change: only the votes, no tiles (U206)", function()
   page("rules"); bottom(pf("rules").lscroll); bottom(pf("rules").rscroll)
 end)
 shot("rules-edit-challenges", "Rules: editing (challenges)", "Each challenge with Turn off (for good; it asks first), above the size and the play style", function()
@@ -684,7 +734,7 @@ shot("heroes-broken", "Adventurers (broken challenges, the Ring)", "Brannic's ca
   pf("heroes").sel = nil; page("heroes"); top(pf("heroes").scroll); top(pf("heroes").lscroll)
 end)
 shot("chronicle-broken", "Chronicle (broken rules, the Ring)", "Brannic took a flight path, breaking Walk everywhere; used a potion, breaking Ironman Fellowship; found the Ring", function() chronicle("all") end)
-shot("rules-challenges-more", "Rules (the challenges, X3-X5)", "The article: a block for each challenge with its icon; Broken by Brannic in red under Walk everywhere and Ironman Fellowship, who carries the Ring, Race to 60's clock, each on its own line. The tiles: Race clock, Ring-bearer Brannic, Rules broken 2", function()
+shot("rules-challenges-more", "Rules (the challenges, X3-X5)", "The article: a block for each challenge with its icon; Broken by Brannic in red under Walk everywhere and Ironman Fellowship, who carries the Ring, Race to 60's clock, each on its own line. No tiles on the right (U206)", function()
   page("rules"); bottom(pf("rules").lscroll); bottom(pf("rules").rscroll)
 end)
 -- U49: the Ring went from Brannic to Corwin (written straight into this copy; the prep after puts it back).
@@ -753,6 +803,13 @@ shot("admin-chapter-2", "Journey Admin (chapter 2)", "Another chapter selected, 
   if ns.char.sizeToasted then ns.char.sizeToasted[cur().id] = nil end
   W():HidePanels(); local A = ns.AdminDraft; A.sel = 2; page("admin"); pf("admin").editor:ShowTab("chapter")
 end)
+shot("admin-back", "Journey Admin (an earlier chapter)", "The chapter before the current one chosen: after its milestones, Back to this chapter (U231), plain, or greyed with the reason under it (Chapter II is complete under today's rules, so Chapter III would open again at once)", function()
+  local A = ns.AdminDraft
+  A.sel = math.max(1, ns.Journey:CurrentIndex(cur()) - 1); W():Refresh()
+  local ed = pf("admin").editor
+  ed:ShowTab("chapter")
+  ed.rscroll:SetVerticalScroll(ed.rscroll:GetVerticalScrollRange())
+end)
 shot("admin-bosses", "Journey Admin (boss picker)", "Which bosses a clear needs", function()
   ns.AdminDraft:PickBosses(cur(), "dm")
 end)
@@ -785,15 +842,16 @@ shot("admin-one-level", "Journey Admin (a 60-60 chapter)", "A one-level chapter 
   A.sel = #A:Journey(f).chapters
   page("admin"); pf("admin").editor:ShowTab("chapter")
 end)
-shot("chapter-milestones", "Chapter (milestones)", "A Required level milestone and an Optional one ticked by hand", function()
+shot("chapter-milestones", "Chapter (milestones)", "A Required level milestone and an Optional one ticked by hand, after the chapter's own, each a row framed like the dungeon rows, gold or green down its left edge (U224): WoW Forever's goals under If you like (U218)", function()
   hideOverlays(); ns.AdminDraft:Discard()
   local f = cur()
   local j = ns.Journey.Clean(f.journey)
   local n = ns.Journey:CurrentIndex(f)
-  j.chapters[n].milestones = {
-    { id = "tour1", kind = "level", value = j.chapters[n].cap, name = ns.Milestones.DefaultName("level", j.chapters[n].cap), req = true },
-    { id = "tour2", kind = "tick", name = "Kill Hogger together", req = false },
-  }
+  -- (Added to the chapter's own, so WoW Forever's goals stay for this shot and tracker-all's For the journey.)
+  local ms = j.chapters[n].milestones or {}
+  ms[#ms + 1] = { id = "tour1", kind = "level", value = j.chapters[n].cap, name = ns.Milestones.DefaultName("level", j.chapters[n].cap), req = true }
+  ms[#ms + 1] = { id = "tour2", kind = "tick", name = "Kill Hogger together", req = false }
+  j.chapters[n].milestones = ms
   ns.Fellowship:PublishJourney(j)
   ns.Fellowship:Tick("tour2", true)
   pf("chapter").sel = nil; page("chapter"); return bottom(pf("chapter").lscroll)
@@ -845,8 +903,8 @@ shot("tourney-signup", "Tournament (sign-up)", "Sign-up open, entrants and seeds
   page("tourney")
 end)
 shot("tourney-bracket", "Tournament (bracket running)", "Semifinals joined to the final by bracket lines, your next duel; cards 60 high with class icons and levels (U17)", function() dev("tourney next"); W():Refresh() end)
-shot("inbox-notice", "Inbox (a notice)", "Your next duel with Open the tournament and Seen (U105); the Inbox button counts it", function()
-  ns.char.inboxSeen = nil; W():OpenPanel("inbox")
+shot("inbox-notice", "Inbox (your next duel)", "Your next duel with Open the tournament, counted on the Inbox button until it is fought (U105, U212)", function()
+  W():OpenPanel("inbox")
 end, { wait = 0.3 })
 prep(function() W():HidePanels() end)
 shot("tourney-champion", "Tournament (over)", "The winner, between two gold cups (U48), and the hand-over", function()
@@ -881,10 +939,17 @@ shot("tourney-20", "Tournament (20 entrants)", "Round by round: round 1's winner
   dev("tourney big"); page("tourney")
 end)
 prep(function() dev("tourney big off") end)
-shot("settings", "Settings", "Folding sections (U10): the book, messages and help on the left; the toasts open on the right under three headings, Your journey, The fellowship, Dungeons and raids (U86), each heading with a tick of its own that turns its whole group on or off, in line with the ticks under it (U116), the tracker folded with what is set; Dungeons and raids folded: \"dungeons: all · raids: open ones\" (U164, U165); under help, The key opens: Chapter (U107)", function()
+local toastFolds -- (the toast groups' folds before the settings shot)
+shot("settings", "Settings", "Folding sections (U10): the book, messages and help on the left; the toasts open on the right under three headings, Your journey, The fellowship, Dungeons and raids (U86), each heading with a tick of its own that turns its whole group on or off, in line with the ticks under it (U116); Your journey and Dungeons and raids folded to their tick, a fold mark and how many are on (\"6 of 6 on\", \"7 of 7 on\"), The fellowship open with its lines, A challenge alone on the last line whole (U233); the tracker folded with what is set; Dungeons and raids folded: \"dungeons: all · raids: open ones\" (U164, U165); under help, The key opens: Chapter (U107)", function()
   ns.AdminDraft:Discard(); W():OpenSettings(); pf("settings"):Fold("toasts", true)
+  -- (Your folds put back by the next shot.)
+  local st = ns.char.setFold or {}
+  ns.char.setFold = st
+  toastFolds = toastFolds or { st.toasts1, st.toasts2, st.toasts3 }
+  for gi = 1, 3 do pf("settings"):FoldToasts(gi, gi == 2) end
 end)
 shot("settings-tracker-off", "Settings (tracker off)", "The tracker open (the toasts fold), its lines faded while it is off", function()
+  if toastFolds then for gi = 1, 3 do ns.char.setFold["toasts" .. gi] = toastFolds[gi] end; toastFolds = nil end
   W():OpenSettings(); pf("settings"):Fold("tracker", true); ns.Settings:Set("tracker", false); W():Refresh()
 end)
 shot("toast-move", "Toast position (move mode)", "The sample banner to drag", function()
@@ -994,17 +1059,17 @@ shot("toast-broken", "Toast: a challenge is broken", "Brannic took a flight path
 end, { toast = true })
 shot("toast-endgame", "Toast: the Endgame is open (big)", "After the journey: the raids", toast("journey", L.TOAST_ENDGAME,
   L.TOAST_ENDGAME_TEXT), { toast = true })
-shot("tracker", "The tracker on the screen", "Chapter, status with the dungeons cleared on the same line (U159), XP bar, you (\"Level 18 · 2.6 to the cap\", one line) with the little bar to the floor or cap, the next step, who is online, a Gathering soon; an icon on each line (U13); the mouse on the title: \"Drag to move · Hold Ctrl to drag by any line\" (U92)", function()
+shot("tracker", "The tracker on the screen", "Chapter, status with the dungeons cleared on the same line, 0 of 2 dungeons (U159, U223), XP bar, you (\"Level 18 · 2.6 to the cap\", one line) with the little bar to the floor or cap, the next step, who is online, a Gathering soon; an icon on each line (U13); the mouse on the title: \"Drag to move · Hold Ctrl to drag by any line\" (U92)", function()
   ns.Settings:Set("trackerDock", false) -- (its own panel here; docked in "tracker-docked")
   ns.Toasts.frame:Hide(); W():Close(); ns.Tracker:SetFolded(false); ns.Tracker:Refresh()
   local bar = ns.Tracker.frame.bar
   -- Not for the README's picture: the tooltip's foot showed over its top (the check of 13 Nov 2026).
   if not TR.brand then bar:GetScript("OnEnter")(bar) end
 end)
-shot("tracker-all", "The tracker, every line on", "Also Prequest (gold, a chain step to pick up now), shared quests, your next duel and the inbox (Settings); where to stop questing in red on its own line under your little bar, not touching it", function()
+shot("tracker-all", "The tracker, every line on", "The status still one line (U223); also For the journey (gold, up to three lines, the second and third in line with the first's words, U217): what to do next for your dungeon quests and one goal of the chapter; shared quests, your next duel and the inbox (Settings); where to stop questing in red on its own line under your little bar, not touching it", function()
   GameTooltip:Hide()
-  -- A prequest to pick up (U124), made up when your log has none; put back in tracker-hidden.
-  if not ns.Together:StartEarly(ns.Fellowship:Current()) then TR.groups = ns.QuestLists.Groups; ns.QuestLists.Groups = ns.Dev.FakeChain end
+  -- A dungeon quest to work on, made up when there is none; put back in tracker-hidden.
+  if #ns.Together:ForJourney(ns.Fellowship:Current()) == 0 then TR.groups = ns.QuestLists.Groups; ns.QuestLists.Groups = ns.Dev.FakeChain end
   local S = ns.Settings
   TR.savedLines = {}
   for _, key in ipairs(S.TRACKER_LINES) do TR.savedLines[key] = S:TrackerLineOn(key); S:SetTrackerLine(key, true) end
@@ -1021,6 +1086,10 @@ end)
 shot("tracker-docked", "The tracker under the game's quest tracker", "Settings: one more section under the game's quest list, with the game's section header, fold button and fonts; every line on, the red stop line clear of the little bar (a client without the game's tracker keeps the panel)", function()
   ns.Settings:Set("trackerDock", true)
   ns.Tracker:Refresh()
+end)
+shot("questlog-marks", "The game's quest log (journey marks)", "The map's quest log: a small map mark before the title of each quest in your log that is a dungeon quest of the journey or a goal (U216), none on the others; pointing at one adds \"Journey Together: The Deadmines · Chapter II\" or the goal to the game's tooltip (needs such a quest in your log)", function()
+  W():Close()
+  if ToggleQuestLog then ToggleQuestLog() end
 end)
 shot("tracker-hidden", "The tracker, hidden", "Nothing on the screen until pointed at; it shows for a moment when something changes", function()
   ns.Settings:Set("trackerDock", false)
@@ -1059,8 +1128,7 @@ shot("walk-focus", "Walkthrough: Focus now", "Focus now framed with sparks; the 
 shot("walk-stand", "Walkthrough: Where we stand", "The chapter's banner framed whole, its picture and Where we stand along its foot; the guide card beside it, covering neither", function() walk("leader", "STAND") end)
 shot("walk-header", "Walkthrough: header buttons", "Your characters, inbox and settings framed together", function() walk("leader", "HEADER") end)
 shot("walk-tracker", "Walkthrough: the tracker", "Outside the book: the tracker framed, the book dimmed", function() walk("leader", "TRACKER") end)
-shot("walk-first-done", "The tour: the end", "Have a look around: your own fellowship again, invite your Adventurers; the ? at the top explains each page; Done (no page steps since U200: each page's ? says it)", function() walk("leader", "DONE") end)
-shot("walk-member-done", "The tour: the end (Adventurer)", "Have a look around: the ? at the top of the book explains each page; Settings starts this tour again; Done", function() walk("member", "DONE") end)
+shot("walk-first-done", "The tour: the end", "Have a look around: your own fellowship shows again; the ? at the top of the book explains each page; Settings starts this tour again; Done. The same end for an Adventurer (U208; no page steps since U200: each page's ? says it)", function() walk("leader", "DONE") end)
 shot("walk-manage", "A new Leader's tour: Manage", "After a promotion, only what is new: Manage on the sample, one spread (U197): the lead, away, name and banner here, invites on the Adventurers page, what needs you in the Inbox", function() walk("leader", "MANAGE", "member") end)
 shot("walk-done", "A new Leader's tour: the end", "That's what your new rank opens; your own fellowship shows again; Done", function() walk("leader", "DONE", "member") end)
 prep(function() ns.Walkthrough:Stop() end)
@@ -1086,9 +1154,9 @@ prep(function() ns.Picture:Hide(); hideOverlays(); W():Open(); dev("watch") end,
 shot("watch-overview", "Following an alt's fellowship: Overview", "The bar says whose fellowship and how fresh; Back to your own; nothing to act on", function()
   page("overview")
 end)
-shot("watch-chapter", "Following: Chapter", "Dungeons and clears to read; no Find group, no Mark cleared", function() page("chapter") end)
+shot("watch-chapter", "Following: Chapter", "Dungeons and clears to read; no Find group, no Mark cleared; no read-only line under the clears (the bar says it, U207)", function() page("chapter") end)
 shot("watch-heroes", "Following: Adventurers", "Levels as the Adventurers sent them; Altara offline; no Leave; the count under the banner; no invite while following, so the right page holds the page's sketch (no title since U201)", function() page("heroes") end)
-shot("watch-rules", "Following: Rules", "Its rulebook as of the last news; Brannic's vote without Yes / No; no Propose", function()
+shot("watch-rules", "Following: Rules", "Its rulebook: who sets the rules, no read-only line (the bar says it, U207); Brannic's vote without Yes / No; no Propose a change heading or form", function()
   -- (An open vote in the pretend fellowship, gone with it at the end.)
   local f, now = ns.Fellowship:Get(ns.Dev.WATCH_ID), time()
   if f then
@@ -1233,6 +1301,7 @@ function TR:Finish(keep)
   self:ShowGameUI()
   self:HdrBack()
   hideOverlays()
+  closeMap()
   ns.Toasts:StopMove()
   ns.Theme.forceKey = nil
   for k, v in pairs(self.saved or {}) do ns.Settings:Set(k, v) end
@@ -1245,6 +1314,8 @@ function TR:Finish(keep)
   ns.Dev.pretendTrial = nil
   ns.Dev.pretendNames = nil
   if realFinished then ns.Quests.Finished = realFinished end -- (the History shot's stand-in, if the tour stopped there)
+  logBack() -- (and the dungeon quest log's)
+  W():HidePanels() -- (a run of the dquests area ends on the side panel)
   if ns.Walkthrough then ns.Walkthrough:Stop() end
   ns.quiet = nil
   -- The pretend Heroes go, then you leave: alone, leaving ends the fellowship.
@@ -1321,9 +1392,9 @@ function TR:Run(arg, opts)
   -- The pages as a full account sees them (on an account without game time the warning bar covered every shot); the
   -- "trial-bar" shot shows it on its own.
   ns.Dev.pretendTrial = false
-  -- With ids, the run ends after the last of them.
+  -- With ids, or some areas (U209, the owner, 14 Nov 2026), the run ends after the last of their shots.
   local last = #shots
-  if ids then
+  if ids or areas then
     last = 0
     for k, s in ipairs(shots) do if not s.prep and wanted(s, areas, ids) then last = k end end
   end
@@ -1333,6 +1404,10 @@ function TR:Run(arg, opts)
     local s = shots[i]
     if not s or i > last then return TR:Finish(keep) end
     if opts.only and (s.prep or not wanted(s, areas, ids)) then return nextShot() end
+    closeMap()
+    -- (A self-test step's picture moment stayed over the book in the first four pictures of the check of 15 Nov 2026;
+    -- picture-moment offers its own.)
+    ns.Picture:Hide()
     local res
     local ok, err = xpcall(function() res = s.fn() end, trace)
     if not ok then
@@ -1363,7 +1438,7 @@ function TR:Run(arg, opts)
       -- Another window over the book would be in every picture from here on (the game's Choose your Input Device
       -- window covered all 222 of the check of 10 Nov 2026, 14:31): the run stops and says which.
       local okCover, cover = pcall(TR.Covering, TR)
-      if okCover and cover then
+      if okCover and cover and not s.game then
         rec.problems[#rec.problems + 1] = { id = s.id, err = "stopped: " .. cover .. " was open over the book" }
         TR.stopped = cover
         return TR:Finish(keep)

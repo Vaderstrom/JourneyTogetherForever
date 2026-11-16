@@ -1,5 +1,6 @@
 -- Needs attention (SPEC §6, §4.13): what the Leader should look at, in the Inbox since U144 (9 Nov 2026; on the Manage
--- page until then). Adventurers not seen for a while, falling behind, over the cap, open invites, older addon versions.
+-- page until then). Adventurers not seen for a while, over the cap, open invites, older addon versions. (Not who is
+-- below the floor: Focus now, the tracker and the Chapter page say it, U239-U240.)
 -- Nothing here changes the fellowship; it only points.
 local _, ns = ...
 local L = ns.L
@@ -19,29 +20,21 @@ local function card(name)
   end
 end
 
--- { { icon, text, key, act = { label, fn } } }, most urgent first; the Inbox adds Seen (U106: it takes a line off the
--- count until its key changes: a new level, a login, a new version). Empty for Adventurers.
+-- { { icon, text, act = { label, fn } } }, most urgent first; notices in the Inbox, never on its count (U212, the owner,
+-- 15 Nov 2026: each new level brought one back on the badge). Empty for Adventurers.
 function A:Gather(f)
   local me = ns.Me()
   local rank = ns.Permissions.Rank(f, me)
   if rank ~= "leader" then return {} end
   local items = {}
-  local function add(icon, text, key, name, act)
-    items[#items + 1] = { icon = icon, text = text, key = key, act = act or { L.NA_CARD, card(name) } }
+  local function add(icon, text, name, act)
+    items[#items + 1] = { icon = icon, text = text, act = act or { L.NA_CARD, card(name) } }
   end
   local ch = J:Current(f)
 
-  -- Falling behind: below the floor of the current chapter.
   if ch then
-    -- (Not yourself: Focus now tells you how far you are.)
-    for _, name in ipairs(J:Below(f, ch.n)) do
-      if name ~= me then
-        add("waiting", L.NA_BEHIND:format(ns.Short(name), Hr:Level(f, name), J:FloorLevel(f, ch)),
-          ("behind:%s:%d:%d"):format(name, Hr:Level(f, name), J:FloorLevel(f, ch)), name)
-      end
-    end
     for _, name in ipairs(J:OverCap(f)) do
-      add("cap", L.NA_OVER:format(ns.Short(name), Hr:Level(f, name), ch.cap), ("over:%s:%d:%d"):format(name, Hr:Level(f, name), ch.cap), name)
+      add("cap", L.NA_OVER:format(ns.Short(name), Hr:Level(f, name), ch.cap), name)
     end
   end
   -- Not seen for a while (not yet away), and away by the rule.
@@ -49,12 +42,10 @@ function A:Gather(f)
   for _, name in ipairs(names) do
     -- (Not a Friend of the fellowship: they drop in now and then, SPEC §1.1. Nor the Fallen: their journey ended.)
     if name ~= me and not J:Uncounted(f, name) then
-      local last = Hr:LastSeen(f, name)
-      local days = math.floor((time() - last) / DAY)
+      local days = math.floor((time() - Hr:LastSeen(f, name)) / DAY)
       local away = J:Away(f, name)
-      -- (Keyed by when they were last seen, not the days: seen stays seen until they log in again.)
-      if away == "auto" then add("away", L.NA_AWAY_AUTO:format(ns.Short(name), days), ("away:%s:%d"):format(name, last), name)
-      elseif not away and days >= self.QUIET_DAYS then add("away", L.NA_QUIET:format(ns.Short(name), days), ("quiet:%s:%d"):format(name, last), name) end
+      if away == "auto" then add("away", L.NA_AWAY_AUTO:format(ns.Short(name), days), name)
+      elseif not away and days >= self.QUIET_DAYS then add("away", L.NA_QUIET:format(ns.Short(name), days), name) end
     end
   end
   -- Open invites.
@@ -65,12 +56,12 @@ function A:Gather(f)
   for _, name in ipairs(invites) do
     local left = ns.Sync and ns.Sync:InviteLeft(f, name)
     add("group", left and L.NA_INVITE_LEFT:format(ns.Short(name), ns.TimeLeft(left)) or L.NA_INVITE:format(ns.Short(name)),
-      "invite:" .. name .. ":" .. tostring(f.invites[name]), name, { L.NA_CANCEL_INVITE, function() F:CancelInvite(name) end })
+      name, { L.NA_CANCEL_INVITE, function() F:CancelInvite(name) end })
   end
   -- Older addon versions than the newest one seen in the fellowship (as on the Adventurers page).
   for _, name in ipairs(names) do
     local ver, newest = Hr:OldVersion(f, name)
-    if ver then add("done", L.NA_VERSION:format(ns.Short(name), ver, newest), ("ver:%s:%s:%s"):format(name, ver, newest), name) end
+    if ver then add("done", L.NA_VERSION:format(ns.Short(name), ver, newest), name) end
   end
   return items
 end

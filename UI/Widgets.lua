@@ -2274,18 +2274,20 @@ function UI.LevelTrack(parent, width, dark)
       end
     end
     self.notches:HideFrom(k + 1)
+    -- (A floor of level 1, the Prologue's, is always reached: no mark for it, U236.)
+    local hasFloor = tr.floor > 1
     for i, v in ipairs({ tr.floor, tr.cap }) do
       local m = self.marks[i]
       m:ClearAllPoints(); m:SetPoint("CENTER", self, "TOPLEFT", x(v), -LT_LINE_Y - 1)
       m.label:SetText((i == 1 and L.TRACK_FLOOR or L.TRACK_CAP):format(v))
       m.label:ClearAllPoints(); m.label:SetPoint("TOP", m, "BOTTOM", 0, -2)
-      m.label:Show()
+      m:SetShown(i == 2 or hasFloor); m.label:SetShown(i == 2 or hasFloor)
     end
     -- Floor and cap close together (a chapter far ahead, the track stretched to reach it): one label between them
     -- ("floor 54 and cap 56" overlapped in the check of 31 Oct 2026).
     local fl, cp = self.marks[1].label, self.marks[2].label
     local labelX = { x(tr.floor), x(tr.cap) }
-    if x(tr.cap) - x(tr.floor) < (fl:GetStringWidth() + cp:GetStringWidth()) / 2 + 8 then
+    if hasFloor and x(tr.cap) - x(tr.floor) < (fl:GetStringWidth() + cp:GetStringWidth()) / 2 + 8 then
       fl:SetText(L.TRACK_BOTH:format(tr.floor, tr.cap))
       fl:ClearAllPoints(); fl:SetPoint("TOP", self, "TOPLEFT", (x(tr.floor) + x(tr.cap)) / 2, -LT_LINE_Y - 12)
       local half = fl:GetStringWidth() / 2

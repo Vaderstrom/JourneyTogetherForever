@@ -49,6 +49,8 @@ local ROW_H, BAR_W = 46, 96
 
 -- Names like Upper Blackrock Spire need about 180 pixels (they were cut off at 120; seen in the tour).
 local ATT_COLS, ATT_NAME_W, ATT_ROW_H = 5, 210, 32
+-- A step's box: the room inside its edge, and the line down to the next box (U214).
+local ATT_PAD, ATT_GAP = 7, 12
 
 -- The Attunements tab (SPEC §6): left a grid of attunements × Heroes, right the chosen one's steps.
 local function buildAttune(pf, width)
@@ -101,20 +103,27 @@ local function buildAttune(pf, width)
   pf.aKey = UI.WrapText(R, 12, "ink2", width)
   pf.aStepsHead = UI.SectionHeader(R, width)
   pf.aStepsHead:SetText(L.ATT_STEPS)
+  -- Each step a box, joined to the next by a line, as the Attune addon draws a chain (U214, the owner, 15 Nov 2026:
+  -- "Build it for attunements"): done in green, the step you are on in gold, the rest plain. Coloured at refresh by
+  -- its state, so it has no theme painter that would reset it.
   pf.aSteps = UI.Pool(function()
-    local p = CreateFrame("Frame", nil, R)
+    local p = CreateFrame("Frame", nil, R, "BackdropTemplate")
+    p:SetBackdrop({ bgFile = ns.WHITE, edgeFile = ns.WHITE, edgeSize = 1 })
     p:SetWidth(width)
+    p.link = p:CreateTexture(nil, "BACKGROUND")
+    p.link:SetWidth(2); p.link:SetHeight(ATT_GAP); p.link:SetPoint("TOP", p, "BOTTOM")
     p.ring = UI.Round(p, "ARTWORK", 22)
-    p.ring:SetPoint("TOPLEFT", 0, 0)
+    p.ring:SetPoint("TOPLEFT", ATT_PAD, -ATT_PAD)
     p.check = UI.Check(p, 18)
     p.check:SetTexture(ns.MARKS.done)
     p.check:SetPoint("CENTER", p.ring, "CENTER")
     p.n = UI.Text(p, 12, "white", "title", "CENTER")
     p.n:SetPoint("CENTER", p.ring, "CENTER")
-    p.title = UI.WrapText(p, 13, "ink", width - 34, "book")
-    p.title:SetPoint("TOPLEFT", 32, -2)
-    p.heroes = UI.WrapText(p, 11, "ink2", width - 34)
-    addListen(p, width)
+    p.title = UI.WrapText(p, 13, "ink", width - 34 - 2 * ATT_PAD, "book")
+    p.title:SetPoint("TOPLEFT", 32 + ATT_PAD, -ATT_PAD - 2)
+    p.heroes = UI.WrapText(p, 11, "ink2", width - 34 - 2 * ATT_PAD)
+    addListen(p, width - 2 * ATT_PAD)
+    p.listen:SetPoint("TOPRIGHT", -ATT_PAD, -ATT_PAD)
     return p
   end)
   pf.aDrop = UI.WrapText(R, 13, "ink", width, "book")
@@ -252,7 +261,12 @@ local function refreshAttune(pf, f, me)
         if not p then break end
         nSteps = i
         local ok, here = mine.steps[i], mine.at == i
-        p.ring:SetColorTexture(ns.Hex(here and (light and "B8742A" or "D8A850") or (ok and "3E7A3A" or "7A6A55")))
+        local gold = light and "B8742A" or "D8A850"
+        p.ring:SetColorTexture(ns.Hex(here and gold or (ok and "3E7A3A" or "7A6A55")))
+        p:SetBackdropColor(Theme:RGBA(here and gold or "3E7A3A", (here or ok) and 0.16 or 0))
+        p:SetBackdropBorderColor(Theme:RGBA(here and gold or (ok and "3E7A3A" or "line"), here and 1 or 0.9))
+        p.link:SetColorTexture(Theme:RGBA(ok and "3E7A3A" or "line", 0.9))
+        p.link:SetShown(i < #a.steps)
         p.check:SetShown(ok); p.n:SetShown(not ok); p.n:SetText(i)
         p:SetQuest(st[1])
         p.title:SetText(st[2] .. (here and ("  ·  " .. L.Q_YOU_ARE_HERE) or ""))
@@ -266,8 +280,9 @@ local function refreshAttune(pf, f, me)
         p.heroes:SetText(#on > 0 and L.ATT_ON_IT:format(table.concat(on, ", ")) or "")
         p.heroes:ClearAllPoints(); p.heroes:SetPoint("TOPLEFT", p.title, "BOTTOMLEFT", 0, -2)
         local h = math.max(24, p.title:GetStringHeight() + (#on > 0 and p.heroes:GetStringHeight() + 4 or 0) + 4)
+          + 2 * ATT_PAD
         p:SetHeight(h)
-        r:Place(p, h, 4)
+        r:Place(p, h, ATT_GAP)
       end
     end
   end
@@ -279,19 +294,151 @@ local function refreshAttune(pf, f, me)
   pf.aArt:Fit(r.y)
 end
 
+-- The Dungeon quests tab (U213, the owner, 15 Nov 2026): the dungeon quest log, Under way on the left page and Open
+-- now on the right (QL:Log). A short row each: the quest, its dungeon and chapter, your next step and where it starts.
+-- A click opens it on its Dungeon page, the one home of a dungeon's quests (U141); the pin shows it on the map.
+local function logButton(parent, width)
+  local r = CreateFrame("Button", nil, parent)
+  r:SetWidth(width)
+  local hl = r:CreateTexture(nil, "HIGHLIGHT")
+  hl:SetPoint("TOPLEFT", -4, 3); hl:SetPoint("BOTTOMRIGHT", 4, -3); hl:SetColorTexture(1, 0.9, 0.6, 0.12)
+  r.icon = r:CreateTexture(nil, "ARTWORK")
+  r.icon:SetSize(14, 14); r.icon:SetPoint("TOPLEFT", 0, -1)
+  r.title = UI.WrapText(r, 13, "ink", width - 50, "title")
+  r.title:SetPoint("TOPLEFT", 20, 0)
+  r.next = UI.WrapText(r, 11, "ink2", width - 50)
+  r.next:SetPoint("TOPLEFT", r.title, "BOTTOMLEFT", 0, -2)
+  ns.DungeonPage.NewPin(r)
+  r:SetScript("OnClick", function() -- (the side panel would cover the Dungeon page)
+    if r.key then ns.Window:HidePanels(); ns.DungeonPage:Open(r.key, r.id) end
+  end)
+  UI.Tooltip(r, L.DQL_ROW_TIP)
+  return r
+end
+
+-- A dungeon's heading over its rows (U230: its name and chapter were on every row); a click opens its Dungeon page.
+local function logHead(parent, width)
+  local b = CreateFrame("Button", nil, parent)
+  b:SetSize(width, 18)
+  local hl = b:CreateTexture(nil, "HIGHLIGHT")
+  hl:SetPoint("TOPLEFT", -4, 2); hl:SetPoint("BOTTOMRIGHT", 4, -2); hl:SetColorTexture(1, 0.9, 0.6, 0.12)
+  b.text = UI.Text(b, 12, "accent", "title")
+  b.text:SetPoint("LEFT")
+  b:SetScript("OnClick", function() if b.key then ns.Window:HidePanels(); ns.DungeonPage:Open(b.key) end end)
+  UI.Tooltip(b, L.DQL_HEAD_TIP)
+  return b
+end
+
+-- One part of the log in c (1: Under way, 2: Open now): its heading, its empty line, its dungeons' headings and rows.
+local function newPart(c, width, i)
+  local part = { head = UI.SectionHeader(c, width), none = UI.SketchLine(c, width, "EmptyQuests"),
+    rows = UI.Pool(function() return logButton(c, width) end), heads = UI.Pool(function() return logHead(c, width) end) }
+  part.head:SetHelp(i == 1 and L.DQL_UNDER_HELP or L.DQL_OPEN_HELP)
+  return part
+end
+
+local function buildLog(pf, width)
+  pf.log = {}
+  for i, side in ipairs({ pf.left, pf.right }) do
+    local sc = UI.Scroll(side)
+    if i == 1 then sc:SetPoint("TOPLEFT", 0, -34); sc:SetPoint("BOTTOMRIGHT") else sc:SetAllPoints() end
+    pf.log[i] = newPart(sc.child, width, i)
+    pf.log[i].scroll = sc
+  end
+end
+
+-- A log row's next line: the next step and where it starts, or what is left.
+local function nextLine(QL, row)
+  local q = row.q
+  if row.what == "step" then
+    local n = #q.steps
+    local where = row.step.status == "log" and L.DQ_IN_LOG or QL.WhereText(row.step.start)
+    return L.DQL_STEP:format(n > 1 and L.DG_STEP_OF:format(row.k, n) or L.DQL_FIRST, row.step.name, where)
+  end
+  if row.what == "pick" then return L.DQL_PICK:format(QL.WhereText(q.start)) end
+  return row.what == "log" and L.DQL_IN_LOG or L.DQL_RUN
+end
+
+-- Places part i of the log, with its rows (list), on the stack s.
+local function placePart(s, part, i, list)
+  local QL, J = ns.QuestLists, ns.Journey
+  part.head:SetText((i == 1 and L.DQL_UNDER or L.DQL_OPEN) .. (#list > 0 and ("  ·  " .. #list) or ""))
+  s:Place(part.head, 29, 6)
+  part.none:SetShown(#list == 0)
+  if #list == 0 then
+    part.none:SetText(i == 1 and L.DQL_UNDER_NONE or L.DQL_OPEN_NONE)
+    s:Place(part.none, part.none.h, 8)
+  end
+  local n, nh, last = 0, 0, nil
+  for _, row in ipairs(list) do
+    local r = part.rows:Get(n + 1)
+    if not r then break end
+    -- (The log comes in the journey's order: a dungeon's rows follow each other.)
+    if row.key ~= last then
+      local hd = part.heads:Get(nh + 1)
+      if not hd then break end
+      nh, last = nh + 1, row.key
+      local d = ns.Dungeon(row.key)
+      hd.key = row.key
+      hd.text:SetText((d and d[2] or row.key) .. "  ·  " .. L.CHAPTER_ROMAN:format(J.Roman(row.n)))
+      if nh > 1 then s:Skip(4) end
+      s:Place(hd, 18, 4)
+    end
+    n = n + 1
+    local q = row.q
+    r.id, r.key, r.qname = q.id, row.key, q.name
+    r.icon:SetTexture((QL.STATUS[row.status] or QL.STATUS.no)[1])
+    r.title:SetText(q.name)
+    r.next:SetText(nextLine(QL, row))
+    ns.DungeonPage.SetPin(r, q)
+    local h = math.max(24, r.title:GetStringHeight() + r.next:GetStringHeight() + 4)
+    r:SetHeight(h)
+    s:Place(r, h, 10)
+  end
+  part.rows:HideFrom(n + 1)
+  part.heads:HideFrom(nh + 1)
+end
+
+local function refreshLog(pf, f, me)
+  local log = ns.QuestLists:Log(f, me)
+  for i, list in ipairs({ log.under, log.open }) do
+    local part = pf.log[i]
+    local s = UI.Stack(part.scroll.child)
+    placePart(s, part, i, list)
+    part.scroll:SetContentHeight(s.y + 8)
+  end
+end
+
+-- The Overview's side panel (U215, the owner, 15 Nov 2026: "kinda like a 'right side' menu on the overview page"):
+-- the same log, Under way above Open now. (Registered once loaded: Window.lua loads after this file; the window is
+-- built at login.)
+ns:On("DB_READY", function() ns.Window:RegisterPanel("dquests", { title = L.TAB_DQUESTS, icon = "dungeons",
+  build = function(p) p.parts = { newPart(p.body, p.width, 1), newPart(p.body, p.width, 2) } end,
+  refresh = function(p)
+    local ctx = ns.Pages:Context()
+    local log = ctx.f and ns.QuestLists:Log(ctx.f, ctx.me) or { under = {}, open = {} }
+    local s = UI.Stack(p.body)
+    s:Skip(6)
+    placePart(s, p.parts[1], 1, log.under)
+    s:Skip(8)
+    placePart(s, p.parts[2], 2, log.open)
+    p.scroll:SetContentHeight(s.y + 10)
+  end }) end)
+
 local function build(pf)
   local W = ns.Window
   local width = W.PAGE_W - 8
 
-  -- Tabs (U141, the rebuild of 9 Nov 2026): Shared quests · Quest chains · Attunements & keys, with icons (U102). A
-  -- dungeon's quests are on its Dungeon page (the Dungeon quests tab is gone).
+  -- Tabs (U141, the rebuild of 9 Nov 2026): Shared quests · Quest chains · Dungeon quests · Attunements & keys, with
+  -- icons (U102). A dungeon's quests are on its Dungeon page; the Dungeon quests tab is their log, a row each linking
+  -- there (U213).
   pf.tab = "quests"
   pf.tabs = UI.Tabs(pf.left, { { L.TAB_QUESTS, "quests", "quests" },
-    { L.TAB_CHAINS, "chains", "chapter" }, { L.TAB_ATTUNE, "attune", "toast_attune" } },
+    { L.TAB_CHAINS, "chains", "chapter" }, { L.TAB_DQUESTS, "dungeons", "dungeons" }, { L.TAB_ATTUNE, "attune", "toast_attune" } },
     function() return pf.tab end, function(v) pf.tab = v; pf.sel = nil; W:Refresh() end, width,
     function(v)
       local f = ns.Fellowship:Current()
-      if not f or v == "attune" then return nil end
+      if not f or v == "attune" or v == "dungeons" then return nil end
       local n = 0
       for _, x in ipairs(Q:Items(f)) do
         if (v == "chains") == (x.chain == true) and (x.together or x.join) and not Q.Finished(x, ns.Me()) then n = n + 1 end
@@ -430,6 +577,7 @@ local function build(pf)
   UI.Tooltip(pf.listen, L.LISTEN_TIP)
   pf.shareWhy = UI.WrapText(R, 12, "ink2", width)
   buildAttune(pf, width)
+  buildLog(pf, width)
 end
 
 -- Quests tab: quests near this chapter's levels first (from 3 below the floor to 3 over the cap; unknown levels too).
@@ -463,11 +611,16 @@ local function refresh(pf, ctx)
   local width = ns.Window.PAGE_W - 8
   local me = ctx.me
   pf.tabs:Refresh()
-  local attune = pf.tab == "attune"
-  pf.lscroll:SetShown(not attune); pf.rscroll:SetShown(not attune)
+  local attune, log = pf.tab == "attune", pf.tab == "dungeons"
+  pf.lscroll:SetShown(not attune and not log); pf.rscroll:SetShown(not attune and not log)
   pf.alscroll:SetShown(attune); pf.arscroll:SetShown(attune)
+  pf.log[1].scroll:SetShown(log); pf.log[2].scroll:SetShown(log)
   if attune then
     refreshAttune(pf, f, me)
+    return
+  end
+  if log then
+    refreshLog(pf, f, me)
     return
   end
   -- The items of this tab: chains, or single quests (near this chapter's levels unless Show all). Only what is about

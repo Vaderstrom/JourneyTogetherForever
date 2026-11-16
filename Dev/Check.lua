@@ -4,9 +4,10 @@
 -- by feature area (Dev/Areas.lua) with the screenshot files, and writes review/index.html to look through them.
 --   /jtf check                  everything: all checks, all screenshots, then on an Alliance character the README's
 --                               pictures (/jtf brand) in the same run (about 12 minutes)
---   /jtf check setup join       all checks, then only those areas' screenshots (to look again after a fix)
+--   /jtf check setup join       the checks and screenshots up to those areas' last ones, only theirs photographed
+--                               (to look again after a fix; U209)
 --   /jtf check models           an area that stands alone (Dev/Areas.lua): only its checks and screenshots
---   /jtf check quick            checks only, no screenshots (about a minute)
+--   /jtf check quick            checks only, no screenshots (about 3 minutes)
 --   /jtf check shots [areas]    screenshots only (all, or those areas; all of them also takes the README's pictures)
 --   /jtf check areas            the areas, with how many checks and screenshots each has
 local _, ns = ...
@@ -67,7 +68,8 @@ function C:Run(text)
   -- They are taken on an Alliance character only (TR:Brand).
   local brand = shots and not areas and UnitFactionGroup("player") == "Alliance"
   ns.db.check.brand = brand or nil
-  ns:Print(L.CHECK_START:format(selftest and L.CHECK_WITH_SELFTEST or "", count,
+  local which = only and L.CHECK_WITH_SELFTEST_ONLY or areas and L.CHECK_WITH_SELFTEST_TO or L.CHECK_WITH_SELFTEST
+  ns:Print(L.CHECK_START:format(selftest and which or "", count,
     #list > 0 and table.concat(list, ", ") or L.CHECK_ALL_AREAS, brand and L.CHECK_WITH_BRAND:format(#ns.Tour.BRAND) or ""), true)
   local function tour()
     if not shots then return C:Finish() end
@@ -77,5 +79,5 @@ function C:Run(text)
       C_Timer.After(2, function() ns.Tour:Brand(function() C:Finish() end) end)
     end })
   end
-  if selftest then ns.SelfTest:Run("", { only = only, onDone = tour }) else tour() end
+  if selftest then ns.SelfTest:Run("", { only = only, areas = areas, onDone = tour }) else tour() end
 end

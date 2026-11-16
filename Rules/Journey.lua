@@ -161,7 +161,7 @@ end
 
 -- The furthest chapter the fellowship has reached. Every chapter before it stays complete, also when a Hero joins
 -- or comes back from away (decided after the in-game self-test): newcomers catch up on their own. Only the leader's
--- Undo clear takes the fellowship back (J:Reopen).
+-- Undo clear and Journey Admin's Back to this chapter (U231) take the fellowship back (J:Reopen).
 function J:Reached(f) return math.max(1, tonumber(f.reached) or 1) end
 
 -- The earlier chapter a dungeon's clear holds complete: it is needed in a chapter before the current one. nil when
@@ -180,24 +180,35 @@ function J:Reopen(f, n)
   f.reopenV = f.v + 1
 end
 
--- The chapter's own goal: its required dungeons cleared, or without them every counted Hero at the cap.
+-- How many counted Heroes (not those catching up) have reached chapter ch's cap, and of how many.
+function J:AtCap(f, ch)
+  local counted, there = self:Pacing(f), 0
+  for _, name in ipairs(counted) do if level(f, name) >= ch.cap then there = there + 1 end end
+  return there, #counted
+end
+
+-- The chapter's own goal: its required dungeons cleared, or without them (the Prologue) every counted Hero at the cap;
+-- with Everyone to the cap first both (U226, the owner, 15 Nov 2026: "kinda like the first chapter").
 function J:GoalDone(f, n)
   local ch = f.journey.chapters[n]
   if not ch then return true end
   local req = self:Required(f, n)
-  if #req > 0 then
-    for _, x in ipairs(req) do if not self:Cleared(f, x.key) then return false end end
-    return true
-  end
-  local counted = self:Pacing(f)
-  if #counted == 0 then return false end
-  for _, name in ipairs(counted) do if level(f, name) < ch.cap then return false end end
-  return true
+  for _, x in ipairs(req) do if not self:Cleared(f, x.key) then return false end end
+  if not self:CapHolds(f, n, req) then return true end
+  local there, of = self:AtCap(f, ch)
+  return of > 0 and there == of
 end
+-- The cap holds chapter n: Everyone to the cap first, or no Required dungeons. req: J:Required(f, n) when known.
+function J:CapHolds(f, n, req) return f.rules.capFirst or #(req or self:Required(f, n)) == 0 end
 
 -- Complete: reached past it, or its goal and its Required milestones (Rules/Milestones.lua) are done.
 function J:Done(f, n)
   if n < self:Reached(f) then return true end
+  return self:Complete(f, n)
+end
+-- Chapter n complete on its own (its goal and Required milestones), whatever was reached: Back to this chapter (U231)
+-- is greyed while it is, since the chapter would complete again at once.
+function J:Complete(f, n)
   if not f.journey.chapters[n] then return true end
   return self:GoalDone(f, n) and #ns.Milestones:OpenRequired(f, n) == 0
 end
@@ -330,13 +341,14 @@ function J:Banner(f, n)
     local text = #open == 1 and L.BN_MILESTONES_TEXT_1:format(open[1].name) or L.BN_MILESTONES_TEXT_N:format(#open, open[1].name)
     return { icon = "open", title = L.BN_MILESTONES, text = text, color = "2E5E9A", step = L.STEP_MILESTONES, stage = "milestones" }
   end
-  if #req == 0 then
-    local counted, there = self:Pacing(f), 0
-    for _, name in ipairs(counted) do if level(f, name) >= ch.cap then there = there + 1 end end
-    return { icon = "level", title = L.BN_LEVEL, text = L.BN_LEVEL_TEXT:format(ch.cap, there, #counted), color = "2E5E9A", step = L.STEP_2_LEVEL, stage = "level" }
-  end
   local left = {}
   for _, x in ipairs(req) do if not self:Cleared(f, x.key) then left[#left + 1] = x end end
+  -- No dungeons (the Prologue), or all cleared while Everyone to the cap first holds the chapter (U226).
+  if #left == 0 then
+    local there, of = self:AtCap(f, ch)
+    return { icon = "level", title = L.BN_LEVEL, text = (#req == 0 and L.BN_LEVEL_TEXT or L.BN_CAPFIRST_TEXT):format(ch.cap, there, of),
+      color = "2E5E9A", step = #req == 0 and L.STEP_2_LEVEL or nil, stage = "level" }
+  end
   local text = L.BN_OPEN_TEXT:format(#req - #left, #req) .. (#left > 0 and L.BN_OPEN_NEXT:format(left[1].d[2]) or "")
   return { icon = "open", title = L.BN_OPEN, text = text, color = "2E7A3E", step = L.STEP_2_RUN, stage = "run" }
 end
@@ -349,8 +361,12 @@ function J:Stages(f, n)
   if not ch then return {}, self:Banner(f, n) end
   local b = self:Banner(f, n)
   local hasDungeons = #self:Required(f, n) > 0
-  local nodes = { { key = "floor", label = L.STAGE_FLOOR:format(self:FloorLevel(f, ch)) },
-    { key = hasDungeons and "run" or "level", label = hasDungeons and L.STAGE_RUN or L.STAGE_LEVEL:format(ch.cap) } }
+  local nodes, fl = {}, self:FloorLevel(f, ch)
+  -- (A floor of level 1, the Prologue's, is always reached: no stage for it, U236.)
+  if fl > 1 then nodes[1] = { key = "floor", label = L.STAGE_FLOOR:format(fl) } end
+  nodes[#nodes + 1] = { key = hasDungeons and "run" or "level", label = hasDungeons and L.STAGE_RUN or L.STAGE_LEVEL:format(ch.cap) }
+  -- Everyone to the cap first (U226): levelling to the cap after the dungeons, as in the Prologue.
+  if hasDungeons and f.rules.capFirst then nodes[#nodes + 1] = { key = "level", label = L.STAGE_LEVEL:format(ch.cap) } end
   for _, m in ipairs(ns.Milestones:List(f, n)) do
     if m.req then nodes[#nodes + 1] = { key = "milestones", label = L.STAGE_MILESTONES }; break end
   end

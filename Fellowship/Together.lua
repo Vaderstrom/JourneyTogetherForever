@@ -193,7 +193,7 @@ local function plural(n, one, many) return n == 1 and L[one] or L[many]:format(n
 -- quests to get first), or wait (the chapter waits for the floor), and a short line for where the line does not fit
 -- beside Find group (the check of 10 Nov 2026, 22:46: "Nothing to get first: its 4 quests start i...").
 -- waiting: x's chapter is yours and waits for the floor. Its dungeons the game has opened then say what to get ready
--- meanwhile, dimmed and without a button; the waiting box above says what it waits for (the check of 11 Nov 2026,
+-- meanwhile, dimmed and without a button; the floor line above says what it waits for (the check of 11 Nov 2026,
 -- 23:49).
 local function dungeonLine(f, x, st, fl, waiting)
   if st == "cleared" then return L.STATE_CLEARED end
@@ -237,9 +237,10 @@ local function dungeonLine(f, x, st, fl, waiting)
 end
 
 -- Your To do for chapter n, in order: the new Leader's first steps (the current chapter only), reach the floor, the
--- chapter's dungeons (the suggested order) and its Required milestones, steps for later dungeons still open (U136),
--- and under If you like the next chapter's dungeons that may be run now and the Optional milestones. Each item
--- { kind = "start" | "floor" | "dungeon" | "milestone" | "later" | "early", text or line, done }; a dungeon or early
+-- chapter's dungeons (the suggested order), the cap when it holds the chapter (U227) and its Required milestones, steps
+-- for later dungeons still open (U136), and under If you like the next chapter's dungeons that may be run now and the
+-- Optional milestones. Each item
+-- { kind = "start" | "floor" | "dungeon" | "cap" | "milestone" | "later" | "early", text or line, done }; a dungeon or early
 -- one also has x, state, action ("find" | "ready") and wait; a milestone m and req; a later one e (QL:Later's entry).
 -- noLater: without the steps for later dungeons (they cost the most; Focus now asks for them last).
 function T:ToDo(f, n, noLater)
@@ -251,14 +252,32 @@ function T:ToDo(f, n, noLater)
     for _, st in ipairs(self:Started(f) or {}) do items[#items + 1] = { kind = "start", text = st.text, done = st.done, page = st.page } end
   end
   local fl, lvl = J:FloorLevel(f, ch), Hr:Level(f, me)
-  -- (A Friend of the fellowship never counts for the floor, SPEC §1.1.)
-  if not F:IsFriend(f, me) then items[#items + 1] = { kind = "floor", text = L.TODO_FLOOR:format(fl), done = lvl >= fl } end
+  -- (A Friend of the fellowship never counts for the floor, SPEC §1.1; a floor of level 1, the Prologue's, is always
+  -- reached: no line for it, U236.)
+  if fl > 1 and not F:IsFriend(f, me) then
+    local it = { kind = "floor", text = L.TODO_FLOOR:format(fl), done = lvl >= fl }
+    -- Your estimate on the line in the current chapter (U232: the waiting box that said it went).
+    if now and not it.done then
+      local h = Hr:Get(f, me) or {}
+      local _, sec = ns.Pace.ToLevel(lvl, h.xp, h.xpMax, fl, h.pace)
+      -- (short: where the line does not fit; the whole line on hover then.)
+      if sec then it.short, it.text = it.text, L.TODO_FLOOR_ETA:format(fl, ns.TimeLeft(sec)) end
+    end
+    items[#items + 1] = it
+  end
   for _, x in ipairs(J:ChapterList(f, n)) do
     local st = J:DungeonState(f, n, x)
     local line, action, wait, short = dungeonLine(f, x, st, fl, now and not J:Unlocked(f))
     local it = { kind = x.early and "early" or "dungeon", x = x, state = st, line = line, action = action, wait = wait,
       short = short, done = st == "cleared", you = J:ClearedBy(f, x.key)[me] ~= nil }
     if x.early then early[#early + 1] = it else items[#items + 1] = it end
+  end
+  -- The cap, whenever it holds the chapter (U227): Everyone to the cap first, or no Required dungeons (J:GoalDone).
+  -- How many are there only in the current chapter (today's levels say nothing of a chapter already complete).
+  if not F:IsFriend(f, me) and J:CapHolds(f, n) then
+    local there, of = J:AtCap(f, ch)
+    items[#items + 1] = { kind = "cap", done = lvl >= ch.cap,
+      text = now and of > 1 and L.TODO_CAP_N:format(ch.cap, there, of) or L.TODO_CAP:format(ch.cap) }
   end
   -- The milestones (SPEC §2; the owner, 9 Nov 2026): Required ones hold the chapter, Optional ones are goals.
   for _, m in ipairs(ns.Milestones:List(f, n)) do
@@ -285,7 +304,8 @@ end
 
 -- Focus now: the one thing to do now, the first open item of your chapter's To do, picked in Play now's order when
 -- others are online (SPEC §4.4, §6). { head, why, button = { kind = "page" | "find" | "invite" | "ready", page, key,
--- names }, link = { page or key (a Dungeon page), text } }; the tracker shows head.
+-- names }, link = { page or key (a Dungeon page), text }, namesBelow = true when it names everyone below the floor (the
+-- Overview's strip then says nothing of the floor, U239) }; the tracker shows head.
 function T:Focus(f)
   local ch = J:Current(f)
   if not ch then return { head = L.FOCUS_RAIDS, why = L.FOCUS_RAIDS_WHY, button = { kind = "page", page = "raids" } } end
@@ -308,10 +328,10 @@ function T:Focus(f)
     for _, name in ipairs(below) do if name ~= me then others[#others + 1] = name end end
     local why = self.HowFar(f, me, J:FloorLevel(f, ch), true)
     if #others > 0 then why = why .. " " .. L.FOCUS_SAME_SPOT:format(ns.Quests.NameList(others)) end
-    return { head = L.FOCUS_FLOOR:format(J:FloorLevel(f, ch)), why = why, button = invite, link = chapter }
+    return { head = L.FOCUS_FLOOR:format(J:FloorLevel(f, ch)), why = why, button = invite, link = chapter, namesBelow = true }
   end
   if p and p.kind == "help" then
-    return { head = L.FOCUS_HELP:format(ns.Short(p.who)), why = L.FOCUS_HELP_WHY, button = invite, link = chapter }
+    return { head = L.FOCUS_HELP:format(ns.Short(p.who)), why = L.FOCUS_HELP_WHY, button = invite, link = chapter, namesBelow = #below == 1 }
   end
   -- Play now's dungeon, else the first you still need (as Recommended next), else the first one you cleared.
   local pick
@@ -340,42 +360,42 @@ function T:Focus(f)
       button = { kind = "ready", key = e.x.key }, link = page(e.x) }
   end
   if #below > 0 then
-    return { head = L.FOCUS_WAITING, why = L.NEXT_WAITING:format(J.Names(f, below, true), J:FloorLevel(f, ch)), button = invite, link = chapter }
+    return { head = L.FOCUS_WAITING, why = L.NEXT_WAITING:format(J.Names(f, below, true), J:FloorLevel(f, ch)), button = invite, link = chapter,
+      namesBelow = true }
   end
   if p then return { head = L.FOCUS_TOGETHER, why = p.text, button = invite } end
-  if Hr:Level(f, me) < ch.cap then return { head = L.FOCUS_LEVEL:format(ch.cap), why = L.FOCUS_LEVEL_WHY, link = chapter } end
+  if Hr:Level(f, me) < ch.cap then
+    -- (A chapter without dungeons, the Prologue's, says so: "dungeons are done" there, the check of 16 Nov 2026.)
+    local why = #J:Required(f, ch.n) == 0 and L.CH_NO_DUNGEONS_PIC:format(ch.cap) or L.FOCUS_LEVEL_WHY
+    return { head = L.FOCUS_LEVEL:format(ch.cap), why = why, link = chapter }
+  end
   return { head = L.FOCUS_DONE, why = L.FOCUS_DONE_WHY, link = chapter }
 end
 
--- The tracker's Prequest line (U124): the next step of a chain for your chapter's dungeons (not cleared) or a later
--- dungeon's, once your level reaches it and it is not in your log yet. { text, key } or nil.
-function T:StartEarly(f)
-  local QL = ns.QuestLists
-  local cur, me = J:CurrentIndex(f), ns.Me()
-  local lvl = Hr:Level(f, me)
-  local keys = {}
-  for _, x in ipairs(J:ChapterList(f, cur)) do
-    if not x.early and not J:Cleared(f, x.key) then keys[#keys + 1] = x.key end
-  end
-  for _, e in ipairs(QL:Later(f, cur)) do keys[#keys + 1] = e.x.key end
-  for _, key in ipairs(keys) do
-    local g = QL:Groups(f, key, me)
-    for _, q in ipairs(g and g.earlier or {}) do
-      -- (The dungeon quest already in your log or done: nothing to start, as Who is ready counts it.)
-      for _, s in ipairs(q.status == "no" and q.steps or {}) do
-        if s.status ~= "done" then
-          -- The chain's next step: open now and not picked up yet, or nothing to say for this chain.
-          if s.status == "no" and s.lvl and s.lvl <= lvl then
-            local st = s.start or {}
-            local where = st.by and st.zone and L.TRACK_BY_IN:format(st.by, st.zone) or st.by or st.zone
-            return { text = L.TRACK_EARLY:format(s.name .. (where and (", " .. where) or "")), key = key }
-          end
-          break
-        end
-      end
+-- The tracker's For the journey (U217, the owner, 15 Nov 2026; it was one Prequest line, U124): up to three things to
+-- do next, in the dungeon quest log's order (U213): your dungeon quests under way, then this chapter's next quest
+-- milestone you have not done (one: chapter III has three, which left no line for the dungeons), then the dungeon
+-- quests open now. { text, key, id }; a goal has no key.
+T.FOR_JOURNEY = 3
+function T:ForJourney(f)
+  local QL, M, me = ns.QuestLists, ns.Milestones, ns.Me()
+  local log, out = QL:Log(f, me), {}
+  local function add(text, key, id) if #out < self.FOR_JOURNEY then out[#out + 1] = { text = text, key = key, id = id } end end
+  local function line(r)
+    local q = r.q
+    if r.what == "step" then
+      return L.TRACK_J_STEP:format(r.step.name, r.step.status == "log" and L.TRACK_J_IN_LOG or QL.WhereText(r.step.start))
     end
+    if r.what == "pick" then return L.TRACK_J_PICK:format(q.name, QL.WhereText(q.start)) end
+    local d = ns.Dungeon(r.key)
+    return L.TRACK_J_RUN:format(q.name, d and d[2] or r.key)
   end
-  return nil
+  for _, r in ipairs(log.under) do add(line(r), r.key, r.q.id) end
+  for _, m in ipairs(M:List(f, J:CurrentIndex(f))) do
+    if m.kind == "quest" and not M:HeroDone(f, m, me) then add(L.TRACK_J_GOAL:format(m.name)); break end
+  end
+  for _, r in ipairs(log.open) do add(line(r), r.key, r.q.id) end
+  return out
 end
 
 -- Does what Focus now's button says.

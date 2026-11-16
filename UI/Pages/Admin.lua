@@ -295,6 +295,22 @@ local function build(pf)
     return c
   end)
   pf.msAdd = UI.TextButton(R, L.MS_ADD, function() local f = cur(); if f then A:MilestoneForm(f) end end, "plain")
+  -- Back to this chapter (U231, the owner, 16 Nov 2026: "Is there a way for the leader/admin backtrack"; picked
+  -- "Journey Admin"): on a chapter before the current one; greyed, with the reason under it, while a draft waits or
+  -- when that chapter would complete again at once.
+  pf.back = UI.TextButton(R, L.ADMIN_BACK, function()
+    local f, n = cur(), A.sel
+    local ch = f and f.journey.chapters[n]
+    if not ch then return end
+    W:Confirm(L.ADMIN_BACK_CONFIRM:format(ns.Journey.Roman(n), ch.name), L.ADMIN_BACK_GO, function() F:Do({ k = "back", n = n }) end)
+  end, "plain")
+  pf.backWhy = UI.WrapText(R, 12, "ink2", width, "book")
+  -- Why Back to this chapter is greyed for chapter n, or nil.
+  function pf.backBlocked(f, n)
+    if A.jd then return L.ADMIN_BACK_DRAFT end
+    local J = ns.Journey
+    if J:Complete(f, n) then return L.ADMIN_BACK_DONE:format(J.Roman(n), J.Roman(n + 1)) end
+  end
   function pf.placeMilestones(r)
     local f = cur()
     local ch = f and A:Journey(f).chapters[A.sel]
@@ -316,6 +332,14 @@ local function build(pf)
     pf.msNone:SetShown(#ms == 0)
     if #ms == 0 then r:Place(pf.msNone, pf.msNone:GetStringHeight(), 6) end
     r:Place(pf.msAdd, 28, 16)
+    local earlier = A.sel < ns.Journey:CurrentIndex(f) and f.journey.chapters[A.sel] ~= nil
+    local why = earlier and pf.backBlocked(f, A.sel)
+    pf.back:SetShown(earlier); pf.backWhy:SetShown(why and true or false)
+    if earlier then
+      pf.back:SetEnabled(not why)
+      r:Place(pf.back, 28, why and 4 or 16)
+      if why then pf.backWhy:SetText(why); r:Place(pf.backWhy, pf.backWhy:GetStringHeight(), 16) end
+    end
   end
 
   -- Export, in Whole journey: the journey as a string to copy.

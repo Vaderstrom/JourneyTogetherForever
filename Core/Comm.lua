@@ -250,6 +250,7 @@ function C:DropFor(target)
   for i = #self.queue, 1, -1 do if self.queue[i].target == target then table.remove(self.queue, i) end end
 end
 
+local function withStack(e) return debugstack and (tostring(e) .. "\n" .. debugstack(2, 12, 0)) or e end
 function C:Receive(prefix, msg, channel, sender)
   -- During a lockdown the game hides incoming text and sender (secret values): such a message cannot be read.
   -- (Invites are sent again until their receipt arrives, see Fellowship/Sync.lua.)
@@ -291,7 +292,15 @@ function C:Receive(prefix, msg, channel, sender)
     self.packs[sender] = tonumber(data.z) == 1 and C.Z == 1 or nil
   end
   local fn = self.handlers[tag]
-  if fn then fn(sender, data) end
+  if not fn then return end
+  -- While it is handled the book and the tracker draw its news once a second, not at once (Comm.receiving). Put back
+  -- as it was also when the handler fails (your own clicks then waited until the next message) or when a lab message
+  -- is handled inside another; the error goes on with its stack, and the event's handler reports it (Core/Init.lua).
+  local was = self.receiving
+  self.receiving = true
+  local done, err = xpcall(function() fn(sender, data) end, withStack)
+  self.receiving = was
+  if not done then error(err, 0) end
 end
 
 -- /jtf debug: a pretend Hero's message goes through the same path as a real one.

@@ -14,7 +14,8 @@ function C:Reset()
   -- The banner starts in the side's colour: Alliance blue, Horde crimson (a Horde fellowship started blue; seen in game).
   local horde = ns.Theme:Horde()
   self.step, self.name, self.color, self.emblem, self.role, self.preset = 1, "", ns.BANNERS[horde and 2 or 1][2], ns.Emblems:First(), "DPS", ns.Rules.Suggest("party")[2]
-  self.rules = ns.Rules.New()
+  -- (The suggested style's rules, so Everyone to the cap first comes with Together, U226.)
+  self.rules = ns.Rules.WithStyle(ns.Rules.New(), ns.Rules.Suggest("party")[1])
   self.size = "party"
   self.fine = false -- step 2: the full rules form instead of the styles
   -- "Your own journey" (28 Oct 2026): shaped here, in a Chapters step after the journey (the journey editor).
@@ -259,6 +260,7 @@ function C:Review()
   local rows = {
     { L.REVIEW_K_FLOOR, r.floorTol > 0 and L.REVIEW_SLACK_FLOOR:format(r.floorTol) or L.REVIEW_SLACK_NONE },
     { L.REVIEW_K_CAP, r.capTol > 0 and L.REVIEW_CAP:format(r.capTol) or L.REVIEW_CAP_NONE },
+    { L.REVIEW_K_CAPFIRST, r.capFirst and L.ON or L.OFF },
     { L.REVIEW_K_RUNXP, runs },
     { L.REVIEW_K_RUN, L.REVIEW_RUN_V:format(r.minHeroes) },
     { L.REVIEW_K_CLEAR, clear },

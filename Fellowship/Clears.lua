@@ -622,8 +622,7 @@ function C:ApplyOp(f, op, by, t)
   end
   if not was and J:Cleared(f, key) then self:ClearedToast(f, key) end
   if back and not J:Cleared(f, key) then
-    J:Reopen(f, back)
-    F:Log(f, L.CHR_REOPENED:format(ns.Journey.Roman(back), f.journey.chapters[back].name), t, "reopened", by)
+    F:Reopen(f, back, t, by)
   end
   return true
 end

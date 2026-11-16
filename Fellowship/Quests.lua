@@ -29,13 +29,19 @@ function Q:AddLink(a, b)
   if not a or not b or a == b then return end
   local d = db()
   local cur = d.questLinks[a]
-  if not cur then d.questLinks[a] = b return end
+  if not cur then d.questLinks[a] = b; self:Stale() return end
   if cur == b then return end
   local alts = d.questAlts[a] or {}
   for _, x in ipairs(alts) do if x == b then return end end
-  if #alts < 4 then alts[#alts + 1] = b end
+  if #alts < 4 then alts[#alts + 1] = b; self:Stale() end
   d.questAlts[a] = alts
 end
+
+-- Links() and Chains() are remembered until a link, a title or Questie's links change (Q:Stale): with Questie's
+-- thousands of links every look walked them all again (the owner, 15 Nov 2026: "I don't want this addon to cause any
+-- stuttering"). Callers only read what they get. (A test that edits the shipped chains calls Q:Stale itself.)
+Q.rev = 0
+function Q:Stale() self.rev = self.rev + 1 end
 
 -- Every chain link the addon knows, from four sources (docs/QUEST-CHAINS.md), weakest first:
 --   Questie's database when the player has Questie (read at run time only: never saved, shared or harvested),
@@ -43,6 +49,8 @@ end
 -- Returns links[a] = b and alts[a] = { other next quests }.
 function Q:Links()
   local d, ship = db(), ns.QUEST_CHAINS or {}
+  local m = self.linksMemo
+  if m and m.rev == self.rev then return m.links, m.alts end
   local links, alts = {}, {}
   for a, b in pairs(self.questie or {}) do links[a] = b end
   for a, b in pairs(ship.links or {}) do links[a] = b end
@@ -53,6 +61,7 @@ function Q:Links()
       for _, b in ipairs(list) do if b ~= links[a] then alts[a][#alts[a] + 1] = b end end
     end
   end
+  self.linksMemo = { rev = self.rev, links = links, alts = alts }
   return links, alts
 end
 
@@ -65,7 +74,8 @@ local function gameTitle(id)
   if not (QL and QL.GetTitleForQuestID) then return nil end
   local ok, t = pcall(QL.GetTitleForQuestID, id)
   if ok and type(t) == "string" and not secret(t) and t ~= "" then -- (secret first: no comparing a secret value)
-    db().questTitles[id] = t
+    local d = db()
+    if d.questTitles[id] ~= t then d.questTitles[id] = t; Q:Stale() end -- (the chains go by title: walked again)
     return t
   end
   if QL.RequestLoadQuestByID and not Q.titleAsked[id] then
@@ -146,7 +156,7 @@ end
 local function questieDB()
   if Q.qdb then return Q.qdb end
   local m = Q.QuestieModule("QuestieDB")
-  if m and m.QueryQuestSingle then Q.qdb = m end
+  if m and m.QueryQuestSingle then Q.qdb = m; Q:Stale() end -- (its names join the chains' titles)
   return Q.qdb
 end
 Q.QuestieDB = questieDB
@@ -184,10 +194,11 @@ function Q:FromQuestie(ids)
       if not nxt or nxt == 0 or self.questie[cur] then break end
       self.questie[cur] = nxt
       cur, n = nxt, n + 1
+      self:Stale()
     end
     local pre = ask(id, "preQuestSingle")
     local prev = type(pre) == "table" and tonumber(pre[1]) or tonumber(pre)
-    if prev and prev ~= 0 and not self.questie[prev] then self.questie[prev] = id end
+    if prev and prev ~= 0 and not self.questie[prev] then self.questie[prev] = id; self:Stale() end
   end
 end
 
@@ -240,7 +251,10 @@ function Q:MyLog()
   end
   -- Remember titles and zones: chain parts are shown by name once a Hero has had them.
   local d = db()
-  for id, q in pairs(out) do d.questTitles[id] = q.t; if q.z ~= "" then d.questZones[id] = q.z end end
+  for id, q in pairs(out) do
+    if d.questTitles[id] ~= q.t then d.questTitles[id] = q.t; self:Stale() end
+    if q.z ~= "" then d.questZones[id] = q.z end
+  end
   -- Chains the game or Questie know for these quests.
   self:FromQuestLines(out)
   self:FromQuestie(out)
@@ -328,8 +342,8 @@ function Q:Store(f, name, d, t)
     local a, b = tonumber(ln[1]), tonumber(ln[2])
     if a and b and a ~= b then
       Q:AddLink(a, b)
-      if type(ln[3]) == "string" then links.questTitles[a] = links.questTitles[a] or ln[3] end
-      if type(ln[4]) == "string" then links.questTitles[b] = links.questTitles[b] or ln[4] end
+      if type(ln[3]) == "string" and not links.questTitles[a] then links.questTitles[a] = ln[3]; Q:Stale() end
+      if type(ln[4]) == "string" and not links.questTitles[b] then links.questTitles[b] = ln[4]; Q:Stale() end
     end
   end
   -- True when the quests handed in or the keys changed (milestones, attunements), or a dungeon quest was picked up or
@@ -400,9 +414,14 @@ end)
 ---------------------------------------------------------------------------
 -- Chains and the list of shared quests
 ---------------------------------------------------------------------------
--- Known chains: { { ids = { questID, ... } } }, each at least two parts, from the first part to the last.
+-- Known chains: { { ids = { questID, ... } } }, each at least two parts, from the first part to the last. Also
+-- index[questID] = the chains (their numbers here) it is a step of, as ChainAt finds it (a variant, or a branch of
+-- the step before), and all[questID] = true for every step.
 function Q:Chains()
-  local links, isTo = self:Links(), {}
+  local m = self.chainsMemo
+  if m and m.rev == self.rev then self.variants = m.variants; return m.chains, m.index, m.all end
+  local links, alts = self:Links()
+  local isTo = {}
   for _, b in pairs(links) do isTo[b] = true end
   local chains = {}
   -- Quests with the same title one after another are one step: the class and race variants of a quest, which the
@@ -429,23 +448,39 @@ function Q:Chains()
     end
   end
   table.sort(chains, function(x, y) return x.ids[1] < y.ids[1] end)
-  return chains
+  local index, all = {}, {}
+  local function add(id, k) local t = index[id] or {}; index[id] = t; t[#t + 1] = k end
+  for k, c in ipairs(chains) do
+    for i, id in ipairs(c.ids) do
+      all[id] = true
+      add(id, k)
+      for _, v in ipairs(self.variants[id] or {}) do add(v, k) end
+      for _, b in ipairs(i > 1 and alts[c.ids[i - 1]] or {}) do add(b, k) end
+    end
+  end
+  self.chainsMemo = { rev = self.rev, chains = chains, variants = self.variants, index = index, all = all }
+  return chains, index, all
 end
 
 -- Where a Hero is in a chain: the part (0-based) in their log, the part after the last one they handed in, or nil.
--- A branch (another next quest) counts as the step it replaces.
-function Q:ChainAt(h, ids)
+-- A branch (another next quest) counts as the step it replaces. alts: Links()'s branches, from a caller that asks
+-- for many (each Links() copies every link: once per chain and Adventurer, it made "script ran too long" on the
+-- tracker, the owner's BugGrabber of 15 Nov 2026).
+-- (No table or function made per look: it runs for every chain and Adventurer, 778 KB of throwaway data a list.)
+local NONE = {}
+local function has(variants, set, ids, i, alts)
+  if not set then return false end
+  if set[ids[i]] then return true end
+  for _, b in ipairs(i > 1 and alts[ids[i - 1]] or NONE) do if set[b] then return true end end
+  for _, b in ipairs(variants and variants[ids[i]] or NONE) do if set[b] then return true end end
+  return false
+end
+function Q:ChainAt(h, ids, alts)
   if not h then return nil end
-  local _, alts = self:Links()
-  local function has(set, i)
-    if not set then return false end
-    if set[ids[i]] then return true end
-    for _, b in ipairs(i > 1 and alts[ids[i - 1]] or {}) do if set[b] then return true end end
-    for _, b in ipairs(self.variants and self.variants[ids[i]] or {}) do if set[b] then return true end end
-    return false
-  end
-  for i = 1, #ids do if has(h.quests, i) then return i - 1 end end
-  for i = #ids, 1, -1 do if has(h.questsDone, i) then return i end end
+  if not alts then alts = select(2, self:Links()) end
+  local v = self.variants
+  for i = 1, #ids do if has(v, h.quests, ids, i, alts) then return i - 1 end end
+  for i = #ids, 1, -1 do if has(v, h.questsDone, ids, i, alts) then return i end end
   return nil
 end
 
@@ -484,11 +519,24 @@ function Q:Items(f)
   local me = ns.Me()
   local heroes = {}
   for name in pairs(f.members) do heroes[name] = f.heroes and f.heroes[name] or nil end
-  local items, inChain = {}, {}
-  for _, c in ipairs(self:Chains()) do
+  local items = {}
+  local _, alts = self:Links()
+  local chains, index, inChain = self:Chains()
+  -- Only the chains someone here has a step of, in the log or handed in (ChainAt is nil for all others): with
+  -- Questie's thousands, every chain for every Adventurer was about 40 ms a look.
+  local on, ks = {}, {}
+  local function mark(set)
+    for id in pairs(set or NONE) do
+      for _, k in ipairs(index[id] or NONE) do if not on[k] then on[k] = true; ks[#ks + 1] = k end end
+    end
+  end
+  for _, h in pairs(heroes) do mark(h.quests); mark(h.questsDone) end
+  table.sort(ks)
+  for _, k in ipairs(ks) do
+    local c = chains[k]
     local at, steps = {}, {}
-    for i, id in ipairs(c.ids) do inChain[id] = true; steps[i] = title(id, heroes[me]) end
-    for name, h in pairs(heroes) do at[name] = self:ChainAt(h, c.ids) end
+    for i, id in ipairs(c.ids) do steps[i] = title(id, heroes[me]) end
+    for name, h in pairs(heroes) do at[name] = self:ChainAt(h, c.ids, alts) end
     if next(at) then
       local others = {}
       for name in pairs(at) do if name ~= me then others[#others + 1] = name end end

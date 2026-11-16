@@ -64,6 +64,18 @@ end
 -- Every preset but Start from scratch begins with the Prologue (27 Oct 2026): levels 1-15, no dungeons, done when
 -- everyone reaches 15. Each chapter keeps its picture (art: the preset chapter's number, or "prologue"), so the
 -- pictures do not move when chapters are added in front.
+-- WoW Forever's own goals (U218, the owner, 15 Nov 2026: "mile stones to the journey that is unique to WoW forever such
+-- as sleeping bag Touch etc."; picked "Optional goals", the bag in chapter III): Optional quest milestones in the
+-- chapter of their level, in every preset but Start from scratch. The quest IDs are from Wowhead's WoW Forever pages
+-- and the Warcraft Wiki; the library's later levels are a guess from Wowhead (to confirm in game).
+ns.FOREVER_GOALS = {
+  { id = "fbag", quest = 79976, level = 22, name = { Alliance = "MS_F_BAG_A", Horde = "MS_F_BAG_H" } }, -- This Must Be The Place
+  { id = "ftorch", quest = 98372, level = 22, name = "MS_F_TORCH" }, -- An Unfortunate End
+  { id = "flib", quest = 78150, level = 22, name = "MS_F_LIB" }, -- Friend of the Library
+  { id = "flib2", quest = 79536, level = 35, name = "MS_F_LIB2" }, -- Greater Friend of the Library
+  { id = "flib3", quest = 82208, level = 46, name = "MS_F_LIB2" }, -- Greater Friend of the Library (the third)
+}
+
 function ns.BuildJourney(key, faction)
   local P = ns.PRESETS[key] and key or "forever"
   local preset = ns.PRESETS[P]
@@ -90,6 +102,16 @@ function ns.BuildJourney(key, faction)
       name = s.name or ns.CLASSIC[s[2]][1]
     end
     chapters[i + off] = { name = name, floor = b[1], cap = b[2], color = ns.PALETTE[color], art = art }
+  end
+  for _, g in ipairs(P ~= "scratch" and ns.FOREVER_GOALS or {}) do
+    for _, c in ipairs(chapters) do
+      if g.level >= c.floor and g.level < c.cap then
+        local nameKey = type(g.name) == "table" and (g.name[faction] or g.name.Alliance) or g.name
+        c.milestones = c.milestones or {}
+        c.milestones[#c.milestones + 1] = { id = g.id, kind = "quest", value = g.quest, name = L[nameKey], req = false }
+        break
+      end
+    end
   end
   local place = {}
   for _, d in ipairs(ns.DUNGEONS) do

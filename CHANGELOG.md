@@ -1,5 +1,43 @@
 # Changelog
 
+## 1.10.0 (16 November 2026)
+- What's New shows once after this update: your dungeon quests, every step on the map, and WoW Forever's goals.
+- Fixed: dungeon quest starts and chain steps updated (Rig Wars no longer a step of the Chief Engineer Scooty chain; The True Masters givers in Stormwind placed on the map).
+- Fixed: "script ran too long" errors from the tracker (and the Inbox after it) on characters who know many quest chains, Questie's among them. The quest list read every known chain link again for each chain and Adventurer.
+- Fixed: an error about a secret value in instances from the play-time pace (whether you are away).
+- Fixed: where to stop questing for the dungeon quests no longer counts the quests of a dungeon the fellowship has already cleared.
+- Fixed: in the Prologue, the Overview's Focus now said the chapter's dungeons are done. It says "No dungeons in this chapter: level together to 15."
+- Smoother play: changes other Adventurers send often come several at once, after a dungeon or at login. They now redraw the book and the tracker once a second, not once each, and your own clicks still show at once. The quest chains are worked out once, and again only when one changes. The tracker no longer redraws at the start and end of each fight unless it hides in combat.
+- Rules: a new rule, Everyone to the cap first. With it on, the next chapter opens only once the chapter's dungeons are cleared and every Adventurer has reached the cap, as in the Prologue. Until then the Chapter page says Level together, with Level to 21 after Run the dungeons, and nobody is told to stop questing. New fellowships that play Together or Strict have it on; Relaxed and fellowships made before have it off. Everyone should update: an addon on an older version does not know the rule and opens the next chapter at the dungeons.
+- Rules: editing the rules (and fine-tuning them when you found a fellowship) has no summary box at the top any more. The rulebook on the Rules page says the rules in words. Nor does a box say your changes are a draft: the bar at the foot says "Changes stay a draft until you publish."
+- Chapter page: once every Mandatory dungeon of a chapter is cleared, their rows fold into one ticked line, "The 3 dungeons are cleared", or with the floor reached "Done: the floor and the 3 dungeons". Click it to see them again. When the cap holds the chapter (Everyone to the cap first, or a chapter without dungeons), Your To do ends with "Reach level 21", with how many are there.
+- Journey Admin: Back to this chapter. The Leader picks an earlier chapter and takes the fellowship back to it, for example after turning on Everyone to the cap first in a chapter that opened too soon. It asks first; clears and the Chronicle stay, and everyone gets a message. It is greyed, with the reason, when that chapter would be complete again at once. Everyone should update first: an older version opens the next chapter again.
+- Overview: the floor and cap are no longer written under the chapter's name. The level track just below marks them.
+- Chapter page: the box that listed who is below the floor is gone. The right page's Below the floor says who and how far, and Your To do's floor line has your own estimate: "Reach the floor, level 15 · about 10 hours at your pace".
+- Chapter page: where to stop questing for the dungeon quests is said on the Overview (and the tracker, and the dungeon's own page), no longer under where the Adventurers stand. The stop mark stays on the level track.
+- Settings: the progress toasts fold under their three headings, each with its tick and how many are on. Click a heading to see its lines.
+- Chapter page: the Prologue no longer has a floor to reach. Its floor is level 1, so the "Everyone at 1" stage, the "Reach the floor, level 1" line and the "floor 1" mark are gone, and the Overview no longer says "Everyone is at the floor." there.
+- Show on map: the marks are a gold ring around the exact spot, and the map shows through the middle. The fellowship's crest no longer covers the place.
+- Overview: when Focus now names who is below the floor ("Help Corwin to the floor", "Wait for the floor", or "Reach level 15" for you), the line under the level track no longer says it again.
+- Inbox: the Leader no longer gets a note that an Adventurer is below the floor. Focus now, the tracker and the Chapter page already say it.
+- Dungeon page: a dungeon with no quests for your faction (Shadowfang Keep for the Alliance), or one already cleared, no longer tells you where to stop questing. The Overview answers for the whole chapter.
+- Tracker: the dungeons cleared read "0 of 2 dungeons", so the status line stays one line.
+- Chapter page: the milestones in Your To do are rows framed like the dungeon rows, gold for Required and green for Optional.
+- Tracker: For the journey replaces the Prequest line. Up to three lines say what to do next for your dungeon quests and this chapter's goals: the next step of a chain you started, a goal, a quest to pick up. Click a line to open its Dungeon page, or the Chapter page for a goal.
+- Quest log: the game's quest log marks each quest that matters to the journey, a dungeon quest, a step of its chain or a goal. Its tooltip names the dungeon and chapter, or the goal.
+- Chapters: a new journey comes with WoW Forever's own goals as Optional milestones: Cozy Sleeping Bag, Night Watchman's Torch and Friend of the Library in chapter III, Greater Friend of the Library in chapters VI and IX. They never hold a chapter back.
+- Dungeon quests: more quests now say where they start, Azshara's chain steps are listed, and Rocknot's Ale is gone from the list (it left the game's list).
+- Inspect: no number boxes. The level and online are in the line under the name. Where the Adventurer stands (to the floor, over the cap, away set by the Leader) is a line of its own, and a Fallen's Days together is a row of their journey.
+- Rules page: the boxes of where the challenges stand are gone. The Challenges article says each of them.
+- Viewing another character's fellowship: only the bar at the top says read only. The Rules page and the Chapter page no longer say it again.
+- The tour ends the same way for a Leader and an Adventurer. It says Settings starts it again, and that Done brings back your own fellowship.
+- Inbox: the count on its button is only what waits for your answer: invitations, Gatherings, votes, asks to group up and your next duel. Notices, such as an Adventurer below the floor or the cap warning, are listed after them, dimmed, with their button, and never counted. Seen is gone, since a notice came back with each new level.
+- Quests page: a new Dungeon quests tab is your dungeon quest log. Under way lists the chains and quests you have started, Open now the ones you can start at your level, in the order of the journey. Each dungeon's name and chapter head its rows (click it to open its Dungeon page), and each row says your next step and where it starts. Click a row to open it on its Dungeon page.
+- Overview: Your dungeon quests, at the top right of the chapter's picture, opens your dungeon quest log at the book's side, Under way above Open now. Click a row to open it on its Dungeon page.
+- Quests page, Attunements & keys: the chosen attunement's steps are boxes joined by a line. Steps done are green, the step you are on is gold, and who is on each step is still under it.
+- Show on map: the map now opens in front. The book steps aside while the map is open and comes back when you close it.
+- Show on map: a quest with a chain shows a mark where the quest starts and where each step starts, numbered like the steps on the page. Steps done are faded and the next one glows. The map opens at the next step's zone. Click a mark to set a waypoint and follow it; the marks stay until you close the map. The numbers sit under the mark (a run as "1-5"), and the mark shows above other addons' map pins.
+
 ## 1.9.0 (14 November 2026)
 - What's New shows once after this update: Show on map, class quests, and easier pages.
 - Dungeon page: Pin on map and the entrance button (now "Show on map") open the world map at the spot with the fellowship's crest on it. Click the mark to set a waypoint and follow it, or right-click to take it away. In combat the place goes to chat.

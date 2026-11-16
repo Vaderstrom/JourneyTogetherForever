@@ -9,24 +9,18 @@ ns.Inbox = Inbox
 -- A button that closes the Inbox and opens a page.
 local function go(page) return function() ns.Window:HidePanels(); ns.Window:ShowPage(page) end end
 
--- { text, important, actions = { { label, fn, style } }, key, seen } items, most important first. An item with a key
--- is a notice (U105): it has a button to where it is handled and Seen, which takes it off the count until its key
--- changes; seen ones come last, dimmed. Items with answers (invitations, votes) count until answered.
+-- { text, important, actions = { { label, fn, style } }, notice } items: what waits for your answer first (invitations,
+-- Gatherings, votes, asks to group up, the size's rules, your next duel), counted until answered; then the notices,
+-- dimmed, with a button to where each is handled and never on the count (U212, the owner, 15 Nov 2026: "Only
+-- answers"; their Seen, U105, came back on the badge with each new level).
 function Inbox:Items()
-  local items = ns.SeenLast("inboxSeen", self:Gather())
-  for _, item in ipairs(items) do
-    if item.key and not item.seen then
-      local key = item.key
-      item.actions = item.actions or {}
-      item.actions[#item.actions + 1] = { L.NOTICE_SEEN, function() Inbox:See(key) end, "plain" }
-    end
+  local answers, notices = {}, {}
+  for _, item in ipairs(self:Gather()) do
+    local list = item.notice and notices or answers
+    list[#list + 1] = item
   end
-  return items
-end
-
-function Inbox:See(key)
-  ns.MarkSeen("inboxSeen", key, self:Gather())
-  ns.Window:Refresh()
+  for _, item in ipairs(notices) do answers[#answers + 1] = item end
+  return answers
 end
 
 function Inbox:Gather()
@@ -70,33 +64,31 @@ function Inbox:Gather()
   local ch = f and ns.Journey:Current(f)
   local cap = f and ns.Progress:CapState(f, ch)
   if cap then
-    items[#items + 1] = { key = ("cap:%s:%s:%d"):format(cap, f.id, ch.n), important = cap == "at",
+    items[#items + 1] = { notice = true, important = cap == "at",
       text = cap == "at" and L.WARN_AT_CAP or L.WARN_CLOSE:format(ch.cap), actions = { { L.OPEN_CHAPTER, go("chapter"), "primary" } } }
   end
-  -- For the Leader, what needs attention (U144; on Manage until the rebuild): each with its button and Seen.
+  -- For the Leader, what needs attention (U144): each with its button.
   for _, a in ipairs(f and ns.Attention:Gather(f) or {}) do
     local act = a.act[2]
-    items[#items + 1] = { key = a.key, text = a.text, important = false,
+    items[#items + 1] = { notice = true, text = a.text, important = false,
       actions = { { a.act[1], function() ns.Window:HidePanels(); act() end, "primary" } } }
   end
   -- The tournament: sign-up open, my next duel, and for the Guild Master the hand-over.
   local t = f and f.tourney
   if t then
     local me = ns.Me()
-    -- (A table each: Items adds Seen to it.)
-    local function open() return { { L.INBOX_OPEN_TOURNEY, go("tourney"), "primary" } } end
+    local open = { { L.INBOX_OPEN_TOURNEY, go("tourney"), "primary" } }
     if t.phase == "signup" and not t.signed[me] then
-      items[#items + 1] = { key = "tsign:" .. tostring(t.id), text = L.INBOX_T_SIGNUP, important = false, actions = open() }
+      items[#items + 1] = { notice = true, text = L.INBOX_T_SIGNUP, important = false, actions = open }
     end
     local m, other = ns.Tourney:MyMatch(f, me)
     if m then
-      items[#items + 1] = { key = ("tduel:%s:%s:%s"):format(tostring(t.id), tostring(t.slot), other),
-        text = L.INBOX_T_DUEL:format(ns.Short(other)), important = true, actions = open() }
+      items[#items + 1] = { text = L.INBOX_T_DUEL:format(ns.Short(other)), important = true, actions = open }
     end
     local _, _, rankIndex = GetGuildInfo("player")
     if t.phase == "done" and t.champion and t.champion ~= me and rankIndex == 0 then
-      items[#items + 1] = { key = "thand:" .. tostring(t.id), text = L.INBOX_T_HANDOVER:format(ns.Short(t.champion)),
-        important = true, actions = open() }
+      items[#items + 1] = { notice = true, text = L.INBOX_T_HANDOVER:format(ns.Short(t.champion)),
+        important = true, actions = open }
     end
   end
   return items
@@ -104,7 +96,7 @@ end
 
 function Inbox:Count()
   local n = 0
-  for _, item in ipairs(self:Items()) do if not item.seen then n = n + 1 end end
+  for _, item in ipairs(self:Gather()) do if not item.notice then n = n + 1 end end
   return n
 end
 
@@ -136,8 +128,8 @@ local function refresh(p)
     if not r then break end
     shown = i
     r.text:SetText(item.text)
-    r.text:SetTextColor(Theme:RGBA(item.seen and "ink2" or "ink"))
-    r.bar:SetColorTexture(Theme:RGBA(item.important and not item.seen and "C0392B" or "line"))
+    r.text:SetTextColor(Theme:RGBA(item.notice and "ink2" or "ink"))
+    r.bar:SetColorTexture(Theme:RGBA(item.important and not item.notice and "C0392B" or "line"))
     local h = r.text:GetStringHeight() + 24
     local x = 14
     for j, b in ipairs(r.buttons) do
@@ -162,13 +154,9 @@ end
 
 ns.Window:RegisterPanel("inbox", { title = L.INBOX, build = build, refresh = refresh })
 
--- 1.4's Seen marks on Manage's Needs attention carry over to the Inbox, once (U144); the pages' first visits went
--- with U146 (walkPages).
+-- The Seen marks went with U212 (notices never count), 1.4's Needs attention ones too; the pages' first visits with
+-- U146 (walkPages).
 ns:On("DB_READY", function()
   local c = ns.char
-  if type(c.attSeen) == "table" then
-    c.inboxSeen = type(c.inboxSeen) == "table" and c.inboxSeen or {}
-    for k, v in pairs(c.attSeen) do if v == true then c.inboxSeen[k] = true end end
-  end
-  c.attSeen, c.walkPages = nil, nil
+  c.inboxSeen, c.attSeen, c.walkPages = nil, nil, nil
 end)

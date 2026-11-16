@@ -7,11 +7,13 @@ local L = ns.L
 local D = { tourney = false, fakes = {}, game = {} }
 ns.Dev = D
 
--- A made-up chain step open from level 1, in QuestLists:Groups' shape: the tracker's Prequest line (U124) for the
--- self-test and the tour when your own log has none.
+-- A made-up chain under way (its first step done), in QuestLists:Groups' shape: the tracker's For the journey (U217)
+-- for the self-test and the tour when your own log has none. (Negative IDs: no quest of the game.)
 function D.FakeChain()
-  return { earlier = { { status = "no", steps = { { status = "no", lvl = 1, name = "The Defias Brotherhood",
-    start = { by = "Gryan Stoutmantle", zone = "Westfall" } } } } } }
+  local start = { by = "Gryan Stoutmantle", zone = "Westfall" }
+  return { pick = {}, earlier = { { id = -1, name = "The Defias Brotherhood", status = "no", start = start, steps = {
+    { id = -2, status = "done", lvl = 1, name = "Report to Gryan Stoutmantle", start = start },
+    { id = -3, status = "no", lvl = 1, name = "The Defias Brotherhood", start = start } } } } }
 end
 
 D.TEST_LEADER = "Testleader"
@@ -69,21 +71,28 @@ function D:TestFellowship(myRole)
   return f
 end
 
+-- A pretend Hero answers a moment later, as over the wire. D.answering counts the answers on their way: the
+-- self-test waits for them between steps (U210).
+function D:Later(secs, fn)
+  self.answering = (self.answering or 0) + 1
+  C_Timer.After(secs, function() self.answering = self.answering - 1; fn() end)
+end
+
 -- Messages to pretend Heroes. Returns true when handled (nothing is whispered).
 function D:Intercept(target, tag, data)
   if not self.fakes[target] then return false end
   -- A pretend Hero with a copy of its own answers like a second addon (Dev/Peers.lua).
   if ns.Peers and ns.Peers:Handle(target, tag, data) then return true end
   -- Pretend Heroes have the addon: an invite gets its receipt.
-  if tag == "INV" then C_Timer.After(0.3, function() ns.Comm:Inject(target, "INVA", { fid = data.fid }) end) end
+  if tag == "INV" then self:Later(0.3, function() ns.Comm:Inject(target, "INVA", { fid = data.fid }) end) end
   if tag == "GRPA" then ns:Debug(L.DEV_ANSWERED:format(ns.Short(target), data.yes and L.JOIN_GROUP or L.NOT_NOW)) end
   -- The pretend alt's fellowship (/jtf debug watch): its Companions answer as real ones would (Fellowship/Watch.lua).
   if data.fid == self.WATCH_ID and (tag == "WATCHQ" or tag == "WATCHG") then
-    C_Timer.After(0.3, function() self:WatchAnswer(target, tag) end)
+    self:Later(0.3, function() self:WatchAnswer(target, tag) end)
   end
   if target == ns.FullName(self.TEST_LEADER) and tag == "ACC" and data.fid == self.TEST_ID then
     local f = self:TestFellowship(data.role)
-    C_Timer.After(0.5, function() ns.Comm:Inject(target, "SNAP", { f = f }) end)
+    self:Later(0.5, function() ns.Comm:Inject(target, "SNAP", { f = f }) end)
   end
   return true
 end

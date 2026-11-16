@@ -340,7 +340,7 @@ end
 -- leader was offline) are noticed and the leader's copy wins.
 function S:Digest(f)
   -- (seen: which changes the copy has, so two copies with different changes at the same version are noticed too.)
-  local core = { f.name, f.color, f.emblem, f.leader, f.officers, f.rules, f.journey, f.disbanded or false, f.seen or {} }
+  local core = { f.name, f.color, f.emblem, f.leader, f.officers, ns.Rules.Shared(f.rules), f.journey, f.disbanded or false, f.seen or {} }
   local members = {}
   -- (A Friend of the fellowship adds a mark only then, so copies without any Friends agree with older versions.)
   for name, m in pairs(f.members) do members[name] = { m.role, m.second or "", m.away or "", m.friend and 1 or nil } end
@@ -546,7 +546,12 @@ end)
 Comm:On("SNAP", function(sender, d)
   -- (A copy from an addon before 0.13 has no leadership count: Sync:Beats.)
   local old = type(d) == "table" and type(d.f) == "table" and d.f.lv == nil
-  if type(d) == "table" and type(d.f) == "table" then d.f.more = nil end
+  if type(d) == "table" and type(d.f) == "table" then
+    d.f.more = nil
+    -- (A copy from an older addon lacks the rules it does not know: ours are kept, U226.)
+    local ours = type(d.f.id) == "string" and F:Get(d.f.id)
+    if ours then ns.Rules.KeepNewer(d.f.rules, ours.rules) end
+  end
   local snap = type(d) == "table" and F:Sanitize(d.f)
   if not snap or not snap.members[sender] and snap.leader ~= sender then return end
   local me, mine = ns.Me(), F:Get(snap.id)

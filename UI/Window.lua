@@ -705,6 +705,9 @@ function W:Build()
   end)
   f:SetScript("OnHide", function()
     f.backdrop:Hide()
+    -- Stepped aside for the world map (UI/MapMark.lua): not closed by the player, so nothing below ends (an open side
+    -- panel hides with the book and comes back with it).
+    if W.aside then return end
     W:HidePanels(); ns.Sound("close")
     W:LeavePage(W.current)
     -- Closing the book ends watching another character's fellowship; it opens on your own next time.
@@ -1284,7 +1287,8 @@ ns:On("FELLOWSHIP", function()
     W.page = "setup"
   end
   W.wasInFellow = inFellow
-  W:Refresh()
+  -- (A change from another Adventurer's message: once a second, as for their news, U74; Tracker.lua says why.)
+  if ns.Comm.receiving then W:RefreshSoon() else W:Refresh() end
 end)
 ns:RegisterEvent("UI_SCALE_CHANGED", function() W:ApplyScale() end)
 ns:RegisterEvent("DISPLAY_SIZE_CHANGED", function() W:ApplyScale() end)

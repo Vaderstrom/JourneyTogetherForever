@@ -25,7 +25,7 @@ local function quietly(fn)
 end
 
 local function send(p, tag, data)
-  C_Timer.After(Pe.DELAY, function() ns.Comm:Inject(p.name, tag, data) end)
+  ns.Dev:Later(Pe.DELAY, function() ns.Comm:Inject(p.name, tag, data) end)
 end
 
 function Pe:Get(name) return name and self.list[ns.FullName(name)] or nil end

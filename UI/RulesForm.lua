@@ -78,28 +78,22 @@ function UI.RulesForm(left, right, width, o)
     t:SetText(range); t:SetPoint("LEFT", s, "RIGHT", 8, 0)
     return add(side, { frames = { f }, visible = visible, layout = function(stack) stack:Place(f, 28, 10) end })
   end
-  -- A line of text that changes with the rules.
-  local function line(side, textFn, visible, boxed)
+  -- A line of text that changes with the rules. (No summary of the rules above the form: the rulebook says them,
+  -- U222, the check of 15 Nov 2026.)
+  local function line(side, textFn, visible)
     local parent = side == "left" and left or right
-    local box = boxed and UI.Card(parent) or nil
-    local fs = UI.WrapText(box or parent, boxed and 13 or 12, boxed and "ink" or "ink2", boxed and (width - 24) or width, boxed and "book" or nil)
-    if box then fs:SetPoint("TOPLEFT", 12, -9) end
-    return add(side, { frames = { box or fs }, visible = visible, layout = function(stack)
+    local fs = UI.WrapText(parent, 12, "ink2", width)
+    return add(side, { frames = { fs }, visible = visible, layout = function(stack)
       fs:SetText(textFn())
-      if box then
-        box:SetSize(width, fs:GetStringHeight() + 18)
-        stack:Place(box, fs:GetStringHeight() + 18, 8)
-      else
-        stack:Place(fs, fs:GetStringHeight(), 10)
-      end
+      stack:Place(fs, fs:GetStringHeight(), 10)
     end })
   end
 
   -- Left page
-  line("left", function() return R.Summary(o.get()) end, nil, true)
   head("left", L.H_LEVELING)
   row("left", L.R_FLOOR, L.R_FLOOR_HINT, choice(left, nums({ 0, 1, 2, 3 }), "floorTol"))
   row("left", L.R_CAP, L.R_CAP_HINT, choice(left, nums({ 0, 1, 2, 3 }), "capTol"))
+  row("left", L.R_CAPFIRST, L.R_CAPFIRST_HINT, onOff(left, "capFirst"))
   row("left", L.R_RUNXP, L.R_RUNXP_HINT, onOff(left, "runXp"))
   row("left", L.R_RUNXPMAX, L.R_RUNXPMAX_HINT, choice(left, nums({ 1, 2, 3, 4, 5 }), "runXpMax"), function() return get("runXp") end)
   head("left", L.H_RUNS)

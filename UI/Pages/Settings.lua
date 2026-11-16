@@ -86,6 +86,8 @@ local function column(pf, parent, width)
     for i, it in ipairs(items) do
       local f = tick(it[1], it[2], it[3])
       f:SetPoint("TOPLEFT", ((i - 1) % 2) * width / 2, -(sec.y + math.floor((i - 1) / 2) * GRID))
+      -- (Alone on the last line, it has the whole line: the check of 16 Nov 2026, A challenge: a fall, ... the Ring.)
+      if i == #items and i % 2 == 1 then f:SetWidth(width) end
       out[it.key or i] = f
     end
     sec.y = sec.y + math.ceil(#items / 2) * GRID
@@ -124,6 +126,7 @@ local function column(pf, parent, width)
   function c:Layout()
     local y, openIn = 0, {}
     for i, sec in ipairs(self.sections) do
+      if sec.relayout then sec.relayout() end -- (the toasts' groups fold inside their section, U233)
       local h, shut = sec.head, folded(sec)
       -- One open per group, also from a fold saved before a section joined one (1.4's "Other addons", U165).
       if sec.group and not shut then shut = openIn[sec.group] or false; openIn[sec.group] = true end
@@ -153,7 +156,8 @@ local function column(pf, parent, width)
     local y, groups = 0, {}
     for i, sec in ipairs(self.sections) do
       y = y + 31 + (i < #self.sections and GAP or 0)
-      if sec.group then groups[sec.group] = math.max(groups[sec.group] or 0, sec.y) else y = y + sec.y end
+      local sy = sec.maxY or sec.y -- (every part open)
+      if sec.group then groups[sec.group] = math.max(groups[sec.group] or 0, sy) else y = y + sy end
     end
     for _, h in pairs(groups) do y = y + h end
     return y
@@ -244,15 +248,18 @@ local function build(pf)
     for _, k in ipairs(list) do if on(k) then n = n + 1 end end
     return n
   end
+  local function toastSum(kinds) return L.SET_SUM_ON:format(count(kinds, function(k) return Settings:ToastOn(k) end), #kinds) end
   local toasts = right:Head("toasts", L.PROGRESS_TOASTS, L.PROGRESS_TOASTS_HINT, { group = "right", sum = function()
-    local t = Settings.TOAST_EVENTS
-    return L.SET_SUM_ON:format(count(t, function(k) return Settings:ToastOn(k) end), #t)
+    return toastSum(Settings.TOAST_EVENTS)
   end })
   pf.example = UI.TextButton(Rp, L.EXAMPLE_TOAST, function() ns.Toasts:Example() end, "link", 12)
   pf.example:SetPoint("BOTTOMRIGHT", toasts, "BOTTOMRIGHT", 0, 7)
-  -- Under three short headings (U86): your journey, the fellowship, dungeons and raids.
+  -- Under three short headings (U86): your journey, the fellowship, dungeons and raids. Each folds to its tick and how
+  -- many are on, its lines on a click on its words (U233, the check of 16 Nov 2026: twenty lines at once). Folded at
+  -- first; kept for the character (ns.char.setFold, "toasts1" to "toasts3").
+  local tsec = right.cur
   pf.toastRows, pf.toastHeads = {}, {}
-  for _, g in ipairs(Settings.TOAST_GROUPS) do
+  for gi, g in ipairs(Settings.TOAST_GROUPS) do
     pf.toastHeads[#pf.toastHeads + 1] = right:Sub(L[g[1]], function()
       for _, kind in ipairs(g[2]) do if not Settings:ToastOn(kind) then return false end end
       return true
@@ -266,7 +273,16 @@ local function build(pf)
       items[#items + 1] = { L["TOAST_" .. kind:upper()], function() return Settings:ToastOn(kind) end,
         function(v) Settings:SetToast(kind, v); ns.Window:Refresh() end, key = kind }
     end
-    for kind, f in pairs(right:Grid(items)) do pf.toastRows[kind] = f.box end
+    local frames, head = right:Grid(items), pf.toastHeads[gi]
+    head.kinds, head.frames = g[2], {}
+    for i, kind in ipairs(g[2]) do pf.toastRows[kind] = frames[kind].box; head.frames[i] = frames[kind] end
+    head.icon = tsec.body:CreateTexture(nil, "ARTWORK")
+    head.icon:SetSize(14, 14); head.icon:SetPoint("LEFT", head, "RIGHT", 4, 0)
+    head.sum = UI.Text(tsec.body, 11, "ink2")
+    head.sum:SetPoint("LEFT", head.icon, "RIGHT", 4, 0)
+    head.click = CreateFrame("Button", nil, tsec.body)
+    head.click:SetPoint("TOPLEFT", head, "TOPLEFT", -2, 4); head.click:SetPoint("BOTTOMRIGHT", head.icon, "BOTTOMRIGHT", 2, -4)
+    head.click:SetScript("OnClick", function() pf:FoldToasts(gi) end)
   end
   right:Skip(2)
   -- Toast position: Move shows a banner to drag; Done ends it; Reset puts it back at the top.
@@ -285,7 +301,43 @@ local function build(pf)
   end
   place:Refresh()
   pf.toastPlace = place
-  right:Row(L.TOAST_POSITION, place, L.TOAST_POSITION_HINT)
+  local placeRow = right:Row(L.TOAST_POSITION, place, L.TOAST_POSITION_HINT)
+  local function toastsShut(gi)
+    local v = ns.char and ns.char.setFold and ns.char.setFold["toasts" .. gi]
+    if v == nil then return true end
+    return v
+  end
+  -- Places the toasts' groups from the top down, open or folded; the section's height follows (maxY: all open).
+  function tsec.relayout()
+    local y, full = 0, 0
+    for gi, head in ipairs(pf.toastHeads) do
+      local shut = toastsShut(gi)
+      head:ClearAllPoints(); head:SetPoint("TOPLEFT", 21, -(y + 6))
+      if not head.icon:SetTexture(FOLD_ICON[shut]) then head.icon:SetColorTexture(0, 0, 0, 0) end
+      head.sum:SetText(shut and toastSum(head.kinds) or "")
+      y = y + 22
+      local rows = math.ceil(#head.frames / 2) * GRID
+      for i, fr in ipairs(head.frames) do
+        fr:SetShown(not shut)
+        fr:ClearAllPoints(); fr:SetPoint("TOPLEFT", ((i - 1) % 2) * width / 2, -(y + math.floor((i - 1) / 2) * GRID))
+      end
+      if not shut then y = y + rows end
+      full = full + 22 + rows
+    end
+    placeRow:ClearAllPoints(); placeRow:SetPoint("TOPLEFT", 0, -(y + 2))
+    tsec.y, tsec.maxY = y + 2 + ROW, full + 2 + ROW
+  end
+  tsec.relayout()
+  -- Opens or folds toast group gi (a click on its heading toggles it).
+  function pf:FoldToasts(gi, open)
+    if not ns.char then return end
+    local st = ns.char.setFold or {}
+    ns.char.setFold = st
+    local shut = not toastsShut(gi)
+    if open ~= nil then shut = not open end
+    st["toasts" .. gi] = shut
+    self.layout()
+  end
   -- The tracker: turned on at the heading; its lines and how it behaves under it, faded while it is off. Folded at
   -- first: the toasts and the tracker take turns.
   local tracker = right:Head("tracker", L.TRACKER, L.TRACKER_HINT, { group = "right", folded = true, sum = function()

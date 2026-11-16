@@ -1,6 +1,6 @@
 -- Heroes (SPEC §4.8). List view: left the fellowship's banner, its roles, every Adventurer's card (status, level, XP)
 -- and Leave (U196, the owner, 14 Nov 2026); right Invite Adventurers, the Friends of the fellowship and the Fallen.
--- Click a Hero to inspect: left their gear, right XP, facts, this chapter's dungeons, roles,
+-- Click a Hero to inspect: left their gear, right XP, where they stand, this chapter's dungeons, roles,
 -- I'm away / I'm back and Play another character (yourself).
 local _, ns = ...
 local L = ns.L
@@ -684,7 +684,7 @@ local function buildInspect(pf, width)
   pf.gearAsOf = UI.WrapText(left, 12, "ink2", width)
   pf.gearAsOf:SetPoint("BOTTOMLEFT", 0, 0)
 
-  -- Right page: XP, facts, dungeons, roles, away, play another character.
+  -- Right page: XP, where they stand, dungeons, roles, away, play another character.
   pf.iscroll = UI.Scroll(pf.right)
   pf.iscroll:SetAllPoints()
   pf.insR = pf.iscroll
@@ -696,11 +696,9 @@ local function buildInspect(pf, width)
   -- Another Hero: Whisper and Invite to group (SPEC §6).
   pf.whisper = UI.TextButton(R, L.WHISPER, function() if pf.sel then ns.Together:Whisper(pf.sel) end end, "plain", 12)
   pf.inviteBtn = UI.TextButton(R, L.INVITE_TO_GROUP, function() if pf.sel then ns.Together:Invite({ pf.sel }) end end, "plain", 12)
-  -- Number tiles (U6): the level, the chapter's levels and the status (a word, drawn smaller when long).
-  pf.facts = {}
-  for i, s in ipairs({ { L.FACT_LEVEL, "bn_level" }, { L.FACT_CHAPTER, "chapter" }, { L.FACT_STATUS, "heroes" } }) do
-    pf.facts[i] = UI.NumberTile(R, (width - 24) / 3, 54, s[1], ns.ICONS[s[2]])
-  end
+  -- (No number tiles since U205, the owner, 14 Nov 2026: the level and presence are in the line on the left, the
+  -- chapter's levels in the header. What only the Status tile said is a line: where they stand, or away by the Leader.)
+  pf.iStand = UI.Text(R, 12, "ink2")
   pf.chHead = UI.Text(R, 17, "ink", "title")
   pf.chHead:SetText(L.THIS_CHAPTER)
   pf.dungeons = UI.Pool(function()
@@ -723,7 +721,7 @@ local function buildInspect(pf, width)
   pf.memHead = UI.Text(R, 17, "ink", "title")
   pf.memHead:SetText(L.MEMORIAL_HEAD)
   pf.memRows = {}
-  for i, key in ipairs({ "MEMORIAL_JOINED", "MEMORIAL_FELL_ON", "MEMORIAL_CLEARED", "MEMORIAL_FIRSTS" }) do
+  for i, key in ipairs({ "MEMORIAL_JOINED", "MEMORIAL_FELL_ON", "MEMORIAL_DAYS", "MEMORIAL_CLEARED", "MEMORIAL_FIRSTS" }) do
     local r = CreateFrame("Frame", nil, R)
     r:SetSize(width - 8, 22)
     r.label = UI.Text(r, 13, "ink2")
@@ -918,17 +916,17 @@ local function refreshInspect(pf, ctx, width)
     pf.inviteBtn:ClearAllPoints(); pf.inviteBtn:SetPoint("LEFT", pf.whisper, "RIGHT", 8, 0)
   end
   local ch = ctx.chapter
-  local st = Hr:Status(f, name)
-  -- (The Fallen: their days in the fellowship where the chapter's levels go.)
-  local days = memorial and (memorial.days or "-")
-  local values = { level, fallen and days or (ch and (ch.floor .. "-" .. ch.cap) or "-"), st }
-  pf.facts[2]:SetLabel(fallen and L.FACT_DAYS or L.FACT_CHAPTER)
-  local y = s.y
-  for i, tile in ipairs(pf.facts) do
-    tile:Set(values[i])
-    tile:ClearAllPoints(); tile:SetPoint("TOPLEFT", R, "TOPLEFT", (i - 1) * ((width - 24) / 3 + 8), -y); tile:Show()
+  -- What the line on the left does not say (as Hr:Status): the Leader set them away, or where they stand in the
+  -- chapter. (A Friend's rank says Friend; the Fallen have their journey.)
+  local away, stand, standColor = ns.Journey:Away(f, name), nil, nil
+  if away == "forced" then stand, standColor = L.STATUS_AWAY_FORCED, "ink2"
+  elseif not fallen and not away and not m.friend then stand, standColor = Hr:Standing(f, name) end
+  if stand == L.STATUS_DONE then stand = nil end -- (the journey done: the header says it, and a lone "Done" said nothing)
+  pf.iStand:SetShown(stand ~= nil)
+  if stand then
+    pf.iStand:SetText(stand); pf.iStand:SetTextColor(Theme:RGBA(standColor))
+    s:Place(pf.iStand, 14, 12)
   end
-  s:Skip(66)
   -- The Fallen: their journey, from joining to the fall.
   pf.chHead:SetShown(not fallen)
   pf.memHead:SetShown(fallen); pf.memFirsts:SetShown(fallen); pf.memNote:SetShown(fallen)
@@ -938,7 +936,7 @@ local function refreshInspect(pf, ctx, width)
     local firsts = {}
     for _, key in ipairs(memorial.firsts) do firsts[#firsts + 1] = L["FIRSTN_" .. key:upper()] end
     local vals = { memorial.joined and ns.Challenges.Day(memorial.joined) or "-", ns.Challenges.Day(memorial.e.t),
-      memorial.cleared, #firsts > 0 and #firsts or L.MEMORIAL_NONE }
+      memorial.days or "-", memorial.cleared, #firsts > 0 and #firsts or L.MEMORIAL_NONE }
     for i, r in ipairs(pf.memRows) do
       r.value:SetText(vals[i])
       r:SetWidth(width - 8)

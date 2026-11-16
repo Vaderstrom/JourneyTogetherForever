@@ -4,8 +4,11 @@ local L = ns.L
 local R = {}
 ns.Rules = R
 
+-- capFirst (U226, the owner, 15 Nov 2026): Everyone to the cap first, the next chapter opens only once every counted
+-- Adventurer has reached the cap. Off by default: rules saved without it are older (a fellowship made before, an older
+-- addon's Leader); the Together and Strict styles turn it on.
 R.DEFAULTS = {
-  floorTol = 0, capTol = 0, runXp = true, runXpMax = 1, minHeroes = 4, clearMode = "all", clearN = 3,
+  floorTol = 0, capTol = 0, runXp = true, runXpMax = 1, capFirst = false, minHeroes = 4, clearMode = "all", clearN = 3,
   offInvite = true, offRemove = true, offClears = false, offAdmin = false, takeover = 14, takeoverNever = false,
   awayDays = 14, awayNever = false, showFuture = false,
   gmT = false, tStart = "manual", tFormat = "single", tBo = 1, tSeed = "level", tMin = 4, tSignup = 48, tRound = 72, tTotal = 14,
@@ -34,17 +37,18 @@ end
 -- Play style: the slack. How far under the floor or over the cap a Companion may be, and XP from runs over the cap.
 R.STYLE_ORDER = { "relaxed", "together", "strict" }
 R.STYLES = {
-  relaxed = { floorTol = 2, capTol = 2, runXp = true, runXpMax = 2 },
-  together = { floorTol = 0, capTol = 0, runXp = true, runXpMax = 1 },
-  strict = { floorTol = 0, capTol = 0, runXp = false, runXpMax = 1 },
+  relaxed = { floorTol = 2, capTol = 2, runXp = true, runXpMax = 2, capFirst = false },
+  together = { floorTol = 0, capTol = 0, runXp = true, runXpMax = 1, capFirst = true },
+  strict = { floorTol = 0, capTol = 0, runXp = false, runXpMax = 1, capFirst = true },
 }
 
 local function matches(rules, set)
-  for k, v in pairs(set) do if rules[k] ~= v then return false end end
+  for k, v in pairs(set) do if k ~= "capFirst" and rules[k] ~= v then return false end end
   return true
 end
 
--- The style these rules match, or "custom".
+-- The style these rules match, or "custom". Not by Everyone to the cap first (U226): a style sets it, but changing it
+-- alone keeps the style, and a fellowship made before it keeps its own.
 function R.StyleOf(rules)
   for _, key in ipairs(R.STYLE_ORDER) do if matches(rules, R.STYLES[key]) then return key end end
   return "custom"
@@ -95,7 +99,7 @@ end
 
 -- Allowed values (a list) or a range { min, max } for every rule.
 R.ALLOWED = {
-  floorTol = { 0, 1, 2, 3 }, capTol = { 0, 1, 2, 3 }, runXp = { true, false }, runXpMax = { 1, 2, 3, 4, 5 },
+  floorTol = { 0, 1, 2, 3 }, capTol = { 0, 1, 2, 3 }, runXp = { true, false }, runXpMax = { 1, 2, 3, 4, 5 }, capFirst = { true, false },
   minHeroes = { 2, 3, 4, 5 }, clearMode = { "one", "n", "all" }, clearN = { 2, 3, 4, 5 },
   offInvite = { true, false }, offRemove = { true, false }, offClears = { true, false }, offAdmin = { true, false },
   takeover = { range = { 7, 30 } }, takeoverNever = { true, false }, awayDays = { range = { 1, 30 } }, awayNever = { true, false },
@@ -141,6 +145,24 @@ end
 
 function R.New(overrides) return R.Clean(overrides or {}) end
 
+-- The rules as every addon in the fellowship holds them, for the fingerprints (Sync:Digest, Conflicts:Parts): without
+-- the ones an older addon does not know (U226), so a copy on the last release still agrees with this one (each copy
+-- cleans the rules it gets to the keys it knows). shortcut: a difference in those alone goes unnoticed; a change of
+-- the rules is a new version, which is noticed.
+R.NEWER = { capFirst = true }
+function R.Shared(rules)
+  local out = {}
+  for k, v in pairs(rules or {}) do if not R.NEWER[k] then out[k] = v end end
+  return out
+end
+
+-- Rules from an older addon (its copy, or its Leader's change) lack those: ours are kept in them, not turned off.
+function R.KeepNewer(rules, ours)
+  if type(rules) ~= "table" or type(ours) ~= "table" then return rules end
+  for k in pairs(R.NEWER) do if rules[k] == nil then rules[k] = ours[k] end end
+  return rules
+end
+
 local function levels(n) return (n == 1 and L.LEVELS_1 or L.LEVELS_N):format(n) end
 local function days(n) return (n == 1 and L.DAYS_1 or L.DAYS_N):format(n) end
 R.Days = days
@@ -153,12 +175,12 @@ function R.Summary(r)
   local away = r.awayNever and L.SUM_AWAY_NEVER or L.SUM_AWAY:format(days(r.awayDays))
   -- Plain words for no allowance ("at most 0 levels below the floor" read oddly; seen in the tour).
   local floor = r.floorTol > 0 and L.SUM_FLOOR:format(levels(r.floorTol)) or L.SUM_FLOOR_NONE
-  return floor .. " " .. cap .. ". " .. L.SUM_RUN:format(r.minHeroes) .. " " .. clear .. " " .. away
+  return floor .. " " .. cap .. ". " .. (r.capFirst and L.SUM_CAPFIRST .. " " or "") .. L.SUM_RUN:format(r.minHeroes) .. " " .. clear .. " " .. away
 end
 
 -- A rule and its value in words, for votes (SPEC §6): "Heroes needed for a run", "3".
 local NAMES = {
-  floorTol = "RN_FLOORTOL", capTol = "RN_CAPTOL", runXp = "R_RUNXP", runXpMax = "RN_RUNXPMAX", minHeroes = "R_MINHEROES",
+  floorTol = "RN_FLOORTOL", capTol = "RN_CAPTOL", runXp = "R_RUNXP", runXpMax = "RN_RUNXPMAX", capFirst = "R_CAPFIRST", minHeroes = "R_MINHEROES",
   clearMode = "R_CLEAR", clearN = "RN_CLEARN", offInvite = "RN_OFFINVITE", offRemove = "RN_OFFREMOVE",
   offClears = "RN_OFFCLEARS", offAdmin = "RN_OFFADMIN", takeover = "RN_TAKEOVER", takeoverNever = "RN_TAKEOVERNEVER",
   awayDays = "RN_AWAYDAYS", awayNever = "RN_AWAYNEVER", showFuture = "R_SHOWFUTURE", gmT = "R_GMT", tStart = "RN_TSTART",
@@ -171,7 +193,7 @@ local ENUMS = {
   tFormat = { single = "F_BRACKET", double = "F_DOUBLE", groups = "F_GROUPS", rr = "F_RR" },
   tBo = { [1] = "BO_1", [3] = "BO_3", [5] = "BO_5" }, tSeed = { level = "SEED_LEVEL", random = "SEED_RANDOM" },
 }
-local ONOFF = { runXp = true, gmT = true }
+local ONOFF = { runXp = true, gmT = true, capFirst = true }
 local NEVER = { takeoverNever = true, awayNever = true }
 
 function R.Name(key) return NAMES[key] and L[NAMES[key]] or key end
@@ -191,7 +213,7 @@ end
 -- that order they are offered to propose a change). The officer rules (off*) went with the officers. Away and the
 -- Leader's takeover are two rules, so two articles (29 Oct 2026; they were one, "Away and the Leader").
 R.BOOK = {
-  { title = "BOOK_LEVELING", rules = { "floorTol", "capTol", "runXp", "runXpMax" } },
+  { title = "BOOK_LEVELING", rules = { "floorTol", "capTol", "capFirst", "runXp", "runXpMax" } },
   { title = "BOOK_RUNS", rules = { "minHeroes", "clearMode", "clearN" } },
   { title = "BOOK_AWAY", rules = { "awayNever", "awayDays" } },
   { title = "BOOK_LEADER", rules = { "takeoverNever", "takeover" } },
@@ -223,6 +245,7 @@ function R.Book(r, hl)
   lines[1] = {
     L.BOOK_FLOOR:format(hl(r.floorTol > 0 and L.BOOK_FLOOR_N:format(levels(r.floorTol)) or L.BOOK_FLOOR_0)),
     L.BOOK_CAP:format(hl(r.capTol > 0 and L.BOOK_CAP_N:format(levels(r.capTol)) or L.BOOK_CAP_0)),
+    L.BOOK_CAPFIRST:format(hl(r.capFirst and L.BOOK_CAPFIRST_ON or L.BOOK_CAPFIRST_OFF)),
     r.runXp and L.BOOK_RUNXP:format(hl(levels(r.runXpMax))) or L.BOOK_RUNXP_OFF:format(hl(L.BOOK_NO_XP)),
   }
   -- II. Dungeon runs.
