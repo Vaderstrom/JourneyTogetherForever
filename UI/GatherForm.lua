@@ -27,19 +27,33 @@ function GF:Choices(f)
     return a.key < b.key
   end)
   table.sort(rest, function(a, b) if a.lvl ~= b.lvl then return a.lvl < b.lvl end return a.key < b.key end)
-  for _, k in ipairs(ahead) do list[#list + 1] = { key = k.key, text = ns.Dungeon(k.key)[2] } end
+  for _, k in ipairs(ahead) do list[#list + 1] = { key = k.key, text = ns.Dungeon(k.key)[2], ahead = true } end
   for _, k in ipairs(rest) do list[#list + 1] = { key = k.key, text = ns.Dungeon(k.key)[2] } end
   for _, r in ipairs(ns.RAIDS) do list[#list + 1] = { key = r[1], text = L.G_RAID_CHOICE:format(r[2]) } end
   return list
 end
 
--- The chosen time as a timestamp.
-function GF:At()
-  local now = time()
-  local t = date("*t", now)
-  local midnight = now - (t.hour * 3600 + t.min * 60 + t.sec)
-  return midnight + self.day * 86400 + self.hour * 3600 + self.minute * 60
+-- The choice What starts on (U129, the roadmap review of 17 Nov 2026; it started on Something else): the dungeon to run
+-- next in this chapter (J:NextDungeon, else its first one not cleared), else the journey's first one ahead not cleared;
+-- Something else once none is left (after the journey).
+function GF:NextChoice(f)
+  local J = ns.Journey
+  local cur = J:CurrentIndex(f)
+  local key
+  if f.journey.chapters[cur] then
+    key = J:NextDungeon(f, cur)
+    if not key then
+      for _, x in ipairs(J:ChapterList(f, cur)) do if not x.early and not J:Cleared(f, x.key) then key = x.key break end end
+    end
+  end
+  key = key and ns.BaseKey(key)
+  for i, c in ipairs(self.choices) do if key and c.key == key then return i end end
+  for i, c in ipairs(self.choices) do if c.ahead and not J:Cleared(f, c.key) then return i end end
+  return 1
 end
+
+-- The chosen time as a timestamp.
+function GF:At() return ns.Gatherings.Moment(self.day, self.hour, self.minute) end
 
 local function dayText(n)
   if n == 0 then return L.G_TODAY end
@@ -51,9 +65,8 @@ GF.DAYS_SHOWN = DAYS_SHOWN
 
 -- Which of the days shown a time is on (0 today), or nil outside them.
 function GF.DayOf(at)
-  local now = time()
-  local t = date("*t", now)
-  local d = math.floor((at - (now - (t.hour * 3600 + t.min * 60 + t.sec))) / 86400)
+  local t = date("*t", at)
+  local d = math.floor((time({ year = t.year, month = t.month, day = t.day, hour = 12 }) - ns.Gatherings.Moment(0, 12)) / 86400 + 0.5)
   if d >= 0 and d < DAYS_SHOWN then return d end
   return nil
 end
@@ -110,14 +123,16 @@ function GF:Build()
   return o
 end
 
--- day (optional): the day to start on (0 today; the Gatherings page's week ahead).
-function GF:Open(day)
+-- day, hour (optional): the day to start on (0 today) and the hour (when most Adventurers play, U122); the Gatherings
+-- page's week ahead.
+function GF:Open(day, hour)
   local W = ns.Window
   local f = ns.Fellowship:Current()
   if not W.frame or not f or ns.Combat:InCombat() then return end
   if day then self.day = day end
+  if hour then self.hour, self.minute = hour, 0 end
   self.choices = self:Choices(f)
-  self.choice = math.min(self.choice, #self.choices)
+  self.choice = self:NextChoice(f)
   local o = self:Build()
   o.note:SetText("")
   o.problem:SetText("")

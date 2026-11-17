@@ -148,8 +148,16 @@ end
 -- for every Adventurer (the owner, 9 Nov 2026: one source, never learned from play). nil for a quest on no list.
 function QL:Start(id) return ns.QUEST_STARTS[id] end
 
+-- A quest the game does not give h's race (Data/DungeonQuests.lua noRace: Undead cannot take Compendium of the Fallen):
+-- nothing for h to do, so it counts as done and h's lists leave it out. A race not known (an older addon) leaves it in.
+local function closed(h, id)
+  local st = ns.QUEST_STARTS[id] -- (no table made per call: the tracker asks on every redraw)
+  return st ~= nil and st.noRace ~= nil and h.race ~= nil and st.noRace[h.race] == true
+end
+QL.Closed = closed
+
 local function statusOf(h, id)
-  if h.questsDone and h.questsDone[id] then return "done" end
+  if (h.questsDone and h.questsDone[id]) or closed(h, id) then return "done" end
   return h.quests and h.quests[id] and "log" or "no"
 end
 QL.StatusOf = statusOf
@@ -206,16 +214,18 @@ function QL:Groups(f, key, who)
   local quests = self:DungeonQuests(f, key)
   if #quests == 0 then return nil end
   local me = who or ns.Me()
-  local g, members = { pick = {}, earlier = {}, inside = {} }, F:Members(f)
+  local g, members, mine = { pick = {}, earlier = {}, inside = {} }, F:Members(f), Hr:Get(f, me) or {}
   for _, q in ipairs(quests) do
-    local others = {}
-    for _, n in ipairs(members) do
-      local h = n ~= me and Hr:Get(f, n)
-      if h and h.quests and h.quests[q.id] then others[#others + 1] = n end
+    if not closed(mine, q.id) then
+      local others = {}
+      for _, n in ipairs(members) do
+        local h = n ~= me and Hr:Get(f, n)
+        if h and h.quests and h.quests[q.id] then others[#others + 1] = n end
+      end
+      local x = questRow(f, q, me, others)
+      local list = g[groupOf(x.start)]
+      list[#list + 1] = x
     end
-    local x = questRow(f, q, me, others)
-    local list = g[groupOf(x.start)]
-    list[#list + 1] = x
   end
   -- Quests after one chain side by side, where the lowest of them would be (the owner, 12 Nov 2026: the Deadmines'
   -- Red Silk Bandanas and The Defias Brotherhood had Destruction in Deadmines between them).
@@ -304,13 +314,14 @@ end
 -- level it opens at for name (the owner, 14 Nov 2026: Razorfen Downs' Bring the Light opens at 39, its chapter's floor
 -- is 37). The same on every PC: it reads only the shipped data, the shared logs and levels.
 -- { early, earlyOf (chains), pick, pickOf, quests (earlier and pick-up quests), ready, shares, toPick (the starts of
--- the quests still to pick up) }; nil when there is nothing to get ready (no list, or only quests inside).
+-- the quests still to pick up), toPickNames (their names, for Show on map) }; nil when there is nothing to get ready
+-- (no list, or only quests inside).
 function QL:Ready(f, key, name)
   -- (A level not known yet leaves nothing out: Hr:Level would say 1; the review of 14 Nov 2026.)
   local h, counted = Hr:Get(f, name) or {}, nil
   local lvl = tonumber(h.level or (f.members[name] or {}).level)
   local from = (ns.Dungeon(key) or {})[3] or 0
-  local r = { early = 0, earlyOf = 0, pick = 0, pickOf = 0, shares = {}, quests = 0, toPick = {} }
+  local r = { early = 0, earlyOf = 0, pick = 0, pickOf = 0, shares = {}, quests = 0, toPick = {}, toPickNames = {} }
   local chains = {} -- (a chain two quests share counts once, U171)
   -- A shareable quest to pick up that another Adventurer counted for the chapter has in their log is ready for you too,
   -- shared at the entrance (U177, the owner, 10 Nov 2026): shares = { { id, by } }.
@@ -327,11 +338,12 @@ function QL:Ready(f, key, name)
     r.pickOf = r.pickOf + 1
     local by = not ok and sharer(q, st)
     if by then r.shares[#r.shares + 1] = { q.id, by } end
-    if ok or by then r.pick = r.pick + 1 else r.toPick[#r.toPick + 1] = st end
+    if ok or by then r.pick = r.pick + 1 else r.toPick[#r.toPick + 1] = st; r.toPickNames[#r.toPick] = q.name end
   end
   for _, q in ipairs(self:DungeonQuests(f, key)) do
     local st = self:Start(q.id) or {}
-    local g = groupOf(st)
+    -- (One the game does not give name's race is none of name's quests: in no group, so in no count either.)
+    local g = not closed(h, q.id) and groupOf(st)
     local ok = statusOf(h, q.id) ~= "no"
     local later = not ok and lvl ~= nil and lvl < opensAt(st, from) -- (not open to name yet: counted from its level)
     -- (Quests, not chains: the To do counts them. A chain's own quest counts while its chain does, the review of 14 Nov
@@ -396,28 +408,59 @@ end
 -- dungeon's in its page's order. Two parts, what to do next first: under (started: a step or the quest in the log or
 -- done) and open (can be started at who's level now). Each row also has key (the dungeon) and n (its chapter). A
 -- dungeon placed twice (Blackrock Depths in chapters XII and XIII) once, at its first placement not cleared; a quest on
--- several dungeons' lists (In the Name of the Light, Elven Legends) once, at the first of them.
+-- several dungeons' lists (In the Name of the Light, Elven Legends) once, at the first of them. all: both, each
+-- dungeon's under before its open.
 function QL:Log(f, who)
   local J = ns.Journey
   local me = who or ns.Me()
   local lvl, top = levelOf(f, me), J:MaxView(f, me)
-  local out, seen = { under = {}, open = {} }, {}
+  local out, seen = { under = {}, open = {}, all = {} }, {}
   for _, x in ipairs(ns.DungeonPage.List(f)) do
     local base = ns.BaseKey(x.key)
     local g = not seen[base] and x.n <= top and ns.IsOpen(x.key, f) and not J:Cleared(f, x.key) and self:Groups(f, x.key, me)
     if g then seen[base] = true end
     local from = (ns.Dungeon(x.key) or {})[3] or 0
+    local rows = {}
     for _, list in ipairs(g and { g.earlier, g.pick } or {}) do
       for _, q in ipairs(list) do
         local row = not seen[q.id] and logRow(q, from, lvl)
         if row then
           seen[q.id] = true
           row.key, row.n = x.key, x.n
-          local part = row.started and out.under or out.open
-          part[#part + 1] = row
+          rows[#rows + 1] = row
         end
       end
     end
+    for _, under in ipairs({ true, false }) do
+      for _, row in ipairs(rows) do
+        if (not row.started) == (not under) then
+          local part = under and out.under or out.open
+          part[#part + 1] = row
+          out.all[#out.all + 1] = row
+        end
+      end
+    end
+  end
+  return out
+end
+
+-- The Dungeon quests tab's two pages (the owner, 17 Nov 2026: "a priority of what quests you should finish first but
+-- also be aware of what quests you can start with already"): first, the log's rows of chapter n, to finish first: the
+-- current chapter, or with nothing there and its Required dungeons all cleared (waiting for the cap) the next one that
+-- has any; early, the others, to start already. Each in the journey's order. (The journey complete: its last chapter.)
+function QL:Plan(f, who)
+  local J = ns.Journey
+  local log, n = self:Log(f, who), math.min(J:CurrentIndex(f), #f.journey.chapters)
+  local here, nextN, cleared = false, nil, true
+  for _, r in ipairs(log.all) do
+    if r.n == n then here = true elseif r.n > n and (not nextN or r.n < nextN) then nextN = r.n end
+  end
+  for _, x in ipairs(J:Required(f, n)) do cleared = cleared and J:Cleared(f, x.key) end
+  if not here and cleared and nextN then n = nextN end
+  local out = { n = n, first = {}, early = {} }
+  for _, r in ipairs(log.all) do
+    local part = r.n == n and out.first or out.early
+    part[#part + 1] = r
   end
   return out
 end
@@ -525,6 +568,28 @@ function QL:Pin(st, title, marks)
     return "map"
   end
   return nil
+end
+
+-- Show on map on a toast (U248, the owner, 17 Nov 2026: "the toast when notifiying about a new quest etc. Then there
+-- should a button to click to show it on the map"): the marks of the quests it names, list = { { start, name } },
+-- numbered in that order; marks.title names them on the map. nil when no spot of them is known: no button then.
+function QL:ToastMap(list, title)
+  local marks = #list > 0 and self:Marks({ steps = list }) or {}
+  if #marks == 0 then return nil end
+  marks.title = title
+  return marks
+end
+-- The quests still to pick up of QL:Ready's r, for ToastMap.
+function QL.PickList(r)
+  local out = {}
+  for i, st in ipairs(r.toPick) do out[i] = { start = st, name = r.toPickNames and r.toPickNames[i] } end
+  return out
+end
+-- An attunement's first step, for ToastMap (a key that drops has none).
+function QL:AttuneMap(a)
+  local first = a.steps and a.steps[1]
+  local st = first and self:Start(first[1][1])
+  return st and self:ToastMap({ { start = st, name = first[2] } }, a.name) or nil
 end
 
 -- The game's own map pin, followed (WoW Forever allows it: the check of 10 Nov 2026, Westfall).
@@ -639,10 +704,13 @@ function QL:Remind(level)
       local key = ns.BaseKey(x.key)
       local g = not ns.char.dqToasted[key] and self:Groups(f, x.key)
       if g then
-        local starts, chain = {}, nil
+        local starts, chain, onMap = {}, nil, {}
         -- (Quests you only pick up: for your own chapter's dungeons, not the next one's; the owner, 10 Nov 2026.)
         for _, q in ipairs(n == cur and g.pick or {}) do
-          if q.status == "no" and level >= opensAt(q.start, x.d[3]) then starts[#starts + 1] = q.start end
+          if q.status == "no" and level >= opensAt(q.start, x.d[3]) then
+            starts[#starts + 1] = q.start
+            onMap[#onMap + 1] = { start = q.start, name = q.name }
+          end
         end
         for _, q in ipairs(g.earlier) do
           if not chain and q.status == "no" then
@@ -650,7 +718,10 @@ function QL:Remind(level)
               if k > leadIn(q.start) then break end -- (a step inside is done in the run)
               if not stepReady(s.start, s.status) then
                 -- (At the step's own level, as the To do and Coming up: the owner, 10 Nov 2026.)
-                if level >= (s.lvl or q.start.lvl or x.d[3]) then chain = s.name end
+                if level >= (s.lvl or q.start.lvl or x.d[3]) then
+                  chain = s.name
+                  onMap[#onMap + 1] = { start = s.start, name = s.name }
+                end
                 break
               end
             end
@@ -661,7 +732,8 @@ function QL:Remind(level)
           local parts = {}
           if #starts > 0 then parts[1] = QL.PickText(starts) end
           if chain then parts[#parts + 1] = L.TOAST_DQ_CHAIN:format(chain) end
-          ns:Toast("dquest", x.d[2], table.concat(parts, " "), function() QL:Open(x.key) end, { dungeon = x.key })
+          ns:Toast("dquest", x.d[2], table.concat(parts, " "), function() QL:Open(x.key) end,
+            { dungeon = x.key, map = self:ToastMap(onMap, x.d[2]) })
         end
       end
     end
@@ -690,7 +762,7 @@ function QL:OnLevelUp(newLevel)
   local s = SIDE[UnitFactionGroup("player") or ""]
   for _, a in ipairs(self:NewlyAvailable(s, newLevel - 1, newLevel)) do
     ns:Toast("attune", L.TOAST_ATTUNE_TITLE:format(a.name), a.kind == "raid" and L.TOAST_ATTUNE_RAID or L.TOAST_ATTUNE_KEY, "quests",
-      { dungeon = QL.PlaceOf(a) })
+      { dungeon = QL.PlaceOf(a), map = self:AttuneMap(a) })
   end
   self:Remind(newLevel)
 end

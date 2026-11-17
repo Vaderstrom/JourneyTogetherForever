@@ -13,7 +13,7 @@ function C:Update()
   local f = ns.Fellowship:Current()
   local faction, factionName = UnitFactionGroup("player")
   ns.db.characters[me] = { name = ns.Short(me), realm = ns.Realm(), class = class, className = className,
-    level = UnitLevel("player"), fellowshipId = f and f.id or nil, lastSeen = time(), faction = faction, factionName = factionName }
+    level = UnitLevel("player"), fellowshipId = f and not f.solo and f.id or nil, lastSeen = time(), faction = faction, factionName = factionName }
 end
 
 -- This character first, then the others by name.

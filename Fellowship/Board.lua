@@ -32,9 +32,11 @@ end
 
 local function heroes(f, n)
   local note, standing = {}, {}
-  for i, g in ipairs(J:Groups(f, n)) do
+  local groups = J:Groups(f, n)
+  for i, g in ipairs(groups) do
     for _, r in ipairs(g.rows) do note[r.name], standing[r.name] = r.note, STANDING[i] end
   end
+  for _, r in ipairs(groups.catching or {}) do note[r.name], standing[r.name] = r.note, "below" end
   local counted, catching, friends, away, fallen = {}, {}, {}, {}, {}
   for _, name in ipairs(J:Counted(f)) do
     if J:CatchingUp(f, name) then catching[#catching + 1] = name else counted[#counted + 1] = name end
@@ -226,7 +228,7 @@ function B:Write()
     db.webhooks = out
   end
   local f = ns.Fellowship:Current()
-  if f and not f.disbanded then out.groups[f.id] = self:Group(f) end
+  if f and not f.disbanded and not f.solo then out.groups[f.id] = self:Group(f) end -- (on your own: never sent, U241)
   local keep = {}
   for _, c in pairs(db.characters or {}) do if c.fellowshipId then keep[c.fellowshipId] = true end end
   if f and not f.disbanded then keep[f.id] = true end

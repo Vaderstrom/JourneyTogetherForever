@@ -86,7 +86,7 @@ ns.ManualSteps = {
         ("%s: chapter %d of %d"):format(f.name, ns.Journey:CurrentIndex(f) or 0, n)
     end },
   { id = "prologue-page", section = "Creating and joining", todo = "Open the Chapter page.",
-    see = "Level 1-15 · Level together. A track of stages (Level to 15, Complete; no floor of level 1) and the Prologue's picture (a valley with an inn) where dungeons would be.",
+    see = "Level 1-15 · Level together. A track of stages (Everyone to 15, Complete; no floor of level 1) and the Prologue's picture (a valley with an inn) where dungeons would be.",
     cmds = { "/jtf chapter" },
     auto = function()
       local f = cur()

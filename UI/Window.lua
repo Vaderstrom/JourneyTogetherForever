@@ -23,7 +23,7 @@ local LOGO, LOGO_FULL, HEAD_SHIFT = 156, 118, 48
 -- and Admin: 42; 29 Oct 2026, U157). NAV_SPACE is the sidebar's height, GROUP_H what a group label takes with its gap.
 local NAV_ROW, NAV_SPACE, GROUP_H = 46, 600, 26
 local NAV_IDS = { "overview", "chapter", "dungeons", "raids", "quests", "chronicle", "heroes", "gatherings", "manage", "tourney", "admin",
-  "rules", "history" }
+  "rules", "history", "welcome" }
 W.WIDTH, W.HEIGHT = WIDTH, HEIGHT
 -- Width for content on one page: with the sidebar (pages of a fellowship) and without (start pages). Half the book
 -- area (window, minus frame and sidebar) minus the page's edges and margins: 414 and 497 at the mockup's 1140.
@@ -429,7 +429,8 @@ local function buildNav(body)
     b.label:SetPoint("LEFT", ring, "RIGHT", 10, 0)
     local hl = b:CreateTexture(nil, "HIGHLIGHT")
     hl:SetAllPoints(); hl:SetColorTexture(1, 1, 1, 0.06)
-    b:SetScript("OnClick", function() W:ShowPage(id) end)
+    -- (Welcome, on your own: from its start, not the Found or Join page last seen.)
+    b:SetScript("OnClick", function() if id == "welcome" then W.startView = "welcome" end W:ShowPage(id) end)
     -- A count on the bookmark (Manage: things that need attention).
     b.badge = UI.Badge(b)
     b.badge:SetPoint("RIGHT", -10, 0)
@@ -936,11 +937,13 @@ function W:Toggle()
 end
 
 -- Opening a page from the sidebar starts it fresh (for example the Hero list, not the last inspected Hero).
-function W:ShowPage(id)
+-- tab: a page's tab to open it on (the Chapter page's line for later dungeons opens the Quests page's Dungeon quests).
+function W:ShowPage(id, tab)
   local turned = id ~= self.current
   self.page = id
   local pf = self.pageFrames[id]
   if pf then pf.sel = nil end
+  if pf and tab then pf.tab = tab end
   if pf and turned then UI.ScrollsToTop(pf) end
   self:Refresh()
   if turned then self:TurnPage() end
@@ -1031,7 +1034,8 @@ end
 
 function W:RefreshNav(ctx, page)
   local f = self.frame
-  local nav = Pages:Nav(ctx)
+  -- (On your own, Welcome, Found and Join lie on the whole width as without a fellowship: U241.)
+  local nav = (ctx.solo and (page == "welcome" or page == "create" or page == "join")) and {} or Pages:Nav(ctx)
   f.nav:SetShown(#nav > 0)
   f.area:ClearAllPoints()
   f.area:SetPoint("TOPRIGHT"); f.area:SetPoint("BOTTOMRIGHT")
@@ -1051,7 +1055,7 @@ function W:RefreshNav(ctx, page)
     for _, id in ipairs(group.items) do
       local b = self.navItems[id]
       local def = Pages:Get(id)
-      b.label:SetText(def and def.label or id)
+      b.label:SetText(group.labels and group.labels[id] or def and def.label or id)
       b.badge:SetCount(def and def.badge and def.badge(ctx) or 0)
       b:SetHeight(rowH)
       b:ClearAllPoints(); b:SetPoint("TOPLEFT", f.nav, "TOPLEFT", 0, y); b:Show()
@@ -1201,7 +1205,7 @@ end
 -- The warning across the header on a trial account in a fellowship (ns.Trial): the others will not hear this one.
 function W:RefreshTrialBar()
   local h = self.frame and self.frame.header
-  local on = ns.Trial() and ns.Fellowship:Current() ~= nil and not (self.watchBar and self.watchBar:IsShown())
+  local on = ns.Trial() and ns.Fellowship:Real() ~= nil and not (self.watchBar and self.watchBar:IsShown())
   local bar = self.trialBar
   if not bar then
     if not on or Combat:InCombat() then return end
@@ -1270,9 +1274,10 @@ end)
 -- Joining, leaving, being removed or a disband: outside a fellowship the book always opens on Welcome.
 -- Levels decide the current chapter, standings and the header chip: every page can change.
 ns:On("HEROES", function(now, what) if now then W:Refresh() else W:RefreshSoon(what) end end)
-ns:On("LOGIN", function() W.wasInFellow = ns.Fellowship:Current() ~= nil end)
+-- (The journey on your own is no fellowship here: founding one from it still opens the setup guide, U241.)
+ns:On("LOGIN", function() W.wasInFellow = ns.Fellowship:Real() ~= nil end)
 ns:On("FELLOWSHIP", function()
-  local inFellow = ns.Fellowship:Current() ~= nil
+  local inFellow = ns.Fellowship:Real() ~= nil
   -- Only a real change (an invitation arriving is a FELLOWSHIP event too, and it sent the Join page back to
   -- Welcome while wasInFellow was still unknown; seen in the tour).
   if W.wasInFellow ~= nil and inFellow ~= W.wasInFellow then W.startView = "welcome" end

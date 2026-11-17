@@ -251,6 +251,19 @@ function C:Record() return ns.db and ns.db.raceRecord end
 -- Everyone hears of a change within the hour (a copy brought by joining or updating brings no flood).
 local function fresh(f, t) return not f.sample and time() - t <= C.RECENT end
 
+-- e goes in its place in list, oldest first by time, then who (one Adventurer's of the same second as they came): every
+-- copy keeps one order whatever order the changes came in (the soak test of 17 Nov 2026: two falls at once gave each
+-- copy its own order and count).
+local function place(list, e)
+  local function before(a, b)
+    if (a.t or 0) ~= (b.t or 0) then return (a.t or 0) < (b.t or 0) end
+    return tostring(a.who) < tostring(b.who)
+  end
+  local i = #list + 1
+  while i > 1 and before(e, list[i - 1]) do i = i - 1 end
+  table.insert(list, i, e)
+end
+
 -- A fall of by's (op "fell"), recorded with what it cost under the challenges on now: the end of their journey
 -- (fatal: their one life), a shared life (pool: how many are left; out: it was the last). False when it costs
 -- nothing (no survival challenge, already Fallen, the shared lives spent and no life of their own at stake) or this
@@ -264,13 +277,34 @@ function C:ApplyFall(f, by, op, t)
   end
   local one, left = self:OneLife(f), self:SharedLeft(f)
   local e = { who = by, t = t, n = n, lvl = tonumber(op.lvl), zone = str(op.zone), foe = str(op.foe), foeP = op.foeP == true or nil }
-  if left and left > 0 then e.life, e.pool, e.out = true, left - 1, left == 1 or nil end
+  e.life = left and left > 0 or nil
   e.fatal = one or nil
   if not e.life and not one then return false end
   f.falls = f.falls or {}
-  table.insert(f.falls, e)
-  while #f.falls > self.FALLS_MAX do table.remove(f.falls, 1) end
-  if fresh(f, t) then ns:Toast("challenge", self:FallToast(f, e)) end
+  place(f.falls, e)
+  -- The shared lives in time order: what each life-costing fall left (pool), and the last one (out).
+  -- shortcut: whether a fall costs a life is still decided as it comes; two falls that cross for the very last life
+  -- outside the Leader's order can differ until the next heartbeat's copy. Upgrade if a check ever shows it.
+  if e.life then
+    local k, total = 0, self:SharedLives(f)
+    for _, x in ipairs(f.falls) do
+      if x.life then k = k + 1; x.pool = total - k; x.out = x.pool == 0 or nil end
+    end
+  end
+  -- The cut never takes a fall that cost a shared life (SHARED_MAX at most): the lives left and each pool are counted
+  -- from them (release review of 2.0: a cut gave lives back and the next recount rewrote the pools).
+  -- shortcut: a fall that only ended a journey is still cut oldest first, so past the cut an old Fallen is no longer
+  -- Fallen; that takes over 170 Hardcore deaths. Keep current members' first if a fellowship ever comes near.
+  local i = 1
+  while #f.falls > self.FALLS_MAX and i <= #f.falls do
+    if f.falls[i].life then i = i + 1 else table.remove(f.falls, i) end
+  end
+  if fresh(f, t) then
+    ns:Toast("challenge", self:FallToast(f, e))
+    -- (A fall that came in late, older than one heard before, can make that one take the last life: said too.)
+    local out = e.life and self:LivesOut(f)
+    if out and out ~= e then ns:Toast("challenge", self:FallToast(f, out)) end
+  end
   -- The Ring-bearer fell: the Ring is lost with them.
   local r = f.ring
   if e.fatal and r and not r.state and r.who == by then
@@ -318,7 +352,7 @@ function C:ApplyBreak(f, by, op, t)
   if not key or not self:Holds(f, by, key) then return false end
   local e = { who = by, t = t, what = op.what, key = key, x = str(op.x) }
   f.broken = f.broken or {}
-  table.insert(f.broken, e)
+  place(f.broken, e)
   while #f.broken > self.BROKEN_MAX do table.remove(f.broken, 1) end
   if fresh(f, t) then
     ns:Toast("challenge", by == ns.Me() and L.T_BROKE_YOU or L.T_BROKE, self:BreakText(e), "chronicle", self:ToastOf(key))

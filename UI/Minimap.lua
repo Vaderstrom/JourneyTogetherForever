@@ -23,11 +23,28 @@ function M:Place()
   b:SetPoint("CENTER", Minimap, "CENTER", math.cos(a) * r, math.sin(a) * r)
 end
 
-local function tooltip(tt)
+-- The fellowship at a glance (U131, the roadmap review of 17 Nov 2026; it was the name, click and drag): its name and
+-- the header's chapter chip, your level against the floor and the cap (the tracker's line), the Inbox and the next
+-- Gathering. Then what the button does, like other minimap buttons; drag: the button moves (not the compartment's).
+function M.Tooltip(tt, drag)
   tt:AddLine(L.ADDON_NAME)
-  -- What the button does, like other minimap buttons (the tooltip was only the name; seen in the tour).
+  local f = ns.Fellowship:Current()
+  if f then
+    local name, chip = ns.Pages:Header(ns.Pages:Context())
+    tt:AddLine(name, 1, 1, 1)
+    tt:AddLine(chip, 0.8, 0.8, 0.8)
+    local you = ns.Together:You(f).head
+    if you then tt:AddLine(you, 1, 1, 1) end
+    local n = ns.Inbox:Count()
+    if n > 0 then tt:AddLine(L.MINIMAP_TIP_INBOX:format(n), 1, 1, 1) end
+    local G = ns.Gatherings
+    for _, g in ipairs(G:Upcoming(f)) do
+      if g.at >= time() - 3600 then tt:AddLine(L.TRACK_GATHER:format(G.When(g.at), G.What(g)), 1, 1, 1) break end
+    end
+    tt:AddLine(" ")
+  end
   tt:AddLine(L.MINIMAP_TIP_CLICK, 1, 1, 1)
-  tt:AddLine(L.MINIMAP_TIP_DRAG, 0.7, 0.7, 0.7)
+  if drag then tt:AddLine(L.MINIMAP_TIP_DRAG, 0.7, 0.7, 0.7) end
 end
 
 -- LibDBIcon from another addon, or nil.
@@ -43,7 +60,7 @@ function M:BuildDBIcon(ldb, icon)
   local obj = ldb:NewDataObject(ADDON, {
     type = "launcher", text = L.ADDON_NAME, label = L.ADDON_NAME, icon = ns.MEDIA .. "LogoSmall",
     OnClick = function() ns.Window:Toggle() end,
-    OnTooltipShow = function(tt) if tt and tt.AddLine then tooltip(tt) end end,
+    OnTooltipShow = function(tt) if tt and tt.AddLine then M.Tooltip(tt, true) end end,
   })
   if not obj then return false end
   -- LibDBIcon keeps its place and shown state in this table (minimapPos in degrees, hide).
@@ -85,7 +102,7 @@ function M:BuildOwn()
   b:SetScript("OnClick", function() ns.Window:Toggle() end)
   b:SetScript("OnEnter", function()
     GameTooltip:SetOwner(b, "ANCHOR_LEFT")
-    tooltip(GameTooltip)
+    M.Tooltip(GameTooltip, true)
     GameTooltip:Show()
   end)
   b:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -103,8 +120,7 @@ function M:Compartment()
     func = function() ns.Window:Toggle() end,
     funcOnEnter = function(button)
       GameTooltip:SetOwner(button, "ANCHOR_LEFT")
-      GameTooltip:AddLine(L.ADDON_NAME)
-      GameTooltip:AddLine(L.MINIMAP_TIP_CLICK, 1, 1, 1)
+      M.Tooltip(GameTooltip)
       GameTooltip:Show()
     end,
     funcOnLeave = function() GameTooltip:Hide() end,

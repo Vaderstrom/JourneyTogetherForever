@@ -9,7 +9,7 @@ local G = { step = 1 }
 ns.SetupGuide = G
 
 -- Shown when this character has not seen it yet (only in a fellowship).
-function G:Pending() return ns.char ~= nil and not ns.char.setupDone and ns.Fellowship:Current() ~= nil end
+function G:Pending() return ns.char ~= nil and not ns.char.setupDone and ns.Fellowship:Real() ~= nil end
 
 -- Opens the guide from the start; after it the book goes to `after` (default: the Overview).
 function G:Open(after)

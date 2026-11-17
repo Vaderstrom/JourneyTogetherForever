@@ -39,7 +39,8 @@ local function build(pf)
   pf.lscroll:SetAllPoints()
   pf.art = UI.PageArt(pf.lscroll, "Gatherings")
   local Lc = pf.lscroll.child
-  pf.new = UI.TextButton(Lc, L.G_SCHEDULE, function() ns.GatherForm:Open() end, "primary")
+  -- (On the day and hour of the week when most Adventurers play, when the day cards know one: U122.)
+  pf.new = UI.TextButton(Lc, L.G_SCHEDULE, function() ns.GatherForm:Open(pf.bestDay, pf.bestHour) end, "primary")
   pf.head = UI.SectionHeader(Lc, width)
   pf.head:SetText(L.G_UPCOMING)
   pf.rows = UI.Pool(function()
@@ -137,8 +138,7 @@ local function build(pf)
     d.what:SetPoint("TOPLEFT", 8, -25); if d.what.SetMaxLines then d.what:SetMaxLines(3) end
     d.who = UI.Text(d, 12, "ink")
     d.who:SetPoint("BOTTOMLEFT", 7, 7); d.who:SetWidth(dw - 12); d.who:SetWordWrap(false)
-    d.add = UI.TextButton(d, L.G_SCHEDULE, function() ns.GatherForm:Open(d.n) end, "link", 11)
-    d.add:SetPoint("CENTER", 0, -8)
+    d.add = UI.TextButton(d, L.G_SCHEDULE, function() ns.GatherForm:Open(d.n, d.busy) end, "link", 11)
     local hl = d:CreateTexture(nil, "HIGHLIGHT")
     hl:SetAllPoints(d.art); hl:SetColorTexture(1, 0.9, 0.6, 0.08)
     d:SetScript("OnClick", function() if d.g then pf.gid = d.g.id; W:Refresh() end end)
@@ -233,12 +233,20 @@ local function refresh(pf, ctx)
     if d then byDay[d] = byDay[d] or {}; table.insert(byDay[d], g) end
   end
   local y0 = r.y
+  pf.bestDay, pf.bestHour = nil, nil
+  local most, weeks = 0, 0
   for i, d in ipairs(pf.week) do
     local items = byDay[d.n]
     local g = items and items[1]
     d.g = g
     d.day:SetText(GF.DayText(d.n))
-    d.what:SetShown(g ~= nil); d.who:SetShown(g ~= nil); d.add:SetShown(g == nil)
+    -- U122: the hour most of you play that day (an empty day says it above Schedule, which starts there).
+    local h, many, w = G:Busiest(f, d.n)
+    d.busy = h
+    if h and (many > most or many == most and w > weeks) then pf.bestDay, pf.bestHour, most, weeks = d.n, h, many, w end
+    d.what:SetShown(g ~= nil or h ~= nil); d.who:SetShown(g ~= nil); d.add:SetShown(g == nil)
+    d.add:ClearAllPoints()
+    if h then d.add:SetPoint("BOTTOM", 0, 8) else d.add:SetPoint("CENTER", 0, -8) end
     d.art:SetShown(g ~= nil); d.fade:SetShown(g ~= nil)
     if g then
       -- Its dungeon's picture, else the chapter's (something else, a campfire), with light words over it.
@@ -259,6 +267,7 @@ local function refresh(pf, ctx)
       d.day:SetTextColor(Theme:RGBA("E8C878")); d.what:SetTextColor(1, 1, 1); d.who:SetTextColor(Theme:RGBA("chipText"))
     else
       d.day:SetTextColor(Theme:RGBA("ink2"))
+      if h then d.what:SetText(L.G_BUSY:format(many, ("%02d:00"):format(h))); d.what:SetTextColor(Theme:RGBA("ink")) end
     end
     d:SetSelected(g ~= nil and g == chosen)
     local col, row = (i - 1) % DAY_COLS, math.floor((i - 1) / DAY_COLS)

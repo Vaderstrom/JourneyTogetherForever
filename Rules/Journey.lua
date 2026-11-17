@@ -194,15 +194,40 @@ function J:GoalDone(f, n)
   if not ch then return true end
   local req = self:Required(f, n)
   for _, x in ipairs(req) do if not self:Cleared(f, x.key) then return false end end
+  if f.solo then return true end -- (on your own no cap holds a chapter, U241)
   if not self:CapHolds(f, n, req) then return true end
   local there, of = self:AtCap(f, ch)
   return of > 0 and there == of
 end
 -- The cap holds chapter n: Everyone to the cap first, or no Required dungeons. req: J:Required(f, n) when known.
 function J:CapHolds(f, n, req) return f.rules.capFirst or #(req or self:Required(f, n)) == 0 end
+-- Chapter n's floor needs no step of its own: the chapter before held everyone at its cap, at or over this floor, as the
+-- Prologue and Everyone to the cap first do (the owner, 17 Nov 2026: "That is the last step of chapter 2"). Chapters
+-- done follow the rule as it is, like the others (the owner, 17 Nov 2026: "everyone should reach cap before next chapter
+-- opens and all Dungeons are completed. If it's off the next chapter opens if Dungeons are completed").
+function J:FloorHeld(f, n)
+  local prev, ch = f.journey.chapters[n - 1], f.journey.chapters[n]
+  return prev ~= nil and ch ~= nil and prev.cap >= self:FloorLevel(f, ch) and self:CapHolds(f, n - 1)
+end
+
+-- Everyone to the cap first, just turned on (the owner, 17 Nov 2026: the fellowship stood in Chapter III, three below
+-- Chapter II's cap): the first chapter before the current one that its dungeons completed while not every counted
+-- Hero has reached its cap, to go back to (F:CapBackCheck). nil: none. Only the cap is asked again, not the clears. On
+-- the best levels the copy knows (the owner, 17 Nov 2026: "make sure that the chapter actually moves back"; waiting for
+-- a level heard since the Leader's login never came for an Adventurer who plays at other times).
+function J:CapBack(f)
+  for n = 1, self:CurrentIndex(f) - 1 do
+    local ch = f.journey.chapters[n]
+    if #self:Required(f, n) > 0 then
+      local there, of = self:AtCap(f, ch)
+      if there < of then return n end
+    end
+  end
+end
 
 -- Complete: reached past it, or its goal and its Required milestones (Rules/Milestones.lua) are done.
 function J:Done(f, n)
+  if f.solo then return n < self:CurrentIndex(f) end
   if n < self:Reached(f) then return true end
   return self:Complete(f, n)
 end
@@ -216,6 +241,14 @@ end
 -- Number of the current chapter (#chapters + 1 when the journey is complete). It only moves forward: reaching a
 -- chapter is remembered in f.reached.
 function J:CurrentIndex(f)
+  -- On your own (U241): the chapter your level is in, the last whose floor you have reached; complete at the last
+  -- chapter's cap once its dungeons are cleared.
+  if f.solo then
+    local chs, lvl, cur = f.journey.chapters, level(f, ns.Me()), 1
+    for n, ch in ipairs(chs) do if lvl >= ch.floor then cur = n end end
+    if chs[cur] and cur == #chs and lvl >= chs[cur].cap and self:GoalDone(f, cur) then cur = cur + 1 end
+    return cur
+  end
   local cur = #f.journey.chapters + 1
   for n = 1, #f.journey.chapters do if not self:Done(f, n) then cur = n break end end
   if cur > self:Reached(f) then f.reached = cur end
@@ -319,6 +352,11 @@ function J:Banner(f, n)
   if not ch then return { icon = "done", title = L.BN_JOURNEY_DONE, text = L.BN_JOURNEY_DONE_TEXT, color = "3E7A3A", step = "", stage = "end" } end
   local cur = self:CurrentIndex(f)
   local req = self:Required(f, n)
+  -- On your own (U241): chapters come and go with your level.
+  if f.solo and n ~= cur then
+    if n > cur then return { icon = "locked", title = L.BN_NOT_STARTED, text = L.BN_SOLO_LATER:format(ch.floor), color = "7A6A55", step = "", stage = "later" } end
+    return { icon = "done", title = L.BN_SOLO_PAST, text = L.BN_SOLO_PAST_TEXT, color = "3E7A3A", step = "", stage = "done" }
+  end
   if n > cur then
     -- The chapter just before it, and where the fellowship is when that is further back (every later chapter said
     -- "opens when Chapter I is complete"; seen in game).
@@ -343,6 +381,12 @@ function J:Banner(f, n)
   end
   local left = {}
   for _, x in ipairs(req) do if not self:Cleared(f, x.key) then left[#left + 1] = x end end
+  -- On your own, done here: the next chapter comes with your level (U241).
+  if #left == 0 and f.solo then
+    local nx = f.journey.chapters[n + 1]
+    return { icon = "done", title = L.BN_SOLO_DONE, text = nx and L.BN_SOLO_NEXT:format(J.Roman(n + 1), nx.floor) or L.BN_SOLO_END:format(ch.cap),
+      color = "3E7A3A", step = "", stage = "done" }
+  end
   -- No dungeons (the Prologue), or all cleared while Everyone to the cap first holds the chapter (U226).
   if #left == 0 then
     local there, of = self:AtCap(f, ch)
@@ -362,15 +406,22 @@ function J:Stages(f, n)
   local b = self:Banner(f, n)
   local hasDungeons = #self:Required(f, n) > 0
   local nodes, fl = {}, self:FloorLevel(f, ch)
-  -- (A floor of level 1, the Prologue's, is always reached: no stage for it, U236.)
-  if fl > 1 then nodes[1] = { key = "floor", label = L.STAGE_FLOOR:format(fl) } end
-  nodes[#nodes + 1] = { key = hasDungeons and "run" or "level", label = hasDungeons and L.STAGE_RUN or L.STAGE_LEVEL:format(ch.cap) }
+  -- (A floor of level 1, the Prologue's, is always reached: no stage for it, U236. Nor one the chapter before held,
+  -- J:FloorHeld, unless someone is below it now.)
+  -- (On your own neither, U241: the chapter follows your level.)
+  if fl > 1 and not f.solo and (b.stage == "floor" or not self:FloorHeld(f, n)) then nodes[1] = { key = "floor", label = L.STAGE_FLOOR:format(fl) } end
+  if hasDungeons or not f.solo then
+    nodes[#nodes + 1] = { key = hasDungeons and "run" or "level", label = hasDungeons and L.STAGE_RUN or L.STAGE_LEVEL:format(ch.cap) }
+  end
   -- Everyone to the cap first (U226): levelling to the cap after the dungeons, as in the Prologue.
-  if hasDungeons and f.rules.capFirst then nodes[#nodes + 1] = { key = "level", label = L.STAGE_LEVEL:format(ch.cap) } end
+  if hasDungeons and f.rules.capFirst and not f.solo then nodes[#nodes + 1] = { key = "level", label = L.STAGE_LEVEL:format(ch.cap) } end
   for _, m in ipairs(ns.Milestones:List(f, n)) do
     if m.req then nodes[#nodes + 1] = { key = "milestones", label = L.STAGE_MILESTONES }; break end
   end
   nodes[#nodes + 1] = { key = "complete", label = L.STAGE_COMPLETE }
+  -- On your own, a chapter with nothing to do but level has no track (U256: a lone ticked Complete read as done at
+  -- level 1, the check of 17 Nov 2026).
+  if f.solo and #nodes == 1 then return {}, b end
   local at = 0 -- the current node; 0 = not started, past the last = all done
   if b.stage == "done" then at = #nodes + 1
   elseif b.stage ~= "later" then
@@ -406,7 +457,9 @@ function J:Counts(f, n)
     { L.CNT_OVER, above, "C0392B" }, { L.CNT_AWAY, away, "ink2" } }
 end
 
--- Where the Heroes stand in chapter n (Chapter page): groups { label, range, color, rows = { { name, note } } }.
+-- Where the Heroes stand in chapter n (Chapter page): groups { label, range, color, rows = { { name, note } } }, and
+-- .catching: newcomers catching up below the floor ({ { name, note } }), who hold nobody back, so they are no red
+-- Below the floor row but one grey line under the list (U252, the roadmap review of 17 Nov 2026).
 function J:Groups(f, n)
   local ch = f.journey.chapters[n]
   if not ch then return {} end
@@ -427,11 +480,13 @@ function J:Groups(f, n)
       color = "B8742A", rows = {} },
     { label = L.GRP_OVER, range = L.GRP_CAP_RANGE:format(over + 1), color = "C0392B", rows = {} },
     { label = L.GRP_AWAY, range = L.GRP_AWAY_RANGE, color = "ink2", rows = {} },
+    catching = {},
   }
   for _, name in ipairs(self:Counted(f)) do
     local l = level(f, name)
     if l < fl then
-      table.insert(g[1].rows, { name = name, note = (self:CatchingUp(f, name) and L.NOTE_CATCHING or L.NOTE_TO_FLOOR):format(far(name, fl)) })
+      if self:CatchingUp(f, name) then table.insert(g.catching, { name = name, note = L.NOTE_CATCHING:format(far(name, fl)) })
+      else table.insert(g[1].rows, { name = name, note = L.NOTE_TO_FLOOR:format(far(name, fl)) }) end
     elseif l < top then table.insert(g[2].rows, { name = name, note = l < cap and L.NOTE_TO_CAP:format(far(name, cap)) or L.NOTE_AT_CAP })
     elseif l > over then table.insert(g[4].rows, { name = name, note = L.NOTE_OVER_BY:format(l - over) })
     else table.insert(g[3].rows, { name = name, note = l > cap and L.NOTE_OVER_ALLOWED:format(l - cap) or L.NOTE_AT_CAP })
@@ -474,7 +529,7 @@ end
 function J:OverCap(f)
   local ch = self:Current(f)
   local list = {}
-  if not ch then return list end
+  if not ch or f.solo then return list end
   for _, name in ipairs(self:Counted(f)) do if level(f, name) > self:CapLevel(f, ch) then list[#list + 1] = name end end
   return list
 end

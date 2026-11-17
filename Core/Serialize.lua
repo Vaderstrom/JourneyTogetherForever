@@ -137,3 +137,47 @@ function S.Decode(s)
   if not ok or not i or i ~= #s + 1 then return nil, false end
   return v, true
 end
+
+-- The game's CBOR (U254, Core/Comm.lua) beside this text: one truth whichever carried a message, because every
+-- fingerprint is Hash(Encode(...)) of what was stored (docs/ARCHITECTURE.md §2).
+-- Canon: data the game's CBOR read, made what Decode(Encode(data)) gives on this client: each number, keys too, as
+-- tonumber of its text (whole numbers below 10^14 are already). Errors where the text could not carry a number (as
+-- Decode fails). Changes v in place and returns it.
+local floor = math.floor
+local function canonNum(v)
+  if v == floor(v) and v > -1e14 and v < 1e14 then return v end
+  local n = tonumber(num(v))
+  if n == nil then error("a number the text cannot carry") end
+  return n
+end
+local function canon(v)
+  local t = type(v)
+  if t == "number" then return canonNum(v) end
+  if t ~= "table" then return v end
+  local moved
+  for k, x in pairs(v) do
+    local tx = type(x)
+    if tx == "number" or tx == "table" then v[k] = canon(x) end
+    if type(k) == "number" then
+      local ck = canonNum(k)
+      if ck ~= k then moved = moved or {}; moved[k] = ck end
+    end
+  end
+  if moved then for k, ck in pairs(moved) do local x = v[k]; v[k] = nil; v[ck] = x end end
+  return v
+end
+S.Canon = canon
+
+-- CborSafe: false when the game's CBOR might not carry v as the text does, and such data goes as text: a -0 (a whole
+-- number, it may come back as 0; the text keeps "-0") and a fraction (the check of 17 Nov 2026: one of the self-test's
+-- fractions came back changed; no message in the tests carries one, so CBOR keeps whole numbers, text and true/false).
+local function safe(v)
+  local t = type(v)
+  if t == "number" then return v == floor(v) and not (v == 0 and 1 / v < 0) end
+  if t ~= "table" then return true end
+  for k, x in pairs(v) do
+    if not safe(k) or not safe(x) then return false end
+  end
+  return true
+end
+S.CborSafe = safe

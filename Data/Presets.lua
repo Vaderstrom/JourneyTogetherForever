@@ -68,6 +68,40 @@ end
 -- as sleeping bag Touch etc."; picked "Optional goals", the bag in chapter III): Optional quest milestones in the
 -- chapter of their level, in every preset but Start from scratch. The quest IDs are from Wowhead's WoW Forever pages
 -- and the Warcraft Wiki; the library's later levels are a guess from Wowhead (to confirm in game).
+-- WoW Forever's goals the chapters lack (by id, or by quest: one added by hand from Pick from your quests; the release
+-- review of 17 Nov 2026), each with the number of the chapter of its level: { { g, i } }.
+function ns.ForeverGoalsMissing(chapters)
+  local have, quests, out = {}, {}, {}
+  for _, c in ipairs(chapters) do
+    for _, m in ipairs(c.milestones or {}) do
+      have[m.id] = true
+      if m.kind == "quest" then quests[tonumber(m.value) or m.value] = true end
+    end
+  end
+  for _, g in ipairs(ns.FOREVER_GOALS) do
+    if not have[g.id] and not quests[g.quest] then
+      for i, c in ipairs(chapters) do
+        if g.level >= c.floor and g.level < c.cap then out[#out + 1] = { g = g, i = i }; break end
+      end
+    end
+  end
+  return out
+end
+-- Adds them, Optional, and returns them: a new journey, and Journey Admin's Add WoW Forever's goals for one made
+-- before them (the owner, 17 Nov 2026).
+function ns.AddForeverGoals(chapters, faction)
+  local list = ns.ForeverGoalsMissing(chapters)
+  for _, x in ipairs(list) do
+    local g, c = x.g, chapters[x.i]
+    c.milestones = c.milestones or {}
+    c.milestones[#c.milestones + 1] = { id = g.id, kind = "quest", value = g.quest, name = ns.ForeverGoalName(g, faction), req = false }
+  end
+  return list
+end
+-- A goal's milestone name for a faction (the bag's note is in Westfall or in the Barrens).
+function ns.ForeverGoalName(g, faction)
+  return L[type(g.name) == "table" and (g.name[faction] or g.name.Alliance) or g.name]
+end
 ns.FOREVER_GOALS = {
   { id = "fbag", quest = 79976, level = 22, name = { Alliance = "MS_F_BAG_A", Horde = "MS_F_BAG_H" } }, -- This Must Be The Place
   { id = "ftorch", quest = 98372, level = 22, name = "MS_F_TORCH" }, -- An Unfortunate End
@@ -103,16 +137,7 @@ function ns.BuildJourney(key, faction)
     end
     chapters[i + off] = { name = name, floor = b[1], cap = b[2], color = ns.PALETTE[color], art = art }
   end
-  for _, g in ipairs(P ~= "scratch" and ns.FOREVER_GOALS or {}) do
-    for _, c in ipairs(chapters) do
-      if g.level >= c.floor and g.level < c.cap then
-        local nameKey = type(g.name) == "table" and (g.name[faction] or g.name.Alliance) or g.name
-        c.milestones = c.milestones or {}
-        c.milestones[#c.milestones + 1] = { id = g.id, kind = "quest", value = g.quest, name = L[nameKey], req = false }
-        break
-      end
-    end
-  end
+  if P ~= "scratch" then ns.AddForeverGoals(chapters, faction) end
   local place = {}
   for _, d in ipairs(ns.DUNGEONS) do
     local k, min, max, ch, role = d[1], d[3], d[4], d[5], d[6]

@@ -230,7 +230,7 @@ end
 -- Seen ones are kept per character and fellowship.
 function FS:Check(f)
   f = f or F:Current()
-  if not f then return 0 end
+  if not f or f.solo then return 0 end -- (on your own you are first at everything: U241)
   local seen = ns.char.firstsSeen
   if type(seen) ~= "table" or seen.fid ~= f.id then seen = { fid = f.id }; ns.char.firstsSeen = seen end
   local n = 0

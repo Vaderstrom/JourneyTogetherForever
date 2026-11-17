@@ -343,8 +343,9 @@ local function refreshLeft(pf, f, key, ctx)
     s:Place(pf.cleared, pf.cleared:GetStringHeight(), 6)
   end
   pf.lscroll:SetContentHeight(s.y + 8)
-  -- The foot: Find group (not while watching, nor for a later dungeon), Waypoint where the entrance is known.
-  pf.group:SetShown(not ctx.watching and not later)
+  -- The foot: Find group (not while watching, nor for a later dungeon, nor on your own: U241), Waypoint where the
+  -- entrance is known.
+  pf.group:SetShown(not ctx.watching and not ctx.solo and not later)
   local e = DP.Entrance(key)
   pf.way:SetShown(e ~= nil)
   pf.wayTip = e and L.DG_WAY_TIP:format(L.DQ_AT:format(e.zone, e.x, e.y))

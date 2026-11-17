@@ -63,7 +63,7 @@ end
 local function prep(fn, wait) shots[#shots + 1] = { fn = fn, wait = wait, prep = true } end
 
 -- Phase A: no fellowship.
-shot("welcome", "Welcome", "No fellowship: logo, features, Found / Join, Your characters (without a fellowship: hidden) with How a journey works right under it, down to the page's foot (U67)", function()
+shot("welcome", "Welcome", "No fellowship: logo, features, Found / Join / On your own (U241), Your characters (without a fellowship: hidden) with How a journey works right under it, down to the page's foot (U67)", function()
   ns.Characters.showAll = false
   W().startView = "welcome"; W():Open(); W():Refresh()
 end)
@@ -80,6 +80,12 @@ shot("characters-panel-all", "Your characters panel (all shown)", "After Show: t
   if p and p.list and p.list.toggle:IsShown() and not ns.Characters.showAll then p.list.toggle:Click() end
 end)
 prep(function() ns.Characters.showAll = false end)
+shot("solo-chapter", "On your own: the Chapter page", "Welcome's third tile (U241): the chapter of your level from the WoW Forever journey, its dungeons with Get ready, no floor, cap or standings (Level up, never together; no stage track in a chapter without dungeons, U256; a drawing on the right page); the sidebar has Chapter, Dungeons, Quests and Found or join", function()
+  W():HidePanels()
+  if not ns.Fellowship:Current() then ns.Fellowship:Solo() end
+  W():ShowPage("chapter")
+end)
+prep(function() ns.char.solo = nil; W().startView = "welcome"; W():Refresh() end)
 shot("create-1", "Create: step 1 (empty)", "Name, role and four size cards; on the right your banner, its colour and every emblem", function()
   W():HidePanels(); ns.CreateState:Reset(); W().startView = "create"; W():Refresh()
 end)
@@ -171,7 +177,7 @@ shot("setup-3", "Setup guide: Reminders", "Cap warning, picture moment, minimap 
   ns.SetupGuide.step = 3; W():Refresh()
 end)
 shot("leader-overview-new", "Overview (new fellowship)", "Alone: the title Overview with no line under it (U162); the chapter's banner across the sheet with Where we stand on its dark foot in light words (U158), the Prologue's level track with the cap only and no word of the floor (U236), Focus now on its picture with your first step (Invite your Adventurers), Since last time on the notice board and Coming up (no Gatherings) on the road ahead, three cards alike with light headings; all in view (U139, U148, U149, U155)", function() page("overview") end)
-shot("leader-chapter-new", "Chapter (new fellowship)", "The Prologue: your To do starts with your first steps, then Reach level 15, no floor line (its floor is level 1, U236); the stage track Level to 15, Complete (no Everyone at 1) and its picture in place of dungeons; on the right, the level track with the cap only, no floor 1 mark", function() page("chapter") end)
+shot("leader-chapter-new", "Chapter (new fellowship)", "The Prologue: your To do starts with your first steps, then Reach level 15, no floor line (its floor is level 1, U236); the stage track Everyone to 15, Complete (no Everyone at 1) and its picture in place of dungeons; on the right, the level track with the cap only, no floor 1 mark", function() page("chapter") end)
 shot("leader-quests-empty", "Quests (alone)", "No shared quests", function() page("quests") end)
 -- The Chronicle at All (the self-test leaves it at Sessions; seen in the check of 29 Oct 2026).
 local function chronicle(filter) page("chronicle"); pf("chronicle").filter = filter; W():Refresh() end
@@ -224,7 +230,7 @@ shot("news", "What's New", "Over the book on parchment in its frame: What's New 
   ns.db.newsSeen = keep
 end)
 prep(function() hideOverlays() end)
-shot("chapter", "Chapter", "The stage track, the banner, your To do: the floor, then every dungeon as a row with what you need under it, whole on one line (its short form, \"Nothing to get first.\", where the long one does not fit) (Find group or Get ready and ⋯ at the right; a click opens its page), For later dungeons on a gold tint, each with its next step and no countdown (\"Testing the Wells: open now.\" or \"Murloc Gills, step 2 of 10.\", U172), If you like (U140); the level track, where the Adventurers stand (no line for an empty group, U187), the room", function()
+shot("chapter", "Chapter", "The stage track, the banner, your To do: the floor, then every dungeon as a row with what you need under it, whole on one line (its short form, \"Nothing to get first.\", where the long one does not fit) (Find group or Get ready and ⋯ at the right; a click opens its page), the chains for later dungeons as one line, \"2 chains for later dungeons open now\" (U250), If you like (U140); the level track, where the Adventurers stand (no line for an empty group, U187), the room", function()
   dev("hero Corwin level 17"); page("chapter"); top(pf("chapter").lscroll)
 end)
 -- M25: everyone at the floor and online: Play now's pick is Focus now's (U139).
@@ -325,7 +331,7 @@ shot("share-window", "Share the addon (no answer)", "Kim did not answer: the add
 end)
 -- Everyone to the cap first (U226, the owner, 15 Nov 2026): the chapter's dungeons cleared with the rule on, so it waits
 -- for the cap; chapter-unlocked turns it off again, which opens the next chapter.
-shot("chapter-capfirst", "Chapter (everyone to the cap first)", "Everyone to the cap first on (U226): every dungeon row cleared, and the stage track has Level to 21 after Run the dungeons, the current step (Run the dungeons done); the line under the name says Level together, and Where the Adventurers stand has no Stop questing; Your To do has the floor and the cleared dungeons in one ticked line, \"Done: the floor and the 3 dungeons\" (U227, U234), then Reach level 21 with how many are there; the chapter stays, nothing opens yet", function()
+shot("chapter-capfirst", "Chapter (everyone to the cap first)", "Everyone to the cap first on (U226): every dungeon row cleared and kept, ticked (the owner, 17 Nov 2026: no longer one line); the stage track has no Everyone at the floor (the chapter before held it), then Run the dungeons done and Everyone to the cap current; the line under the name says Level together, and Where the Adventurers stand has no Stop questing; Your To do has no Reach the floor line, the cleared dungeons each in its row, then Reach the cap with how many are there; the chapter stays, nothing opens yet", function()
   hideOverlays()
   pf("chronicle").filter = "all"
   local f = cur()
@@ -532,7 +538,7 @@ local logDone
 local function logBack()
   if logDone then logDone.h.questsDone[logDone.id] = logDone.was; logDone = nil end
 end
-shot("quests-dungeon-log", "Quests (Dungeon quests tab)", "The dungeon quest log as a level 20 sees it (U213): Under way on the left (a stand-in: the first step of the first chain done, so its rows say Step 2 and where it starts), Open now on the right, in the journey's order; each dungeon's name and chapter once as a heading in the accent colour (U230), then a row each: the quest, the next step and a pin", function()
+shot("quests-dungeon-log", "Quests (Dungeon quests tab)", "The dungeon quest log as a level 20 sees it (U213; the owner, 17 Nov 2026): on the left First: Chapter N, this chapter's quests to finish first, each dungeon's name once without its chapter; on the right Start early, the later chapters' in the journey's order, each dungeon's name and chapter once (U230); in each dungeon the started ones first (a stand-in: the first step of the first chain done, so its rows say Step 2 and where it starts), then a row each to pick up: the quest, the next step and a pin", function()
   if realFinished then ns.Quests.Finished = realFinished end
   ns.QuestLists.viewLevel = 20
   local f, me = cur(), ns.Me()
@@ -548,7 +554,7 @@ shot("quests-dungeon-log", "Quests (Dungeon quests tab)", "The dungeon quest log
   end
   local p = pf("quests"); p.sel = nil; p.tabs.buttons[3]:Click()
 end)
-shot("overview-dquests", "Overview (Your dungeon quests)", "Your dungeon quests › on the banner's top right opens the dungeon quest log at the book's right side, like the Inbox (U215): Under way (the same stand-in, Step 2) above Open now, a heading per dungeon with its chapter (U230), then a short row each with the quest, the next step and a pin", function()
+shot("overview-dquests", "Overview (Your dungeon quests)", "Your dungeon quests › on the banner's top right opens the dungeon quest log at the book's right side, like the Inbox (U215): First: Chapter N above Start early, as on the tab, a heading per dungeon (U230), then a short row each with the quest, the next step and a pin", function()
   page("overview"); W():OpenPanel("dquests")
 end)
 shot("quests-attune-none", "Quests (Attunements, level 30)", "None open yet: when the first one opens", function()
@@ -773,11 +779,12 @@ end, { toast = true })
 shot("gatherings-empty", "Gatherings (none yet)", "Schedule, the week ahead as seven plain day cards with Schedule (U4), and how Gatherings work", function()
   hideOverlays(); page("gatherings")
 end)
-shot("gather-form", "Schedule a Gathering", "The form", function()
+shot("gather-form", "Schedule a Gathering", "The form, What on the dungeon to run next, not Something else (U129)", function()
   ns.GatherForm:Open()
 end)
-shot("gatherings", "Gatherings", "Upcoming Gatherings, each with its time, name and answer count, no Yes / Maybe / No on the rows (U193); the chosen one with who is coming; the week ahead as day cards, four to a row, a day with a Gathering on its dungeon's picture with the class icons of who is coming, the chosen one marked (U4)", function()
+shot("gatherings", "Gatherings", "Upcoming Gatherings, each with its time, name and answer count, no Yes / Maybe / No on the rows (U193); the chosen one with who is coming; the week ahead as day cards, four to a row, a day with a Gathering on its dungeon's picture with the class icons of who is coming, the chosen one marked (U4); a day without one says when most of you play above its Schedule (U122)", function()
   hideOverlays()
+  dev("hero Brannic plays 19-22"); dev("hero Elyra plays 19-22"); dev("hero Corwin plays 20-21")
   ns.Gatherings:Schedule("wc", "bring potions", time() + 26 * 3600)
   ns.Dev:Hero("Brannic", "gather", TR.look.gather)
   page("gatherings")
@@ -831,12 +838,30 @@ shot("admin-export", "Journey Admin (export)", "The journey string to copy", fun
   ns.AdminDraft.sel = 1
   hideOverlays(); local p = pf("admin"); p.export:Click()
 end)
-shot("admin-milestone-form", "Journey Admin (add a milestone)", "Kind, value, name, Required or Optional", function()
+shot("admin-milestone-form", "Journey Admin (add a milestone)", "Kind, value, name, Required or Optional; Pick from your quests open, its list over the form (the owner, 17 Nov 2026: it opened under it)", function()
   hideOverlays(); ns.AdminDraft:MilestoneForm(cur())
+  local o = W().overlays.milestone
+  if o and o.pick:IsShown() and not o.pick.menu:IsShown() then o.pick:Click() end
+end)
+-- The owner, 17 Nov 2026: WoW Forever's goals into a journey made before them.
+shot("admin-goals", "Journey Admin (WoW Forever's goals)", "A draft without WoW Forever's goals (taken out for the shot): the Whole journey tab, Add WoW Forever's goals under Start over and Import, beside the other journey-wide actions (U249)", function()
+  hideOverlays()
+  local A, f, ids = ns.AdminDraft, cur(), {}
+  for _, g in ipairs(ns.FOREVER_GOALS) do ids[g.id] = true end
+  A:Discard()
+  A:Edit(f, function(j)
+    for _, ch in ipairs(j.chapters) do
+      local keep = {}
+      for _, m in ipairs(ch.milestones or {}) do if not ids[m.id] then keep[#keep + 1] = m end end
+      ch.milestones = keep
+    end
+  end)
+  page("admin"); pf("admin").editor:ShowTab("journey")
 end)
 shot("admin-one-level", "Journey Admin (a 60-60 chapter)", "A one-level chapter added at the end, ready to publish", function()
   hideOverlays()
   local A, f, JE = ns.AdminDraft, cur(), ns.JourneyEdit
+  A:Discard() -- (admin-goals left one)
   -- (Split the last chapter, then drag the mark to 60: 58-60 and 60-60.)
   A:Edit(f, function(j) local n = JE.Split(j, #j.chapters); if n then JE.SetBoundary(j, n - 1, 60) end end)
   A.sel = #A:Journey(f).chapters
@@ -902,7 +927,7 @@ shot("tourney-signup", "Tournament (sign-up)", "Sign-up open, entrants and seeds
   for _, n in ipairs(PRETEND) do dev("hero " .. n .. " signup") end
   page("tourney")
 end)
-shot("tourney-bracket", "Tournament (bracket running)", "Semifinals joined to the final by bracket lines, your next duel; cards 60 high with class icons and levels (U17)", function() dev("tourney next"); W():Refresh() end)
+shot("tourney-bracket", "Tournament (bracket running)", "Semifinals joined to the final by bracket lines across the whole right page, the cards wider and further apart (U134); your next duel; cards 60 high with class icons and levels (U17)", function() dev("tourney next"); W():Refresh() end)
 shot("inbox-notice", "Inbox (your next duel)", "Your next duel with Open the tournament, counted on the Inbox button until it is fought (U105, U212)", function()
   W():OpenPanel("inbox")
 end, { wait = 0.3 })
@@ -948,6 +973,11 @@ shot("settings", "Settings", "Folding sections (U10): the book, messages and hel
   toastFolds = toastFolds or { st.toasts1, st.toasts2, st.toasts3 }
   for gi = 1, 3 do pf("settings"):FoldToasts(gi, gi == 2) end
 end)
+shot("settings-toast-point", "Settings: pointing at a toast's line", "Dungeons and raids open; pointing at A dungeon or raid is cleared shows that toast, The Stockade with its picture, also while it is off; no Show an example toast at the heading (U121)", function()
+  W():OpenSettings(); pf("settings"):Fold("toasts", true); pf("settings"):FoldToasts(3, true)
+  local row = pf("settings").toastRows.clear:GetParent()
+  row:GetScript("OnEnter")(row)
+end, { toast = true })
 shot("settings-tracker-off", "Settings (tracker off)", "The tracker open (the toasts fold), its lines faded while it is off", function()
   if toastFolds then for gi = 1, 3 do ns.char.setFold["toasts" .. gi] = toastFolds[gi] end; toastFolds = nil end
   W():OpenSettings(); pf("settings"):Fold("tracker", true); ns.Settings:Set("tracker", false); W():Refresh()
@@ -961,10 +991,22 @@ end)
 local function toast(kind, title, text, more)
   return function()
     ns.Toasts:StopMove(); W():Close()
-    local m = more and { dungeon = more.dungeon } or nil
+    local m = more and { dungeon = more.dungeon, map = more.map } or nil
     if m and type(m.dungeon) == "function" then m.dungeon = m.dungeon() end
+    if m and type(m.map) == "function" then m.map = m.map() end
     -- A text can be a function, made when the shot runs: ns.VERSION, say, is set only at ADDON_LOADED, after this file.
     ns.Toasts:Push(kind, type(title) == "function" and title() or title, type(text) == "function" and text() or text, nil, m)
+  end
+end
+-- Show on map's marks for a toast (U248): the first quests of a dungeon whose start is known.
+local function dqMap(key)
+  return function()
+    local QL, list = ns.QuestLists, {}
+    for _, q in ipairs(ns.Dungeon(key) and QL:DungeonQuests(cur(), key) or {}) do
+      local st = QL:Start(q.id)
+      if st and st.x and #list < 3 then list[#list + 1] = { start = st, name = q.name } end
+    end
+    return QL:ToastMap(list, ns.Dungeon(key) and ns.Dungeon(key)[2])
   end
 end
 -- A clear message (U7): the place's picture on the left, its name, and who was there in their class colours.
@@ -1011,20 +1053,23 @@ shot("toast-session", "Toast: session recap (big)", "After playing together: how
 end, { toast = true })
 shot("toast-long", "Toast: a long text", "Wraps to more lines; the banner grows", toast("clear", L.TOAST_CLEARED,
   L.TOAST_CLEAR_FOR:format("Brannic, Elyra, Corwin and you") .. " " .. L.TOAST_ENDGAME_TEXT), { toast = true })
-shot("toast-attune", "Toast: an attunement opens", "At the level where it can be started, with the raid's picture (U8)",
+shot("toast-attune", "Toast: an attunement opens", "At the level where it can be started, with the raid's picture (U8); Show on map, where its first step starts, when that is known (U248)",
   -- The title names the raid whose picture it shows (WoW Forever has no Molten Core; check of 6 Nov 2026).
   toast("attune", function() return L.TOAST_ATTUNE_TITLE:format(ns.Raid(first(ns.RAIDS, "mc"))[2]) end, L.TOAST_ATTUNE_RAID,
-    { dungeon = function() return first(ns.RAIDS, "mc") end }), { toast = true })
-shot("toast-dquest", "Toast: dungeon quests to pick up", "Once per dungeon of this chapter or the next, when its first quest opens to you, with the dungeon's picture (U79)",
+    { dungeon = function() return first(ns.RAIDS, "mc") end, map = function()
+      local raid = first(ns.RAIDS, "mc")
+      for _, a in ipairs(ns.ATTUNEMENTS) do if a.key == raid or a.raid == raid then return ns.QuestLists:AttuneMap(a) end end
+    end }), { toast = true })
+shot("toast-dquest", "Toast: dungeon quests to pick up", "Once per dungeon of this chapter or the next, when its first quest opens to you, with the dungeon's picture (U79) and Show on map under the text (U248)",
   toast("dquest", function() return ns.Dungeon("dm")[2] end, function()
     return L.TOAST_DQ_PICK_IN:format(L.DQ_N_QUESTS:format(3), "Westfall") .. " " .. L.TOAST_DQ_CHAIN:format("Red Silk Bandanas")
-  end, { dungeon = "dm" }), { toast = true })
+  end, { dungeon = "dm", map = dqMap("dm") }), { toast = true })
 -- (The prequests done, two quests still at their givers: Almost ready, the owner, 12-13 Nov 2026.)
 local function almost()
   return ns.Ready.ReadyToast(ns.Dungeon("dm")[2], { early = 1, earlyOf = 1, toPick = { { zone = "Westfall" }, { zone = "Westfall" } } })
 end
 shot("toast-dready", "Toast: ready for a dungeon", "Under \"Ready for a dungeon\": \"Almost ready\", \"The prequests for The Deadmines are ready. Pick up 2 quests in Westfall before the run.\" (then, once they are picked up, \"Ready to go\", \"Ready for The Deadmines\"); each once per dungeon of your chapter, never in combat, with its picture (U98); a click opens its page",
-  toast("dready", function() return (almost()) end, function() return select(2, almost()) end, { dungeon = "dm" }), { toast = true })
+  toast("dready", function() return (almost()) end, function() return select(2, almost()) end, { dungeon = "dm", map = dqMap("dm") }), { toast = true })
 shot("toast-dallready", "Toast: everyone is ready", "\"Everyone is ready for The Deadmines\": once per dungeon when every counted Adventurer is (U99)",
   toast("dallready", L.T_ALL_READY, function() return L.T_ALL_READY_TEXT:format(ns.Dungeon("dm")[2]) end, { dungeon = "dm" }), { toast = true })
 shot("toast-dshare", "Toast: a quest to share", "In a dungeon, \"Share Collecting Memories: Pata needs it.\" with the Deadmines' picture, Share quest and Not now; it stays until answered, then the next quest (U178)", function()
@@ -1037,8 +1082,8 @@ shot("toast-invite", "Toast: an invitation", "\"Lea invites you to Band.\" with 
   ns.Toasts:Push("invite", L.T_INVITE, L.INBOX_INVITE:format("Lea", "Band"), nil,
     { icon = ns.ICONS.toast_invite, actions = { { L.ACCEPT, function() end }, { L.DECLINE, function() end } } })
 end, { toast = true })
-shot("toast-dremind", "Toast: a reminder", "\"Pata reminds you: 2 Deadmines quests to pick up.\" with the dungeon's picture and who sent it (U100)",
-  toast("dremind", L.REMIND_TITLE, function() return L.REMIND_N:format("Pata", 2, "Deadmines") end, { dungeon = "dm", who = "Pata" }), { toast = true })
+shot("toast-dremind", "Toast: a reminder", "\"Pata reminds you: 2 Deadmines quests to pick up.\" with the dungeon's picture and who sent it (U100), and Show on map (U248)",
+  toast("dremind", L.REMIND_TITLE, function() return L.REMIND_N:format("Pata", 2, "Deadmines") end, { dungeon = "dm", who = "Pata", map = dqMap("dm") }), { toast = true })
 shot("toast-room", "Toast: leave room for the dungeons", "At the stop point (and half a level before it): the dungeon quests will take you to the cap, stop questing elsewhere (U78)",
   toast("room", L.TOAST_ROOM_NOW_TITLE, L.TOAST_ROOM_NOW), { toast = true })
 shot("toast-first", "Toast: a fellowship first", "\"Brannic is the first to ride a mount.\"", toast("first", L.T_FIRST:format("Brannic"), L.FIRST_MOUNT:format("Brannic")), { toast = true })
@@ -1083,7 +1128,7 @@ shot("tracker-all", "The tracker, every line on", "The status still one line (U2
   R.Chapter = function() return fake end
   ns.Tracker:Refresh()
 end)
-shot("tracker-docked", "The tracker under the game's quest tracker", "Settings: one more section under the game's quest list, with the game's section header, fold button and fonts; every line on, the red stop line clear of the little bar (a client without the game's tracker keeps the panel)", function()
+shot("tracker-docked", "The tracker under the game's quest tracker", "Settings: one more section under the game's quest list, with the game's section header, fold button and fonts; every line on, the red stop line clear of the little bar (a client without the game's tracker keeps the panel). With ForeverCore: a section of its column under its quest list, as wide as it, never over it (U255)", function()
   ns.Settings:Set("trackerDock", true)
   ns.Tracker:Refresh()
 end)
@@ -1106,7 +1151,7 @@ shot("picture-moment", "Picture after the final boss", "Take a picture as the on
   ns.Settings:Set("trackerHover", false)
   ns.Picture:Offer("dm")
 end)
-shot("minimap-tooltip", "Minimap button", "The button and its tooltip", function()
+shot("minimap-tooltip", "Minimap button", "The button and its tooltip: the fellowship, its chapter, your level against the floor and the cap, the Inbox count and the next Gathering, then click and drag (U131)", function()
   ns.Picture:Hide()
   local b = ns.MinimapButton.button
   local enter = b and b:GetScript("OnEnter")
@@ -1179,7 +1224,7 @@ end)
 prep(function() W():HidePanels(); ns.Dev:WatchForget() end)
 
 -- Newcomers, trial accounts and a restore (27 Oct 2026).
-shot("chapter-catching", "Chapter: a newcomer catching up", "Fenna joined far below the floor: listed as catching up, not holding the dungeons", function()
+shot("chapter-catching", "Chapter: a newcomer catching up", "Fenna joined far below the floor: one grey line under the list, Catching up: Fenna (level 2), not a red Below the floor row (U252)", function()
   hideOverlays(); W():Open()
   local f = cur()
   if not f then return end

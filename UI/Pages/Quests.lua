@@ -294,8 +294,9 @@ local function refreshAttune(pf, f, me)
   pf.aArt:Fit(r.y)
 end
 
--- The Dungeon quests tab (U213, the owner, 15 Nov 2026): the dungeon quest log, Under way on the left page and Open
--- now on the right (QL:Log). A short row each: the quest, its dungeon and chapter, your next step and where it starts.
+-- The Dungeon quests tab (U213, the owner, 15 Nov 2026): the dungeon quest log, the chapter to finish first on the left
+-- page and Start early on the right (QL:Plan; the owner, 17 Nov 2026: it was Under way and Open now, "I don't
+-- understand this layout"). A short row each: the quest, your next step and where it starts.
 -- A click opens it on its Dungeon page, the one home of a dungeon's quests (U141); the pin shows it on the map.
 local function logButton(parent, width)
   local r = CreateFrame("Button", nil, parent)
@@ -329,11 +330,11 @@ local function logHead(parent, width)
   return b
 end
 
--- One part of the log in c (1: Under way, 2: Open now): its heading, its empty line, its dungeons' headings and rows.
+-- One part of the log in c (1: First, 2: Start early): its heading, its empty line, its dungeons' headings and rows.
 local function newPart(c, width, i)
   local part = { head = UI.SectionHeader(c, width), none = UI.SketchLine(c, width, "EmptyQuests"),
     rows = UI.Pool(function() return logButton(c, width) end), heads = UI.Pool(function() return logHead(c, width) end) }
-  part.head:SetHelp(i == 1 and L.DQL_UNDER_HELP or L.DQL_OPEN_HELP)
+  part.head:SetHelp(i == 1 and L.DQL_FIRST_HELP or L.DQL_EARLY_HELP)
   return part
 end
 
@@ -359,14 +360,17 @@ local function nextLine(QL, row)
   return row.what == "log" and L.DQL_IN_LOG or L.DQL_RUN
 end
 
--- Places part i of the log, with its rows (list), on the stack s.
-local function placePart(s, part, i, list)
+-- Places part i of the plan (QL:Plan), with its rows, on the stack s. Part 1's heading names its chapter, so its
+-- dungeons' do not.
+local function placePart(s, part, i, plan)
   local QL, J = ns.QuestLists, ns.Journey
-  part.head:SetText((i == 1 and L.DQL_UNDER or L.DQL_OPEN) .. (#list > 0 and ("  ·  " .. #list) or ""))
+  local list = i == 1 and plan.first or plan.early
+  part.head:SetText((i == 1 and L.DQL_FIRST_PART:format(L.CHAPTER_ROMAN:format(J.Roman(plan.n))) or L.DQL_EARLY)
+    .. (#list > 0 and ("  ·  " .. #list) or ""))
   s:Place(part.head, 29, 6)
   part.none:SetShown(#list == 0)
   if #list == 0 then
-    part.none:SetText(i == 1 and L.DQL_UNDER_NONE or L.DQL_OPEN_NONE)
+    part.none:SetText(i == 1 and L.DQL_FIRST_NONE or L.DQL_EARLY_NONE)
     s:Place(part.none, part.none.h, 8)
   end
   local n, nh, last = 0, 0, nil
@@ -380,7 +384,7 @@ local function placePart(s, part, i, list)
       nh, last = nh + 1, row.key
       local d = ns.Dungeon(row.key)
       hd.key = row.key
-      hd.text:SetText((d and d[2] or row.key) .. "  ·  " .. L.CHAPTER_ROMAN:format(J.Roman(row.n)))
+      hd.text:SetText((d and d[2] or row.key) .. (i == 1 and "" or "  ·  " .. L.CHAPTER_ROMAN:format(J.Roman(row.n))))
       if nh > 1 then s:Skip(4) end
       s:Place(hd, 18, 4)
     end
@@ -400,28 +404,27 @@ local function placePart(s, part, i, list)
 end
 
 local function refreshLog(pf, f, me)
-  local log = ns.QuestLists:Log(f, me)
-  for i, list in ipairs({ log.under, log.open }) do
-    local part = pf.log[i]
+  local plan = ns.QuestLists:Plan(f, me)
+  for i, part in ipairs(pf.log) do
     local s = UI.Stack(part.scroll.child)
-    placePart(s, part, i, list)
+    placePart(s, part, i, plan)
     part.scroll:SetContentHeight(s.y + 8)
   end
 end
 
 -- The Overview's side panel (U215, the owner, 15 Nov 2026: "kinda like a 'right side' menu on the overview page"):
--- the same log, Under way above Open now. (Registered once loaded: Window.lua loads after this file; the window is
+-- the same log, First above Start early. (Registered once loaded: Window.lua loads after this file; the window is
 -- built at login.)
 ns:On("DB_READY", function() ns.Window:RegisterPanel("dquests", { title = L.TAB_DQUESTS, icon = "dungeons",
   build = function(p) p.parts = { newPart(p.body, p.width, 1), newPart(p.body, p.width, 2) } end,
   refresh = function(p)
     local ctx = ns.Pages:Context()
-    local log = ctx.f and ns.QuestLists:Log(ctx.f, ctx.me) or { under = {}, open = {} }
+    local plan = ctx.f and ns.QuestLists:Plan(ctx.f, ctx.me) or { n = 1, first = {}, early = {} }
     local s = UI.Stack(p.body)
     s:Skip(6)
-    placePart(s, p.parts[1], 1, log.under)
+    placePart(s, p.parts[1], 1, plan)
     s:Skip(8)
-    placePart(s, p.parts[2], 2, log.open)
+    placePart(s, p.parts[2], 2, plan)
     p.scroll:SetContentHeight(s.y + 10)
   end }) end)
 

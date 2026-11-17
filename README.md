@@ -23,6 +23,7 @@ Built for **WoW Forever**.
 - **A group photo**: the whole fellowship in 3D on the whole screen, with poses and backdrops.
 - **Your fellowship, your way**: your own journey, a rulebook anyone can propose changes to, Gatherings, a Guild
   Master tournament and posts to your Discord.
+- **Or on your own**: follow the journey alone, chapter by your level, until you find a fellowship.
 
 - [How it works](#how-it-works)
 - [Features](#features):
@@ -58,6 +59,9 @@ Built for **WoW Forever**.
 - **Joining**: someone in a fellowship invites you by name, and the invitation shows on the **Join a fellowship** page
   and in your inbox. Choose your role and **Accept**. **Leaving** is a button on the Adventurers page; when the Leader
   leaves, the next Adventurer leads and the journey goes on for everyone else.
+- **On your own**, the third way in on the Welcome page: follow the WoW Forever journey alone on this character. The
+  chapter follows your level, with no floor or cap, and each dungeon, once open at your level, has its quests to pick
+  up and its run. Nothing is sent to anyone; founding or joining a fellowship replaces it.
 
 ## Features
 
@@ -79,14 +83,15 @@ The **Overview** answers "what now?" at a glance, all of it in view without scro
 - **Your To do**, in the order you act: reach the floor ("about 10 hours at your pace"), then every dungeon as a row with its picture, role, levels
   and what you need for it ("2 quests to pick up", "Ready: your quests are in your log"), with **Find group** (it
   invites the Adventurers online who still need it, a tank and a healer first) or **Get ready**. The mandatory ones
-  come first, lowest levels first; the first one not cleared says **Recommended next**, and once they are all cleared
-  they fold into one ticked line. Then the chapter's Required
-  **milestones**, with **Tick off** for the Leader. Then **For later dungeons**: a prequest chain to start now for a
-  dungeon of a later chapter, once you reach its first step's level (a chain you have started comes first, with its step). Then **If you like**: the next chapter's dungeons that may be run now (From the next
+  come first, lowest levels first; the first one not cleared says **Recommended next**, and a cleared one stays,
+  ticked. Then the chapter's Required
+  **milestones**, with **Tick off** for the Leader. Then one line for the prequest chains of later chapters'
+  dungeons you can start now ("2 chains for later dungeons open now"): point at it to see them, and a click opens them
+  under Start early on the Quests page. Then **If you like**: the next chapter's dungeons that may be run now (From the next
   chapter) and the Optional milestones. A click on a row opens [the dungeon's page](#the-dungeon-pages).
 - **All chapters**: the whole journey (later chapters can stay hidden until reached).
 - The **level track**, where the Adventurers stand (below the floor, ready, at the cap, over the cap, away) and the room
-  for the dungeon quests.
+  for the dungeon quests. A newcomer catching up holds nobody back: one grey line under the list.
 - **Clears are picked up from boss kills** (no clicking needed). A message with the dungeon's picture and who was in
   the group tells everyone the moment the last needed boss dies; Adventurers outside the group hear it when the group
   leaves the instance.
@@ -166,8 +171,9 @@ The **Quests** page has four tabs:
   pick up (**Pick up and join**), grouped by zone with the zone you are in first, with everyone's progress and what you can do: **Ask to group up**, Invite to group, or
   the game's **Share quest**.
 - **Quest chains** learned as the fellowship plays, or all of them from the start with Questie installed.
-- **Dungeon quests**: your dungeon quest log. **Under way** lists the chains and quests you have started, **Open now**
-  the ones you can start at your level, in the order of the journey, each with your next step and where it starts.
+- **Dungeon quests**: your dungeon quest log. **First** lists this chapter's chains and quests, to finish first, and
+  **Start early** the later chapters' you have started or can start at your level, in the order of the journey. In
+  each dungeon the ones you have started come first, each with your next step and where it starts.
 - **Attunements and keys** up to 60 (Onyxia, Upper Blackrock Spire, Scholomance,
   Blackrock Depths, Stratholme, Dire Maul and more): a grid of who has done what, and each one's steps.
 
@@ -182,6 +188,10 @@ and its tooltip names the dungeon and chapter, or the goal.
 Plan times to play together: **Schedule** a Gathering with a time and a note, everyone answers Yes, Maybe or No, and
 the page shows who is coming and the week ahead as seven day cards, like the game's calendar. A reminder pops up before it starts, and the Overview and the
 tracker show the next one.
+
+**When most of you play**: a day without a Gathering says when most of the fellowship plays ("3 of you play around
+20:00"), and Schedule starts at that hour, on the dungeon to run next. Each account shares only the hours of the
+week it played in the last two weeks; Settings → Gatherings → Share when I play turns it off.
 
 ![Gatherings](.github/screenshots/gatherings.jpg)
 
@@ -244,7 +254,8 @@ Five steps, and you can change everything later except the challenges:
 - Each dungeon is Mandatory, From the next chapter or Optional, and you can choose **which bosses** a clear needs.
 - **Milestones**, up to ten per chapter, Required or Optional: a quest everyone has handed in, a level everyone
   reaches, an attunement or key, or one the Leader ticks off by hand. A new journey comes with WoW Forever's own goals
-  as Optional milestones: Cozy Sleeping Bag, Night Watchman's Torch and Friend of the Library.
+  as Optional milestones: Cozy Sleeping Bag, Night Watchman's Torch and Friend of the Library. **Add WoW Forever's
+  goals** puts them into a journey made before them.
 - **Back to this chapter** takes the fellowship back to an earlier chapter. It asks first; clears and the Chronicle
   stay, and everyone gets a message.
 - **Export** the journey as a string to share with another fellowship, or **Import** one. Changes are a draft until
@@ -327,12 +338,14 @@ log out; the app reads it from your saved data and posts nothing you have not ch
   reaches the floor or the cap or goes over it, new rules, a Gathering soon, an attunement opens, and more. Big
   moments (a chapter unlocked, the journey complete) show first in the middle of the screen, like the game's Level Up
   banner. Each can be turned off, and you can drag them where you like, or hold Ctrl and drag one while it shows.
-  Click one to open the page it is about.
+  Click one to open the page it is about. A toast that names quests to pick up has **Show on map**: a numbered mark
+  on the world map where each one starts.
 - **The tracker**: the chapter, where you stand (with a little bar to the floor or the cap and where to stop
   questing), Focus now, **For the journey** (up to three next steps for your dungeon quests and the chapter's goals), dungeons cleared, who is online, the next Gathering, shared quests, your next duel and
   your inbox, each line with its icon. It starts as a panel you drag anywhere, which can hide until you point at it;
   or put it under the game's quest tracker, as one more section in the game's own look that moves and folds with the
-  game's list. Hold Ctrl to drag it by any line, or out from under the game's list.
+  game's list. Hold Ctrl to drag it by any line, or out from under the game's list. With ForeverCore it is one
+  section of ForeverCore's quest column, under the quests.
 - **Picture after a final boss**: Take a picture (with or without the interface) or open the group photo, right
   there in the dungeon.
 - The **inbox** in the header: invitations, votes, Gatherings, asks to group up, the tournament, and for the Leader
@@ -350,8 +363,9 @@ log out; the app reads it from your saved data and posts nothing you have not ch
 - A **setup guide** the first time (it asks where you want the tracker), then **Show me around**: a short first tour
   of the Overview, the sidebar, the buttons at the top and the tracker. Settings starts it again, and the **?** in
   the header walks you through the page you are on.
-- Settings for every toast (under three headings, each with a tick for its whole group), the tracker's lines, chat
-  messages, the cap warning, sounds, reduced effects and the minimap button. A **key**, Shift+J unless the game uses it already, opens the book at the page you
+- Settings for every toast (under three headings, each with a tick for its whole group; point at one to see it), the
+  tracker's lines, chat messages, the cap warning, sounds, reduced effects and the minimap button, whose tooltip shows
+  your chapter, your level against the floor and the cap, the Inbox and the next Gathering. A **key**, Shift+J unless the game uses it already, opens the book at the page you
   choose (Options → Keybindings → Journey Together Forever). Button collectors can gather the minimap button, and the addon is in the game's addon compartment.
 - **What's New**: once after an update, a page over the book with the update's news. `/jtf news` shows it again.
 

@@ -21,13 +21,17 @@
 --     beside ln): "#" and the packed bytes, with NUL (which addon messages cannot carry) and the escape byte itself
 --     escaped as \1\2 and \1\1 (as Guild Together does). A whole copy is about 4 times smaller: a join takes about a
 --     second.
+--   * the game's CBOR (U254, 17 Nov 2026; docs/ARCHITECTURE.md §2): to an addon that says it reads it (cb = 1, beside
+--     ln and z), a message's data is written by the game ("*TAG:" and the CBOR bytes, escaped as packed ones; packed
+--     too when long). Read back, Serialize.Canon makes it the very table the text would have, so fingerprints agree.
+--     Data with a fraction or a -0 goes as text (Serialize.CborSafe).
 -- Adapted from GuildHall_Core/Sync.lua (queue, chunks, handlers).
 local _, ns = ...
 local LANES = { "JTF", "JTF2", "JTF3" }
 local LANE_OF = {}
 for i, p in ipairs(LANES) do LANE_OF[p] = i end
 local C = { PREFIX = LANES[1], LANES = #LANES, handlers = {}, queue = {}, buffers = {}, recent = {}, fullName = {},
-  seq = 0, peers = {}, packs = {}, lane = {}, waits = {} }
+  seq = 0, peers = {}, packs = {}, cbor = {}, lane = {}, waits = {} }
 ns.Comm = C
 ns.PREFIX = C.PREFIX
 
@@ -56,6 +60,8 @@ C.Z = (EU and EU.CompressString and EU.DecompressString) and 1 or nil
 local function escape(s) return (s:gsub("\1", "\1\1"):gsub("%z", "\1\2")) end
 local function unescape(s) return (s:gsub("\1([\1\2])", function(x) return x == "\1" and "\1" or "\0" end)) end
 C.Escape, C.Unescape = escape, unescape
+-- The game's CBOR (see the top). C.CB is 1 when this client writes and reads it.
+C.CB = (EU and EU.SerializeCBOR and EU.DeserializeCBOR) and 1 or nil
 function C:Pack(body)
   if not C.Z then return nil end
   local ok, z = pcall(EU.CompressString, body)
@@ -107,28 +113,53 @@ function C:Send(target, tag, data, urgent, replace)
   if target then self:SendAll({ target }, tag, data, urgent, replace) end
 end
 
--- The same message to several players, packed once (U71, 7 Nov 2026: a state to nine Adventurers was packed nine
--- times). What goes out to each is what Send would send.
+-- A message's body in one form (forms[true]: the game's CBOR, forms[false]: our text), made once for every target:
+-- body (what is packed), wire (what goes when not packed), packed (nil until asked, false when it does not pay).
+-- Data the game cannot write, or might not write as the text does (Serialize.CborSafe), goes as text.
+local function form(forms, cb, tag, data)
+  local f = forms[cb]
+  if f then return f end
+  if cb then
+    local ok, raw = false, nil
+    if ns.Serialize.CborSafe(data) then ok, raw = pcall(EU.SerializeCBOR, data) end
+    if ok and type(raw) == "string" then
+      local body = "*" .. tag .. ":" .. raw
+      f = { body = body, wire = "*" .. escape(body:sub(2)), cb = true }
+    else
+      f = form(forms, false, tag, data)
+    end
+  else
+    local body = tag .. ":" .. ns.Serialize.Encode(data)
+    f = { body = body, wire = body }
+  end
+  forms[cb] = f
+  return f
+end
+
+-- The same message to several players, written once in each form it needs (U71, 7 Nov 2026: a state to nine
+-- Adventurers was packed nine times). What goes out to each is what Send would send.
 function C:SendAll(targets, tag, data, urgent, replace)
-  local body, packed
+  local forms, hinted = {}, false
   for _, target in ipairs(targets) do
     if not (ns.Dev and ns.Dev:Intercept(target, tag, data)) then
-      if not body then
-        if HINT[tag] and type(data) == "table" then data.ln, data.z = #LANES, C.Z end
-        body = tag .. ":" .. ns.Serialize.Encode(data)
+      if not hinted then
+        hinted = true
+        if HINT[tag] and type(data) == "table" then data.ln, data.z, data.cb = #LANES, C.Z, C.CB end
       end
-      local msg = body
+      local f = form(forms, self.cbor[target] and C.CB == 1 or false, tag, data)
+      local msg = f.wire
       -- A long message packed, for an addon that reads packed ones (when packing makes it shorter).
-      if #body > MAX and self.packs[target] then
-        if packed == nil then
-          packed = self:Pack(body) or false
-          if packed and #packed >= #body then packed = false end
+      if #msg > MAX and self.packs[target] then
+        if f.packed == nil then
+          f.packed = self:Pack(f.body) or false
+          if f.packed and #f.packed >= #msg then f.packed = false end
         end
-        if packed then
-          self.packed, self.saved = (self.packed or 0) + 1, (self.saved or 0) + #body - #packed
-          msg = packed
+        if f.packed then
+          self.packed, self.saved = (self.packed or 0) + 1, (self.saved or 0) + #msg - #f.packed
+          msg = f.packed
         end
       end
+      if f.cb then self.cbors = (self.cbors or 0) + 1 end
       if replace then self:DropTag(target, tag) end
       self:Queue(target, tag, msg, urgent)
     end
@@ -278,18 +309,36 @@ function C:Receive(prefix, msg, channel, sender)
     self.buffers[key] = nil
     msg = table.concat(buf.parts)
   end
-  -- Packed (see the top): from an addon that knows this one reads them.
-  if msg:sub(1, 1) == "#" then
+  -- Packed, or the game's CBOR (see the top): from an addon that knows this one reads them.
+  local first = msg:sub(1, 1)
+  if first == "#" then
     msg = self:Unpack(msg)
     if not msg then return end
+  elseif first == "*" then
+    msg = "*" .. unescape(msg:sub(2))
   end
-  local tag, payload = msg:match("^(%u+):(.*)$")
-  if not tag then return end
-  local data, ok = ns.Serialize.Decode(payload)
-  if not ok then return end
+  local tag, data
+  if msg:sub(1, 1) == "*" then
+    if C.CB ~= 1 then return end
+    local colon = msg:find(":", 2, true)
+    tag = colon and msg:sub(2, colon - 1)
+    if not tag or not tag:find("^%u+$") then return end
+    local ok, v = pcall(EU.DeserializeCBOR, msg:sub(colon + 1))
+    if ok then ok, v = pcall(ns.Serialize.Canon, v) end
+    if not ok then return end
+    data = v
+  else
+    local payload
+    tag, payload = msg:match("^(%u+):(.*)$")
+    if not tag then return end
+    local ok
+    data, ok = ns.Serialize.Decode(payload)
+    if not ok then return end
+  end
   if type(data) == "table" and tonumber(data.ln) then
     self.peers[sender] = math.max(1, math.min(#LANES, math.floor(tonumber(data.ln))))
     self.packs[sender] = tonumber(data.z) == 1 and C.Z == 1 or nil
+    self.cbor[sender] = tonumber(data.cb) == 1 and C.CB == 1 or nil
   end
   local fn = self.handlers[tag]
   if not fn then return end

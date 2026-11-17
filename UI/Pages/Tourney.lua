@@ -6,10 +6,9 @@ local L = ns.L
 local UI, Theme = ns.UI, ns.Theme
 local T, Tn, Hr, R = ns.Tournament, ns.Tourney, ns.Hero, ns.Rules
 
-local COL_W = 196
--- 18 px between columns for the bracket lines. Cards 60 high with a class icon and level on each line (U17, 31 Oct
--- 2026: the small cards left most of the page empty).
-local CARD_W, CARD_H, GAP = COL_W - 18, 60, 10
+-- Cards 60 high with a class icon and level on each line (U17, 31 Oct 2026: the small cards left most of the page
+-- empty); in a drawn bracket each column is half the page, its cards 18 px narrower for the bracket lines (U134).
+local CARD_W, CARD_H, GAP = 178, 60, 10
 
 local function who(x, f)
   if x == false then return L.T_BYE end
@@ -421,15 +420,20 @@ local function refresh(pf, ctx)
     c:ClearAllPoints(); c:SetPoint("TOPLEFT", Rc, "TOPLEFT", x, -top); c:Show()
   end
 
-  -- Up to 8 entrants in a stage: the drawn bracket, columns two by two joined by bracket lines.
+  -- Up to 8 entrants in a stage: the drawn bracket, columns two by two joined by bracket lines, across the page's
+  -- whole width; with four or fewer the cards stand further apart too (U134, the roadmap review of 17 Nov 2026: four
+  -- entrants were a small bracket in the page's corner).
   local function bracket(st, cols)
+    local colW = math.floor((ns.Window.PAGE_W - 8) / 2)
+    local cardW = colW - 18
+    local gap = #st.columns[cols[1]].matches <= 2 and GAP * 4 or GAP
     for i = 1, #cols, 2 do
       local top, tallest = rs.y, 0
       local prev -- the left column's card centres, to draw the bracket lines to the right column
       for k = 0, 1 do
         local col = st.columns[cols[i + k]]
         if col then
-          local x, yy = k * COL_W, top
+          local x, yy = k * colW, top
           label(col.label, x, yy)
           yy = yy + 18
           local centres = {}
@@ -439,16 +443,16 @@ local function refresh(pf, ctx)
             if feeds then
               local a, b = prev[2 * j - 1], prev[2 * j] or prev[2 * j - 1]
               yy = (a.y + b.y) / 2 - CARD_H / 2
-              local mid = x - (COL_W - CARD_W) / 2
+              local mid = x - (colW - cardW) / 2
               for _, src in ipairs({ a, b }) do
-                link(src.x + CARD_W, src.y, mid, src.y, src.w ~= nil)
+                link(src.x + cardW, src.y, mid, src.y, src.w ~= nil)
               end
               link(mid, a.y, mid + 2, b.y, a.w ~= nil or b.w ~= nil)
               link(mid, yy + CARD_H / 2, x, yy + CARD_H / 2, m.w ~= nil)
             end
             centres[j] = { x = x, y = yy + CARD_H / 2, w = m.w }
-            card(m, x, yy, CARD_W)
-            yy = yy + CARD_H + GAP
+            card(m, x, yy, cardW)
+            yy = yy + CARD_H + gap
           end
           prev = centres
           tallest = math.max(tallest, yy - top)

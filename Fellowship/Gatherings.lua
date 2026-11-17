@@ -163,4 +163,90 @@ function G:Tick()
   end
 end
 
-ns:On("LOGIN", function() C_Timer.NewTicker(G.TICK, function() G:Tick() end) end)
+---------------------------------------------------------------------------
+-- When the fellowship plays (U122, the roadmap review of 17 Nov 2026)
+---------------------------------------------------------------------------
+-- The hours this account was online, on any of its characters, in a fellowship or not (ns.db.played: { [hours
+-- since 1970 by the server's clock] = true }, the last two weeks). Shared with the state as a grid of the week's 168
+-- hours by the server's clock (hour 0 is Thursday 00:00 there; the same hour for every Adventurer, whatever their
+-- time zone or their PC's clock): how many of the two weeks they played then (0, 1 or 2), three hours to a letter.
+G.WEEK, G.PLAYED_FOR = 168, 336
+local DIGITS = "0123456789abcdefghijklmnopq" -- 27: three hours of 0, 1 or 2
+
+-- Hour (and minute) of day n (0 today) by this PC's calendar, as a timestamp: by the date, not n * 86400 after
+-- midnight, so a day after the clocks change keeps its hours (code review of 2.0).
+function G.Moment(n, hour, minute)
+  local t = date("*t", time())
+  return time({ year = t.year, month = t.month, day = t.day + n, hour = hour or 0, min = minute or 0, sec = 0 })
+end
+
+function G:Played()
+  local now = math.floor(GetServerTime() / 3600)
+  local p = type(ns.db.played) == "table" and ns.db.played or {}
+  ns.db.played = p
+  if p[now] then return end
+  p[now] = true
+  for h in pairs(p) do if type(h) ~= "number" or h <= now - self.PLAYED_FOR then p[h] = nil end end
+end
+
+-- The grid of a record like ns.db.played.
+function G.Grid(played)
+  local n = {}
+  for h in pairs(played) do local s = h % G.WEEK; n[s] = math.min(2, (n[s] or 0) + 1) end
+  local out = {}
+  for s = 0, G.WEEK - 1, 3 do
+    local v = (n[s] or 0) * 9 + (n[s + 1] or 0) * 3 + (n[s + 2] or 0) + 1
+    out[#out + 1] = DIGITS:sub(v, v)
+  end
+  return table.concat(out)
+end
+
+function G:MyGrid() return G.Grid(ns.db.played or {}) end
+
+function G.Valid(grid) return type(grid) == "string" and #grid == G.WEEK / 3 and not grid:find("[^0-9a-q]") end
+
+-- How many of the two weeks a grid played in hour s of the week (0-167).
+function G.Weeks(grid, s)
+  local i = math.floor(s / 3) + 1
+  local v = DIGITS:find(grid:sub(i, i), 1, true) - 1
+  return math.floor(v / 3 ^ (2 - s % 3)) % 3
+end
+
+-- The hour (0-23, the player's own time) of day n (0 today) when most Adventurers play, how many, and their weeks
+-- (to break a tie), from the grids they share (mine from this account's own record); nil when fewer than two do.
+-- Today only the hours ahead. One grid per account (h.mark, U68): two characters of one player count once.
+function G:Busiest(f, n)
+  local me, grids, accts = ns.Me(), {}, {}
+  for name in pairs(f.members) do
+    local h = Hr:Get(f, name)
+    local grid = name == me and self:MyGrid() or h and h.pt
+    local acct = name == me and ns.Watch and ns.Watch:Mark() or h and h.mark or name
+    if G.Valid(grid) and not accts[acct] then accts[acct] = true; grids[#grids + 1] = grid end
+  end
+  if #grids < 2 then return nil end
+  local now = time()
+  local skew = GetServerTime() - now -- (this PC's clock may be off; the grids are by the server's)
+  local best, most, weeks
+  for hour = 0, 23 do
+    local at = G.Moment(n, hour)
+    if at > now then
+      local s = math.floor((at + skew) / 3600) % self.WEEK
+      local people, w = 0, 0
+      for _, grid in ipairs(grids) do
+        local x = G.Weeks(grid, s)
+        if x > 0 then people, w = people + 1, w + x end
+      end
+      if people >= 2 and (not best or people > most or people == most and w > weeks) then best, most, weeks = hour, people, w end
+    end
+  end
+  return best, most, weeks
+end
+
+-- Sharing turned off or on: the others hear it with the state.
+ns:On("SETTING", function(key)
+  if key == "sharePlay" and F:Current() then Hr:Soon("share", 3, function() Hr:SendState() end) end
+end)
+ns:On("LOGIN", function()
+  G:Played()
+  C_Timer.NewTicker(G.TICK, function() G:Played(); G:Tick() end)
+end)

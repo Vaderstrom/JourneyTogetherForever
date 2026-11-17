@@ -6,13 +6,35 @@ local UI, Theme, Combat, Settings = ns.UI, ns.Theme, ns.Combat, ns.Settings
 local T = { shownCount = 0, exampleN = 0, moving = false }
 ns.Toasts = T
 
--- Settings → "Show an example toast" goes through these in turn (from the mockup; the clear with its picture, U7).
-T.EXAMPLES = {
-  { "chapter", L.EX_CHAPTER_TITLE, L.EX_CHAPTER_TEXT }, { "floor", L.EX_FLOOR_TITLE, L.EX_FLOOR_TEXT },
-  { "clear", L.EX_CLEAR_TITLE, L.EX_CLEAR_TEXT, { dungeon = "stocks", kicker = L.TOAST_CLEARED, who = L.EX_CLEAR_WHO } },
-  { "heroFloor", L.EX_HEROFLOOR_TITLE, L.EX_HEROFLOOR_TEXT },
-  { "heroCap", L.EX_HEROCAP_TITLE, L.EX_HEROCAP_TEXT }, { "overCap", L.EX_OVERCAP_TITLE, L.EX_OVERCAP_TEXT },
-}
+-- Each kind's example (Settings: pointing at its line, U121): { title, text, more }, in the toast's own words with
+-- sample names (the first six from the mockup; the clear with its picture, U7).
+function T:ExampleOf(kind)
+  local dd, at = ns.Dungeon("dm") or ns.DUNGEONS[1], ns.ATTUNEMENTS[1]
+  local a, b, key, dn = L.EX_NAME_1, L.EX_NAME_2, dd[1], dd[2]
+  local d = { dungeon = key }
+  local E = {
+    chapter = { L.EX_CHAPTER_TITLE, L.EX_CHAPTER_TEXT }, floor = { L.EX_FLOOR_TITLE, L.EX_FLOOR_TEXT },
+    clear = { L.EX_CLEAR_TITLE, L.EX_CLEAR_TEXT, { dungeon = "stocks", kicker = L.TOAST_CLEARED, who = L.EX_CLEAR_WHO } },
+    heroFloor = { L.EX_HEROFLOOR_TITLE, L.EX_HEROFLOOR_TEXT }, heroCap = { L.EX_HEROCAP_TITLE, L.EX_HEROCAP_TEXT },
+    overCap = { L.EX_OVERCAP_TITLE, L.EX_OVERCAP_TEXT },
+    ahead = { L.T_AHEAD:format(3, a), L.T_AHEAD_TEXT:format(a) },
+    session = { L.T_SESSION:format(ns.Session.Duration(7800)),
+      ns.Session:Text({ with = { a, b }, levels = { { a, 24, 25 } }, runs = { { key = key, cleared = true } } }, true) },
+    gathering = { L.G_SOON, L.G_SOON_TEXT:format(dn, ns.Gatherings.When(time() + 3600)), d },
+    attune = { L.TOAST_ATTUNE_TITLE:format(at and at.name or dn), L.TOAST_ATTUNE_RAID },
+    dquest = { dn, ns.QuestLists.PickText({ {} }), d },
+    dready = { L.T_READY, L.T_READY_TEXT:format(dn), d },
+    dallready = { L.T_ALL_READY, L.T_ALL_READY_TEXT:format(dn), d },
+    dremind = { L.REMIND_TITLE, L.REMIND_1:format(a, (dn:gsub(L.REMIND_ARTICLE, ""))), d },
+    dshare = { L.T_SHARE, L.T_SHARE_1:format(L.EX_QUEST, b), d },
+    room = { L.TOAST_ROOM_NOW_TITLE, L.TOAST_ROOM_NOW },
+    version = { L.TOAST_VERSION_TITLE, L.TOAST_VERSION_TEXT:format(a, L.EX_VERSION, ns.VERSION or "") },
+    first = { L.T_FIRST:format(a), ns.Firsts.Text({ key = "lvl20", name = a }) },
+    invite = { L.T_INVITE, L.INBOX_INVITE:format(a, L.EX_FELLOWSHIP) },
+    challenge = { L.T_RING, L.CH_RING_CLAIMED:format(a, L.RING_A_RING), ns.Challenges:ToastOf("ring") },
+  }
+  return E[kind]
+end
 
 -- Small caps line above the title: the toast's own (own), else the event's name, or the addon's name.
 function T:Kicker(kind, own)
@@ -20,20 +42,22 @@ function T:Kicker(kind, own)
   return (label or L.ADDON_NAME):upper()
 end
 
--- Returns "off" (Reduce effects or this event turned off) or "shown". page (optional): the book's page a click opens.
+-- Returns "off" (Reduce effects or this event turned off; Settings' example shows through both) or "shown". page (optional): the book's page a click opens.
 -- more (optional): { dungeon = key (its picture on the left), kicker = text, who = a line under the text,
--- solemn = true (a Fallen, the last shared life: darker, slower, with a bell; SPEC §9), icon = a path of ns.ICONS (in
+-- example = true (Settings' example: shown also while its kind is off), solemn = true (a Fallen, the last shared life: darker, slower, with a bell; SPEC §9), icon = a path of ns.ICONS (in
 -- place of its kind's: a challenge's own), framed = true (the big moments' gold frame at the normal size: the Ring
 -- passing on), sound = a name for ns.Sound, big = true (a big moment's banner for another kind: a Fallen, U43),
 -- go = a line in the lower right that says where a click leads, actions = { { label, fn }, ... } (up to two buttons
 -- under the text: the toast stays until one is pressed or the banner is clicked away; an invitation, U109), still =
--- a function that says whether the answers still apply (answered elsewhere: the toast goes) }.
+-- a function that says whether the answers still apply (answered elsewhere: the toast goes), map = Show on map's
+-- marks (QuestLists:ToastMap; a button that, unlike answers, keeps the toast's usual time: U248) }.
 function T:Push(kind, title, text, page, more)
-  if Settings:Get("reduce") or (kind and not Settings:ToastOn(kind)) then return "off" end
+  -- (Settings' example shows with Reduce effects too, calm: pointing at a line showed nothing; release review of 2.0.)
+  if (Settings:Get("reduce") or (kind and not Settings:ToastOn(kind))) and not (more and more.example) then return "off" end
   more = more or {}
   local t = { kind = kind, title = title, text = text, page = page, dungeon = more.dungeon, kicker = more.kicker, who = more.who,
     solemn = more.solemn, icon = more.icon, framed = more.framed, sound = more.sound, big = more.big, go = more.go,
-    actions = more.actions, still = more.still }
+    actions = more.actions, still = more.still, map = more.map, example = more.example }
   -- The banner is made at login. Only after a /reload during combat can it be missing: then it shows after combat.
   if not self.frame and Combat:InCombat() then
     Combat:AfterCombat(function() T:Show(t) end)
@@ -45,10 +69,19 @@ end
 
 function ns:Toast(kind, title, text, page, more) return T:Push(kind, title, text, page, more) end
 
-function T:Example()
-  local e = self.EXAMPLES[self.exampleN % #self.EXAMPLES + 1]
-  self.exampleN = self.exampleN + 1
-  return self:Push(e[1], e[2], e[3], nil, e[4])
+-- Settings → pointing at a toast's line shows that toast (U121, the roadmap review of 17 Nov 2026; it replaced Show an
+-- example toast), also while it is off, to see it before turning it off or on. Without a kind (/jtf debug toast), the
+-- next kind in turn.
+function T:Example(kind)
+  if not kind then
+    local all = Settings.TOAST_EVENTS
+    kind = all[self.exampleN % #all + 1]
+    self.exampleN = self.exampleN + 1
+  end
+  local e = self:ExampleOf(kind)
+  local more = e[3] or {}
+  more.example = true
+  return self:Push(kind, e[1], e[2], nil, more)
 end
 
 ---------------------------------------------------------------------------
@@ -293,7 +326,9 @@ function T:Fill(t)
   -- Taller when the text takes more than one line, and for the line of who was there.
   local extra = math.max(0, math.ceil((f.text:GetStringHeight() or 0) - (big and 17 or 15)))
   if t.who then extra = extra + math.ceil(f.who:GetStringHeight() or 0) + 4 end
-  if t.actions then extra = extra + 30 end
+  -- Show on map (U248): the quests the toast names on the world map; in combat their place goes to chat.
+  local acts = t.actions or (t.map and { { L.DG_WAYPOINT, function() ns.QuestLists:Pin(nil, t.map.title or t.title, t.map) end } })
+  if acts then extra = extra + 30 end
   local h = (big and 112 or 86) + extra
   -- With a picture the banner is as tall as it with its margins, and the words sit in the middle beside it.
   local top = 14
@@ -309,7 +344,7 @@ function T:Fill(t)
   f.hold:SetDuration(t.actions and T.ANSWER_HOLD or (big and 6 or (solemn and T.SOLEMN.hold or 3.05)))
   local x = 0
   for i, b in ipairs(f.acts) do
-    local a = t.actions and t.actions[i]
+    local a = acts and acts[i]
     b:SetShown(a ~= nil)
     if a then
       b.fn = a[2]
@@ -420,7 +455,9 @@ function T:Show(t)
   end
   self:Fill(t)
   self.current = t
-  self:Settle(f, self.MID[t.kind] == true or t.big == true)
+  local calm = Settings:Get("reduce") -- (only an example gets here then: no fade and no slide)
+  if calm then f.fadeIn:SetDuration(0) end
+  self:Settle(f, not calm and (self.MID[t.kind] == true or t.big == true))
   self.shownCount = self.shownCount + 1
   f:SetAlpha(1)
   f:Show()

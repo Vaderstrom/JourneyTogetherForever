@@ -1,5 +1,32 @@
 # Changelog
 
+## 2.0.0 (17 November 2026)
+- What's New shows once after this update: on your own, when most of you play, and dungeon quests in order.
+- Fixed: inspecting an Adventurer who has shared no gear said "No gear shared yet." twice, on the card and under it. It says it once now.
+- Fixed: when two Adventurers' changes crossed on the way, the Chronicle could list the same lines in another order for each of you, and with Shared lives two falls at once could count the lives left differently, until the copies settled up to five minutes later. Every copy now keeps them in time order.
+- Fixed: Undead Adventurers are no longer asked for Compendium of the Fallen (Scarlet Monastery) or Necklace Recovery, Take 3 (Uldaman), quests the game does not give the Undead. Who is ready, the To do, the toasts and where to stop questing leave them out for them.
+- Fixed: dungeon quests updated: the Horde's The Platinum Discs (Uldaman) ends in Thunder Bluff, as the Alliance's ends in Ironforge; A Taste of Flame (Blackrock Depths) shows its chain from the Searing Gorge; WoW Forever's XP for eight quests, the Onyxia attunement's among them; Blackmaw Hold's Forsaken paladin quest, The Reliquary of Tyr, as a class quest.
+- With ForeverCore, Under the game's quest tracker makes the tracker one section of ForeverCore's quest column, under the quests (it sat over ForeverCore's list, which takes the place of the game's tracker since ForeverCore 1.14.2). ForeverCore places it: its width, scale, background and lock apply.
+- Chapter page: a drawing fills the right page when its lists leave room, as on the other pages.
+- Sync: messages between Adventurers on this version are now written and read by the game itself, so they are smaller and quicker to handle. Adventurers on an older version still get them as before, and every copy of the fellowship stays the same whichever way a message came.
+- Welcome: On your own, a third way in. Follow the WoW Forever journey alone on this character: the chapter follows your level, with no floor or cap, and each dungeon, once open at your level, has its quests to pick up and its run; a chapter without dungeons just says to level up, with no stage track. Nothing is sent to anyone. The sidebar keeps Chapter, Dungeons, Quests and Found or join; founding or joining a fellowship replaces it.
+- Fixed: turning on Everyone to the cap first in a later chapter now takes the fellowship back to the chapter whose cap not every Adventurer has reached. A fellowship that turned it on with 1.10.0 goes back after its Leader logs in, once the Leader's addon has heard from another Adventurer. Only the cap is asked again, not the dungeons.
+- Chapter page: the stage track no longer starts with "Everyone at 21" when the chapter before already waited for everyone to reach 21; that was its last step. Your To do drops "Reach the floor" then too, once you are there. The cap stage reads "Everyone to 21" (it said "Level to 21").
+- Chapter page: cleared dungeons keep their rows in Your To do, ticked, instead of folding into one line.
+- Quests page: the Dungeon quests tab shows this chapter's quests on the left, under "First: Chapter III", to finish first, and the later chapters' on the right, under "Start early". In each dungeon the quests you have started come first. The Overview's Your dungeon quests panel and the tracker's For the journey follow the same order.
+- Journey Admin: "Add WoW Forever's goals", on the Whole journey tab, puts the Cozy Sleeping Bag, Night Watchman's Torch and Friend of the Library goals into a journey made before 1.10, as Optional milestones in the chapter of their level. Publish to share them. A goal you already added by hand is not added twice.
+- Fixed: in Journey Admin's Add a milestone, the Pick from your quests list opened behind the form.
+- Chapter page: the chains for later dungeons that you can start now are one line in Your To do ("2 chains for later dungeons open now"). Point at it to see them; a click opens them under Start early on the Quests page.
+- Chapter page: a newcomer catching up, who holds nobody back, is one grey line under Where the Adventurers stand ("Catching up: Fenna (level 2)") instead of a red Below the floor row.
+- Settings: pointing at a line under Progress toasts shows that toast, also while it is off or Reduce effects is on, so you can see it before you turn it off or on. Show an example toast is gone.
+- Gatherings: Schedule a Gathering opens on the dungeon to run next instead of "Something else".
+- Gatherings: The week ahead says when most of you play on each day without a Gathering ("3 of you play around 20:00"), and its Schedule starts at that hour; Schedule at the top starts at the busiest day and hour of the week. Each account records the hours it plays on any character, the last two weeks, and shares only those hours of the week. Settings → Gatherings → Share when I play turns it off. Adventurers on an older version are not counted until they update.
+- Minimap button: its tooltip shows your fellowship's chapter, your level against the floor and the cap, how many things wait in the Inbox and the next Gathering.
+- Tournament: a bracket of up to eight Adventurers fills the right page, its cards wider; with four, further apart too.
+- Toasts: the ones that name quests to pick up or to start (dungeon quests, Almost ready, a reminder, an attunement) have a Show on map button. The world map opens with a numbered mark where each quest starts; click a mark to set a waypoint. In combat the place is written in chat. The toast keeps its usual time.
+- Fixed: a Gathering scheduled for a day after the clocks change to or from summer time started an hour off the time chosen.
+- Tracker: while the chapter waits for the floor, the status line says what to do about it ("Help Corwin to the floor"), once instead of twice.
+
 ## 1.10.0 (16 November 2026)
 - What's New shows once after this update: your dungeon quests, every step on the map, and WoW Forever's goals.
 - Fixed: dungeon quest starts and chain steps updated (Rig Wars no longer a step of the Chief Engineer Scooty chain; The True Masters givers in Stormwind placed on the map).

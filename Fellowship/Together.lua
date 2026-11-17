@@ -248,13 +248,14 @@ function T:ToDo(f, n, noLater)
   local ch = f.journey.chapters[n]
   if not ch then return items end
   local me, now = ns.Me(), n == J:CurrentIndex(f)
-  if now then
+  -- (On your own no first steps of a Leader, no floor and no cap: U241.)
+  if now and not f.solo then
     for _, st in ipairs(self:Started(f) or {}) do items[#items + 1] = { kind = "start", text = st.text, done = st.done, page = st.page } end
   end
   local fl, lvl = J:FloorLevel(f, ch), Hr:Level(f, me)
   -- (A Friend of the fellowship never counts for the floor, SPEC §1.1; a floor of level 1, the Prologue's, is always
-  -- reached: no line for it, U236.)
-  if fl > 1 and not F:IsFriend(f, me) then
+  -- reached: no line for it, U236. Nor once you are at one the chapter before held, J:FloorHeld: its last step.)
+  if fl > 1 and not f.solo and not F:IsFriend(f, me) and not (lvl >= fl and J:FloorHeld(f, n)) then
     local it = { kind = "floor", text = L.TODO_FLOOR:format(fl), done = lvl >= fl }
     -- Your estimate on the line in the current chapter (U232: the waiting box that said it went).
     if now and not it.done then
@@ -274,7 +275,7 @@ function T:ToDo(f, n, noLater)
   end
   -- The cap, whenever it holds the chapter (U227): Everyone to the cap first, or no Required dungeons (J:GoalDone).
   -- How many are there only in the current chapter (today's levels say nothing of a chapter already complete).
-  if not F:IsFriend(f, me) and J:CapHolds(f, n) then
+  if not f.solo and not F:IsFriend(f, me) and J:CapHolds(f, n) then
     local there, of = J:AtCap(f, ch)
     items[#items + 1] = { kind = "cap", done = lvl >= ch.cap,
       text = now and of > 1 and L.TODO_CAP_N:format(ch.cap, there, of) or L.TODO_CAP:format(ch.cap) }
@@ -305,7 +306,8 @@ end
 -- Focus now: the one thing to do now, the first open item of your chapter's To do, picked in Play now's order when
 -- others are online (SPEC §4.4, §6). { head, why, button = { kind = "page" | "find" | "invite" | "ready", page, key,
 -- names }, link = { page or key (a Dungeon page), text }, namesBelow = true when it names everyone below the floor (the
--- Overview's strip then says nothing of the floor, U239) }; the tracker shows head.
+-- Overview's strip then says nothing of the floor, U239), floor = true when it is about the floor (the tracker's status
+-- line then says it, U251) }; the tracker shows head.
 function T:Focus(f)
   local ch = J:Current(f)
   if not ch then return { head = L.FOCUS_RAIDS, why = L.FOCUS_RAIDS_WHY, button = { kind = "page", page = "raids" } } end
@@ -328,10 +330,10 @@ function T:Focus(f)
     for _, name in ipairs(below) do if name ~= me then others[#others + 1] = name end end
     local why = self.HowFar(f, me, J:FloorLevel(f, ch), true)
     if #others > 0 then why = why .. " " .. L.FOCUS_SAME_SPOT:format(ns.Quests.NameList(others)) end
-    return { head = L.FOCUS_FLOOR:format(J:FloorLevel(f, ch)), why = why, button = invite, link = chapter, namesBelow = true }
+    return { head = L.FOCUS_FLOOR:format(J:FloorLevel(f, ch)), why = why, button = invite, link = chapter, namesBelow = true, floor = true }
   end
   if p and p.kind == "help" then
-    return { head = L.FOCUS_HELP:format(ns.Short(p.who)), why = L.FOCUS_HELP_WHY, button = invite, link = chapter, namesBelow = #below == 1 }
+    return { head = L.FOCUS_HELP:format(ns.Short(p.who)), why = L.FOCUS_HELP_WHY, button = invite, link = chapter, namesBelow = #below == 1, floor = true }
   end
   -- Play now's dungeon, else the first you still need (as Recommended next), else the first one you cleared.
   local pick
@@ -373,13 +375,14 @@ function T:Focus(f)
 end
 
 -- The tracker's For the journey (U217, the owner, 15 Nov 2026; it was one Prequest line, U124): up to three things to
--- do next, in the dungeon quest log's order (U213): your dungeon quests under way, then this chapter's next quest
--- milestone you have not done (one: chapter III has three, which left no line for the dungeons), then the dungeon
--- quests open now. { text, key, id }; a goal has no key.
+-- do next, in the Dungeon quests tab's order (QL:Plan; the release review of 17 Nov 2026: two orders for one log):
+-- this chapter's quests under way, then this chapter's next quest milestone you have not done (one: chapter III has
+-- three, which left no line for the dungeons), then this chapter's to start, then Start early's, under way first.
+-- { text, key, id }; a goal has no key.
 T.FOR_JOURNEY = 3
 function T:ForJourney(f)
   local QL, M, me = ns.QuestLists, ns.Milestones, ns.Me()
-  local log, out = QL:Log(f, me), {}
+  local plan, out = QL:Plan(f, me), {}
   local function add(text, key, id) if #out < self.FOR_JOURNEY then out[#out + 1] = { text = text, key = key, id = id } end end
   local function line(r)
     local q = r.q
@@ -390,11 +393,14 @@ function T:ForJourney(f)
     local d = ns.Dungeon(r.key)
     return L.TRACK_J_RUN:format(q.name, d and d[2] or r.key)
   end
-  for _, r in ipairs(log.under) do add(line(r), r.key, r.q.id) end
+  local function rows(part, under)
+    for _, r in ipairs(part) do if (not r.started) == (not under) then add(line(r), r.key, r.q.id) end end
+  end
+  rows(plan.first, true)
   for _, m in ipairs(M:List(f, J:CurrentIndex(f))) do
     if m.kind == "quest" and not M:HeroDone(f, m, me) then add(L.TRACK_J_GOAL:format(m.name)); break end
   end
-  for _, r in ipairs(log.open) do add(line(r), r.key, r.q.id) end
+  rows(plan.first, false); rows(plan.early, true); rows(plan.early, false)
   return out
 end
 
@@ -470,6 +476,7 @@ T.HowFar = howFar
 ---------------------------------------------------------------------------
 -- { head ("Level 19 · 2.6 to the cap"), state (the head without the level) }.
 function T:You(f)
+  if f.solo then return {} end -- (on your own: no floor or cap to measure you against, U241)
   local me = ns.Me()
   local lvl = Hr:Level(f, me)
   local ch = J:Current(f)

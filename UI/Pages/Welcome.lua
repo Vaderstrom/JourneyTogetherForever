@@ -19,7 +19,8 @@ local function build(pf)
   tag:SetText(L.TAGLINE)
   -- The two ways in as large picture tiles, like the Adventure Guide's dungeon buttons (they were two small buttons
   -- under the features; seen in game, 27 Oct 2026). Sized so the three feature lines still fit under them.
-  local TILE_H, TILE_TOP = 112, -186
+  -- (Three since On your own, U241: lower, so the feature lines keep their place.)
+  local TILE_H, TILE_GAP, TILE_TOP = 72, 10, -186
   pf.found = UI.PictureTile(left, width, TILE_H, function(tex, w, h) ns.Pages:SetChapterArt(tex, 1, w, h, 0.45) end,
     function() W.startView = "create"; W:Refresh() end)
   pf.found:Set(L.FOUND, L.FOUND_TILE)
@@ -30,16 +31,22 @@ local function build(pf)
     tex:SetTexture(ns.MEDIA .. hall[1]); UI.Cover(tex, hall[2], w, h, 0.5)
   end, function() W.startView = "join"; W:Refresh() end)
   pf.join:Set(L.JOIN, L.JOIN_TILE)
-  pf.join:SetPoint("TOP", pf.found, "BOTTOM", 0, -12)
+  pf.join:SetPoint("TOP", pf.found, "BOTTOM", 0, -TILE_GAP)
+  -- On your own (U241): the journey by your level, never sent; on it, back to it.
+  pf.solo = UI.PictureTile(left, width, TILE_H, function(tex, w, h) ns.Pages:SetChapterArt(tex, 2, w, h, 0.5) end, function()
+    if not ns.Fellowship:Current() then ns.Fellowship:Solo() end
+    W:ShowPage("chapter")
+  end)
+  pf.solo:SetPoint("TOP", pf.join, "BOTTOM", 0, -TILE_GAP)
   -- A link to the Join page (it was pale gold text that did nothing; seen in the tour).
   pf.invites = UI.TextButton(left, "", function() W.startView = "join"; W:Refresh() end, "link", 13)
-  pf.invites:SetPoint("TOP", pf.join, "BOTTOM", 0, -6)
+  pf.invites:SetPoint("TOP", pf.solo, "BOTTOM", 0, -6)
   -- A trial account (ns.Trial): what will not work, where the invites line would be.
   pf.trial = UI.WrapText(left, 12, "B0321E", width, "book")
-  pf.trial:SetPoint("TOP", pf.join, "BOTTOM", 0, -6)
+  pf.trial:SetPoint("TOP", pf.solo, "BOTTOM", 0, -6)
   pf.trial:SetText(L.TRIAL)
   -- What the addon does, below the two ways in.
-  local y = TILE_TOP - 2 * TILE_H - 12 - 36
+  local y = TILE_TOP - 3 * TILE_H - 2 * TILE_GAP - 36
   for i, key in ipairs({ "overview", "tourney", "quests" }) do
     local icon = UI.Round(left, "ARTWORK", 22)
     icon:SetPoint("TOPLEFT", 0, y)
@@ -87,13 +94,14 @@ local function build(pf)
   pf.list = UI.CharacterList(pf.scroll.child, width - 8)
 end
 
-local function refresh(pf)
+local function refresh(pf, ctx)
   local n = #ns.Fellowship:MyInvites()
   local trial = ns.Trial()
   pf.trial:SetShown(trial)
+  if ctx and ctx.solo then pf.solo:Set(L.SOLO_BACK, L.SOLO_BACK_TILE) else pf.solo:Set(L.SOLO, L.SOLO_TILE) end
   -- (The invites line goes under the trial warning.)
   pf.invites:ClearAllPoints()
-  pf.invites:SetPoint("TOP", trial and pf.trial or pf.join, "BOTTOM", 0, trial and -4 or -6)
+  pf.invites:SetPoint("TOP", trial and pf.trial or pf.solo, "BOTTOM", 0, trial and -4 or -6)
   pf.invites:SetShown(n > 0)
   pf.invites:SetLabel(ns.InlineTexture(ns.ICONS.inbox, 14) .. " " .. (n == 1 and L.INVITES_WAITING_1 or L.INVITES_WAITING_N:format(n)))
   local listH = pf.list:Refresh() + 8

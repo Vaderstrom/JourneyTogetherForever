@@ -210,16 +210,16 @@ local function build(pf)
   left:Head("help", L.SET_HELP)
   -- The setup guide and the walkthrough again (only in a fellowship: they are part of the book).
   pf.setupAgain = UI.TextButton(Lp, L.SETUP_AGAIN, function()
-    if not ns.Fellowship:Current() then return end
+    if not ns.Fellowship:Real() then return end
     ns.SetupGuide:Open(W.beforeSettings)
   end, "plain")
-  pf.setupAgain.Refresh = function(b) b:SetEnabled(ns.Fellowship:Current() ~= nil) end
+  pf.setupAgain.Refresh = function(b) b:SetEnabled(ns.Fellowship:Real() ~= nil) end
   left:Row(L.SETUP_GUIDE, pf.setupAgain, L.SETUP_AGAIN_HINT)
   pf.walkAgain = UI.TextButton(Lp, L.WALK_AGAIN, function()
-    if not ns.Fellowship:Current() then return end
+    if not ns.Fellowship:Real() then return end
     ns.Walkthrough:Start()
   end, "plain")
-  pf.walkAgain.Refresh = function(b) b:SetEnabled(ns.Fellowship:Current() ~= nil) end
+  pf.walkAgain.Refresh = function(b) b:SetEnabled(ns.Fellowship:Real() ~= nil) end
   left:Row(L.WALK_SETTING, pf.walkAgain, L.WALK_AGAIN_HINT)
   pf.minimapBox = UI.Checkbox(Lp, check("minimap"))
   left:Row(L.MINIMAP_BUTTON, pf.minimapBox, L.MINIMAP_HINT)
@@ -249,11 +249,9 @@ local function build(pf)
     return n
   end
   local function toastSum(kinds) return L.SET_SUM_ON:format(count(kinds, function(k) return Settings:ToastOn(k) end), #kinds) end
-  local toasts = right:Head("toasts", L.PROGRESS_TOASTS, L.PROGRESS_TOASTS_HINT, { group = "right", sum = function()
+  right:Head("toasts", L.PROGRESS_TOASTS, L.PROGRESS_TOASTS_HINT, { group = "right", sum = function()
     return toastSum(Settings.TOAST_EVENTS)
   end })
-  pf.example = UI.TextButton(Rp, L.EXAMPLE_TOAST, function() ns.Toasts:Example() end, "link", 12)
-  pf.example:SetPoint("BOTTOMRIGHT", toasts, "BOTTOMRIGHT", 0, 7)
   -- Under three short headings (U86): your journey, the fellowship, dungeons and raids. Each folds to its tick and how
   -- many are on, its lines on a click on its words (U233, the check of 16 Nov 2026: twenty lines at once). Folded at
   -- first; kept for the character (ns.char.setFold, "toasts1" to "toasts3").
@@ -276,6 +274,19 @@ local function build(pf)
     local frames, head = right:Grid(items), pf.toastHeads[gi]
     head.kinds, head.frames = g[2], {}
     for i, kind in ipairs(g[2]) do pf.toastRows[kind] = frames[kind].box; head.frames[i] = frames[kind] end
+    -- Pointing at a line shows that toast (U121; it was Show an example toast at the heading).
+    for _, kind in ipairs(g[2]) do
+      local row = frames[kind]
+      -- (Once: from the line onto its tick is not a second showing; code review of 2.0.)
+      local function show()
+        local T = ns.Toasts
+        if T.current and T.current.example and T.current.kind == kind and T.frame and T.frame:IsShown() then return end
+        T:Example(kind)
+      end
+      row:EnableMouse(true)
+      row:SetScript("OnEnter", show)
+      row.box:HookScript("OnEnter", show)
+    end
     head.icon = tsec.body:CreateTexture(nil, "ARTWORK")
     head.icon:SetSize(14, 14); head.icon:SetPoint("LEFT", head, "RIGHT", 4, 0)
     head.sum = UI.Text(tsec.body, 11, "ink2")
@@ -378,6 +389,11 @@ local function build(pf)
   right:Row(L.DUNGEONS_SHOW, dropdown(Rp, CHOICES, "dungeonsShow"), L.DUNGEONS_SHOW_HINT)
   right:Row(L.RAIDS_SHOW, dropdown(Rp, CHOICES, "raidsShow"), L.RAIDS_SHOW_HINT)
   right:Row(L.STORY_FROM, dropdown(Rp, { { L.SPOKEN, "spoken" }, { L.LORE_FOREVER, "lore" } }, "storyFrom"), L.STORY_FROM_HINT)
+  -- Gatherings (U122): whether the others see when you play. (Taking turns too: the left page was full.)
+  right:Head("gatherings", L.NAV_GATHERINGS, nil, { group = "right", folded = true, sum = function()
+    return Settings:Get("sharePlay") and L.SET_SUM_PLAY_ON or L.SET_SUM_PLAY_OFF
+  end })
+  right:Row(L.SHARE_PLAY, UI.Checkbox(Rp, check("sharePlay")), L.SHARE_PLAY_HINT)
   pf.heights = { left = left:MaxHeight(), right = right:MaxHeight() }
   function pf.layout() left:Layout(); right:Layout() end
   -- Opens or folds a section; opening one of a group folds the others.

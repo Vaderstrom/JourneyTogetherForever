@@ -888,7 +888,7 @@ local function refreshInspect(pf, ctx, width)
     end
     cd.none:SetShown(#worn == 0)
   end
-  if not h.gear then pf.gearAsOf:SetText(L.GEAR_NONE)
+  if not h.gear then pf.gearAsOf:SetText(card and "" or L.GEAR_NONE) -- the card says it already (check of 17 Nov 2026)
   elseif online then pf.gearAsOf:SetText(L.GEAR_NOW:format(ns.Short(name)))
   else pf.gearAsOf:SetText(L.GEAR_AS_OF:format(ns.TimeAgo(h.gearTime or Hr:LastSeen(f, name)), ns.Short(name))) end
 

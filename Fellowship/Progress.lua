@@ -90,7 +90,8 @@ function P:Check(f)
   local ch = f.journey.chapters[cur]
   local unlocked = ch ~= nil and J:Unlocked(f)
   local stand = {}
-  if ch then
+  -- (On your own only the chapter and the journey: no floor or cap, U241.)
+  if ch and not f.solo then
     for _, name in ipairs(J:Counted(f)) do
       stand[name] = standing(f, ch, name)
       self:OverCap(f, ch, cur, name)
@@ -161,7 +162,7 @@ end
 -- "close" (the level before the cap, past the warning point), "at" (at or over the cap), or nil.
 function P:CapState(f, ch)
   ch = ch or J:Current(f)
-  if not ch or not ns.Settings:Get("warnCap") then return nil end
+  if not ch or f.solo or not ns.Settings:Get("warnCap") then return nil end
   local lvl = Hr:Level(f, ns.Me())
   if lvl >= ch.cap then return "at" end
   local max = UnitXPMax("player") or 0

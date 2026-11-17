@@ -108,12 +108,13 @@ function V:Apply(f, op, by, t)
     local yes, _, need = self:Counts(f, { ballots = ballots }, awayFor(f, op))
     if yes < need then return false end
     v.ballots = ballots
-    local r = {}
+    local r, was = {}, f.rules
     for k, val in pairs(f.rules) do r[k] = val end
     r[v.key] = v.value
     f.rules = R.Clean(r)
     v.result, v.closed = "passed", t
     F:Log(f, L.CHR_VOTE_PASSED:format(R.Name(v.key), R.ValueText(v.key, v.value)), t, "votepassed")
+    F:RulesChanged(f, was)
     ns:Toast(nil, L.V_PASSED, L.V_PASSED_TEXT:format(R.Name(v.key), R.ValueText(v.key, v.value)), "rules")
   else
     return false

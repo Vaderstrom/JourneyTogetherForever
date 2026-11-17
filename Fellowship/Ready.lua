@@ -145,7 +145,9 @@ function R:Check()
     local id = title and (mine.ready and key or "almost:" .. key)
     if id and not seen[key] and not seen[id] then
       seen[id] = true
-      ns:Toast("dready", title, text, function() R:Open(key) end, { dungeon = key })
+      -- (Almost ready names the quests still to pick up: Show on map marks them, U248.)
+      local map = not mine.ready and ns.QuestLists:ToastMap(ns.QuestLists.PickList(mine), name) or nil
+      ns:Toast("dready", title, text, function() R:Open(key) end, { dungeon = key, map = map })
     end
     if not seen["all:" .. key] and self:Everyone(f, key) then
       seen["all:" .. key] = true
@@ -220,7 +222,8 @@ function R:Apply(f, by, op, t)
       local who = ns.Short(by)
       local text = pick == 0 and L.REMIND_EARLY:format(who, where)
         or (pick == 1 and L.REMIND_1:format(who, where) or L.REMIND_N:format(who, pick, where))
-      ns:Toast("dremind", L.REMIND_TITLE, text, function() R:Open(key) end, { dungeon = key, who = by })
+      ns:Toast("dremind", L.REMIND_TITLE, text, function() R:Open(key) end,
+        { dungeon = key, who = by, map = pick > 0 and ns.QuestLists:ToastMap(ns.QuestLists.PickList(r), ns.Dungeon(key)[2]) or nil })
     end
   end
   return true

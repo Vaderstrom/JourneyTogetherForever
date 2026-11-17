@@ -295,6 +295,23 @@ local function build(pf)
     return c
   end)
   pf.msAdd = UI.TextButton(R, L.MS_ADD, function() local f = cur(); if f then A:MilestoneForm(f) end end, "plain")
+  -- WoW Forever's goals for a journey made before them (the owner, 17 Nov 2026: "an easy add feature for the journey
+  -- admin"): into the draft, each in the chapter of its level; This chapter then shows the chapter of the first. In
+  -- Whole journey, with the other journey-wide actions (U249; under a chapter's dungeons it was out of sight).
+  pf.goals = UI.TextButton(ed.panes.journey, L.ADMIN_GOALS, function()
+    local f = cur()
+    if not f then return end
+    A:Edit(f, function(d) local added = ns.AddForeverGoals(d.chapters, f.faction); A.sel = added[1] and added[1].i or A.sel end)
+    pf.editor:ShowTab("chapter")
+  end, "plain", 12)
+  UI.Tooltip(pf.goals, function()
+    local f, names, seen = cur(), {}, {}
+    for _, x in ipairs(f and ns.ForeverGoalsMissing(A:Journey(f).chapters) or {}) do
+      local s = ns.ForeverGoalName(x.g, f.faction) -- (the two Greater Friend goals share a name: once)
+      if not seen[s] then seen[s] = true; names[#names + 1] = s end
+    end
+    return L.ADMIN_GOALS_TIP:format(table.concat(names, "\n"))
+  end)
   -- Back to this chapter (U231, the owner, 16 Nov 2026: "Is there a way for the leader/admin backtrack"; picked
   -- "Journey Admin"): on a chapter before the current one; greyed, with the reason under it, while a draft waits or
   -- when that chapter would complete again at once.
@@ -351,6 +368,9 @@ local function build(pf)
     if f then W:TextDialog(L.EXPORT_TITLE, L.EXPORT_HINT, ns.Journey.Export(A:Journey(f))) end
   end, "plain", 12)
   function pf.placeExport(r)
+    local f = cur()
+    pf.goals:SetShown(f ~= nil and #ns.ForeverGoalsMissing(A:Journey(f).chapters) > 0)
+    if pf.goals:IsShown() then r:Place(pf.goals, 28, 12) end
     r:Place(pf.exportLabel, 16, 4)
     r:Place(pf.export, 28, 12)
   end

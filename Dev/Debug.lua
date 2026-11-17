@@ -241,6 +241,18 @@ function D:HeroMore(f, full, what, arg)
   elseif what == "gear" then
     -- They share their gear (your own items, as a stand-in).
     ns.Comm:Inject(full, "GEAR", { fid = f.id, g = ns.Hero:MyGear(), t = time() })
+  elseif what == "plays" then
+    -- When they play (U122): every day of the last two weeks from one hour to another in your own time, 19-22 unless
+    -- given: /jtf debug hero <Name> plays 20-21
+    local a, b = (arg or ""):match("^(%d+)%-(%d+)$")
+    a, b = tonumber(a) or 19, tonumber(b) or 22
+    local skew, played = GetServerTime() - time(), {}
+    for d = -14, -1 do
+      for hr = a, b do played[math.floor((ns.Gatherings.Moment(d, hr) + skew) / 3600)] = true end
+    end
+    local s = self:StateOf(f, full)
+    s.pt = ns.Gatherings.Grid(played)
+    ns.Comm:Inject(full, "STATE", { fid = f.id, v = f.v, s = s })
   elseif what == "version" then
     -- Their addon says hello with another version: /jtf debug hero <Name> version 0.9.0 (the version notice)
     ns.Comm:Inject(full, "HELLO", { fid = f.id, v = f.v, s = self:StateOf(f, full, arg ~= "" and arg or "0.9.0") })
@@ -331,6 +343,10 @@ function D:SyncInfo()
   -- Real-time sync (6 Nov 2026): whispers free of the per-prefix wait, and what packing saved.
   ns:Debug(L.DEV_SYNC_PACKED:format(ns.Comm:Free() and L.ON or L.OFF, ns.Comm.Z and L.ON or L.OFF, ns.Comm.packed or 0,
     ns.Comm.saved or 0))
+  -- The game's CBOR (U254): how many messages went in it, and to how many who read it.
+  local readers = 0
+  for _ in pairs(ns.Comm.cbor) do readers = readers + 1 end
+  ns:Debug(L.DEV_SYNC_CBOR:format(ns.Comm.CB and L.ON or L.OFF, ns.Comm.cbors or 0, readers))
 end
 
 ---------------------------------------------------------------------------

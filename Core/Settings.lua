@@ -15,6 +15,7 @@ S.TOAST_GROUPS = {
 S.DEFAULTS = {
   theme = "journal", size = 1, fullscreen = false, chat = "all", warnCap = true, warnPct = 75, reduce = false, minimap = true, lang = "en",
   picture = true, -- the picture moment after a dungeon's final boss (UI/Picture.lua)
+  sharePlay = true, -- the hours this account plays, shared with the fellowship (U122, Fellowship/Gatherings.lua)
   sounds = true, -- the book's sounds (UI/Sound.lua)
   storyFrom = "spoken", -- the story button: Spoken first, or Lore Forever ("lore") (UI/OtherAddons.lua; 6 Nov 2026)
   tracker = true, -- the on-screen tracker (UI/Tracker.lua)

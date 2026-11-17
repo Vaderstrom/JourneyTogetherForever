@@ -381,9 +381,9 @@ Comm:On("INV", function(sender, d)
     -- in a fellowship (Accept would ask to leave it first: the Join page does that).
     local fid, inv = d.fid, ns.char.invites[d.fid]
     -- (Not one past its day: a courier's copy hours late; MyInvites no longer lists it.)
-    if not cur and now - inv.time <= S.EXPIRE then
+    if not F:Real() and now - inv.time <= S.EXPIRE then
       ns:Toast("invite", L.T_INVITE, (inv.friend and L.INBOX_INVITE_FRIEND or L.INBOX_INVITE):format(ns.Short(inv.leader or sender), inv.name),
-        nil, { icon = ns.ICONS.toast_invite, still = function() return not F:Current() and ns.char.invites[fid] ~= nil end, actions = {
+        nil, { icon = ns.ICONS.toast_invite, still = function() return not F:Real() and ns.char.invites[fid] ~= nil end, actions = {
           { L.ACCEPT, function() F:AcceptInvite(fid, ns.CreateState.role) end },
           { L.DECLINE, function() F:DeclineInvite(fid) end } } })
     end
@@ -557,7 +557,7 @@ Comm:On("SNAP", function(sender, d)
   local me, mine = ns.Me(), F:Get(snap.id)
   -- The copy of a fellowship this addon lost (Sync:Unknown): restored at once when this character knew it was in it,
   -- else after a question.
-  if not mine and S.asked[snap.id] and snap.members[me] and snap.members[sender] and not F:Current() and not snap.disbanded then
+  if not mine and S.asked[snap.id] and snap.members[me] and snap.members[sender] and not F:Real() and not snap.disbanded then
     S.asked[snap.id] = nil
     if ns.char.fellowshipId == snap.id then return S:Restore(snap) end
     S.restore = { f = snap, from = sender }
@@ -612,9 +612,13 @@ Comm:On("SNAPM", function(sender, d)
       list[#list + 1] = { text = e.text, time = tonumber(e.time), k = type(e.k) == "string" and e.k or nil, who = type(e.who) == "string" and e.who or nil }
     end
   end
-  -- (Newest first; lines with the same time keep their order.)
+  -- (F:Log's order: newest first, the same time by who; one Adventurer's lines of the same second keep their order.)
   for i, e in ipairs(list) do e._i = i end
-  table.sort(list, function(a, b) if a.time ~= b.time then return a.time > b.time end return a._i < b._i end)
+  table.sort(list, function(a, b)
+    if a.time ~= b.time then return a.time > b.time end
+    if (a.who or "") ~= (b.who or "") then return (a.who or "") < (b.who or "") end
+    return a._i < b._i
+  end)
   for _, e in ipairs(list) do e._i = nil end
   while #list > F.CHRONICLE_MAX do table.remove(list) end
   f.chronicle = list
@@ -662,7 +666,7 @@ end
 S.asked = {}
 
 function S:Unknown(sender, fid)
-  if type(fid) ~= "string" or F:Get(fid) or F:Current() or self.asked[fid] or self.restore then return end
+  if type(fid) ~= "string" or F:Get(fid) or F:Real() or self.asked[fid] or self.restore then return end
   self.asked[fid] = true
   Comm:Send(sender, "SNAPQ", { fid = fid, v = 0 }, false, true)
 end
@@ -683,7 +687,7 @@ end
 -- The question, in the book: "Lea says you are in Band. Restore it?"
 function S:OfferRestore()
   local r = self.restore
-  if not r or F:Current() then return end
+  if not r or F:Real() then return end
   ns.Window:Confirm(L.RESTORE_Q:format(ns.Short(r.from), r.f.name), L.RESTORE_OK, function() S:Restore(r.f) end)
 end
 

@@ -260,7 +260,7 @@ end
 
 -- rank: the tour's rank (default: yours); since: only what is new since that rank (after a promotion).
 function WK:Start(rank, since)
-  if not ns.Fellowship:Current() then return false end
+  if not ns.Fellowship:Real() then return false end
   if later(function() WK:Start(rank, since) end) then return false end
   rank = rank or self:MyRank() or "member"
   build()
@@ -371,7 +371,7 @@ end
 ---------------------------------------------------------------------------
 -- The card alone: "Show me around?" with Show me around / Later.
 function WK:Offer(rank, since)
-  if self.on or not ns.Fellowship:Current() or not W():IsOpen() then return false end
+  if self.on or not ns.Fellowship:Real() or not W():IsOpen() then return false end
   build()
   self.offer = { rank = rank, since = since }
   local step = { id = since and "OFFER_NEW" or "OFFER" }

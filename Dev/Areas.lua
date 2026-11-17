@@ -6,6 +6,8 @@
 -- noShots / noChecks: areas that have nothing to show or nothing to test on their own (with the reason).
 -- alone: its checks and shots need nothing set up before them (no fellowship, no pretend Heroes): "/jtf check <area>"
 -- with only such areas runs just their checks and shots, in seconds instead of minutes.
+-- needs: steps of other areas (prefixes, as checks) that its steps build on, run before them in a check of this area
+-- (U253; A.SETUP below are those every area builds on).
 local _, ns = ...
 local A = {}
 ns.CheckAreas = A
@@ -13,13 +15,14 @@ ns.CheckAreas = A
 A.LIST = {
   { key = "basics", title = "Game, art, boss data, crests; the book in combat",
     checks = { "game APIs", "textures", "boss data", "the presets:", "version notice:", "crests:", "the book in combat",
-      "screenshots:" },
+      "screenshots:", "the check:" },
     noShots = "checks only: game functions and our files" },
   { key = "controls", title = "Buttons and choices (the game's art)", checks = { "controls:" }, shots = { "controls-gallery" } },
-  { key = "welcome", title = "Welcome and Your characters", shots = { "welcome", "characters-panel", "characters-panel-all" },
+  { key = "welcome", title = "Welcome, Your characters and On your own (U241)", shots = { "welcome", "characters-panel", "characters-panel-all", "solo-chapter" },
     checks = { "play another character", "welcome:" } },
   { key = "found", title = "Create a Fellowship (size, style, journey, your own)",
     checks = { "create:", "found the Selftest fellowship", "rename and banner" },
+    needs = { "challenges: Create's step" }, -- (the review lists the challenges chosen there)
     shots = { "create-1", "create-1-filled", "create-2", "create-2-fine", "create-3", "create-3-own", "create-chapters",
       "create-chapters-shelf", "create-chapters-journey", "create-4" } },
   { key = "setup", title = "Setup guide", checks = { "setup guide" }, shots = { "setup-1", "setup-2", "setup-3" } },
@@ -34,6 +37,7 @@ A.LIST = {
     shots = { "leader-overview-new", "overview-ready", "overview-catchup", "overview-behind", "overview-since" } },
   { key = "together", title = "Playing together: Play now, keep in step, session recap, friends without the addon",
     checks = { "keep in step", "session recap", "friends without the addon" },
+    needs = { "the ones ahead see who is behind" }, -- (the Adventurers' levels you pull ahead of)
     shots = { "overview-playnow", "toast-ahead", "toast-session", "chronicle-sessions", "share-window" } },
   { key = "watch", title = "Following another character's fellowship", checks = { "watch:" },
     shots = { "watch-overview", "watch-chapter", "watch-heroes", "watch-rules", "watch-inspect", "watch-characters" } },
@@ -46,21 +50,26 @@ A.LIST = {
   { key = "news", title = "What's New: once after each update", checks = { "what's new" }, shots = { "news" } },
   { key = "chapter", title = "Chapter, dungeons and clears",
     checks = { "chapter page and Find group", "chapter page:", "clears:", "mark cleared", "prologue:", "catching up:" },
+    needs = { "the ones ahead see who is behind" }, -- (Adventurers at the floor and above, for Find group)
     shots = { "leader-chapter-new", "chapter-waiting", "chapter", "chapter-tooltip", "chapter-picture", "chapter-next",
       "chapter-later", "find-group", "chapter-partial", "chapter-you-cleared", "undo-reopen-confirm", "chapter-catching", "chapter-capfirst" } },
   { key = "milestones", title = "Milestones", checks = { "milestones" },
     shots = { "chapter-milestones", "admin-milestone-form", "admin-one-level" } },
   { key = "chronicle", title = "Chronicle and the cap", checks = { "Chronicle: three tabs", "Chronicle filters", "Chronicle: chapters", "Chronicle: the fellowship's firsts", "firsts: a real mount", "the cap:" },
+    needs = { "the ones ahead see who is behind", "clears: partial, then cleared" }, -- (a run for the Runs filter)
     shots = { "leader-chronicle-empty", "chronicle", "chronicle-runs", "chronicle-firsts" } },
   { key = "challenges", title = "Challenges: chosen at founding; survival, broken rules, the Ring, the race, held at the door (X1-X5, X7)",
     checks = { "challenges:" },
+    needs = { "create: each step on both pages", "create: the journey editor" }, -- (Create open at its Challenges step)
     shots = { "create-challenges", "create-challenges-tip", "create-challenges-many", "heroes-fallen", "inspect-fallen",
       "chronicle-fallen", "chronicle-firsts-fallen", "overview-lives", "rules-challenges", "rules-edit-challenges",
       "heroes-broken", "chronicle-broken", "rules-challenges-more", "rules-ring-road", "chapter-ring-bearer", "rules-edit-ironman", "toast-ring-passed",
       "toast-fallen", "toast-broken" } },
   { key = "moments", title = "Moments: the journey's big moments and your pictures", checks = { "moments:" },
+    needs = { "picture moment: take a picture", "mark cleared: the next chapter unlocks" }, -- (a picture, a chapter)
     shots = { "leader-moments-empty", "moments" } },
   { key = "history", title = "Chronicle: The fellowship, its own story (History until U142)", checks = { "history:" },
+    needs = { "tournament: round robin" }, -- (a tournament in its story)
     shots = { "leader-history-alone", "history" } },
   { key = "photo", title = "Group photo: everyone together on the whole screen", checks = { "group photo:" },
     shots = { "group-photo", "group-photo-studio", "group-photo-twelve", "group-photo-look" } },
@@ -72,7 +81,7 @@ A.LIST = {
   { key = "dquests", title = "Dungeon quests: the To do's needs, the lists and chains (U79, U101, U141)", checks = { "dungeon quests:" },
     shots = { "toast-dquest", "dungeon-page-chain", "dungeon-map", "dungeon-page-class", "quests-dungeon-log", "overview-dquests" } },
   { key = "dungeonpage", title = "The Dungeons page; the Dungeon page, Who is ready, Remind; the game's tabs (U96-U102, U157)",
-    checks = { "dungeon page:", "tabs:" }, shots = { "dungeons", "dungeons-open", "dungeon-page", "dungeon-page-forever", "dungeon-page-who", "quests-dungeons-new", "toast-dready", "toast-dallready", "toast-dremind", "toast-dshare" } },
+    checks = { "dungeon page:", "tabs:" }, needs = { "mark cleared: the next chapter unlocks" }, shots = { "dungeons", "dungeons-open", "dungeon-page", "dungeon-page-forever", "dungeon-page-who", "quests-dungeons-new", "toast-dready", "toast-dallready", "toast-dremind", "toast-dshare" } },
   { key = "room", title = "Room for the dungeon quests", checks = { "room:" },
     shots = { "overview-room", "chapter-room", "dungeon-page-room", "toast-room" } },
   { key = "attune", title = "Attunements", checks = { "quests: tabs and attunements", "attunements:" },
@@ -91,7 +100,7 @@ A.LIST = {
   { key = "inbox", title = "Inbox, with what needs the Leader's attention (U144)", checks = { "inbox", "ask to group up", "needs attention" },
     shots = { "inbox-attention", "inbox-full", "inbox-size", "inbox-notice" } },
   { key = "admin", title = "Journey Admin", checks = { "Journey Admin", "export and import" },
-    shots = { "leader-admin", "admin-chapter-2", "admin-back", "admin-bosses", "admin-shelf", "admin-add-again", "admin-journey", "admin-export" } },
+    shots = { "leader-admin", "admin-chapter-2", "admin-back", "admin-bosses", "admin-shelf", "admin-add-again", "admin-journey", "admin-export", "admin-goals" } },
   { key = "raids", title = "The Endgame and raids", checks = { "the Endgame" }, shots = { "raids-early", "raids", "raids-mc", "toast-endgame" } },
   { key = "tourney", title = "Guild Master tournament", checks = { "tournament" },
     shots = { "tourney-signup", "tourney-bracket", "tourney-champion", "tourney-double", "tourney-groups", "tourney-rr", "tourney-20" } },
@@ -105,7 +114,7 @@ A.LIST = {
   { key = "board", title = "The board for the Discord companion", checks = { "board:" },
     noShots = "saved data for the companion app; nothing on the screen" },
   { key = "access", title = "Realms and trial accounts", checks = { "realms:", "trial account:" }, shots = { "trial-bar" } },
-  { key = "settings", title = "Settings", checks = { "settings and themes" }, shots = { "settings", "settings-tracker-off" } },
+  { key = "settings", title = "Settings", checks = { "settings and themes" }, shots = { "settings", "settings-toast-point", "settings-tracker-off" } },
   { key = "themes", title = "Themes, book sizes and full screen", checks = { "screen:" },
     shots = { "night-overview", "night-chapter", "night-quests", "night-heroes", "night-manage", "alliance-overview", "alliance-chapter",
       "alliance-heroes", "horde-overview", "horde-chapter", "horde-heroes", "horde-manage", "horde-chronicle", "horde-quests", "size-80",
@@ -120,6 +129,26 @@ for _, a in ipairs(A.LIST) do
 end
 
 function A:Get(key) return byKey[key] end
+
+-- What a check of some areas runs of the self-test before their last step (U253, the roadmap review of 17 Nov 2026:
+-- a rerun of one late area ran some 260 steps first): their own steps, the steps every area builds on (A.SETUP) and
+-- those of other areas that theirs build on (an area's `needs`), each a prefix of step names as in `checks`. The tour
+-- still sets up every screen before their last picture: its pictures build on each other (the chapter, levels and
+-- clears the earlier screens made). tests/test_check.lua runs every area on its own and holds it to its checks.
+A.SETUP = { "found the Selftest fellowship", "getting started (the leader", "invite pretend Heroes",
+  "the invites were received", "pretend Heroes accept", "levels: below the floor" }
+
+local function starts(name, list)
+  for _, p in ipairs(list or {}) do if name:sub(1, #p) == p then return true end end
+  return false
+end
+
+function A:Runs(name, set)
+  if starts(name, self.SETUP) then return true end
+  for _, key in ipairs(self:ForStep(name)) do if set[key] then return true end end
+  for key in pairs(set) do if byKey[key] and starts(name, byKey[key].needs) then return true end end
+  return false
+end
 
 -- Do these areas (a set of keys) all stand alone? Then a check runs only their steps and shots.
 function A:Alone(set)

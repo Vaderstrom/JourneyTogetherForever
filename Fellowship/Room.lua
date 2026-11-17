@@ -63,10 +63,13 @@ function R:Share(f, key, name, seen)
     if xp then out.quests = out.quests + xp else out.unknown = out.unknown + 1 end
   end
   for _, q in ipairs(QL:DungeonQuests(f, key)) do
-    count(q.id)
-    -- A step of its chain done in the run pays there too (Uldaman's A Sign of Hope, before The Lost Tablets of Will).
-    local st = ns.QUEST_STARTS[q.id]
-    for _, s in ipairs(st and st.after or {}) do if s.run then count(s[1], s.xp) end end
+    -- (Not one the game does not give name's race, nor its chain: name's lists never ask for them.)
+    if not QL.Closed(h, q.id) then
+      count(q.id)
+      -- A step of its chain done in the run pays there too (Uldaman's A Sign of Hope, before The Lost Tablets of Will).
+      local st = ns.QUEST_STARTS[q.id]
+      for _, s in ipairs(st and st.after or {}) do if s.run then count(s[1], s.xp) end end
+    end
   end
   return out
 end
@@ -76,6 +79,7 @@ end
 -- chapter, a level size (at the level cap) or any quest XP known (no "about 0.0 levels" line).
 -- Levels are walked one by one with the game's XP table (Pace.Reach, Pace.Back): each is bigger than the last.
 function R:Chapter(f, name)
+  if f and f.solo then return nil end -- (on your own no cap, so no room: U241)
   local J = ns.Journey
   local ch = f and J:Current(f)
   local level, xp, max = standing(f, name)

@@ -457,6 +457,7 @@ end
 -- shown: 1.5 once raised "bad argument #1 to 'SetText'" on a red button's tooltip in WoW Forever (the owner, 10 Nov
 -- 2026; the cause is not known yet, the self-test hovers those buttons to find it).
 function UI.Tooltip(frame, text)
+  frame.tipText = text -- (the self-test reads it: in WoW Forever a hooked script cannot be run by hand)
   frame:HookScript("OnEnter", function()
     local t = type(text) == "function" and text() or text
     if type(t) ~= "string" or (issecretvalue and issecretvalue(t)) or t == "" then return end
@@ -1132,7 +1133,9 @@ function UI.Dropdown(parent, width, options, getValue, setValue)
   menu.bgRole = "page1"
   menu:Paint()
   menu:SetPoint("TOPLEFT", dd, "BOTTOMLEFT", 0, -2)
-  menu:SetFrameLevel(owner:GetFrameLevel() + 100)
+  -- Above whatever holds the box: an overlay (Add a milestone) lies 100 over the page (the owner, 17 Nov 2026:
+  -- "Pick from your quests" opened under it).
+  menu:SetFrameLevel(math.max(owner:GetFrameLevel(), parent:GetFrameLevel()) + 100)
   menu:Hide()
   dd.menu = menu
   dd.items = {}
@@ -2387,6 +2390,7 @@ end
 
 -- Where the Companions stand (Chapter and Overview pages): a section per group (below the floor, ready, at the cap,
 -- over the cap, away) with its Companions under it; a group with nobody says nothing (U187, the owner, 12 Nov 2026).
+-- Newcomers catching up: one grey line under the list, "Catching up: Fenna (level 2)" (U252).
 -- :Set(f, n, stack) places it on a UI.Stack.
 function UI.Standings(parent, width)
   local s = { groups = {} }
@@ -2424,17 +2428,20 @@ function UI.Standings(parent, width)
     r.note:SetPoint("RIGHT", r.level, "LEFT", -10, 0)
     return r
   end)
+  s.catching = UI.Text(parent, 12, "ink2")
+  s.catching:SetWidth(width - 24)
 
   function s:Hide()
     for _, g in ipairs(self.groups) do g:Hide() end
     self.rows:HideFrom(1)
+    self.catching:Hide()
   end
 
   function s:Set(f, n, stack)
     local J, Hr, L = ns.Journey, ns.Hero, ns.L
     local light = Theme:Current().light
-    local rowN = 0
-    for i, g in ipairs(J:Groups(f, n)) do
+    local rowN, groups = 0, J:Groups(f, n)
+    for i, g in ipairs(groups) do
       local gf = self.groups[i]
       if #g.rows == 0 then
         gf:Hide()
@@ -2472,6 +2479,13 @@ function UI.Standings(parent, width)
       end
     end
     self.rows:HideFrom(rowN + 1)
+    local who = {}
+    for _, r in ipairs(groups.catching or {}) do who[#who + 1] = L.STAND_CATCHING_WHO:format(ns.Short(r.name), Hr:Level(f, r.name)) end
+    self.catching:SetShown(#who > 0)
+    if #who > 0 then
+      self.catching:SetText(L.STAND_CATCHING:format(table.concat(who, ", ")))
+      stack:Place(self.catching, self.catching:GetStringHeight(), 8, 12)
+    end
   end
   return s
 end

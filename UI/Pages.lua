@@ -37,6 +37,7 @@ function P:Context()
   -- Manage is the Leader's, in Admin; Adventurers invite on the Adventurers page (27 Oct 2026).
   ctx.canManage = ctx.isLeader or false
   ctx.canAdmin = ctx.isLeader or false
+  ctx.solo = ctx.f and ctx.f.solo or nil -- on your own (U241)
   if ns.Dev and ns.Dev.tourney and ctx.inFellow then ctx.tActive = true end
   -- Watching another character's fellowship (Fellowship/Watch.lua): read-only, no rank.
   -- (The walkthrough's sample keeps your rank there, so its pages show as they will for you.)
@@ -56,6 +57,13 @@ local function raidsShown(f) return f and ns.Endgame and (ns.Endgame:Open(f) or 
 -- Sidebar groups for ctx (empty outside a fellowship).
 function P:Nav(ctx)
   if not ctx.inFellow then return {} end
+  -- On your own (U241): the journey's pages, and Found or join (Welcome) to found or join a fellowship instead.
+  if ctx.solo then
+    local journey = { "chapter", "dungeons", "quests" }
+    if raidsShown(ctx.f) then table.insert(journey, 3, "raids") end
+    return { { label = L.NAV_JOURNEY, items = journey },
+      { label = L.NAV_FELLOWSHIP, items = { "welcome" }, labels = { welcome = L.NAV_FIND } } }
+  end
   -- Watching: the pages to follow the fellowship by, nothing to act on. The rules read only (28 Oct 2026).
   if ctx.watching then
     local journey = { "overview", "chapter", "dungeons", "chronicle" }
@@ -105,6 +113,12 @@ function P:Resolve(page, startView, ctx)
   local def = self.pages[page]
   -- Settings shows in and outside a fellowship (def.anywhere).
   if def and def.anywhere then return page end
+  -- On your own (U241): Welcome leads on to Found and Join as without a fellowship; anything else not in the sidebar
+  -- shows the Chapter page.
+  if ctx.solo then
+    if page == "welcome" then return startView or "welcome" end
+    return ((def and def.free) or self:InNav(page, ctx)) and page or "chapter"
+  end
   if ctx.inFellow then
     return ((def and def.free) or self:InNav(page, ctx)) and page or "overview"
   end

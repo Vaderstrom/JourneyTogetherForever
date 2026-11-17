@@ -80,9 +80,6 @@ local function build(pf)
     return n
   end)
   pf.links = UI.Pool(function() local t = pf.track:CreateTexture(nil, "BORDER"); t:SetHeight(2); return t end)
-  -- Steps for later dungeons still open once the chapter's own stages are done: they never hold it back (U140).
-  pf.laterLine = UI.Text(Lc, 12, "B8742A", "body", "CENTER")
-  pf.laterLine:SetWidth(width)
   -- All chapters (U140, the Overview's contents until the rebuild): every chapter, folded until asked for.
   pf.allBtn = UI.TextButton(Lc, "", function() pf.allCh = not pf.allCh; W:Refresh() end, "link", 13)
   pf.toc = UI.Pool(function()
@@ -111,12 +108,10 @@ local function build(pf)
   pf.div = UI.Divider(Lc)
   pf.todoHead = UI.SectionHeader(Lc, width)
   pf.todoHead:SetText(L.TODO_HEAD)
-  pf.subLater = UI.Text(Lc, 11, "ink2")
-  pf.subLater:SetText(L.TODO_LATER:upper())
   pf.subLike = UI.Text(Lc, 11, "ink2")
   pf.subLike:SetText(L.TODO_IF_YOU_LIKE:upper())
-  -- A To do line without a dungeon (the new Leader's steps, reach the floor): its mark and text; a step with a page
-  -- opens it.
+  -- A To do line without a dungeon (the new Leader's steps, reach the floor, the chains for later dungeons): its mark
+  -- and text; a step with a page opens it (and its tab).
   pf.simple = UI.Pool(function()
     local r = CreateFrame("Button", nil, Lc)
     r:SetSize(width, 24)
@@ -127,24 +122,16 @@ local function build(pf)
     r.text:SetWidth(width - 30); r.text:SetWordWrap(false)
     local hl = r:CreateTexture(nil, "HIGHLIGHT")
     hl:SetAllPoints(); hl:SetColorTexture(1, 0.9, 0.6, 0.08)
-    -- (The cleared dungeons' line, U227, shows or hides their rows.)
-    r:SetScript("OnClick", function()
-      if r.fold then pf.unfold[r.fold] = not pf.unfold[r.fold]; W:Refresh() elseif r.page then W:ShowPage(r.page) end
-    end)
+    r:SetScript("OnClick", function() if r.page then W:ShowPage(r.page, r.tab) end end)
     UI.Tooltip(r, function() return r.tip end)
     return r
   end)
-  pf.unfold = {}
   -- A dungeon as one row (28 Oct 2026: the picture cards took a page each and the dungeons had to be scrolled): a
   -- small picture, name, kind and levels, and at the right its state or Find group. The rest is in the tooltip.
   pf.rows = UI.Pool(function()
     local c = UI.Card(Lc)
     c:SetSize(width, ROW_H)
     c:EnableMouse(true)
-    -- A step for a later dungeon lies on a gold tint (U140).
-    c.tint = c:CreateTexture(nil, "BORDER", nil, 2)
-    c.tint:SetPoint("TOPLEFT", 2, -2); c.tint:SetPoint("BOTTOMRIGHT", -2, 2)
-    c.tint:SetColorTexture(0.79, 0.64, 0.29, 0.14)
     -- The role's colour down the row's left edge (and its border): mandatory, from the next chapter, optional at a
     -- glance.
     c.stripe = c:CreateTexture(nil, "ARTWORK", nil, 3)
@@ -261,6 +248,8 @@ local function build(pf)
   -- The level track above the list (U5, 31 Oct 2026): the chapter's floor and cap with everyone on one line.
   pf.levelTrack = UI.LevelTrack(R, width)
   pf.stand = UI.Standings(R, width)
+  -- (On your own the right page was bare under the clears, the check of 17 Nov 2026: the page sketch fills it.)
+  pf.art = UI.PageArt(pf.rscroll, "Since")
 
   -- Dungeon clears: a card with a header row (Hero, dungeons) and one row per Hero.
   pf.mTitle = UI.SectionHeader(R, width)
@@ -518,7 +507,7 @@ local function refresh(pf, ctx)
   local banner = J:Banner(f, view)
   -- (A chapter without dungeons, such as the Prologue, said "Dungeons open"; seen in the check run. So did one whose
   -- dungeons are cleared while Everyone to the cap first holds it, the check of 15 Nov 2026.)
-  local open = (#J:InChapter(f, view) > 0 and banner.stage ~= "level") and L.CH_STATE_OPEN or L.CH_STATE_LEVEL
+  local open = (#J:InChapter(f, view) > 0 and banner.stage ~= "level") and L.CH_STATE_OPEN or (f.solo and L.CH_STATE_SOLO or L.CH_STATE_LEVEL)
   local state = view == cur and (unlocked and open or L.CH_STATE_WAIT) or (view < cur and L.CH_STATE_DONE or L.CH_STATE_NOT)
   -- (The run rule moved to the dungeons' heading: the line wrapped to two in game and pushed the rows down.)
   pf.line:SetText(ch and (L.CH_LEVELS:format(ch.floor, ch.cap) .. state) or "")
@@ -531,15 +520,6 @@ local function refresh(pf, ctx)
     s:Place(pf.track, TRACK_H, 6)
   end
   local items = ch and ns.Together:ToDo(f, view) or {}
-  -- Steps for later dungeons still open, said once the chapter's own stages are done (they never hold it back).
-  local laterOpen = 0
-  for _, it in ipairs(items) do if it.kind == "later" then laterOpen = laterOpen + it.e.open end end
-  local last = nodes[#nodes]
-  pf.laterLine:SetShown(laterOpen > 0 and last ~= nil and last.state ~= "todo")
-  if pf.laterLine:IsShown() then
-    pf.laterLine:SetText(laterOpen == 1 and L.TODO_LATER_OPEN_1 or L.TODO_LATER_OPEN_N:format(laterOpen))
-    s:Place(pf.laterLine, 16, 4)
-  end
   -- All chapters, folded: every chapter, done, now or yet to be revealed; a click shows it here.
   pf.allBtn:SetLabel(UI.FoldLabel(pf.allCh and L.ALL_CHAPTERS_HIDE or L.ALL_CHAPTERS, pf.allCh))
   s:Place(pf.allBtn, 20, 2, math.floor((width - pf.allBtn:GetWidth()) / 2))
@@ -583,42 +563,47 @@ local function refresh(pf, ctx)
   local MS = ns.Milestones
   local canTick = P.Can(f, ns.Me(), "clears") and not ctx.watching
   local nSimple, nMs, shown, subs = 0, 0, 0, {}
-  pf.subLater:Hide(); pf.subLike:Hide()
-  -- U227 (the check of 15 Nov 2026, 22:42): once every Mandatory dungeon is cleared their rows fold into one ticked
-  -- line, its tooltip naming them; a click shows the rows again (with the Leader's ⋯ Undo clear).
-  -- (The chapter's goal's own list, J:Required: a dungeon the game does not offer yet keeps its row.)
-  local req, mand, todo, key = {}, {}, items, f.id .. ":" .. view
-  for _, x in ipairs(J:Required(f, view)) do req[x.key] = true end
-  for _, it in ipairs(items) do if it.kind == "dungeon" and req[it.x.key] then mand[#mand + 1] = it end end
-  local fold, floor = #mand > 0, nil
-  for _, it in ipairs(mand) do fold = fold and it.done end
-  -- U234 (the check of 16 Nov 2026): the floor reached joins the line, "Done: the floor and the 3 dungeons".
-  for _, it in ipairs(items) do if it.kind == "floor" and it.done then floor = it end end
-  if fold then
-    local names, n = {}, #mand
-    for i, it in ipairs(mand) do names[i] = it.x.d[2] end
-    todo = {}
-    for _, it in ipairs(items) do
-      if it == (floor or mand[1]) then
-        todo[#todo + 1] = { kind = "fold", done = true, tip = L.TODO_CLEARED_TIP:format(table.concat(names, ", ")),
-          text = floor and (n == 1 and L.TODO_DONE_1 or L.TODO_DONE_N:format(n)) or (n == 1 and L.TODO_CLEARED_1 or L.TODO_CLEARED_N:format(n)) }
-      end
-      if not (it == floor or (it.kind == "dungeon" and req[it.x.key])) or pf.unfold[key] then todo[#todo + 1] = it end
+  pf.subLike:Hide()
+  -- The chains for later dungeons as one line (U250, the owner, 17 Nov 2026): "2 chains for later dungeons open now",
+  -- each dungeon and its next step in the tooltip; a click opens the Dungeon quests tab, whose Start early is their one
+  -- home (U246). They never hold the chapter back.
+  -- (Chains counted, not dungeons: one dungeon can have two; code review of 2.0.)
+  local laterTip, laterPlaced, chains = {}, false, 0
+  for _, it in ipairs(items) do
+    if it.kind == "later" then
+      laterTip[#laterTip + 1] = it.x.d[2] .. "  ·  " .. (it.line or "")
+      chains = chains + #it.e.steps
     end
   end
-  for _, it in ipairs(todo) do
+  local laterText = chains == 1 and L.TODO_LATER_CHAINS_1 or L.TODO_LATER_CHAINS_N:format(chains)
+  table.insert(laterTip, 1, laterText); laterTip[#laterTip + 1] = L.TODO_LATER_CLICK
+  -- (A cleared dungeon keeps its row, ticked: the owner, 17 Nov 2026, "Do not hide the dungeons we have completed";
+  -- U227 and U234 folded them into one line.)
+  for _, it in ipairs(items) do
     local like = it.kind == "early" or (it.kind == "milestone" and not it.req)
-    local sub = it.kind == "later" and pf.subLater or (like and pf.subLike or nil)
+    local sub = like and pf.subLike or nil
     if sub and not subs[sub] then
       subs[sub] = true
       sub:Show()
       s:Skip(4)
       s:Place(sub, 14, 4)
     end
-    if it.kind == "start" or it.kind == "floor" or it.kind == "cap" or it.kind == "fold" then
+    if it.kind == "later" then
+      nSimple = nSimple + (laterPlaced and 0 or 1)
+      local r = not laterPlaced and pf.simple:Get(nSimple)
+      laterPlaced = true
+      if r then
+        r.mark:SetMark("open")
+        r.text:SetText(laterText)
+        r.text:SetTextColor(Theme:RGBA("ink"))
+        r.page, r.tab, r.tip = "quests", "dungeons", table.concat(laterTip, "\n") -- (UI.Tooltip shows text only)
+        s:Place(r, 24, 2)
+      end
+    elseif it.kind == "start" or it.kind == "floor" or it.kind == "cap" then
       nSimple = nSimple + 1
       local r = pf.simple:Get(nSimple)
       if r then
+        r.tab = nil
         r.mark:SetMark(it.done and "cleared" or "open")
         r.text:SetText(it.text)
         -- Cut to the short line where it does not fit; the whole line on hover then.
@@ -626,7 +611,7 @@ local function refresh(pf, ctx)
         if cut then r.text:SetText(it.short) end
         r.text:SetTextColor(Theme:RGBA(it.done and "ink2" or "ink"))
         r.page = not it.done and it.page or nil
-        r.fold, r.tip = it.kind == "fold" and key or nil, cut and it.text or it.tip
+        r.tip = cut and it.text or it.tip
         s:Place(r, 24, 2)
       end
     elseif it.kind == "milestone" then
@@ -654,34 +639,22 @@ local function refresh(pf, ctx)
       shown = shown + 1
       local x = it.x
       local st = it.state
-      c.mark:SetShown(it.kind ~= "later")
       if st then c.mark:SetMark(st) end
       c.name:SetText(x.d[2])
       -- A dungeon of the next chapter is mandatory in its own: gold there, blue ("From the next chapter") here.
       local role = it.kind == "early" and "b" or (x.role == "o" and "o" or "m")
-      local color = it.kind == "later" and "B8742A" or (J.ROLE_COLOR[role] or J.ROLE_COLOR.m)[1]
+      local color = (J.ROLE_COLOR[role] or J.ROLE_COLOR.m)[1]
       local roleText = it.kind == "early" and L.ROLE_BRIDGE or (role == "o" and L.ROLE_OPTIONAL or L.ROLE_MANDATORY)
       c.stripe:SetColorTexture(ns.Hex(color))
       c.borderRole = color; c:Paint()
-      c.tint:SetShown(it.kind == "later")
-      local label, tip = roleText
-      if it.kind == "later" then
-        label = L.TODO_COMES_IN:format(J.Roman(it.e.chapter))
-        tip = { x.d[2], label }
-        for _, step in ipairs(it.e.steps) do
-          tip[#tip + 1] = L.LATER_TIP_STEP:format(step.name, step.lvl)
-        end
-        tip[#tip + 1] = L.CH_ROW_LATER -- (a later dungeon's page has no Who is ready, SPEC §4.5b)
-      else
-        tip = rowTip(f, x, st, roleText, counted)
-        -- U192 (the owner, 14 Nov 2026): the next chapter's row names its chapter, not "From the next chapter" too.
-        if it.kind == "early" then label = L.CHAPTER_ROMAN:format(J.Roman(x.early or view + 1)) end
-        if x.key == nextKey then label = L.CH_ROW_NEXT; table.insert(tip, #tip, L.CH_ROW_NEXT_TIP) end
-      end
+      local label, tip = roleText, rowTip(f, x, st, roleText, counted)
+      -- U192 (the owner, 14 Nov 2026): the next chapter's row names its chapter, not "From the next chapter" too.
+      if it.kind == "early" then label = L.CHAPTER_ROMAN:format(J.Roman(x.early or view + 1)) end
+      if x.key == nextKey then label = L.CH_ROW_NEXT; table.insert(tip, #tip, L.CH_ROW_NEXT_TIP) end
       c.tip, c.roleText = tip, roleText
       local function line(levels) return ("|cff%s%s|r%s"):format(Theme:HexFor(color), label, levels and ("  ·  " .. levels) or "") end
       -- (No chapter name on this chapter's own rows, U192: the page is the chapter.)
-      local levels = it.kind ~= "later" and L.CH_ROW_LEVELS:format(x.d[3], x.d[4]) or nil
+      local levels = L.CH_ROW_LEVELS:format(x.d[3], x.d[4])
       c.sub:SetText(line(levels))
       c.brief:SetText(it.line or "")
       c.brief:SetShown(true)
@@ -689,11 +662,12 @@ local function refresh(pf, ctx)
       -- At the right: Find group or Get ready (not for a later dungeon or one from the next chapter), and for the
       -- Leader a "⋯" menu with Mark cleared and Undo clear.
       c.key, c.action = x.key, it.action
-      local showGroup = it.kind == "dungeon" and it.action ~= nil and not ctx.watching
+      -- (On your own only Get ready: there is nobody to find, U241.)
+      local showGroup = it.kind == "dungeon" and it.action ~= nil and not ctx.watching and not (ctx.solo and it.action ~= "ready")
       c.group:SetShown(showGroup)
       if showGroup then c.group:SetLabel(it.action == "ready" and L.TODO_GET_READY_BUTTON or L.FIND_GROUP) end
       c.menu:Update()
-      if ctx.watching or it.kind == "later" then c.menu:Hide() end
+      if ctx.watching then c.menu:Hide() end
       c.state:Hide()
       local rx = width - 8
       for _, w in ipairs({ c.menu, c.group }) do
@@ -725,21 +699,26 @@ local function refresh(pf, ctx)
   pf.none:SetShown(ch ~= nil and #list == 0)
   if ch and #list == 0 then
     ns.Pages:SetChapterArt(pf.none.pic, ns.Pages:ArtOf(f, view), width - 4, BIG_PIC_H - 4, 0.5)
-    pf.none.text:SetText(L.CH_NO_DUNGEONS_PIC:format(ch.cap))
+    pf.none.text:SetText((f.solo and L.CH_NO_DUNGEONS_SOLO or L.CH_NO_DUNGEONS_PIC):format(ch.cap))
     s:Place(pf.none, BIG_PIC_H, 6)
   end
   pf.lscroll:SetContentHeight(s.y + 8)
 
-  -- Where the Heroes stand.
+  -- Where the Heroes stand (not on your own: U241, no floor or cap; the clears table alone).
   local r = UI.Stack(pf.rscroll.child)
-  r:Place(pf.head, pf.head:GetHeight(), 4)
-  local room = view == cur and not ctx.watching and ns.Room:Chapter(f, ns.Me()) or nil
-  local th = pf.levelTrack:Set(f, view, 6, room and room.stop)
-  if th > 0 then r:Place(pf.levelTrack, th, 12) end
-  pf.stand:Set(f, view, r)
+  pf.head:SetShown(not ctx.solo); pf.levelTrack:SetShown(not ctx.solo)
+  if ctx.solo then pf.stand:Hide() end
+  if not ctx.solo then
+    r:Place(pf.head, pf.head:GetHeight(), 4)
+    local room = view == cur and not ctx.watching and ns.Room:Chapter(f, ns.Me()) or nil
+    local th = pf.levelTrack:Set(f, view, 6, room and room.stop)
+    if th > 0 then r:Place(pf.levelTrack, th, 12) end
+    pf.stand:Set(f, view, r)
+  end
   -- (The room's answer is on the Overview, U235: only its stop tick on the track here.)
   refreshMatrix(pf, ctx, list, r, width)
   pf.rscroll:SetContentHeight(r.y + 8)
+  pf.art:Fit(r.y)
 end
 
 ns.Pages:Register({ id = "chapter", label = L.NAV_CHAPTER, header = "none", build = build, refresh = refresh,

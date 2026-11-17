@@ -12,14 +12,31 @@ F.ROLES = { Tank = true, Healer = true, DPS = true }
 
 function F:Get(id) return id and ns.db.fellowships[id] or nil end
 
--- This character's fellowship (nil when none, or when it was disbanded or this character is no longer in it).
+-- This character's fellowship (nil when none, or when it was disbanded or this character is no longer in it). Without
+-- one, the journey on your own (U241): ns.char.solo, this character's only and never sent.
 function F:Current()
   -- While the book draws another character's fellowship (Fellowship/Watch.lua): that one.
   local W = ns.Watch
   if W and W.rendering then return W:Fellowship() end
   local f = self:Get(ns.char.fellowshipId)
   if f and not f.disbanded and f.members[ns.Me()] then return f end
+  local s = ns.char.solo
+  if type(s) == "table" and type(s.members) == "table" and s.members[ns.Me()] then return s end
   return nil
+end
+
+-- The fellowship this character is in with others: not the journey on your own (invites, restoring, the guides).
+function F:Real()
+  local f = self:Current()
+  return f and not f.solo and f or nil
+end
+
+-- On your own (U241, the roadmap review of 17 Nov 2026): a journey of one from the WoW Forever preset, on this
+-- character. Its chapter follows your level (Rules/Journey.lua) and one run of yours clears a dungeon. Founding or
+-- joining a fellowship replaces it.
+function F:Solo()
+  if self:Current() then return nil end
+  return self:Create({ solo = true, name = L.SOLO, preset = "forever" })
 end
 
 function F:Count(f)
@@ -75,8 +92,18 @@ F.LOG_ICON = {
   gather = "gatherings", gathercancel = "gatherings", tstart = "tourney", champion = "tourney", tcancel = "tourney",
   marked = "hist_mark", undid = "hist_undo", reopened = "hist_undo", ticked = "hist_mark", unticked = "hist_undo",
 }
+-- Newest first, in one order on every copy whatever order the changes came in (the soak test of 17 Nov 2026: two
+-- copies at the same version held the same lines in another order): by time, then who; one Adventurer's lines of the
+-- same second as they came, the newest first. (SNAPM's merge sorts the same way, Fellowship/Sync.lua.)
+local function above(e, x)
+  local te, tx = tonumber(e.time) or 0, tonumber(x.time) or 0
+  if te ~= tx then return te > tx end
+  return (e.who or "") <= (x.who or "")
+end
 function F:Log(f, text, t, k, who)
-  table.insert(f.chronicle, 1, { text = text, time = t or time(), k = k, who = who })
+  local e, i = { text = text, time = t or time(), k = k, who = who }, 1
+  while f.chronicle[i] and not above(e, f.chronicle[i]) do i = i + 1 end
+  table.insert(f.chronicle, i, e)
   while #f.chronicle > self.CHRONICLE_MAX do table.remove(f.chronicle) end
 end
 -- The fellowship goes back to chapter n (Undo clear, Back to this chapter), with its Chronicle line.
@@ -84,6 +111,57 @@ function F:Reopen(f, n, t, by)
   ns.Journey:Reopen(f, n)
   self:Log(f, L.CHR_REOPENED:format(ns.Journey.Roman(n), f.journey.chapters[n].name), t, "reopened", by)
 end
+-- Everyone to the cap first on, while the fellowship stands past a chapter whose cap not every counted Hero has
+-- reached (J:CapBack; the owner, 17 Nov 2026: 1.10.0 left it in Chapter III when the rule was turned on): the Leader
+-- takes it back there with Back to this chapter's op, so every copy goes back by one decision. Each time the Leader
+-- sees the rule turned on: when it changes, or after login (a vote passed while away; a fellowship 1.10.0 left ahead).
+-- After login only once another Adventurer has been heard (their copy brings the Leader's rules and the levels they
+-- know up to date: a vote may have turned the rule off meanwhile), and never while a draft waits (as Back to this
+-- chapter); until then it looks again as news comes (the release review of 17 Nov 2026). Then on the best levels
+-- known, so the fellowship does go back (the owner, 17 Nov 2026: "make sure that the chapter actually moves back").
+-- shortcut: a level nobody has heard since its Adventurer last played may be old; Back on it moves forward again as soon
+-- as they are heard at the cap (J:Done). A new Leader checks once too.
+function F:CapBackCheck()
+  local f = self:Current()
+  if not f or f.sample or f.leader ~= ns.Me() or not self.since then return end
+  ns.db.capFirstSeen = ns.db.capFirstSeen or {}
+  local on = f.rules.capFirst and true or false
+  if on and not ns.db.capFirstSeen[f.id] then
+    local A = ns.AdminDraft
+    if (A and A.jd and A.fid == f.id) or not (self.rulesKnown or self:HeardSince(f, self.since)) then return end
+    ns.db.capFirstSeen[f.id] = true -- (first: the op's news runs this again)
+    local back = ns.Journey:CapBack(f)
+    if back and not self:Do({ k = "back", n = back }) then ns.db.capFirstSeen[f.id] = false end
+    return
+  end
+  ns.db.capFirstSeen[f.id] = on
+end
+-- Has another Adventurer been heard since t (the Leader's login)?
+function F:HeardSince(f, t)
+  for _, name in ipairs(self:Members(f)) do
+    if name ~= ns.Me() and ns.Hero:LastSeen(f, name) >= t then return true end
+  end
+  return false
+end
+-- The rules changed (published, or a vote passed); was: the rules before. (After the change: an op in an op.)
+function F:RulesChanged(f, was)
+  if (not f.rules.capFirst) ~= (not was.capFirst) and f.leader == ns.Me() then
+    self.rulesKnown = true -- (changed here, now: the rules are known without waiting for news)
+    C_Timer.After(0, function() self:CapBackCheck() end)
+  end
+end
+ns:On("LOGIN", function() F.since, F.rulesKnown = time(), nil; F:CapBackCheck() end)
+-- While it waits: once a second at most, after the news is stored (not an op inside another); a level heard, or the
+-- journey published (the draft it waited for).
+local capBackSoon
+local function capBackSoonCheck()
+  local f = F:Current()
+  if capBackSoon or not (f and f.rules.capFirst and f.leader == ns.Me()) or (ns.db.capFirstSeen or {})[f.id] then return end
+  capBackSoon = true
+  C_Timer.After(1, function() capBackSoon = nil; F:CapBackCheck() end)
+end
+ns:On("HEROES", capBackSoonCheck)
+ns:On("FELLOWSHIP", capBackSoonCheck)
 
 -- The chronicle as the pages show it: the same line in a row once, with a count ("× 4"). (Seen in the UI tour.)
 -- { { text, time, n, k } }, newest first, at most max; group: only the lines of that History filter.
@@ -208,7 +286,7 @@ end
 -- o: name, color, emblem, role, preset, rules, journey, challenges ({ hardcore = true, shared = 10, ... }; only now:
 -- they cannot be added later, SPEC §9)
 function F:Create(o)
-  if ns.Trial() then ns:Toast(nil, L.TRIAL_T, L.TRIAL) end
+  if ns.Trial() and not o.solo then ns:Toast(nil, L.TRIAL_T, L.TRIAL) end
   local me, now = ns.Me(), time()
   local info = self:MyInfo()
   local f = {
@@ -222,10 +300,16 @@ function F:Create(o)
     chronicle = {}, heroes = {}, runs = {}, kills = {}, undone = {}, history = {}, ticks = {}, seen = {}, updated = now,
     challenges = ns.Challenges.Clean(o.challenges),
   }
-  self:Log(f, L.CHR_FOUNDED:format(f.name, ns.Short(me)), now, "founded", me)
-  ns.db.fellowships[f.id] = f
-  ns.char.fellowshipId = f.id
-  wipe(ns.char.invites)
+  if o.solo then
+    -- (Invitations stay: accepting one replaces it.)
+    f.solo, f.rules.minHeroes, f.rules.clearMode = true, 1, "one"
+    ns.char.solo = f
+  else
+    self:Log(f, L.CHR_FOUNDED:format(f.name, ns.Short(me)), now, "founded", me)
+    ns.db.fellowships[f.id] = f
+    ns.char.fellowshipId = f.id
+    wipe(ns.char.invites)
+  end
   self:Changed()
   ns:Fire("JOINED")
   return f
@@ -338,8 +422,10 @@ function F:ApplyChange(f, op, by, t)
   elseif k == "rules" then
     -- Rules Admin publishes the rules (the leader); a passed vote changes one rule (Fellowship/Votes.lua).
     if not P.Can(f, by, "rules") or type(op.rules) ~= "table" then return false end
+    local was = f.rules
     f.rules = R.Clean(R.KeepNewer(op.rules, f.rules))
     self:Log(f, L.CHR_RULES:format(ns.Short(by)), t, "rules", by)
+    self:RulesChanged(f, was)
     if by ~= ns.Me() and not f.sample then ns:Toast(nil, L.RULES_PUBLISHED_T, L.RULES_PUBLISHED:format(ns.Short(by)), "rules") end
   elseif k == "disband" then
     if not P.Can(f, by, "disband") then return false end
@@ -561,7 +647,7 @@ end
 -- Invitations to this character (only while not in a fellowship), newest first. Older than a day: gone.
 function F:MyInvites()
   local list = {}
-  if self:Current() then return list end
+  if self:Real() then return list end
   for fid, inv in pairs(ns.char.invites) do
     if time() - (inv.time or 0) > ns.Sync.EXPIRE then ns.char.invites[fid] = nil
     else list[#list + 1] = { fid = fid, inv = inv } end
@@ -575,7 +661,7 @@ end
 -- stays open to try later; if it is no longer open (ACCX), the player is told to ask for a new one.
 function F:AcceptInvite(fid, role)
   local inv = ns.char.invites[fid]
-  if not inv or self:Current() then return end
+  if not inv or self:Real() then return end
   if ns.Trial() then ns:Toast(nil, L.TRIAL_T, L.TRIAL) end
   if ns.Comm:Held() then
     ns:Toast(nil, L.ACCEPT_FAILED, L.ACCEPT_BUSY)
@@ -744,7 +830,7 @@ function F:CanTake(main)
   local f = c and self:Get(c.fellowshipId)
   local me = ns.Me()
   if not f or f.disbanded or not f.members[main] or main == me or f.members[me] then return false end
-  local own = self:Current()
+  local own = self:Real()
   if own then return false, L.TAKE_LEAVE_FIRST:format(own.name) end
   if f.faction and f.faction ~= UnitFactionGroup("player") then return false, L.TAKE_FACTION:format(f.faction) end
   if ns.Challenges:Fallen(f, main) then return false, L.TAKE_FALLEN:format(ns.Short(main)) end
@@ -787,7 +873,7 @@ function F:FinishTake(main, fid)
   f.v = f.v + 1
   local n = ns.Sync:Note(f, me, nil, main, op, t, r)
   ns.Sync:SendOp(f, others, op, t, me, n, main, r)
-  ns.char.fellowshipId = f.id
+  ns.char.fellowshipId, ns.char.solo = f.id, nil
   local c = ns.db.characters[main]
   if c then c.fellowshipId = nil end
   local W = ns.Watch
@@ -840,9 +926,14 @@ function F:Changed()
   ns:Fire("FELLOWSHIP")
 end
 
+-- Founding, joining or restoring a fellowship replaces the journey on your own (U241).
+ns:On("JOINED", function() if F:Real() then ns.char.solo = nil end end)
+
 ns:On("DB_READY", function()
   ns.db.fellowships = ns.db.fellowships or {}
   ns.db.characters = ns.db.characters or {}
   ns.char.invites = type(ns.char.invites) == "table" and ns.char.invites or {}
   for id, f in pairs(ns.db.fellowships) do if not F:Sanitize(f) then ns.db.fellowships[id] = nil end end
+  -- (The journey on your own too, U241: one that cannot be read is dropped, and Welcome offers it again.)
+  if ns.char.solo ~= nil and not F:Sanitize(ns.char.solo) then ns.char.solo = nil end
 end)
