@@ -31,7 +31,7 @@ WK.STEPS = {
   { id = "STAND", ranks = ALL, page = "overview", target = function() return pf("overview").pic, pf("overview").stand end },
   -- (The pages' own steps went with U200, 14 Nov 2026: each page's "?" says it.) The Leader's two pages, for the tour
   -- after a promotion; Journey Admin last before the end (the tour went back and forth between them; 28 Oct 2026).
-  { id = "MANAGE", ranks = { leader = true }, page = "manage", target = function() return pf("manage").left end },
+  { id = "LEAD", ranks = { leader = true }, page = "heroes", target = function() return pf("heroes").listL end },
   { id = "HEADER", ranks = ALL, target = function()
     local h = W().frame.header
     return h.chars, h.settings
@@ -50,7 +50,7 @@ WK.STEPS = {
 -- WALK_PG_<PAGE>_R. A flat sheet of parts (the Overview) goes part by part instead: WK.PARTS, WALK_PG_<PAGE>_<PART>.
 WK.PAGES = { welcome = true, create = true, join = true, overview = true, chapter = true, quests = true,
   chronicle = true, moments = true, raids = true, heroes = true, gatherings = true, rules = true, history = true,
-  tourney = true, settings = true, manage = true, rulesadmin = true, admin = true,
+  tourney = true, settings = true, rulesadmin = true, admin = true,
   dungeon = true, dungeons = true }
 WK.PARTS = {
   overview = { { "", function(p) return p.pic, p.stand end }, { "_FOCUS", function(p) return p.focus end },
@@ -81,9 +81,12 @@ function WK:Steps(rank, since)
   return out
 end
 
+-- A text's variant (key .. suffix), or nil when it has none.
+local function variant(key, suffix) local v = L[key .. suffix]; return v ~= key .. suffix and v or nil end
+-- On your own (U272) a page that differs for one has its own words (_SOLO), before the rank's.
 local function text(step, rank, part)
   local key = "WALK_" .. (step.key or step.id) .. (part or "")
-  return L[key .. "_" .. rank:upper()] ~= key .. "_" .. rank:upper() and L[key .. "_" .. rank:upper()] or L[key]
+  return (ns.Challenges.Alone() and variant(key, "_SOLO")) or variant(key, "_" .. rank:upper()) or L[key]
 end
 WK.Text = text
 

@@ -1,7 +1,7 @@
--- Quests (SPEC §4.6). Left: Your quests (in your log) and Other Heroes' quests (they have it, you do not); in
--- each, quest chains first, then single quests by zone; your rows have a coloured edge. Right: the chosen quest or
--- chain: type, your progress (bar, or the chain's parts with You are here), the other Heroes' progress, What you can
--- do, and Ask to group up.
+-- Quests (SPEC §4.6). Together (U263-U264): left the quests to do with other Adventurers in three sections, Do
+-- together now, You could join and They could join you, by zone, a short row each with the faces of who has it; right
+-- the chosen one: the answer (what to do together), the buttons, the map in the book (U267) and where everyone
+-- stands (a chain's step track). Then the dungeon quest log (U213) and Attunements & keys.
 local _, ns = ...
 local L = ns.L
 local UI, Theme = ns.UI, ns.Theme
@@ -44,8 +44,8 @@ local function inkFor(f, name)
   return Theme:RGBA("ink")
 end
 
--- A quest card's height and its progress strip's width (Quests tab and Quest chains tab).
-local ROW_H, BAR_W = 46, 96
+-- A Together row's height (short rows, U263).
+local ROW_H = 26
 
 -- Names like Upper Blackrock Spire need about 180 pixels (they were cut off at 120; seen in the tour).
 local ATT_COLS, ATT_NAME_W, ATT_ROW_H = 5, 210, 32
@@ -195,7 +195,7 @@ local function refreshAttune(pf, f, me)
       if n then
         local p = QL:Progress(f, a, n)
         t:SetText(a.drop and not p.done and L.ATT_NONE or QL:Cell(p))
-        t:SetTextColor(Theme:RGBA(p.done and "3E7A3A" or ((p.n > 0 or p.at) and "B8742A" or "ink2")))
+        t:SetTextColor(Theme:RGBA(p.done and "3E7A3A" or ((p.n > 0 or p.at) and "amberText" or "ink2")))
       else
         t:SetText("")
       end
@@ -296,34 +296,18 @@ end
 
 -- The Dungeon quests tab (U213, the owner, 15 Nov 2026): the dungeon quest log, the chapter to finish first on the left
 -- page and Start early on the right (QL:Plan; the owner, 17 Nov 2026: it was Under way and Open now, "I don't
--- understand this layout"). A short row each: the quest, your next step and where it starts.
--- A click opens it on its Dungeon page, the one home of a dungeon's quests (U141); the pin shows it on the map.
-local function logButton(parent, width)
-  local r = CreateFrame("Button", nil, parent)
-  r:SetWidth(width)
-  local hl = r:CreateTexture(nil, "HIGHLIGHT")
-  hl:SetPoint("TOPLEFT", -4, 3); hl:SetPoint("BOTTOMRIGHT", 4, -3); hl:SetColorTexture(1, 0.9, 0.6, 0.12)
-  r.icon = r:CreateTexture(nil, "ARTWORK")
-  r.icon:SetSize(14, 14); r.icon:SetPoint("TOPLEFT", 0, -1)
-  r.title = UI.WrapText(r, 13, "ink", width - 50, "title")
-  r.title:SetPoint("TOPLEFT", 20, 0)
-  r.next = UI.WrapText(r, 11, "ink2", width - 50)
-  r.next:SetPoint("TOPLEFT", r.title, "BOTTOMLEFT", 0, -2)
-  ns.DungeonPage.NewPin(r)
-  r:SetScript("OnClick", function() -- (the side panel would cover the Dungeon page)
-    if r.key then ns.Window:HidePanels(); ns.DungeonPage:Open(r.key, r.id) end
-  end)
-  UI.Tooltip(r, L.DQL_ROW_TIP)
-  return r
-end
+-- understand this layout"). Each quest the Dungeon page's row (U258, the owner, 18 Nov 2026: "the same structure as in
+-- the dungeons page"), open: where it starts and its chain's steps, each with Show on map (U259); a click folds it in
+-- place, on the tab and in the Overview's panel alike (one log). Its dungeon's heading opens the Dungeon page.
+local logOpen = { opened = {}, openDefault = true }
 
 -- A dungeon's heading over its rows (U230: its name and chapter were on every row); a click opens its Dungeon page.
 local function logHead(parent, width)
   local b = CreateFrame("Button", nil, parent)
-  b:SetSize(width, 18)
+  b:SetSize(width, 20)
   local hl = b:CreateTexture(nil, "HIGHLIGHT")
   hl:SetPoint("TOPLEFT", -4, 2); hl:SetPoint("BOTTOMRIGHT", 4, -2); hl:SetColorTexture(1, 0.9, 0.6, 0.12)
-  b.text = UI.Text(b, 12, "accent", "title")
+  b.text = UI.Text(b, 13, "accentText", "title")
   b.text:SetPoint("LEFT")
   b:SetScript("OnClick", function() if b.key then ns.Window:HidePanels(); ns.DungeonPage:Open(b.key) end end)
   UI.Tooltip(b, L.DQL_HEAD_TIP)
@@ -333,7 +317,8 @@ end
 -- One part of the log in c (1: First, 2: Start early): its heading, its empty line, its dungeons' headings and rows.
 local function newPart(c, width, i)
   local part = { head = UI.SectionHeader(c, width), none = UI.SketchLine(c, width, "EmptyQuests"),
-    rows = UI.Pool(function() return logButton(c, width) end), heads = UI.Pool(function() return logHead(c, width) end) }
+    rows = UI.Pool(function() return ns.DungeonPage.QuestRow(c, width, logOpen) end),
+    heads = UI.Pool(function() return logHead(c, width) end) }
   part.head:SetHelp(i == 1 and L.DQL_FIRST_HELP or L.DQL_EARLY_HELP)
   return part
 end
@@ -348,22 +333,10 @@ local function buildLog(pf, width)
   end
 end
 
--- A log row's next line: the next step and where it starts, or what is left.
-local function nextLine(QL, row)
-  local q = row.q
-  if row.what == "step" then
-    local n = #q.steps
-    local where = row.step.status == "log" and L.DQ_IN_LOG or QL.WhereText(row.step.start)
-    return L.DQL_STEP:format(n > 1 and L.DG_STEP_OF:format(row.k, n) or L.DQL_FIRST, row.step.name, where)
-  end
-  if row.what == "pick" then return L.DQL_PICK:format(QL.WhereText(q.start)) end
-  return row.what == "log" and L.DQL_IN_LOG or L.DQL_RUN
-end
-
--- Places part i of the plan (QL:Plan), with its rows, on the stack s. Part 1's heading names its chapter, so its
--- dungeons' do not.
-local function placePart(s, part, i, plan)
-  local QL, J = ns.QuestLists, ns.Journey
+-- Places part i of the plan (QL:Plan) of who, with its rows, on the stack s. Part 1's heading names its chapter, so
+-- its dungeons' do not.
+local function placePart(s, part, i, plan, who)
+  local J = ns.Journey
   local list = i == 1 and plan.first or plan.early
   part.head:SetText((i == 1 and L.DQL_FIRST_PART:format(L.CHAPTER_ROMAN:format(J.Roman(plan.n))) or L.DQL_EARLY)
     .. (#list > 0 and ("  ·  " .. #list) or ""))
@@ -386,18 +359,14 @@ local function placePart(s, part, i, plan)
       hd.key = row.key
       hd.text:SetText((d and d[2] or row.key) .. (i == 1 and "" or "  ·  " .. L.CHAPTER_ROMAN:format(J.Roman(row.n))))
       if nh > 1 then s:Skip(4) end
-      s:Place(hd, 18, 4)
+      s:Place(hd, 20, 4)
     end
     n = n + 1
-    local q = row.q
-    r.id, r.key, r.qname = q.id, row.key, q.name
-    r.icon:SetTexture((QL.STATUS[row.status] or QL.STATUS.no)[1])
-    r.title:SetText(q.name)
-    r.next:SetText(nextLine(QL, row))
-    ns.DungeonPage.SetPin(r, q)
-    local h = math.max(24, r.title:GetStringHeight() + r.next:GetStringHeight() + 4)
-    r:SetHeight(h)
-    s:Place(r, h, 10)
+    -- (The log's own word last: the Dungeon page has Who is ready for it. The icon is the next step's, so a chain
+    -- under way does not look untouched.)
+    local word = row.what == "run" and L.DQL_RUN or (row.what == "log" and L.DQL_IN_RUN or nil)
+    s:Place(r, ns.DungeonPage.FillQuest(r, row.q, who, false, nil, word), 10)
+    r.icon:SetTexture((ns.QuestLists.STATUS[row.status] or ns.QuestLists.STATUS.no)[1])
   end
   part.rows:HideFrom(n + 1)
   part.heads:HideFrom(nh + 1)
@@ -407,7 +376,7 @@ local function refreshLog(pf, f, me)
   local plan = ns.QuestLists:Plan(f, me)
   for i, part in ipairs(pf.log) do
     local s = UI.Stack(part.scroll.child)
-    placePart(s, part, i, plan)
+    placePart(s, part, i, plan, me)
     part.scroll:SetContentHeight(s.y + 8)
   end
 end
@@ -422,9 +391,9 @@ ns:On("DB_READY", function() ns.Window:RegisterPanel("dquests", { title = L.TAB_
     local plan = ctx.f and ns.QuestLists:Plan(ctx.f, ctx.me) or { n = 1, first = {}, early = {} }
     local s = UI.Stack(p.body)
     s:Skip(6)
-    placePart(s, p.parts[1], 1, plan)
+    placePart(s, p.parts[1], 1, plan, ctx.me)
     s:Skip(8)
-    placePart(s, p.parts[2], 2, plan)
+    placePart(s, p.parts[2], 2, plan, ctx.me)
     p.scroll:SetContentHeight(s.y + 10)
   end }) end)
 
@@ -432,19 +401,19 @@ local function build(pf)
   local W = ns.Window
   local width = W.PAGE_W - 8
 
-  -- Tabs (U141, the rebuild of 9 Nov 2026): Shared quests · Quest chains · Dungeon quests · Attunements & keys, with
-  -- icons (U102). A dungeon's quests are on its Dungeon page; the Dungeon quests tab is their log, a row each linking
-  -- there (U213).
+  -- Tabs (U263, the owner's grilling of 19 Nov 2026; U141 before): Together · Dungeon quests · Attunements & keys,
+  -- with icons (U102). A dungeon's quests are on its Dungeon page; the Dungeon quests tab is their log (U213).
   pf.tab = "quests"
   pf.tabs = UI.Tabs(pf.left, { { L.TAB_QUESTS, "quests", "quests" },
-    { L.TAB_CHAINS, "chains", "chapter" }, { L.TAB_DQUESTS, "dungeons", "dungeons" }, { L.TAB_ATTUNE, "attune", "toast_attune" } },
+    { L.TAB_DQUESTS, "dungeons", "dungeons" }, { L.TAB_ATTUNE, "attune", "toast_attune" } },
     function() return pf.tab end, function(v) pf.tab = v; pf.sel = nil; W:Refresh() end, width,
     function(v)
       local f = ns.Fellowship:Current()
-      if not f or v == "attune" or v == "dungeons" then return nil end
+      if not f or v ~= "quests" then return nil end
+      -- (They could join you is left out: it would count most of your log; U264.)
       local n = 0
       for _, x in ipairs(Q:Items(f)) do
-        if (v == "chains") == (x.chain == true) and (x.together or x.join) and not Q.Finished(x, ns.Me()) then n = n + 1 end
+        if (x.together or x.join) and not Q.Finished(x, ns.Me()) then n = n + 1 end
       end
       return n
     end)
@@ -454,8 +423,7 @@ local function build(pf)
   local Lc = pf.lscroll.child
   pf.showAll = UI.TextButton(Lc, "", function() pf.all = not pf.all; W:Refresh() end, "link", 12)
   pf.showDone = UI.TextButton(Lc, "", function() pf.history = not pf.history; W:Refresh() end, "link", 12)
-  -- Questie is the recommended companion for quest chains (docs/QUEST-CHAINS.md): a note on top, until hidden;
-  -- with Questie running, a short line saying where the chains come from.
+  -- Questie, the companion for quest chains (docs/QUEST-CHAINS.md): a note at the foot while it does not run (U195).
   pf.questie = CreateFrame("Frame", nil, Lc)
   pf.questie:SetWidth(width)
   pf.questie.icon = UI.Round(pf.questie, "ARTWORK", 20)
@@ -467,24 +435,20 @@ local function build(pf)
     ns.db.questieHintHidden = true; W:Refresh()
   end, "link", 12)
   pf.questie.hide:SetPoint("TOPRIGHT", 0, 2)
-  -- Two sections, each a book heading with its count and a "?" that explains it (two lines of help under each made
-  -- the page a wall of text; the owner, 6 Nov 2026: "more bold").
+  -- Three sections, each a book heading with its count and a "?" (U264).
   pf.secs = {}
-  for i = 1, 2 do
-    local s = {}
-    s.head = UI.SectionHeader(Lc, width)
-    s.title = s.head.text
-    s.empty = UI.Text(Lc, 12, "ink2")
-    s.empty:SetText(L.Q_NOTHING)
+  for i, key in ipairs({ "MINE", "OTHERS", "BRING" }) do
+    local s = { head = UI.SectionHeader(Lc, width), key = key }
+    s.head:SetText(L["Q_SECTION_" .. key]); s.head:SetHelp(L["Q_SECTION_" .. key .. "_HELP"])
     pf.secs[i] = s
   end
-  pf.secs[1].head:SetText(L.Q_SECTION_MINE); pf.secs[1].head:SetHelp(L.Q_SECTION_MINE_HELP)
-  pf.secs[2].head:SetText(L.Q_SECTION_OTHERS); pf.secs[2].head:SetHelp(L.Q_SECTION_OTHERS_HELP)
+  pf.empty = UI.Text(Lc, 12, "ink2")
+  pf.empty:SetText(L.Q_NOTHING)
   -- A zone's heading: its name, and on the right how close it is (You are here, Nearby).
   pf.groupLabels = UI.Pool(function()
     local g = CreateFrame("Frame", nil, Lc)
     g:SetSize(width, 20)
-    g.text = UI.Text(g, 13, "accent", "title")
+    g.text = UI.Text(g, 13, "accentText", "title")
     g.text:SetPoint("BOTTOMLEFT", 2, 3)
     g.tag = UI.Text(g, 11, "ink2", "body", "RIGHT")
     g.tag:SetPoint("BOTTOMRIGHT", -2, 4)
@@ -494,83 +458,44 @@ local function build(pf)
     function g:GetText() return self.text:GetText() end
     return g
   end)
-  -- A quest or chain as a card: its icon, name, a strip of your progress (a chain: one pip a part), and a line with
-  -- where you are and who else has it. Yours have a coloured edge.
+  -- A quest or chain as a short row (U263): its icon, name, level or step, and the faces of who has it.
   pf.rows = UI.Pool(function()
-    local r = UI.Card(Lc, "line", "Button")
+    local r = CreateFrame("Button", nil, Lc)
     r:SetSize(width, ROW_H)
-    r.edge = UI.Solid(r, "ARTWORK", "accent", 1)
-    r.edge:SetWidth(3); r.edge:SetPoint("TOPLEFT", 1, -1); r.edge:SetPoint("BOTTOMLEFT", 1, 1)
-    r.icon = UI.Round(r, "ARTWORK", 28)
-    r.icon:SetPoint("LEFT", 10, 0)
-    r.name = UI.Text(r, 14, "ink", "title")
-    r.name:SetPoint("TOPLEFT", 46, -7)
-    r.name:SetWidth(width - 46 - BAR_W - 20)
-    r.bar = bar(r)
-    r.bar:SetHeight(8)
-    r.bar:SetPoint("TOPRIGHT", -12, -11)
-    r.sub = UI.Text(r, 11, "ink2")
-    r.sub:SetPoint("TOPLEFT", r.name, "BOTTOMLEFT", 0, -4)
-    r.sub:SetWidth(width - 56)
+    r.sel = r:CreateTexture(nil, "BACKGROUND", nil, 1)
+    r.sel:SetAllPoints(); r.sel:SetColorTexture(0.72, 0.53, 0.18, 0.22)
     local hl = r:CreateTexture(nil, "HIGHLIGHT")
     hl:SetAllPoints(); hl:SetColorTexture(1, 0.9, 0.6, 0.12)
+    r.icon = UI.Round(r, "ARTWORK", 18)
+    r.icon:SetPoint("LEFT", 4, 0)
+    r.faces = UI.Faces(r, 18)
+    r.faces:SetPoint("RIGHT", -2, 0)
+    r.info = UI.Text(r, 11, "ink2", "body", "RIGHT")
+    r.info:SetPoint("RIGHT", r.faces, "LEFT", -8, 0)
+    r.name = UI.Text(r, 13, "ink", "title")
+    r.name:SetPoint("LEFT", 28, 0); r.name:SetPoint("RIGHT", r.info, "LEFT", -6, 0)
+    r.name:SetWordWrap(false)
+    function r:SetSelected(on) self.sel:SetShown(on) end
     r:SetScript("OnClick", function() pf.sel = r.id; W:Refresh() end)
     return r
   end)
 
+  -- Right: the quest's page (U264): name, zone and type, the answer, the buttons, the map, where everyone stands.
   pf.rscroll = UI.Scroll(pf.right)
   pf.rscroll:SetAllPoints()
   pf.qArt = UI.PageArt(pf.rscroll, "Quest")
   local R = pf.rscroll.child
   pf.none = UI.EmptyState(R, width)
   pf.head = UI.Heading(R, width, "", nil, 20)
-  pf.youHead = UI.SectionHeader(R, width)
-  pf.youHead:SetText(L.Q_YOUR_PROGRESS)
-  pf.youText = UI.WrapText(R, 13, "ink", width, "book")
-  pf.youBar = bar(R)
-  pf.youCount = UI.Text(R, 12, "ink2", "body", "RIGHT")
-  pf.parts = UI.Pool(function()
-    local p = CreateFrame("Frame", nil, R)
-    p:SetWidth(width)
-    p.ring = UI.Round(p, "ARTWORK", 22)
-    p.ring:SetPoint("TOPLEFT", 0, 0)
-    p.check = UI.Check(p, 18)
-    p.check:SetTexture(ns.MARKS.done)
-    p.check:SetPoint("CENTER", p.ring, "CENTER")
-    p.n = UI.Text(p, 12, "white", "title", "CENTER")
-    p.n:SetPoint("CENTER", p.ring, "CENTER")
-    p.title = UI.WrapText(p, 13, "ink", width - 34, "book")
-    p.title:SetPoint("TOPLEFT", 32, -2)
-    p.heroes = UI.WrapText(p, 11, "ink2", width - 34)
-    addListen(p, width)
-    return p
-  end)
-  pf.othersHead = UI.SectionHeader(R, width)
-  pf.othersHead:SetText(L.Q_OTHER_HEROES)
-  pf.others = UI.Pool(function()
-    local o = CreateFrame("Frame", nil, R)
-    o:SetSize(width, 36)
-    o.name = UI.Text(o, 13, "ink", "title")
-    o.name:SetPoint("TOPLEFT", 0, -2)
-    o.name:SetWidth(110)
-    o.bar = bar(o)
-    o.bar:SetPoint("TOPLEFT", 116, -5)
-    o.text = UI.Text(o, 12, "ink", "body", "RIGHT")
-    o.text:SetPoint("TOPRIGHT", 0, -2)
-    o.rel = UI.Text(o, 11, "ink2")
-    o.rel:SetPoint("TOPLEFT", 116, -20)
-    return o
-  end)
-  pf.tipsHead = UI.SectionHeader(R, width)
-  pf.tipsHead:SetText(L.Q_WHAT_YOU_CAN_DO)
+  -- The answer: a line each with a gold dot.
   pf.tips = UI.Pool(function()
     local t = CreateFrame("Frame", nil, R)
     t:SetWidth(width)
-    t.icon = t:CreateTexture(nil, "ARTWORK")
-    t.icon:SetSize(12, 12); t.icon:SetPoint("TOPLEFT", 2, -2)
-    t.icon:SetTexture(ns.MARKS.current)
-    t.text = UI.WrapText(t, 13, "ink", width - 22, "book")
-    t.text:SetPoint("TOPLEFT", 20, 0)
+    t.dot = UI.Round(t, "ARTWORK", 7)
+    t.dot:SetPoint("TOPLEFT", 3, -5)
+    Theme:Fill(t.dot, "gold", 1)
+    t.text = UI.WrapText(t, 13, "ink", width - 18, "book")
+    t.text:SetPoint("TOPLEFT", 16, 0)
     return t
   end)
   pf.ask = UI.TextButton(R, L.ASK_GROUP, function() if pf.item then Q:AskGroup(pf.item) end end, "primary")
@@ -579,14 +504,47 @@ local function build(pf)
   pf.listen = UI.TextButton(R, L.LISTEN, function() if pf.listenID then OA:Listen(pf.listenID) end end, "plain")
   UI.Tooltip(pf.listen, L.LISTEN_TIP)
   pf.shareWhy = UI.WrapText(R, 12, "ink2", width)
+  pf.map = ns.BookMap.New(R, width)
+  -- A single quest: where everyone stands, you first: name, the quest's bar, "3 / 8".
+  pf.stands = UI.Pool(function()
+    local o = CreateFrame("Frame", nil, R)
+    o:SetSize(width, 22)
+    o.name = UI.Text(o, 13, "ink", "title")
+    o.name:SetPoint("LEFT"); o.name:SetWidth(110); o.name:SetWordWrap(false)
+    o.bar = bar(o)
+    o.bar:SetPoint("LEFT", 116, 0)
+    o.text = UI.Text(o, 12, "ink", "body", "RIGHT")
+    o.text:SetPoint("RIGHT")
+    return o
+  end)
+  -- A chain: the step track (U264), each step a ring joined to the next by the book's bar (U262), the faces at its
+  -- right, and Listen in Spoken where the step is a quest.
+  pf.steps = UI.Pool(function()
+    local p = CreateFrame("Frame", nil, R)
+    p:SetWidth(width)
+    p.link = UI.Bar(p, 8, true)
+    p.link.shine:SetAlpha(0)
+    p.ring = UI.Round(p, "ARTWORK", 22)
+    p.ring:SetPoint("TOPLEFT", 0, 0)
+    p.check = UI.Check(p, 18)
+    p.check:SetTexture(ns.MARKS.done)
+    p.check:SetPoint("CENTER", p.ring, "CENTER")
+    p.n = UI.Text(p, 12, "white", "title", "CENTER")
+    p.n:SetPoint("CENTER", p.ring, "CENTER")
+    p.faces = UI.Faces(p, 18)
+    p.faces:SetPoint("TOPRIGHT", 0, -2)
+    p.listen = UI.RoundButton(p, 22, "listen", function() if p.qid then OA:Listen(p.qid) end end)
+    UI.Tooltip(p.listen, L.LISTEN_TIP)
+    p.title = UI.WrapText(p, 13, "ink", width - 34, "book")
+    p.title:SetPoint("TOPLEFT", 32, -3)
+    return p
+  end)
   buildAttune(pf, width)
   buildLog(pf, width)
 end
 
--- Quests tab: quests near this chapter's levels first (from 3 below the floor to 3 over the cap; unknown levels too).
--- Near your own level (the chapter's range hid quests that fit you; seen in the tour): from 5 under it, where a
--- quest turns grey; to join, up to what you can pick up. Quests you are already on have no upper limit.
-Q.GREY_BELOW = 5
+-- Together: single quests near your level (from 5 under it, where a quest turns grey; to join, up to what you can pick
+-- up; unknown levels too), unless Show all. Chains and quests you are on have no upper limit.
 local function nearChapter(_, x)
   if not x.level or x.level == 0 then return true end
   -- (Q.viewLevel: /jtf tour looks as a higher character would, as QuestLists.viewLevel does for attunements.)
@@ -595,17 +553,173 @@ local function nearChapter(_, x)
   return not x.join or x.level <= lvl + Q.JOIN_BELOW
 end
 
-local function rowSub(x, me)
-  local n = #x.others
-  local others = n == 0 and L.Q_SUB_ONLY_YOU or (n == 1 and L.Q_SUB_OTHERS_1 or L.Q_SUB_OTHERS_N:format(n))
-  if x.mine then
-    if x.chain then
-      local at = x.at[me]
-      return (at >= #x.steps and L.Q_SUB_FINISHED or L.Q_SUB_PART:format(at + 1, #x.steps)) .. others
-    end
-    return L.Q_SUB_HAVE:format(x.have[me], x.goal) .. others
+-- A row's right-hand words: "Step 2 of 5" (a chain you are on), "5 steps", "Level 8", "Finished".
+local function rowInfo(x, me)
+  if Q.Finished(x, me) then return L.Q_ROW_DONE end
+  if x.chain then
+    if x.at[me] then return L.Q_ROW_STEP:format(x.at[me] + 1, #x.steps) end
+    return L.Q_ROW_STEPS:format(#x.steps)
   end
-  return (n == 1 and L.Q_SUB_HAS or L.Q_SUB_HAVE_IT):format(Q.NameList(x.others))
+  return (x.level or 0) > 0 and L.Q_ROW_LEVEL:format(x.level) or ""
+end
+
+-- The section an item is in (U264): the first that fits.
+local function section(x) return x.together and 1 or (x.join and 2 or (x.bring and 3 or nil)) end
+
+-- The left page: the three sections by zone, Show all, History, the Questie note. Returns the items shown and how many
+-- are finished (History's count).
+local function refreshList(pf, f, me)
+  local items, hidden, done = {}, 0, 0
+  for _, x in ipairs(Q:Items(f)) do
+    if section(x) then
+      local fin = Q.Finished(x, me)
+      local sel = x.id == pf.sel -- (Open in the book's quest shows, grey or finished too)
+      if x.chain or pf.all or sel or nearChapter(f, x) then
+        if fin then done = done + 1 end
+        if pf.history or not fin or sel then items[#items + 1] = x end
+      elseif pf.history or not fin then
+        hidden = hidden + 1
+      end
+    end
+  end
+  local s = UI.Stack(pf.lscroll.child)
+  local where = Q:Whereabouts()
+  local RANK = { here = 0, near = 1 }
+  local nRows, nLabels = 0, 0
+  pf.zoneOrder = {}
+  pf.empty:SetShown(#items == 0)
+  if #items == 0 then s:Place(pf.empty, 16, 10) end
+  for i, sec in ipairs(pf.secs) do
+    local groups, byZone, count = {}, {}, 0
+    for _, x in ipairs(items) do
+      if section(x) == i then
+        count = count + 1
+        local z = x.zone or ""
+        if not byZone[z] then
+          byZone[z] = { label = z, rows = {}, near = Q:Nearness(z, where) }
+          groups[#groups + 1] = byZone[z]
+        end
+        x.faces = Q:Faces(f, x)
+        x.live = false
+        for _, e in ipairs(x.faces) do x.live = x.live or e.online end
+        table.insert(byZone[z].rows, x)
+      end
+    end
+    table.sort(groups, function(a, b)
+      local ra, rb = RANK[a.near] or (a.label == "" and 3 or 2), RANK[b.near] or (b.label == "" and 3 or 2)
+      if ra ~= rb then return ra < rb end
+      return a.label < b.label
+    end)
+    sec.head:SetShown(count > 0)
+    if count > 0 then
+      sec.head:SetText(L["Q_SECTION_" .. sec.key] .. "  ·  " .. count)
+      s:Place(sec.head, 29, 6)
+    end
+    for _, g in ipairs(groups) do
+      local lab = pf.groupLabels:Get(nLabels + 1)
+      if not lab then break end
+      nLabels = nLabels + 1
+      lab.text:SetText(g.label ~= "" and g.label or L.Q_ZONE_UNKNOWN)
+      lab.tag:SetText(g.near == "here" and L.Q_ZONE_HERE or (g.near == "near" and L.Q_ZONE_NEAR or ""))
+      lab.tag:SetTextColor(Theme:RGBA(g.near == "here" and "3E7A3A" or "ink2"))
+      lab.pin:SetShown(g.near == "here")
+      pf.zoneOrder[#pf.zoneOrder + 1] = { sec = i, near = g.near }
+      s:Place(lab, 20, 3)
+      -- In a zone, a quest with an Adventurer online first, then by name.
+      table.sort(g.rows, function(a, b)
+        if a.live ~= b.live then return a.live end
+        if a.name ~= b.name then return a.name < b.name end
+        return a.id < b.id
+      end)
+      for _, x in ipairs(g.rows) do
+        local r = pf.rows:Get(nRows + 1)
+        if not r then break end
+        nRows = nRows + 1
+        r.id = x.id
+        UI.SetIcon(r.icon, ns.ICONS[x.chain and "bn_chain" or "bn_quest"])
+        r.name:SetText(x.name)
+        r.info:SetText(rowInfo(x, me))
+        r.faces:Set(x.faces)
+        s:Place(r, ROW_H, 2)
+      end
+      s:Skip(6)
+    end
+    if count > 0 then s:Skip(8) end
+  end
+  pf.rows:HideFrom(nRows + 1)
+  pf.groupLabels:HideFrom(nLabels + 1)
+  -- Quests far from your level: Show all / Show only quests near your level.
+  local toggle = hidden > 0 or pf.all
+  pf.showAll:SetShown(toggle)
+  if toggle then
+    pf.showAll:SetLabel(pf.all and L.Q_SHOW_NEAR or L.Q_SHOW_ALL:format(hidden))
+    s:Place(pf.showAll, 20, 4)
+  end
+  -- What you have finished: History / Hide history (U188), only while there is some.
+  pf.showDone:SetShown(done > 0)
+  if done > 0 then
+    pf.showDone:SetLabel(pf.history and L.Q_HIDE_DONE or L.Q_SHOW_DONE:format(done))
+    s:Place(pf.showDone, 20, 4)
+  end
+  -- (No note while Questie runs, U195.)
+  local state = Q:QuestieState()
+  local note = state ~= "on" and not ns.db.questieHintHidden and (state == "off" and L.Q_QUESTIE_OFF or L.Q_QUESTIE_GET)
+  pf.questie:SetShown(note ~= false)
+  if note then
+    pf.questie.text:SetText(note)
+    local h = math.max(22, pf.questie.text:GetStringHeight())
+    pf.questie:SetHeight(h)
+    s:Skip(6)
+    s:Place(pf.questie, h, 10)
+  end
+  pf.lscroll:SetContentHeight(s.y + 8)
+  return items, done
+end
+
+-- A chain's step track on the stack r (U264): rings joined by the book's bar, green up to your step.
+local STEP_GAP = 8
+local function placeSteps(pf, r, f, x, d, width)
+  local light = Theme:Current().light
+  for i, st in ipairs(d.steps) do
+    local p = pf.steps:Get(i)
+    if not p then break end
+    p.ring:SetColorTexture(ns.Hex(st.you and (light and "B8742A" or "D8A850") or (st.done and "3E7A3A" or "7A6A55")))
+    p.check:SetShown(st.done); p.n:SetShown(not st.done)
+    p.n:SetText(st.n)
+    local faces = {}
+    for _, name in ipairs(st.on) do faces[#faces + 1] = Q:Face(f, name, x.zone) end
+    for _, name in ipairs(st.could) do faces[#faces + 1] = Q:Face(f, name, x.zone, true) end
+    local fw = p.faces:Set(faces)
+    local room = fw > 0 and fw + 6 or 0
+    p.qid = st.id
+    p.listen:SetShown(st.id ~= nil)
+    p.listen:ClearAllPoints(); p.listen:SetPoint("TOPRIGHT", -room, 0)
+    p.title:SetWidth(width - 32 - room - (st.id and 28 or 0))
+    p.title:SetText(st.title)
+    local h = math.max(24, p.title:GetStringHeight() + 6)
+    p:SetHeight(h)
+    p.link:SetShown(i < #d.steps)
+    if i < #d.steps then
+      p.link:ClearAllPoints(); p.link:SetPoint("TOP", p.ring, "BOTTOM", 0, 1)
+      p.link:SetHeight(h - 22 + STEP_GAP + 2)
+      p.link:SetColor("3E7A3A")
+      p.link:Set(8, st.done and 1 or 0)
+    end
+    r:Place(p, h, STEP_GAP)
+  end
+  pf.steps:HideFrom(#d.steps + 1)
+end
+
+-- Places the buttons in one row, wrapping, on the stack r.
+local function placeButtons(pf, r, buttons, width)
+  if #buttons == 0 then return end
+  local x, rowY = 0, r.y
+  for _, b in ipairs(buttons) do
+    if x > 0 and x + b:GetWidth() > width then x, rowY = 0, rowY + 34 end
+    b:ClearAllPoints(); b:SetPoint("TOPLEFT", pf.rscroll.child, "TOPLEFT", x, -rowY)
+    x = x + b:GetWidth() + 8
+  end
+  r.y = rowY + 32
 end
 
 local function refresh(pf, ctx)
@@ -618,210 +732,36 @@ local function refresh(pf, ctx)
   pf.lscroll:SetShown(not attune and not log); pf.rscroll:SetShown(not attune and not log)
   pf.alscroll:SetShown(attune); pf.arscroll:SetShown(attune)
   pf.log[1].scroll:SetShown(log); pf.log[2].scroll:SetShown(log)
-  if attune then
-    refreshAttune(pf, f, me)
-    return
-  end
-  if log then
-    refreshLog(pf, f, me)
-    return
-  end
-  -- The items of this tab: chains, or single quests (near this chapter's levels unless Show all). Only what is about
-  -- playing together: quests you share with others, and quests you could join (Fellowship/Quests.lua, Classify).
-  -- What you have finished waits under History (U188); each link counts only what it brings in.
-  local items, hidden, done = {}, 0, 0
-  for _, x in ipairs(Q:Items(f)) do
-    if (x.together or x.join) and (pf.tab == "chains") == (x.chain == true) then
-      local fin = Q.Finished(x, me)
-      if x.chain or pf.all or nearChapter(f, x) then
-        if fin then done = done + 1 end
-        if pf.history or not fin then items[#items + 1] = x end
-      elseif pf.history or not fin then
-        hidden = hidden + 1
-      end
-    end
-  end
-  -- The chosen item: the one clicked, else the first done together, else the first.
+  if attune then return refreshAttune(pf, f, me) end
+  if log then return refreshLog(pf, f, me) end
+  local items, done = refreshList(pf, f, me)
+  -- The chosen item: the one clicked (or opened from the game's quest log, U268), else the first done together, else
+  -- the first.
   local pick
   for _, x in ipairs(items) do if x.id == pf.sel then pick = x end end
   if not pick then for _, x in ipairs(items) do if x.together and not pick then pick = x end end end
   pick = pick or items[1]
   pf.item = pick
+  for _, row in ipairs(pf.rows.items) do row:SetSelected(pick ~= nil and row.id == pick.id) end
 
-  -- Left: the note about Questie (on the Quest chains tab: it is about chains), then the two sections, each by zone:
-  -- the zone you are in first, then the ones on your continent, then the rest (the owner, 6 Nov 2026).
-  local s = UI.Stack(pf.lscroll.child)
-  local state = Q:QuestieState()
-  -- (No line while Questie runs, U195, the owner, 14 Nov 2026: it only filled the tab.)
-  local note = pf.tab == "chains" and state ~= "on" and not ns.db.questieHintHidden
-    and (state == "off" and L.Q_QUESTIE_OFF or L.Q_QUESTIE_GET)
-  pf.questie:SetShown(note ~= nil and note ~= false)
-  if note then
-    pf.questie.text:SetText(note)
-    local h = math.max(22, pf.questie.text:GetStringHeight())
-    pf.questie:SetHeight(h)
-    s:Place(pf.questie, h, 10)
-  end
-  local where = Q:Whereabouts()
-  local RANK = { here = 0, near = 1 }
-  local nRows, nLabels = 0, 0
-  pf.zoneOrder = {}
-  -- "Nothing here right now." only when both sections are empty (U195, the owner, 14 Nov 2026: Short rows, an empty
-  -- group says nothing beside one that has something): not even its heading (the check of 14 Nov 2026, shots 81, 211).
-  local any = #items > 0
-  for i, sec in ipairs(pf.secs) do
-    local groups, byZone, count = {}, {}, 0
-    for _, x in ipairs(items) do
-      if (i == 1 and x.together) or (i == 2 and x.join) then
-        count = count + 1
-        local z = x.zone or ""
-        if not byZone[z] then
-          byZone[z] = { label = z, rows = {}, near = Q:Nearness(z, where) }
-          groups[#groups + 1] = byZone[z]
-        end
-        table.insert(byZone[z].rows, x)
-      end
-    end
-    table.sort(groups, function(a, b)
-      local ra, rb = RANK[a.near] or (a.label == "" and 3 or 2), RANK[b.near] or (b.label == "" and 3 or 2)
-      if ra ~= rb then return ra < rb end
-      return a.label < b.label
-    end)
-    local shown = #groups > 0 or not any
-    sec.head:SetShown(shown)
-    if shown then
-      sec.head:SetText((i == 1 and L.Q_SECTION_MINE or L.Q_SECTION_OTHERS) .. (count > 0 and ("  ·  " .. count) or ""))
-      s:Place(sec.head, 29, 6)
-    end
-    sec.empty:SetShown(#groups == 0 and not any)
-    if sec.empty:IsShown() then s:Place(sec.empty, 16, 10) end
-    for _, g in ipairs(groups) do
-      local lab = pf.groupLabels:Get(nLabels + 1)
-      if not lab then break end
-      nLabels = nLabels + 1
-      lab.text:SetText(g.label ~= "" and g.label or L.Q_ZONE_UNKNOWN)
-      lab.tag:SetText(g.near == "here" and L.Q_ZONE_HERE or (g.near == "near" and L.Q_ZONE_NEAR or ""))
-      lab.tag:SetTextColor(Theme:RGBA(g.near == "here" and "3E7A3A" or "ink2"))
-      lab.pin:SetShown(g.near == "here")
-      pf.zoneOrder[#pf.zoneOrder + 1] = { sec = i, near = g.near }
-      s:Place(lab, 20, 3)
-      for _, x in ipairs(g.rows) do
-        local r = pf.rows:Get(nRows + 1)
-        if not r then break end
-        nRows = nRows + 1
-        r.id = x.id
-        UI.SetIcon(r.icon, ns.ICONS[x.chain and "bn_chain" or "bn_quest"])
-        r.name:SetText(x.name)
-        local there = Q:ThereNow(f, x)
-        r.sub:SetText(rowSub(x, me) .. (#there > 0 and L.Q_THERE_NOW:format(Q.NameList(there)) or ""))
-        r:SetSelected(pick ~= nil and x.id == pick.id)
-        r.edge:SetShown(x.mine)
-        -- Your progress: a pip for each part of a chain, or for each item or kill (a long goal: one fill).
-        local n, have
-        if x.mine and x.chain then n, have = #x.steps, math.min(x.at[me] or 0, #x.steps)
-        elseif x.mine then n, have = x.goal, x.have[me] end
-        r.bar:SetShown(n ~= nil and n > 0)
-        if n and n > 0 then r.bar:Set(BAR_W, have / n, have >= n, n <= UI.BAR_PIPS_MAX and n or nil) end
-        s:Place(r, ROW_H, 4)
-      end
-      s:Skip(4)
-    end
-    if shown then s:Skip(10) end
-  end
-  pf.rows:HideFrom(nRows + 1)
-  pf.groupLabels:HideFrom(nLabels + 1)
-  -- Quests far from this chapter's levels: Show all / Only this chapter's levels.
-  local toggle = pf.tab == "quests" and (hidden > 0 or pf.all)
-  pf.showAll:SetShown(toggle)
-  if toggle then
-    pf.showAll:SetLabel(pf.all and L.Q_SHOW_NEAR or L.Q_SHOW_ALL:format(hidden))
-    s:Place(pf.showAll, 20, 4)
-  end
-  -- What you have finished: History / Hide history (U188), only while this tab has some (the check of 12 Nov 23:02).
-  pf.showDone:SetShown(done > 0)
-  if done > 0 then
-    pf.showDone:SetLabel(pf.history and L.Q_HIDE_DONE or L.Q_SHOW_DONE:format(done))
-    s:Place(pf.showDone, 20, 4)
-  end
-  pf.lscroll:SetContentHeight(s.y + 8)
-
-  -- Right: the chosen quest or chain.
   local r = UI.Stack(pf.rscroll.child)
   local show = pick ~= nil
-  pf.none:SetShown(not show)
-  for _, w in ipairs({ pf.head, pf.youHead, pf.youText, pf.youBar, pf.youCount, pf.othersHead, pf.tipsHead, pf.ask }) do w:SetShown(show) end
-  local nParts, nOthers, nTips = 0, 0, 0
+  pf.none:SetShown(not show); pf.head:SetShown(show)
+  local nTips, mapH = 0, 0
   if not show then
-    pf.inviteQ:Hide(); pf.share:Hide(); pf.shareWhy:Hide(); pf.listen:Hide()
+    pf.ask:Hide(); pf.inviteQ:Hide(); pf.share:Hide(); pf.shareWhy:Hide(); pf.listen:Hide(); pf.map:Hide()
+    pf.stands:HideFrom(1); pf.steps:HideFrom(1)
     r:Skip(60)
-    local chains = pf.tab == "chains"
-    -- All of it near your level finished, under History (the ponytail audit of 13 Nov 2026: "No quest chains learned
-    -- yet" was wrong); one far from your level waits under Show all (the release review of 13 Nov 2026).
+    -- All of it near your level finished, under History; one far from your level waits under Show all.
     local fin = done > 0
-    r:Place(pf.none, pf.none:Set(ns.ICONS[chains and "bn_chain" or "bn_quest"],
-      fin and L.Q_ALL_DONE or (chains and L.Q_EMPTY_CHAINS or L.Q_NONE),
-      fin and L.Q_ALL_DONE_TEXT or (chains and L.Q_EMPTY_CHAINS_TEXT or L.Q_EMPTY_TEXT), nil, nil, "EmptyQuests"), 4)
+    r:Place(pf.none, pf.none:Set(ns.ICONS.bn_quest, fin and L.Q_ALL_DONE or L.Q_NONE,
+      fin and L.Q_ALL_DONE_TEXT or L.Q_EMPTY_TEXT, nil, nil, "EmptyQuests"), 4)
   else
     local d = Q:Detail(pick)
-    -- (A chain may have no zone: no "·" in front of its type then; seen in the tour.)
+    -- (A chain may have no zone: no "·" in front of its type then.)
     pf.head:Set(d.title, ((d.line or "") ~= "" and (d.line .. "  ·  ") or "") .. d.type)
     r:Place(pf.head, pf.head:GetHeight(), 2)
-    -- Your progress: a quest's bar, or a chain's parts with You are here (U189: said once).
-    local you = d.mine and (d.youText ~= nil or d.chain)
-    pf.youHead:SetShown(you); pf.youText:SetShown(you and not d.chain)
-    pf.youBar:SetShown(you and not d.chain); pf.youCount:SetShown(you and not d.chain)
-    if you then r:Place(pf.youHead, 29, 4) end
-    if you and not d.chain then
-      pf.youText:SetText(d.youText)
-      r:Place(pf.youText, pf.youText:GetStringHeight(), 6)
-      pf.youBar:Set(width - 70, d.youPct, d.youPct >= 1, d.youGoal)
-      pf.youCount:SetText(d.youCount)
-      r:Place(pf.youBar, 10, 10)
-      -- The count level with the bar (it sat lower, under the bar's end; seen in the check).
-      pf.youCount:ClearAllPoints(); pf.youCount:SetPoint("RIGHT", pf.youBar, "RIGHT", 70, 0)
-    end
-    -- A chain's parts (under the title when it is not yours: no Your progress over them).
-    if d.chain then
-      if not you then r:Skip(10) end
-      local light = Theme:Current().light
-      for i, part in ipairs(d.parts) do
-        local p = pf.parts:Get(i)
-        if not p then break end
-        nParts = i
-        p.ring:SetColorTexture(ns.Hex(part.you and (light and "B8742A" or "D8A850") or (part.done and "3E7A3A" or "7A6A55")))
-        p.check:SetShown(part.done); p.n:SetShown(not part.done)
-        p.n:SetText(part.n)
-        p:SetQuest(part.id)
-        p.title:SetText(part.title .. (part.you and ("  ·  " .. L.Q_YOU_ARE_HERE) or ""))
-        local names = {}
-        for k, n in ipairs(part.heroes) do names[k] = ns.Short(n) end
-        p.heroes:SetText(table.concat(names, ", "))
-        p.heroes:ClearAllPoints(); p.heroes:SetPoint("TOPLEFT", p.title, "BOTTOMLEFT", 0, -2)
-        local h = math.max(24, p.title:GetStringHeight() + (#names > 0 and p.heroes:GetStringHeight() + 4 or 0) + 4)
-        p:SetHeight(h)
-        r:Place(p, h, 4)
-      end
-    end
-    -- The other Heroes.
-    pf.othersHead:SetShown(#d.others > 0)
-    if #d.others > 0 then r:Place(pf.othersHead, 29, 4) end
-    for i, o in ipairs(d.others) do
-      local row = pf.others:Get(i)
-      if not row then break end
-      nOthers = i
-      row.name:SetText(ns.Short(o.name))
-      row.name:SetTextColor(inkFor(f, o.name))
-      row.bar:Set(width - 116 - 70, o.pct, o.pct >= 1, o.goal)
-      row.text:SetText(o.text)
-      -- Where they are now, when online (who is close to it; 6 Nov 2026).
-      local h = f.heroes and f.heroes[o.name]
-      local zone = h and type(h.zone) == "string" and h.zone ~= "" and Hr:Online(f, o.name) and h.zone
-      row.rel:SetText(zone and ((o.rel ~= "" and (o.rel .. "  ·  ") or "") .. L.Q_IN_ZONE:format(zone)) or o.rel)
-      r:Place(row, 36, 2)
-    end
-    -- What you can do.
-    pf.tipsHead:SetShown(#d.tips > 0)
-    if #d.tips > 0 then r:Skip(6); r:Place(pf.tipsHead, 29, 4) end
+    -- The answer.
     for i, text in ipairs(d.tips) do
       local t = pf.tips:Get(i)
       if not t then break end
@@ -831,41 +771,55 @@ local function refresh(pf, ctx)
       t:SetHeight(h)
       r:Place(t, h, 4)
     end
-    -- Ask to group up and Invite to group (others on it), Share quest (in my log, in a group): one row, wrapping.
-    local buttons = {}
-    pf.ask:SetShown(#pick.others > 0); pf.inviteQ:SetShown(#pick.others > 0)
-    if #pick.others > 0 then buttons[#buttons + 1] = pf.ask; buttons[#buttons + 1] = pf.inviteQ end
-    -- Share quest: shown for a quest in my log, greyed with the reason when it cannot be shared now.
+    -- Ask to group up and Invite to group (others on it, else who could join you), Share quest (in my log), Listen.
+    local buttons, ask, invite = {}, #Q.AskList(pick) > 0, #pick.others > 0
+    pf.ask:SetShown(ask); pf.inviteQ:SetShown(invite)
+    if ask then buttons[#buttons + 1] = pf.ask end
+    if invite then buttons[#buttons + 1] = pf.inviteQ end
     local share = Q:ShareState(pick)
     pf.share:SetShown(share ~= nil)
     pf.share:SetEnabled(share == "ok")
     if share then buttons[#buttons + 1] = pf.share end
-    -- Listen in Spoken: every single quest, Spoken or not (a chain has the button on each of its parts).
-    pf.listenID = not pick.chain and tonumber(tostring(pick.id):match("^q:(%d+)$")) or nil
+    pf.listenID = Q.QuestID(pick)
     pf.listen:SetShown(pf.listenID ~= nil)
     if pf.listenID then buttons[#buttons + 1] = pf.listen end
-    if #buttons > 0 then
-      r:Skip(6)
-      local x, rowY = 0, r.y
-      for _, b in ipairs(buttons) do
-        if x > 0 and x + b:GetWidth() > width then x, rowY = 0, rowY + 34 end
-        b:ClearAllPoints(); b:SetPoint("TOPLEFT", pf.rscroll.child, "TOPLEFT", x, -rowY)
-        x = x + b:GetWidth() + 8
-      end
-      r.y = rowY + 32
-    end
+    if #buttons > 0 then r:Skip(6) end
+    placeButtons(pf, r, buttons, width)
     pf.shareWhy:SetShown(share == "group" or share == "no")
     if pf.shareWhy:IsShown() then
       pf.shareWhy:SetText(share == "group" and L.SHARE_WHY_GROUP or L.SHARE_WHY_NO)
       r:Place(pf.shareWhy, pf.shareWhy:GetStringHeight(), 2)
     end
+    -- The map (U267): none where the game has no art for the zone.
+    local plan = Q:MapPlan(pick)
+    mapH = plan and pf.map:Fill({ map = plan.map, title = pick.name, marks = plan.marks, who = plan.who,
+      target = plan.target }) or 0
+    if mapH > 0 then r:Skip(10); r:Place(pf.map, mapH, 4) else pf.map:Hide() end
+    -- Where everyone stands.
+    r:Skip(10)
+    if d.chain then
+      pf.stands:HideFrom(1)
+      placeSteps(pf, r, f, pick, d, width)
+    else
+      pf.steps:HideFrom(1)
+      for i, o in ipairs(d.rows) do
+        local row = pf.stands:Get(i)
+        if not row then break end
+        row.name:SetText(o.name == me and L.YOU_LABEL or ns.Short(o.name))
+        row.name:SetTextColor(inkFor(f, o.name))
+        local goal = o.goal or 0
+        row.bar:Set(width - 116 - 60, goal > 0 and o.have / goal or 0, goal > 0 and o.have >= goal,
+          goal > 0 and goal <= UI.BAR_PIPS_MAX and goal or nil)
+        row.text:SetText(goal > 0 and (o.have .. " / " .. goal) or "")
+        r:Place(row, 22, 4)
+      end
+      pf.stands:HideFrom(#d.rows + 1)
+    end
   end
-  pf.parts:HideFrom(nParts + 1)
-  pf.others:HideFrom(nOthers + 1)
   pf.tips:HideFrom(nTips + 1)
   pf.rscroll:SetContentHeight(r.y + 8)
-  -- Under a quest's details (the empty state has its own sketch).
-  pf.qArt:Fit(show and r.y or math.huge)
+  -- The page's drawing at the foot only where no map shows (U267; the empty state has its own sketch).
+  pf.qArt:Fit((show and mapH == 0) and r.y or math.huge)
 end
 
 -- Titled Quests, with no line under it (U146).

@@ -22,7 +22,10 @@ local function build(pf)
   -- (Three since On your own, U241: lower, so the feature lines keep their place.)
   local TILE_H, TILE_GAP, TILE_TOP = 72, 10, -186
   pf.found = UI.PictureTile(left, width, TILE_H, function(tex, w, h) ns.Pages:SetChapterArt(tex, 1, w, h, 0.45) end,
-    function() W.startView = "create"; W:Refresh() end)
+    function()
+      if ns.CreateState.solo then ns.CreateState:Reset() end -- (after a look at On your own: a fellowship's Create)
+      W.startView = "create"; W:Refresh()
+    end)
   pf.found:Set(L.FOUND, L.FOUND_TILE)
   pf.found:SetPoint("TOP", 0, TILE_TOP)
   -- The Join tile shows your side's hall (a Horde character saw the Alliance throne room; seen in game).
@@ -32,10 +35,12 @@ local function build(pf)
   end, function() W.startView = "join"; W:Refresh() end)
   pf.join:Set(L.JOIN, L.JOIN_TILE)
   pf.join:SetPoint("TOP", pf.found, "BOTTOM", 0, -TILE_GAP)
-  -- On your own (U241): the journey by your level, never sent; on it, back to it.
+  -- On your own (U241): the journey by your level, never sent; on it, back to it. It starts with Create for one
+  -- (U272): the journey and the challenges.
   pf.solo = UI.PictureTile(left, width, TILE_H, function(tex, w, h) ns.Pages:SetChapterArt(tex, 2, w, h, 0.5) end, function()
-    if not ns.Fellowship:Current() then ns.Fellowship:Solo() end
-    W:ShowPage("chapter")
+    if ns.Fellowship:Current() then W:ShowPage("chapter") return end
+    ns.CreateState:StartSolo()
+    W.startView = "create"; W:Refresh()
   end)
   pf.solo:SetPoint("TOP", pf.join, "BOTTOM", 0, -TILE_GAP)
   -- A link to the Join page (it was pale gold text that did nothing; seen in the tour).

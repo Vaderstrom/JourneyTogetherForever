@@ -31,14 +31,16 @@ DP.GROUPS = {
 local READY_TEX = "Interface\\RaidFrame\\ReadyCheck-Ready"
 local CLASS_ICON = "|TInterface\\Icons\\INV_Misc_Book_09:16:16|t" -- (a tome, as class trainers give)
 
--- A quest row's pin at its top right (the Dungeon page's rows, and the dungeon quest log's, U213): the map with a mark
--- where the quest and each of its chain's steps start (the owner, 14 Nov 2026); p.qname names them.
-function DP.NewPin(p)
+-- A quest row's pin at its top right (DP.QuestRow): the map with a mark where the quest and each of its chain's steps
+-- start (the owner, 14 Nov 2026); p.qname names them.
+local function newPin(p)
   p.marks = {}
-  p.pin = UI.RoundButton(p, 22, "quests", function() if p.st then ns.QuestLists:Pin(p.st, p.qname, p.marks) end end)
+  p.pin = UI.RoundButton(p, 22, "quests", function() if p.st then DP.ToggleMap(p) end end)
+  p.pin.icon:SetSize(16, 16) -- (the map at half the button read as a quest icon: U259)
   p.pin:SetPoint("TOPRIGHT")
   -- The spot's numbers only here (U160: they filled the page's lines).
   UI.Tooltip(p.pin, function()
+    if p.st and DP.MapInBook(p) then return L.MAP_TIP end
     if #p.marks > 1 then return L.DQ_PIN_TIP_MARKS:format(#p.marks) end
     return p.spot and L.DQ_PIN_TIP_AT:format(p.spot) or L.DQ_PIN_TIP_QUESTIE
   end)
@@ -47,13 +49,62 @@ end
 -- The pin for quest q, open at the next to do (the owner, 10 Nov 2026: "Waypoint to where you pickup quests"). A quest
 -- that starts from an item with no spot of its own: at its chain's last step, who hands the item out (Sprite
 -- Jumpsprocket gives Destruction in Deadmines' explosives).
-function DP.SetPin(p, q)
+local function setPin(p, q)
   local QL = ns.QuestLists
   p.marks = QL:Marks(q)
   local focus = p.marks[p.marks.focus]
   p.st = focus and focus.st or q.start
   p.spot = p.st.zone and p.st.x and L.DQ_AT:format(p.st.zone, p.st.x, p.st.y) or nil
   p.pin:SetShown(#p.marks > 0 or QL:CanPin(p.st))
+end
+
+-- A map button's place (the row's, or step k's): its start, the marks the game's map shows (as Show on map did,
+-- U259), and the zone's map.
+local function mapOf(p, k)
+  local QL = ns.QuestLists
+  local st = (k and p.q.steps[k] and p.q.steps[k].start or p.st) or {}
+  local marks = (not k and p.marks) or (st.x and st.y and QL:Marks(p.q, k)) or nil
+  local at = marks and marks[marks.focus or 1]
+  return st, marks, at and at.map or QL:MapOf(st), at
+end
+
+-- True when the game has art for that map: the button opens the map in the book.
+function DP.MapInBook(p, k)
+  local _, _, map = mapOf(p, k)
+  return ns.BookMap.Art(map) ~= nil
+end
+
+-- The map buttons (U267, the owner, 19 Nov 2026): the map in the book under the row, one row at a time (page.mapRow);
+-- the same button again, or another row's, closes it. Where the game has no art for the zone, the game's map as before.
+function DP.ToggleMap(p, k)
+  local st, marks, map = mapOf(p, k)
+  if not ns.BookMap.Art(map) then return ns.QuestLists:Pin(st, p.qname, marks) end
+  local cur = p.page.mapRow
+  p.page.mapRow = not (cur and cur.id == p.id and cur.k == k) and { id = p.id, k = k } or nil
+  ns.Window:Refresh()
+end
+
+-- Each Adventurer's step on q's chain (U266): the first step they have not done, once they have started it (a step done
+-- or in their log), you too. { [k] = { names } }, and who is on the quest or its chain (the map's faces).
+local function onSteps(f, q)
+  local QL, at, who, me = ns.QuestLists, {}, {}, ns.Me()
+  for name in pairs(f.members) do
+    -- (Not the Fallen: their journey ended, as on the Quests page; the release review of 20 Nov 2026.)
+    local h = (name == me or not ns.Challenges:Fallen(f, name)) and f.heroes and f.heroes[name]
+    if h then
+      local started, first = false, nil
+      for k, x in ipairs(q.steps or {}) do
+        local st = x.id and QL.StatusOf(h, x.id) or "no"
+        if st ~= "no" then started = true end
+        if not first and st ~= "done" then first = k end
+      end
+      if started and first then at[first] = at[first] or {}; table.insert(at[first], name) end
+      if (started and first) or QL.StatusOf(h, q.id) == "log" then who[#who + 1] = name end
+    end
+  end
+  for _, list in pairs(at) do table.sort(list, ns.Quests.MeFirst) end
+  table.sort(who, ns.Quests.MeFirst)
+  return at, who
 end
 
 -- Opens the page at a dungeon or raid; Back returns to the page shown before (kept as it was). id: a quest whose row
@@ -66,7 +117,7 @@ function DP:Open(key, id)
   if from and from ~= "dungeon" then W.dungeonBack = from end
   W.dungeon = key
   local pf = W.pageFrames and W.pageFrames.dungeon
-  if pf then pf.who = nil; pf.opened = id and { [id] = true } or {}; UI.ScrollsToTop(pf) end -- (its rows folded each time, U185)
+  if pf then pf.who, pf.mapRow = nil, nil; pf.opened = id and { [id] = true } or {}; UI.ScrollsToTop(pf) end -- (its rows folded each time, U185)
   if W:IsOpen() then
     local turned = W.current ~= "dungeon"
     W.page = "dungeon"
@@ -134,30 +185,64 @@ function DP.Titles(ctx)
   return d[2], head .. "  ·  " .. levels
 end
 
-local function questCard(pf, R, width)
-  -- Where it starts and the steps open on a click on the row (U185; the check of 12 Nov 2026: a link under each row
-  -- made it three lines), what opens in its tooltip.
-  local p = CreateFrame("Button", nil, R)
+-- Whether quest id's row is open on page: page.opened[id] (true or false, a click's), else page.openDefault.
+function DP.IsOpen(page, id)
+  local v = page.opened[id]
+  if v == nil then return page.openDefault == true end
+  return v
+end
+
+-- A step of a chain: its line, and its own Show on map under the row's (U259, the owner, 18 Nov 2026: "so that you
+-- can see where you can pick prequests").
+local function stepRow(p, width)
+  local s = CreateFrame("Frame", nil, p)
+  s:SetWidth(width)
+  s.w = width
+  s.text = UI.WrapText(s, 12, "ink2", width - 30)
+  s.text:SetPoint("TOPLEFT")
+  -- (Its marks made on the click: the log's rows are open, and a refresh would make them for every step.)
+  s.pin = UI.RoundButton(s, 20, "quests", function() if s.st then DP.ToggleMap(p, s.k) end end)
+  s.pin.icon:SetSize(14, 14)
+  s.pin:SetPoint("TOPRIGHT", -1, 2)
+  UI.Tooltip(s.pin, function() return s.st and DP.MapInBook(p, s.k) and L.MAP_TIP or s.tip end)
+  -- Who is on this step (U266), left of its map button.
+  s.faces = UI.Faces(s, 14)
+  s.faces:SetPoint("RIGHT", s.pin, "LEFT", -4, 0)
+  return s
+end
+
+-- A quest's row, on the Dungeon page and in the dungeon quest log (U258, the owner, 18 Nov 2026: "the same structure
+-- as in the dungeons page"), filled by DP.FillQuest. A click opens or folds it in place (U185; the check of 12 Nov
+-- 2026: a link under each row made it three lines), what opens in its tooltip. page holds its open rows (DP.IsOpen).
+function DP.QuestRow(parent, width, page)
+  local p = CreateFrame("Button", nil, parent)
   p:SetWidth(width)
+  p.page = page
   p:SetScript("OnClick", function()
-    pf.opened[p.id] = not pf.opened[p.id] or nil
+    page.opened[p.id] = not DP.IsOpen(page, p.id)
     if GameTooltip:IsOwned(p) then GameTooltip:Hide() end -- (it said what the click did)
     ns.Window:Refresh()
   end)
   UI.Tooltip(p, function() return p.tip end)
   local hl = p:CreateTexture(nil, "HIGHLIGHT")
   hl:SetPoint("TOPLEFT", -4, 3); hl:SetPoint("BOTTOMRIGHT", 4, -3); hl:SetColorTexture(1, 0.9, 0.6, 0.12)
-  -- Its status first (U125): done, in your log, not yet.
+  -- Its status first (U125): done, in your log, not yet. A size up (U258, the owner: "very small and hard to read").
   p.icon = p:CreateTexture(nil, "ARTWORK")
-  p.icon:SetSize(14, 14); p.icon:SetPoint("TOPLEFT", 0, -1)
-  p.title = UI.WrapText(p, 13, "ink", width - 70, "title")
-  p.title:SetPoint("TOPLEFT", 20, 0)
+  p.icon:SetSize(16, 16); p.icon:SetPoint("TOPLEFT", 0, -1)
+  p.title = UI.WrapText(p, 14, "ink", width - 70, "title")
+  p.title:SetPoint("TOPLEFT", 22, 0)
   -- Folded, its status, level and how far; opened, where it starts too (U160: on one line, they were two).
-  p.where = UI.WrapText(p, 11, "ink2", width - 70)   -- clear of the fold and the pin, like the title
-  p.steps = UI.WrapText(p, 11, "ink2", width - 30)
-  DP.NewPin(p)
+  p.where = UI.WrapText(p, 12, "ink2", width - 70)   -- clear of the fold and the pin, like the title
+  p.where:SetPoint("TOPLEFT", p.title, "BOTTOMLEFT", 0, -2)
+  p.before = UI.WrapText(p, 12, "ink", width - 52)
+  p.steps = UI.Pool(function() return stepRow(p, width - 22) end)
+  newPin(p)
   p.fold = p:CreateTexture(nil, "ARTWORK")
   p.fold:SetSize(14, 14); p.fold:SetPoint("TOPRIGHT", p.pin, "TOPLEFT", -6, -1)
+  -- The other Adventurers with it in their log (U266), as on the Together tab.
+  p.faces = UI.Faces(p, 16)
+  p.faces:SetPoint("RIGHT", p.fold, "LEFT", -6, 0)
+  p.w = width
   return p
 end
 
@@ -272,7 +357,7 @@ local function build(pf)
   pf.classAll = UI.LabeledCheck(R, width, L.DQ_CLASS_ALL, L.DQ_CLASS_ALL_TIP,
     function() return pf.classOthers end, function(v) pf.classOthers = v; W:Refresh() end)
   pf.opened = {}
-  pf.quests = UI.Pool(function() return questCard(pf, R, width) end)
+  pf.quests = UI.Pool(function() return DP.QuestRow(R, width, pf) end)
   pf.none = UI.SketchLine(R, width, "EmptySince")
 end
 
@@ -465,8 +550,8 @@ local function stepLine(QL, k, x, nextK)
   local line = x.lvl and L.DQ_STEP_LVL:format(k, x.name, x.lvl) or L.DQ_STEP:format(k, x.name)
   local s = x.start
   if s.by or s.item or s.zone or s.inside then line = line .. "  ·  " .. QL.WhereText(s) end
-  local color = k == nextK and x.status ~= "done" and Theme:HexFor("B8742A") or hexOf(x.status == "done" and "ink2" or "ink")
-  return ("|T%s:12:12|t |cff%s%s|r"):format((QL.STATUS[x.status] or QL.STATUS.no)[1], color, line)
+  local color = k == nextK and x.status ~= "done" and Theme:HexFor(Theme.FIXED.amberText) or hexOf(x.status == "done" and "ink2" or "ink")
+  return ("|T%s:14:14|t |cff%s%s|r"):format((QL.STATUS[x.status] or QL.STATUS.no)[1], color, line)
 end
 
 -- Its level, with the level it can be taken from: "Level 17" alone read as "not before 17" (the owner, 10 Nov 2026).
@@ -481,17 +566,105 @@ local function statusText(QL, q, who, me)
   return QL.StatusText(q.status, who ~= me and q.status == "log" and L.DQ_IN_LOG_OF:format(ns.Short(who)) or nil)
 end
 
--- A quest's line, opened: its status first (the answer; its icon is before the name), where it starts, its level, and
--- who else has it in their log.
+-- A quest's line, opened: its status first (the answer; its icon is before the name), where it starts, its level (who
+-- else has it: the row's faces, U266).
 local function questLine(QL, q, who, me, inside)
   local parts = { statusText(QL, q, who, me), QL.WhereText(q.start) }
   parts[#parts + 1] = levelText(q.start, inside)
-  if #q.others > 0 then
-    local names = {}
-    for _, n in ipairs(q.others) do names[#names + 1] = n == me and L.YOU_LABEL or ns.Short(n) end
-    parts[#parts + 1] = L.DQ_ALSO:format(table.concat(names, ", "))
-  end
   return table.concat(parts, "  ·  ")
+end
+
+-- Fills a quest row (DP.QuestRow) with quest q (QL:Groups) and rowWho's status; inside: it starts in the dungeon (its
+-- level alone); lead: a part before the rest (a class quest's class); last: one after it (the log's "Ready for the
+-- run"). Folded (U185, the owner, 12 Nov 2026): its status, level and how far along its chain. Opened: where it starts,
+-- and its chain's steps under "First, the quest before it" (U258), each with where it starts and its own Show on map
+-- (U259). Returns its height.
+function DP.FillQuest(p, q, rowWho, inside, lead, last)
+  local QL, me, f = ns.QuestLists, ns.Me(), ns.Fellowship:Current()
+  p.id, p.qname, p.q = q.id, q.name, q
+  p.icon:SetTexture((QL.STATUS[q.status] or QL.STATUS.no)[1])
+  -- Faces: who else has it (U266); the title makes room for them.
+  local faces = {}
+  for _, n in ipairs(f and q.others or {}) do faces[#faces + 1] = ns.Quests:Face(f, n, q.start.zone) end
+  local fw = p.faces:Set(faces)
+  p.title:SetWidth(p.w - 70 - (fw > 0 and fw + 6 or 0))
+  local stepsAt, who = {}, {}
+  if f then stepsAt, who = onSteps(f, q) end
+  local st, all = q.start, q.steps or {}
+  local nextK
+  for k, x in ipairs(all) do if not nextK and x.status ~= "done" then nextK = k end end
+  -- (A quest that starts inside has nothing more to open: its heading says where.)
+  local canOpen = #all > 0 or not st.inside
+  local open = canOpen and DP.IsOpen(p.page, q.id)
+  p.title:SetText(q.name)
+  if not open then
+    local parts = { statusText(QL, q, rowWho, me), levelText(st, inside) }
+    if lead then table.insert(parts, 1, lead) end
+    -- (A chain of one quest says nothing until it is done: "Step 1 of 1" read as noise, the check of 12 Nov 2026.)
+    if #all > 1 then parts[#parts + 1] = nextK and L.DG_STEP_OF:format(nextK, #all) or L.DG_STEPS_DONE:format(#all)
+    elseif #all == 1 and not nextK then parts[#parts + 1] = L.DG_STEP_1_DONE end
+    parts[#parts + 1] = last
+    p.where:SetText(table.concat(parts, "  ·  "))
+  else
+    p.where:SetText((lead and lead .. "  ·  " or "") .. questLine(QL, q, rowWho, me, inside) .. (last and "  ·  " .. last or ""))
+  end
+  local label = #all > 1 and L.DG_SHOW_STEPS:format(#all) or (#all == 1 and L.DG_SHOW_STEP_1 or L.DG_SHOW_WHERE)
+  p:EnableMouse(canOpen)
+  p.fold:SetShown(canOpen)
+  p.fold:SetTexture(UI.FOLD_ICON[not open])
+  p.tip = canOpen and (open and L.DG_HIDE_STEPS or label) or nil
+  setPin(p, q)
+  local h, n, steps = p.title:GetStringHeight() + p.where:GetStringHeight() + 4, 0, open and #all > 0
+  p.before:SetShown(steps)
+  if steps then
+    p.before:SetText(#all == 1 and L.DQ_BEFORE_1 or L.DQ_BEFORE_N:format(#all))
+    p.before:ClearAllPoints(); p.before:SetPoint("TOPLEFT", 22, -(h + 4))
+    h = h + 4 + p.before:GetStringHeight()
+    for k, x in ipairs(all) do
+      local s = p.steps:Get(k)
+      if not s then break end
+      n = k
+      s.text:SetText(stepLine(QL, k, x, nextK))
+      -- Its own mark glowing, the chain's others with it; with no spot, Questie's map of its zone.
+      s.st, s.q, s.k = x.start, q, k
+      s.tip = x.start.x and x.start.y and L.DQ_PIN_TIP_STEP:format(k) or L.DQ_PIN_TIP_QUESTIE
+      s.pin:SetShown(QL:CanPin(x.start))
+      local sf = {}
+      for _, name in ipairs(stepsAt[k] or {}) do sf[#sf + 1] = ns.Quests:Face(f, name, x.start.zone) end
+      local sw = s.faces:Set(sf)
+      s.faces:ClearAllPoints(); s.faces:SetPoint("TOPRIGHT", s.pin:IsShown() and -26 or -1, 1)
+      s.text:SetWidth(s.w - 30 - (sw > 0 and sw + 4 or 0))
+      local sh = math.max(s.text:GetStringHeight(), 18)
+      s:SetHeight(sh)
+      s:ClearAllPoints(); s:SetPoint("TOPLEFT", 22, -(h + 4))
+      s:Show()
+      h = h + 4 + sh
+    end
+  end
+  p.steps:HideFrom(n + 1)
+  -- The map in the book under the row (U267), when its map button or a step's opened it.
+  local m = p.page.mapRow
+  local ch = 0
+  if m and m.id == q.id and (open or not m.k) then
+    -- (Not made in combat, CLAUDE.md: the book is drawn again when the fight ends.)
+    if not p.card and ns.Combat:InCombat() then
+      if not p.cardWaits then p.cardWaits = true; ns.Combat:AfterCombat(function() p.cardWaits = nil; ns.Window:Refresh() end) end
+    elseif not p.card then
+      p.card = ns.BookMap.New(p, p.w - 22)
+    end
+    local mst, marks, map, at = mapOf(p, m.k)
+    ch = p.card and p.card:Fill({ map = map, title = q.name, marks = marks or {}, who = who,
+      open = function() QL:Pin(mst, q.name, marks) end, target = at and { st = at.st, map = at.map } or nil }) or 0
+  end
+  if ch > 0 then
+    p.card:ClearAllPoints(); p.card:SetPoint("TOPLEFT", 22, -(h + 8))
+    h = h + 8 + ch
+  elseif p.card then
+    p.card:Hide()
+  end
+  h = math.max(h, 24)
+  p:SetHeight(h)
+  return h
 end
 
 -- The quests under their headings, with the chosen Adventurer's status.
@@ -513,50 +686,12 @@ local function refreshQuests(pf, f, key, r)
     r:Place(pf.none, pf.none.h, 8)
   end
   local nq, shown = 0, 0
-  -- A quest's short row (U185, the owner, 12 Nov 2026): folded, its status (rowWho's), its level and how far along the
-  -- chain; where it starts and every step open on a click. lead: a part before them (a class quest's class).
+  -- A quest's short row (DP.FillQuest) with rowWho's status; lead: a part before the rest (a class quest's class).
   local function place(q, rowWho, inside, lead)
     local p = pf.quests:Get(nq + 1)
     if not p then return end
     nq = nq + 1
-    p.id, p.qname = q.id, q.name
-    p.icon:SetTexture((QL.STATUS[q.status] or QL.STATUS.no)[1])
-    local st = q.start
-    local all = q.steps or {}
-    local nextK
-    for k, x in ipairs(all) do if not nextK and x.status ~= "done" then nextK = k end end
-    -- (A quest that starts inside has nothing more to open: its heading says where.)
-    local canOpen = #all > 0 or not st.inside
-    local open = canOpen and pf.opened[q.id]
-    p.title:SetText(q.name)
-    local steps = {}
-    if not open then
-      local parts = { statusText(QL, q, rowWho, me), levelText(st, inside) }
-      if lead then table.insert(parts, 1, lead) end
-      -- (A chain of one quest says nothing until it is done: "Step 1 of 1" read as noise, the check of 12 Nov 2026.)
-      if #all > 1 then parts[#parts + 1] = nextK and L.DG_STEP_OF:format(nextK, #all) or L.DG_STEPS_DONE:format(#all)
-      elseif #all == 1 and not nextK then parts[#parts + 1] = L.DG_STEP_1_DONE end
-      p.where:SetText(table.concat(parts, "  ·  "))
-    else
-      p.where:SetText((lead and lead .. "  ·  " or "") .. questLine(QL, q, rowWho, me, inside))
-    end
-    -- The chain's steps (U123), each with where it starts.
-    if open then for k, x in ipairs(all) do steps[k] = stepLine(QL, k, x, nextK) end end
-    p.steps:SetText(table.concat(steps, "\n"))
-    p.steps:SetShown(#steps > 0)
-    local label = #all > 1 and L.DG_SHOW_STEPS:format(#all) or (#all == 1 and L.DG_SHOW_STEP_1 or L.DG_SHOW_WHERE)
-    p:EnableMouse(canOpen)
-    p.fold:SetShown(canOpen)
-    p.fold:SetTexture(UI.FOLD_ICON[not open])
-    p.tip = canOpen and (open and L.DG_HIDE_STEPS or label) or nil
-    DP.SetPin(p, q)
-    p.where:ClearAllPoints(); p.where:SetPoint("TOPLEFT", p.title, "BOTTOMLEFT", 0, -2)
-    p.steps:ClearAllPoints(); p.steps:SetPoint("TOPLEFT", p.where, "BOTTOMLEFT", 0, -3)
-    local h = p.title:GetStringHeight() + p.where:GetStringHeight() + 4
-      + (#steps > 0 and p.steps:GetStringHeight() + 3 or 0)
-    h = math.max(h, 24)
-    p:SetHeight(h)
-    r:Place(p, h, 8)
+    r:Place(p, DP.FillQuest(p, q, rowWho, inside, lead), 8)
   end
   local function heading(sec, icon, text)
     shown = shown + 1

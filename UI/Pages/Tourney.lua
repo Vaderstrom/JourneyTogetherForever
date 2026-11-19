@@ -247,10 +247,10 @@ local function refresh(pf, ctx)
     if not sample then m, other = Tn:MyMatch(f, me) end
     if m then
       lines[#lines + 1] = { L.T_MY_MATCH:format(ns.Short(other), t.bo == 1 and L.T_ONE_DUEL or L.T_BEST_OF:format(t.bo),
-        ns.TimeLeft((t.roundEnd or now) - now)), "accent" }
+        ns.TimeLeft((t.roundEnd or now) - now)), "accentText" }
     end
   end
-  if phase == "done" and t.champion then lines[#lines + 1] = { L.T_CHAMPION:format(ns.Short(t.champion)), "B8742A" } end
+  if phase == "done" and t.champion then lines[#lines + 1] = { L.T_CHAMPION:format(ns.Short(t.champion)), "amberText" } end
   if (phase == "signup" or phase == "cancelled") and #signed < (t and t.min or r.tMin) then
     lines[#lines + 1] = { L.T_FEW:format(t and t.min or r.tMin), "B0321E" }
   end

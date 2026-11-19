@@ -1,5 +1,7 @@
 -- Heroes (SPEC §4.8). List view: left the fellowship's banner, its roles, every Adventurer's card (status, level, XP)
 -- and Leave (U196, the owner, 14 Nov 2026); right Invite Adventurers, the Friends of the fellowship and the Fallen.
+-- The Leader's tools are here since Manage went (U202, SPEC §4.9): a ⋯ on each card (away, Friend, lead, remove), and
+-- a click on the banner puts its name, colour and emblem on the right page in place of the invites.
 -- Click a Hero to inspect: left their gear, right XP, where they stand, this chapter's dungeons, roles,
 -- I'm away / I'm back and Play another character (yourself).
 local _, ns = ...
@@ -29,6 +31,54 @@ local function setNameColor(fs, f, name)
   if hex then fs:SetTextColor(ns.Hex(hex)) else fs:SetTextColor(Theme:RGBA("ink")) end
 end
 
+-- Who takes over if the leader stops playing: the longest-serving Adventurer (two ranks, 27 Oct 2026).
+local function takeoverText(f)
+  local leader = ns.Short(f.leader)
+  if f.rules.takeoverNever then return L.TAKEOVER_NEVER:format(leader) end
+  local first = ns.Progress:LongestServing(f)
+  if first then return L.TAKEOVER_FIRST:format(leader, f.rules.takeover, ns.Short(first)) end
+  return L.TAKEOVER_NOBODY:format(leader, f.rules.takeover)
+end
+
+-- The Leader's ⋯ on a card (Manage's until U202): Mark away, a Friend of the fellowship and back, Make leader, Remove.
+-- Read when it opens, for the member the card holds then (a pooled card may hold another after a redraw; review of
+-- 1.7.0).
+local function memberMenu(who)
+  local W, f, me, list = ns.Window, F:Current(), ns.Me(), {}
+  if not f or not f.members[who] or who == f.leader then return list end
+  if f.leader == me then
+    list[#list + 1] = { f.members[who].away == "forced" and L.CLEAR_AWAY or L.MARK_AWAY,
+      function() F:SetAway(who, f.members[who].away ~= "forced") end }
+    -- A Friend of the fellowship and back (the owner, 10 Nov 2026); back only at or below the chapter's cap. Not for
+    -- one of the Fallen (the rules refuse it).
+    if P.Can(f, me, "friend", who) then
+      local friend = F:IsFriend(f, who)
+      list[#list + 1] = { friend and L.MAKE_ADVENTURER or L.MAKE_FRIEND, function()
+        if friend then
+          local ok, why = F:SetFriend(false, who)
+          if not ok and why == "offline" then
+            ns:Toast(nil, L.MAKE_ADVENTURER, L.MAKE_ADVENTURER_OFFLINE:format(ns.Short(who)))
+          elseif not ok and why == "cap" then
+            ns:Toast(nil, L.MAKE_ADVENTURER, L.MAKE_ADVENTURER_CAP:format(ns.Short(who),
+              J:CapLevel(f, J:Current(f)), Hr:Level(f, who)))
+          end
+        else
+          W:Confirm(L.MAKE_FRIEND_CONFIRM:format(ns.Short(who)), L.MAKE_FRIEND, function() F:SetFriend(true, who) end)
+        end
+      end }
+    end
+    list[#list + 1] = { L.MAKE_LEADER, function()
+      W:Confirm(L.MAKE_LEADER_CONFIRM:format(ns.Short(who)), L.MAKE_LEADER, function() F:MakeLeader(who) end)
+    end }
+  end
+  if P.Can(f, me, "remove", who) then
+    list[#list + 1] = { L.REMOVE, function()
+      W:Confirm(L.REMOVE_CONFIRM:format(ns.Short(who)), L.REMOVE, function() F:Remove(who) end)
+    end, true }
+  end
+  return list
+end
+
 -- XP bar (UI.Bar): the level so far in gold, rested XP as a pale blue band ahead of it (at 0% with rested XP the
 -- whole bar was solid blue and read as full; seen in the check, 28 Oct 2026).
 local function xpBar(parent, height, gold)
@@ -52,6 +102,13 @@ local function buildList(pf, width)
   pf.fline = UI.Text(left, 12, "ink2")
   pf.fline:SetPoint("TOPLEFT", pf.fname, "BOTTOMLEFT", 0, -4)
   pf.fline:SetWidth(width - 64); pf.fline:SetWordWrap(false) -- (a long Leader's name ends in "...", not past the page)
+  -- The Leader clicks the banner to change it (U202): The fellowship on the right page, a second click or Done back.
+  pf.bannerBtn = CreateFrame("Button", nil, left)
+  pf.bannerBtn:SetPoint("TOPLEFT"); pf.bannerBtn:SetSize(width, 64)
+  local glow = pf.bannerBtn:CreateTexture(nil, "HIGHLIGHT")
+  glow:SetAllPoints(); glow:SetColorTexture(1, 0.9, 0.6, 0.12)
+  pf.bannerBtn:SetScript("OnClick", function() ns.Sound("choose"); pf.editing = not pf.editing or nil; ns.Window:Refresh() end)
+  UI.Tooltip(pf.bannerBtn, L.BANNER_EDIT_TIP)
   -- (No number tiles since U190, the owner, 14 Nov 2026: the count is in the line under the name (U201), the chapter in
   -- the header's chip, the clears on the Dungeons page.)
   pf.comp = {}
@@ -150,6 +207,10 @@ local function buildList(pf, width)
     c.rank:SetPoint("LEFT", c.name, "RIGHT", 8, 0)
     c.level = UI.Text(c, 18, "ink", "title", "RIGHT")
     c.level:SetPoint("TOPRIGHT", -10, -7)
+    -- The Leader's ⋯ at the top right, the level moved left of it (U202; placed by refreshList).
+    c.menu = UI.MenuButton(c, function() return memberMenu(c.who) end)
+    c.menu:SetSize(30, 24) -- (clear of "Seen 3 hours ago" under it, at -30)
+    c.menu:SetPoint("TOPRIGHT", -4, -3)
     -- Presence (28 Oct 2026): the mark and its word at the top, when last seen (or why away) under them, as in the
     -- game's friends list. Where they stand in the chapter sits after the XP.
     c.status = UI.Text(c, 12, nil, "body", "RIGHT")
@@ -259,6 +320,41 @@ local function buildList(pf, width)
     end)
     pf.folds[g].id, pf.folds[g].label = id, x[2]
   end
+
+  -- The banner's own page, the Leader's (U202; Manage's right page until then): the name, the banner colour and every
+  -- emblem (as in Create a Fellowship), each change on the banner at once; Done shows the invites again.
+  local E = CreateFrame("Frame", nil, pf.right)
+  E:SetAllPoints()
+  pf.edit = E
+  local w = width - 8
+  pf.fHead = UI.SectionHeader(E, w)
+  pf.fHead:SetText(L.BANNER_FELLOWSHIP)
+  pf.fHead:SetHelp("") -- the "?" made now, not during combat
+  pf.fHead:SetPoint("TOPLEFT")
+  local function label(text, at)
+    local t = UI.Text(E, 13, "ink2")
+    t:SetPoint("TOPLEFT", 0, -at)
+    t:SetText(text)
+    return t
+  end
+  local y = 35
+  label(L.NAME, y)
+  pf.rename = UI.EditBox(E, w - 80, 48, "", function(t) F:Rename(t) end)
+  pf.rename:SetPoint("TOPLEFT", 0, -(y + 18))
+  pf.save = UI.TextButton(E, L.SAVE, function() F:Rename(pf.rename:GetText()) end, "plain", 13)
+  pf.save:SetPoint("TOPRIGHT", 0, -(y + 17))
+  label(L.BANNER, y + 58)
+  pf.swatches = UI.Swatches(E, function() local f = F:Current(); return f and f.color end,
+    function(v) local f = F:Current(); if f then F:SetBanner(v, f.emblem) end end)
+  pf.swatches:SetPoint("TOPLEFT", 0, -(y + 76))
+  label(L.EMBLEM, y + 118)
+  pf.emblemGrid = UI.EmblemGrid(E, w - 10, function(n)
+    local f = F:Current()
+    if f then ns.Sound("choose"); F:SetBanner(f.color, n) end
+  end)
+  pf.emblemGrid:SetPoint("TOPLEFT", 0, -(y + 138)); pf.emblemGrid:SetPoint("BOTTOMRIGHT", -8, 38)
+  pf.editDone = UI.TextButton(E, L.BANNER_DONE, function() pf.editing = nil; ns.Window:Refresh() end, "primary", 13)
+  pf.editDone:SetPoint("BOTTOMRIGHT", -8, 0)
 end
 
 local function tourneyLine(f)
@@ -292,6 +388,14 @@ local function refreshList(pf, ctx, width)
   -- The count beside the banner and the roles it adds up (U201, the owner, 14 Nov 2026: it was the right page's title,
   -- over the invite and away from the cards).
   pf.fline:SetText(L.FELLOWSHIP_LINE:format(countLine(ctx), f.faction or "", ns.Short(f.leader)))
+  -- The Leader's banner page (U202): its fields from the fellowship as it is now.
+  pf.bannerBtn:SetShown(pf.canBanner)
+  if pf.editing then
+    pf.fHead:SetHelp(L.BANNER_HELP .. "\n\n" .. takeoverText(f))
+    if not pf.rename.edit:HasFocus() then pf.rename:SetText(f.name) end
+    pf.swatches:Refresh()
+    pf.emblemGrid:Refresh(f.color, f.emblem)
+  end
   -- The roles of the Adventurers who play on; the Friends of the fellowship (SPEC §1.1) and the Fallen (SPEC §9)
   -- counted apart, each in a column after Damage when there are any.
   local counts, fallenN, friendN, living = { Tank = 0, Healer = 0, DPS = 0 }, 0, 0, 0
@@ -425,6 +529,9 @@ local function refreshList(pf, ctx, width)
     setNameColor(c.name, f, name)
     c.rank:SetText(name == f.leader and L.RANK_LEADER or "")
     c.level:SetText(Hr:Level(f, name))
+    c.menu:Update()
+    if ctx.watching then c.menu:Hide() end -- (another character's fellowship only reads)
+    c.level:SetPoint("TOPRIGHT", c.menu:IsShown() and -42 or -10, -7)
     -- The Fallen (SPEC §9): a memorial, not a status. No presence or addon version; their class crest greyed with a
     -- skull on its corner (not their face), the card in muted violet, "Fallen" where the standing goes, and in place of
     -- the XP when and where they fell (the foe a best guess: the game does not tell an addon who killed you).
@@ -1051,7 +1158,11 @@ local function refresh(pf, ctx)
   if not f then return end
   if pf.sel and not f.members[pf.sel] then pf.sel = nil end
   local inspecting = pf.sel ~= nil
-  pf.listL:SetShown(not inspecting); pf.listR:SetShown(not inspecting)
+  -- The banner is the Leader's to change, never while following another character's fellowship (U202).
+  pf.canBanner = not ctx.watching and P.Can(f, ctx.me, "banner")
+  if not pf.canBanner then pf.editing = nil end
+  pf.listL:SetShown(not inspecting); pf.listR:SetShown(not inspecting and not pf.editing)
+  pf.edit:SetShown(not inspecting and pf.editing == true)
   pf.insL:SetShown(inspecting); pf.insR:SetShown(inspecting)
   local width = ns.Window.PAGE_W
   if inspecting then refreshInspect(pf, ctx, width) else refreshList(pf, ctx, width) end

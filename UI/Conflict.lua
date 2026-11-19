@@ -28,7 +28,7 @@ local function build(o)
   o.reportLabel:SetText(L.CONFLICT_REPORT)
   -- U59 (the check of 4 Nov 2026): one click selects the whole report and says what to press.
   o.select = UI.TextButton(o.box, L.CONFLICT_SELECT, function() Cw:SelectReport() end)
-  o.selected = UI.Text(o.box, 12, "accent")
+  o.selected = UI.Text(o.box, 12, "accentText")
   o.holder = UI.Card(o.box)
   o.holder:SetSize(W, 104)
   o.scroll = CreateFrame("ScrollFrame", nil, o.holder)

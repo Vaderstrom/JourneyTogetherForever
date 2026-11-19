@@ -96,7 +96,7 @@ ns.ManualSteps = {
     end },
   { id = "admin-ruler", section = "Creating and joining", todo = "Open Journey Admin (under Admin in the sidebar).",
     see = "The journey editor: the level ruler runs across both pages on a card (the book's rounded frame, like the Overview's card, shaded where it crosses the fold), from 1 to 60 with 10, 20 ... under it, a segment per chapter (its number in it, the chosen one with a bright edge) and gold marks between; dungeons are chips in each chapter, and the shelf of every dungeon is on the right page under the ruler. Drag a gold mark: both chapters' levels follow." },
-  { id = "leave-alone", section = "Creating and joining", todo = "Manage → The fellowship → Leave → confirm.",
+  { id = "leave-alone", section = "Creating and joining", todo = "Adventurers page → Leave the fellowship → confirm.",
     see = "You were alone, so the fellowship ends; you are back on Welcome.", auto = none },
   { id = "accept", section = "Creating and joining", todo = "Get the pretend invite, then Join a fellowship → Accept.",
     see = "A toast and the inbox badge; after Accept you are in Test Fellowship (Testleader leads).",
@@ -227,7 +227,7 @@ ns.ManualSteps = {
       return member("Elyra") and f.name ~= "Nope", ("%s; Elyra %s"):format(f.name, member("Elyra") and "is in" or "is gone")
     end },
   { id = "member-invites", section = "As the Leader", todo = "Brannic invites Darrow (every Adventurer may invite).",
-    see = "Manage, Adventurers tab: an open invite to Darrow, sent by Brannic.", cmds = { "/jtf debug hero Brannic invite Darrow" },
+    see = "Adventurers page, under Invite Adventurers: an open invite to Darrow, sent by Brannic.", cmds = { "/jtf debug hero Brannic invite Darrow" },
     auto = function()
       local f = cur()
       local on = f ~= nil and f.invites[full("Darrow")] ~= nil
@@ -397,6 +397,6 @@ ns.ManualSteps = {
     todo = "List the realms you can whisper. Then on the Adventurers page invite a made-up name on a realm not in that list, for example Bob-Illidan. Nobody is contacted.",
     see = "The list prints in chat; the invite is refused: only your realm and the realms connected to it can share a fellowship.",
     cmds = { { "List realms", realms } } },
-  { id = "leave-test", section = "The client", todo = "Leave Test Fellowship (Manage → The fellowship → Leave).",
+  { id = "leave-test", section = "The client", todo = "Leave Test Fellowship (Adventurers page → Leave the fellowship).",
     see = "Brannic leads after you; you are back on Welcome.", auto = none },
 }

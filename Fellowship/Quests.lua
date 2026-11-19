@@ -13,6 +13,7 @@ local Q = { SEND_DELAY = 15, LINK_WITHIN = 60 }
 ns.Quests = Q
 
 local secret = ns.Secret
+local NONE = {}
 
 local function db()
   ns.db.questLinks = ns.db.questLinks or {}
@@ -278,7 +279,13 @@ function Q:MyDone()
   -- (Our lists, the dungeon quests and their chains' steps: QuestLists:AllIDs.)
   for _, id in ipairs(ns.QuestLists and ns.QuestLists:AllIDs() or {}) do check(id) end
   -- And the quests of the journey's milestones.
-  for _, id in ipairs(ns.Milestones:QuestIDs(F:Current())) do check(id) end
+  local f = F:Current()
+  for _, id in ipairs(ns.Milestones:QuestIDs(f)) do check(id) end
+  -- And every quest in the other Adventurers' logs (U265): They could join you leaves out what I have done.
+  for name in pairs(f and f.members or NONE) do
+    local h = name ~= ns.Me() and f.heroes and f.heroes[name]
+    for id in pairs(h and h.quests or NONE) do check(id) end
+  end
   table.sort(out)
   return out
 end
@@ -370,6 +377,8 @@ function Q:Send(to, force)
   local data = { fid = f.id, q = log, d = doneList, ln = links, k = keys, t = time() }
   local key = ns.Serialize.Encode({ log, doneList, keys })
   local doneMoved = self:Store(f, ns.Me(), data, data.t)
+  local mine = f.heroes and f.heroes[ns.Me()]
+  self.sentDone = mine and mine.questsDone -- (what the others have heard I did, U265)
   if not to and not force and key == self.lastKey then return end
   if not to then self.lastKey = key end
   local lkey = ns.Serialize.Encode(links)
@@ -409,6 +418,14 @@ Comm:On("QUESTS", function(sender, d)
   if not f or not f.members[sender] or not f.members[ns.Me()] then return end
   local doneMoved = Q:Store(f, sender, d, d.t)
   ns:Fire("HEROES", nil, not doneMoved and "quests" or nil)
+  -- A quest in their log that I have done and not yet said so (U265): my list goes again, once (Q:Soon waits, and
+  -- the next list says it).
+  local said = Q.sentDone
+  if said then
+    for id in pairs(f.heroes[sender].quests or NONE) do
+      if not said[id] and done(id) then Q:Soon() break end
+    end
+  end
 end)
 
 ---------------------------------------------------------------------------
@@ -467,7 +484,6 @@ end
 -- for many (each Links() copies every link: once per chain and Adventurer, it made "script ran too long" on the
 -- tracker, the owner's BugGrabber of 15 Nov 2026).
 -- (No table or function made per look: it runs for every chain and Adventurer, 778 KB of throwaway data a list.)
-local NONE = {}
 local function has(variants, set, ids, i, alts)
   if not set then return false end
   if set[ids[i]] then return true end
@@ -518,7 +534,11 @@ end
 function Q:Items(f)
   local me = ns.Me()
   local heroes = {}
-  for name in pairs(f.members) do heroes[name] = f.heroes and f.heroes[name] or nil end
+  -- Not the Fallen: their journey ended (as on Play now, Together.lua), so no list here names them: to do together,
+  -- could join, Ask to group up, the maps (the release review of 20 Nov 2026).
+  for name in pairs(f.members) do
+    if name == me or not ns.Challenges:Fallen(f, name) then heroes[name] = f.heroes and f.heroes[name] or nil end
+  end
   local items = {}
   local _, alts = self:Links()
   local chains, index, inChain = self:Chains()
@@ -568,7 +588,10 @@ function Q:Items(f)
   end
   table.sort(list, function(a, b) if a.zone ~= b.zone then return a.zone < b.zone end return a.name < b.name end)
   for _, s in ipairs(list) do items[#items + 1] = s end
-  for _, x in ipairs(items) do self:Classify(x) end
+  for _, x in ipairs(items) do
+    x.joiners = x.mine and not Q.Finished(x, me) and self:Joiners(f, x, heroes) or {}
+    self:Classify(x)
+  end
   return items
 end
 
@@ -577,8 +600,10 @@ end
 --   join      another Hero is on it, I am not, I have not done it, and my level fits (from JOIN_BELOW levels under
 --             the quest's level). Learned from the fellowship's logs: there is no quest database, so a quest that
 --             needs an earlier one may show too (the page says so).
--- Quests only I have are neither: the game's own quest log shows those.
+--   bring     neither, and another Adventurer could join me (x.joiners: mine and not finished; U264).
+-- Quests only I have, with nobody to join me, are none of these: the game's own quest log shows those.
 Q.JOIN_BELOW = 4
+Q.GREY_BELOW = 5 -- (a quest this many levels under you is grey: the Together tab, and who could join you)
 function Q:Classify(x)
   local others = #x.others > 0
   if x.chain then
@@ -594,7 +619,68 @@ function Q:Classify(x)
     x.together = x.mine and others
     x.join = not x.mine and others and id ~= nil and not done(id) and (not x.level or x.level == 0 or lvl >= x.level - self.JOIN_BELOW)
   end
-  return x.together or x.join
+  x.bring = not x.together and #(x.joiners or NONE) > 0
+  return x.together or x.join or x.bring
+end
+
+-- A single quest's ID (its item id "q:123"), or nil for a chain.
+function Q.QuestID(x) return tonumber(tostring(x.id):match("^q:(%d+)$")) end
+
+-- Names in order: you first, then by name.
+function Q.MeFirst(a, b)
+  local me = ns.Me()
+  if (a == me) ~= (b == me) then return a == me end
+  return a < b
+end
+
+-- Who could join me on x, a quest or chain in my log (U264): another Adventurer not on it, who has not done it (by
+-- what their addon shares, U265; an older addon shares nothing, so its Adventurer is judged by level alone), and whose
+-- level is from JOIN_BELOW under the quest's level to GREY_BELOW over it (a chain: its first step's, where they start;
+-- unknown: any level). Online or not. heroes: Items' (name -> stored Hero), Adventurers never heard from left out.
+function Q:Joiners(f, x, heroes)
+  local me, out = ns.Me(), {}
+  local first = x.chain and x.ids[1] or Q.QuestID(x)
+  local lvl = x.level
+  if x.chain then
+    for _, h in pairs(heroes) do
+      local q = h.quests and h.quests[first]
+      if q and (q.l or 0) > 0 then lvl = q.l end
+    end
+  end
+  for name, h in pairs(heroes) do
+    local on = x.chain and x.at[name] ~= nil or (not x.chain and x.have[name] ~= nil)
+    if name ~= me and not on and not (first and h.questsDone and h.questsDone[first]) then
+      local their = ns.Hero:Level(f, name)
+      if not lvl or lvl == 0 or (their >= lvl - self.JOIN_BELOW and their <= lvl + self.GREY_BELOW) then
+        out[#out + 1] = name
+      end
+    end
+  end
+  table.sort(out)
+  return out
+end
+
+-- One face (U263, UI.Faces): { name, class (token), online, here (online in zone), faded, tip }. zone: the quest's.
+function Q:Face(f, name, zone, faded)
+  local Hr, me = ns.Hero, ns.Me()
+  local h = f.heroes and f.heroes[name]
+  local online = name == me or Hr:Online(f, name)
+  local at = h and type(h.zone) == "string" and h.zone ~= "" and not secret(h.zone) and h.zone or nil
+  local tip
+  if faded then tip = L.FACE_COULD:format(ns.Short(name))
+  elseif name == me then tip = L.YOU_LABEL
+  elseif online then tip = at and L.FACE_ONLINE:format(ns.Short(name), at) or L.FACE_ONLINE_ANY:format(ns.Short(name))
+  else tip = L.FACE_OFFLINE:format(ns.Short(name), ns.TimeAgo(Hr:LastSeen(f, name))) end
+  return { name = name, class = select(2, Hr:ClassName(f, name)), online = online, faded = faded, tip = tip,
+    here = online and at ~= nil and type(zone) == "string" and zone ~= "" and at:lower() == zone:lower() }
+end
+
+-- The faces of a row: who has it, then faded who could join me.
+function Q:Faces(f, x)
+  local out = {}
+  for _, name in ipairs(x.others) do out[#out + 1] = self:Face(f, name, x.zone) end
+  for _, name in ipairs(x.joiners or NONE) do out[#out + 1] = self:Face(f, name, x.zone, true) end
+  return out
 end
 
 -- Finished by me (U188, the owner, 12 Nov 2026): a chain I have done to its last part, or a quest in my log with every
@@ -663,77 +749,140 @@ local function nameList(list)
 end
 Q.NameList = nameList
 
--- The detail of an item (the mockup's qd): { title, line, type, mine, youText, youPct, youCount, youGoal, parts,
--- others = { { name, text, rel, pct, goal } }, tips }. (goal: how many to collect or kill, for the pips.) Each fact once
--- (U189, the owner, 14 Nov 2026): a chain's parts list says where you are ("You are here"), so it has no youText, and
--- no badge says whether it is in your log (What you can do says so when it is not).
+-- The detail of an item (SPEC §4.6, U264, the owner's grilling of 19 Nov 2026: the answer first): { title, line, type,
+-- mine, chain, tips (the answer, a line each, at most ANSWER_MAX), rows (a quest: where everyone stands, you first:
+-- { name, have, goal }), steps (a chain's track: { n, id, title, you, done, on = { names on that step, you first },
+-- could = { who could join you, on step 1 } }) }. Each fact once (U189): no "same part as you", no Other Adventurers
+-- for a chain, no What you can do list.
+Q.ANSWER_MAX = 5
 function Q:Detail(x)
   local me = ns.Me()
-  local d = { title = x.name, mine = x.mine, chain = x.chain, others = {}, tips = {}, parts = {} }
+  local d = { title = x.name, mine = x.mine, chain = x.chain, tips = {}, rows = {}, steps = {} }
+  local tips, joiners = d.tips, x.joiners or NONE
+  local function first(list) table.sort(list, Q.MeFirst) return list end
   if x.chain then
     local my, n = x.at[me], #x.steps
     d.line, d.type = x.zone, L.Q_CHAIN_TYPE:format(n)
     for i, st in ipairs(x.steps) do
-      local heroes = {}
-      for name, v in pairs(x.at) do if v == i - 1 and name ~= me then heroes[#heroes + 1] = name end end
-      table.sort(heroes)
-      d.parts[i] = { n = i, id = x.ids and x.ids[i], title = st, you = my == i - 1, done = my ~= nil and my > i - 1, heroes = heroes }
+      local on = {}
+      for name, v in pairs(x.at) do if v == i - 1 then on[#on + 1] = name end end
+      d.steps[i] = { n = i, id = x.ids and x.ids[i], title = st, you = my == i - 1, done = my ~= nil and my > i - 1,
+        on = first(on), could = i == 1 and joiners or NONE }
     end
-    for _, name in ipairs(x.others) do
-      local v = x.at[name]
-      local rel = ""
-      if v >= n then rel = L.Q_REL_FINISHED
-      elseif my then
-        if v == my then rel = L.Q_REL_SAME_PART
-        elseif v == my - 1 then rel = L.Q_REL_ONE_BEHIND
-        elseif v < my then rel = L.Q_REL_BEHIND:format(my - v)
-        elseif v == my + 1 then rel = L.Q_REL_ONE_AHEAD
-        else rel = L.Q_REL_AHEAD:format(v - my) end
-      end
-      d.others[#d.others + 1] = { name = name, text = v >= n and L.Q_FINISHED or L.Q_PART_OF:format(v + 1, n), rel = rel, pct = math.min(1, v / n) }
+    -- By how far apart, your step counting as the first when you are not on it.
+    if my == nil then
+      tips[1] = x.zone ~= "" and L.Q_ANS_PICKUP:format(x.zone, x.steps[1]) or L.Q_ANS_PICKUP_HERE:format(x.steps[1])
     end
-    if my == nil then d.tips[1] = L.TIP_CHAIN_PICKUP:format(x.zone, nameList(x.others))
-    elseif my >= n then
-      for _, name in ipairs(x.others) do
-        if x.at[name] < n then d.tips[#d.tips + 1] = L.TIP_CHAIN_HELP:format(ns.Short(name), x.steps[x.at[name] + 1]) end
-      end
-    else
-      local same, behind, ahead = {}, {}, {}
+    if my and my >= n then
       for _, name in ipairs(x.others) do
         local v = x.at[name]
-        if v == my then same[#same + 1] = name elseif v == my - 1 then behind[#behind + 1] = name elseif v > my then ahead[#ahead + 1] = name end
+        if v < n then tips[#tips + 1] = L.Q_ANS_DONE_HELP:format(ns.Short(name), v + 1, x.steps[v + 1]) end
       end
-      if #same > 0 then d.tips[#d.tips + 1] = L.TIP_CHAIN_SAME:format(x.steps[my + 1], nameList(same)) end
-      for _, name in ipairs(behind) do d.tips[#d.tips + 1] = L.TIP_CHAIN_BEHIND:format(ns.Short(name), x.steps[my], x.steps[my + 1]) end
-      if #ahead > 0 then d.tips[#d.tips + 1] = (#ahead == 1 and L.TIP_CHAIN_AHEAD_1 or L.TIP_CHAIN_AHEAD_N):format(nameList(ahead), x.steps[my + 1]) end
-    end
-    return d
-  end
-  local my = x.have[me]
-  d.line = L.Q_ZONE_LEVEL:format(x.zone, x.level)
-  d.type = x.kill and L.Q_KILL or L.Q_COLLECT
-  local what = (x.obj or ""):gsub(" slain$", "")
-  for _, name in ipairs(x.others) do
-    local v = x.have[name]
-    local rel = v >= x.goal and L.Q_REL_FINISHED or (my == nil and "" or (v == my and L.Q_REL_SAME or (v > my and L.Q_REL_FURTHER or L.Q_REL_BEHIND_YOU)))
-    d.others[#d.others + 1] = { name = name, text = v .. " / " .. x.goal, rel = rel, pct = math.min(1, v / x.goal), goal = x.goal }
-  end
-  if my == nil then d.tips[1] = L.TIP_Q_PICKUP:format(x.zone, nameList(x.others))
-  elseif my >= x.goal then
-    for _, name in ipairs(x.others) do
-      if x.have[name] < x.goal then d.tips[#d.tips + 1] = L.TIP_Q_HELP:format(ns.Short(name), x.goal - x.have[name]) end
+    else
+      local mine, same = my or 0, {}
+      for _, name in ipairs(x.others) do if math.min(x.at[name], n) == mine then same[#same + 1] = name end end
+      if #same > 0 then tips[#tips + 1] = L.Q_ANS_SAME:format(nameList(same), x.steps[mine + 1]) end
+      for _, name in ipairs(x.others) do
+        local v = math.min(x.at[name], n)
+        local gap, who = mine - v, ns.Short(name)
+        if gap == 1 then tips[#tips + 1] = L.Q_ANS_BEHIND_1:format(who, x.steps[v + 1])
+        elseif gap > 1 then tips[#tips + 1] = L.Q_ANS_BEHIND_N:format(who, gap, mine + 1, v + 1, mine)
+        elseif gap == -1 then tips[#tips + 1] = L.Q_ANS_AHEAD_1:format(who, x.steps[mine + 1])
+        elseif gap < -1 then tips[#tips + 1] = L.Q_ANS_AHEAD_N:format(who, -gap, mine + 1, v) end
+      end
+      if #joiners > 0 then
+        tips[#tips + 1] = (mine == 0 and L.Q_ANS_START_WITH or L.Q_ANS_START_CATCH):format(nameList(joiners), x.steps[1])
+      end
     end
   else
-    local need, fin = {}, {}
-    for _, name in ipairs(x.others) do if x.have[name] < x.goal then need[#need + 1] = name else fin[#fin + 1] = name end end
-    if #need > 0 then d.tips[#d.tips + 1] = L.TIP_Q_TOGETHER:format(nameList(need), what) .. (x.kill and L.TIP_Q_KILL or L.TIP_Q_LOOT) end
-    for _, name in ipairs(fin) do d.tips[#d.tips + 1] = L.TIP_Q_DONE_HELP:format(ns.Short(name), x.goal - my) end
+    local my = x.have[me]
+    d.line = L.Q_ZONE_LEVEL:format(x.zone, x.level)
+    d.type = x.kill and L.Q_KILL or L.Q_COLLECT
+    -- Where everyone stands: you first, then the others.
+    local names = {}
+    for name in pairs(x.have) do names[#names + 1] = name end
+    for _, name in ipairs(first(names)) do d.rows[#d.rows + 1] = { name = name, have = x.have[name], goal = x.goal } end
+    if my == nil then
+      tips[1] = x.zone ~= "" and L.TIP_Q_PICKUP:format(x.zone, nameList(x.others)) or L.TIP_Q_PICKUP_HERE:format(nameList(x.others))
+    elseif my >= x.goal then
+      for _, name in ipairs(x.others) do
+        if x.have[name] < x.goal then tips[#tips + 1] = L.Q_ANS_Q_HELP:format(ns.Short(name), x.goal - x.have[name]) end
+      end
+    else
+      local need, fin = {}, {}
+      for _, name in ipairs(x.others) do if x.have[name] < x.goal then need[#need + 1] = name else fin[#fin + 1] = name end end
+      if #need > 0 then tips[#tips + 1] = (x.kill and L.Q_ANS_Q_KILL or L.Q_ANS_Q_LOOT):format(nameList(need)) end
+      for _, name in ipairs(fin) do tips[#tips + 1] = L.Q_ANS_Q_DONE_HELP:format(ns.Short(name), x.goal - my) end
+    end
+    if #joiners > 0 then
+      tips[#tips + 1] = x.zone ~= "" and L.Q_ANS_BRING:format(nameList(joiners), x.zone) or L.Q_ANS_BRING_HERE:format(nameList(joiners))
+    end
   end
-  if my then
-    d.youText = L.Q_YOU_HAVE:format(what, my, x.goal)
-    d.youPct, d.youCount, d.youGoal = math.min(1, my / x.goal), my .. " / " .. x.goal, x.goal
-  end
+  for i = #tips, self.ANSWER_MAX + 1, -1 do tips[i] = nil end
   return d
+end
+
+-- A quest giver's spot from Questie while it runs (U267): { x, y (0-100), map, by } or nil. Read for this session only,
+-- never kept (as FromQuestie). shortcut: the first spawn of the first NPC that starts it; objects and items give none.
+function Q:QuestiePlace(id)
+  local qdb, zdb = questieDB(), Q.QuestieModule("ZoneDB")
+  if not (qdb and qdb.QueryNPCSingle and zdb and zdb.GetUiMapIdByAreaId) then return nil end
+  local ok, by = pcall(qdb.QueryQuestSingle, id, "startedBy")
+  local npc = ok and type(by) == "table" and type(by[1]) == "table" and tonumber(by[1][1])
+  if not npc then return nil end
+  local ok2, spawns = pcall(qdb.QueryNPCSingle, npc, "spawns")
+  local ok3, name = pcall(qdb.QueryNPCSingle, npc, "name")
+  for area, list in pairs(ok2 and type(spawns) == "table" and spawns or NONE) do
+    local pt = type(list) == "table" and list[1]
+    local okm, map = pcall(zdb.GetUiMapIdByAreaId, zdb, area)
+    if type(pt) == "table" and tonumber(pt[1]) and tonumber(pt[2]) and okm and tonumber(map) then
+      return { x = tonumber(pt[1]), y = tonumber(pt[2]), map = tonumber(map), by = ok3 and type(name) == "string" and name or nil }
+    end
+  end
+  return nil
+end
+
+-- The in-book map of a quest or chain (U267): the zone of my next step (step 1's when I am not on it) and its places
+-- as QuestLists:Marks entries: in my log, where the game marks it on the map; else where it is picked up (a dungeon
+-- quest's from our data, any quest's giver while Questie runs). { map, marks, target ({ st, map }), who (the
+-- Adventurers on it, you too) }, or nil without a map for the zone.
+function Q:MapPlan(x)
+  local QL, me = ns.QuestLists, ns.Me()
+  local id, name, zone
+  if x.chain then
+    local k = math.min((x.at[me] or 0) + 1, #x.ids)
+    id, name, zone = x.ids[k], x.steps[k], db().questZones[x.ids[k]] or x.zone
+  else
+    id, name, zone = Q.QuestID(x), x.name, x.zone
+  end
+  local map = type(zone) == "string" and zone ~= "" and QL:MapOf({ zone = zone }) or nil
+  -- A subzone the log files it under (Shadowglen has no map of its own; the check of 19 Nov 2026): the map you are
+  -- on, while you are there.
+  if not map and self:Nearness(zone) == "here" and C_Map and C_Map.GetBestMapForUnit then
+    map = C_Map.GetBestMapForUnit("player")
+  end
+  if not map then return nil end
+  local marks, item = {}, { name = name, status = "log" }
+  local inLog = id and C_QuestLog and C_QuestLog.GetLogIndexForQuestID and C_QuestLog.GetLogIndexForQuestID(id) ~= nil
+  if inLog and C_QuestLog.GetQuestsOnMap then
+    local ok, list = pcall(C_QuestLog.GetQuestsOnMap, map)
+    for _, q in ipairs(ok and type(list) == "table" and list or NONE) do
+      if not (secret(q.questID) or secret(q.x) or secret(q.y)) and q.questID == id and type(q.x) == "number"
+        and type(q.y) == "number" then
+        marks[1] = { st = { x = q.x * 100, y = q.y * 100, zone = zone }, map = map, items = { item }, next = true }
+      end
+    end
+  elseif id then
+    local st = QL:Start(id)
+    st = st and st.x and st.y and st or self:QuestiePlace(id)
+    local at = st and (st.map or QL:MapOf(st))
+    if at then marks[1] = { st = st, map = at, items = { item }, next = true } end
+  end
+  marks.focus = #marks > 0 and 1 or nil
+  local who = {}
+  for name2 in pairs(x.chain and x.at or x.have) do who[#who + 1] = name2 end
+  table.sort(who, Q.MeFirst)
+  return { map = map, marks = marks, who = who, target = marks[1] and { st = marks[1].st, map = marks[1].map } or nil }
 end
 
 ---------------------------------------------------------------------------
@@ -743,11 +892,25 @@ end
 Q.ASK_FOR = 15 * 60
 Q.asks = {}
 
+-- Who Ask to group up is for: the others on it, else those who could join you (U264). (Its button shows while this
+-- has anyone.)
+function Q.AskList(x) return #x.others > 0 and x.others or x.joiners or NONE end
+
+-- Asks the online ones among the others on it, else among those who could join you (the release review of 20 Nov 2026:
+-- with the others offline it said nobody was online while someone who could join was).
 function Q:AskGroup(x)
   local f = F:Current()
-  if not f or #x.others == 0 then return end
-  for _, name in ipairs(x.others) do Comm:Send(name, "GRPQ", { fid = f.id, q = x.name }) end
-  ns:Toast(nil, L.REQUEST_SENT, (#x.others == 1 and L.ASKED_GROUP_1 or L.ASKED_GROUP_N):format(nameList(x.others), x.name))
+  if not f then return end
+  local function online(list)
+    local out = {}
+    for _, name in ipairs(list or NONE) do if ns.Hero:Online(f, name) then out[#out + 1] = name end end
+    return out
+  end
+  local to = online(x.others)
+  if #to == 0 then to = online(x.joiners) end
+  if #to == 0 then ns:Toast(nil, L.ASK_GROUP, L.ASK_NOBODY_ONLINE) return end
+  for _, name in ipairs(to) do Comm:Send(name, "GRPQ", { fid = f.id, q = x.name }) end
+  ns:Toast(nil, L.REQUEST_SENT, (#to == 1 and L.ASKED_GROUP_1 or L.ASKED_GROUP_N):format(nameList(to), x.name))
 end
 
 -- Open asks to me: { { from, q, t } }, oldest first.

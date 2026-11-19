@@ -45,6 +45,7 @@ local function shownMap()
   local ok, id = pcall(WorldMapFrame.GetMapID, WorldMapFrame)
   return ok and id or nil
 end
+MM.Canvas, MM.Zoom, MM.ShownMap = canvas, zoom, shownMap -- (the Adventurers on the world map, UI/QuestLog.lua)
 
 -- A mark's tooltip: the quest, each step that starts there, who and where, and what a click does.
 local function tip(m)

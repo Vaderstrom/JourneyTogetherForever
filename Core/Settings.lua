@@ -17,6 +17,7 @@ S.DEFAULTS = {
   picture = true, -- the picture moment after a dungeon's final boss (UI/Picture.lua)
   sharePlay = true, -- the hours this account plays, shared with the fellowship (U122, Fellowship/Gatherings.lua)
   sounds = true, -- the book's sounds (UI/Sound.lua)
+  questLog = true, -- what the addon adds to the game's quest log and world map (U216, U268; UI/QuestLog.lua)
   storyFrom = "spoken", -- the story button: Spoken first, or Lore Forever ("lore") (UI/OtherAddons.lua; 6 Nov 2026)
   tracker = true, -- the on-screen tracker (UI/Tracker.lua)
   trackerHover = false, -- hidden mode: the tracker is invisible until the mouse is over it

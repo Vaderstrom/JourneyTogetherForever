@@ -219,7 +219,8 @@ function QL:Groups(f, key, who)
     if not closed(mine, q.id) then
       local others = {}
       for _, n in ipairs(members) do
-        local h = n ~= me and Hr:Get(f, n)
+        -- (Not the Fallen: their journey ended, as on the Quests page; the release review of 20 Nov 2026.)
+        local h = n ~= me and not ns.Challenges:Fallen(f, n) and Hr:Get(f, n)
         if h and h.quests and h.quests[q.id] then others[#others + 1] = n end
       end
       local x = questRow(f, q, me, others)
@@ -513,14 +514,14 @@ end
 -- start (a dungeon's entrance: q = { start = entrance }); quests that start on one spot share its mark. done: all of a
 -- mark's quests done (faded); next: the next to do, the first step not done or else the quest (it glows). focus: the
 -- mark whose zone opens: the next; else the first not done; else the last step's, who hands out the item a quest
--- starts from.
-function QL:Marks(q)
+-- starts from. at: a step's own button (U259): that step glows and its zone opens, done or not.
+function QL:Marks(q, at)
   local items, nextK = {}, nil
   for k, x in ipairs(q.steps or {}) do
     if not nextK and x.status ~= "done" then nextK = k end
-    items[#items + 1] = { st = x.start, k = k, name = x.name, status = x.status, next = nextK == k }
+    items[#items + 1] = { st = x.start, k = k, name = x.name, status = x.status, next = (at or nextK) == k }
   end
-  items[#items + 1] = { st = q.start or {}, name = q.name, status = q.status, next = not nextK and q.status ~= "done" }
+  items[#items + 1] = { st = q.start or {}, name = q.name, status = q.status, next = not at and not nextK and q.status ~= "done" }
   local out, last = {}, nil
   for _, it in ipairs(items) do
     local st = it.st

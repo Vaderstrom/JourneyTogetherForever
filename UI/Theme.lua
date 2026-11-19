@@ -17,12 +17,17 @@ T.THEMES = {
     ink = "3A1612", ink2 = "5C3A2E", line = "C29A7A", card = { "FFFAEE", 0.55 }, light = true },
 }
 T.ACCENT = { journey = "C08A2E", leader = "9A2A3A" }
+-- The brightest an accent may be as text on parchment (its luma); "accentText" darkens a paler one to it.
+T.ACCENT_INK = 0.34
 
 -- Fixed colours of the frame, header and toasts (the same in every theme).
 T.FIXED = {
   gold = "D8B060", goldText = "FFE6A8", chipText = "F3E3BE", dark = "120A04", shade = "0E0802", white = "FFFFFF",
   ribbon1 = "6E140C", ribbon2 = "A82A1C", badge = "B02A1C", studEdge = "2A1A08", muted = "C9B48A",
   bookEdge = "6A4A20", band1 = "6B3A1C", band2 = "3A1E0E", toastTop = "2A1C10", toastText = "E9DCC0", iconLight = "F6DE9A", iconDark = "6A4410",
+  -- The amber "B8742A" as text (the next chain step, a chapter or attunement under way): darker, to read on the page
+  -- (2.2 to 1 in the check of 18 Nov 2026, 23:43); on the Night theme the same light amber as before.
+  amberText = "80501A",
 }
 
 -- Fonts: Friz Quadrata (WoW's own) everywhere. "book" is the font for prose on the pages; it can differ later.
@@ -37,6 +42,7 @@ T.FONT_FANCY = "Fonts\\MORPHEUS.TTF"
 -- colour is laid over it (calms the picture so text stays easy to read).
 T.PAPER_TINT = { journal = { 1, 1, 1 }, night = { 0.32, 0.36, 0.46 }, alliance = { 0.94, 0.96, 1 }, horde = { 1, 0.93, 0.88 } }
 T.PAPER_WASH = 0.5
+T.SPELL_WASH = 0.25 -- over the spell book's pages (U261)
 
 T.accent = T.ACCENT.journey
 T.painters = {}
@@ -61,7 +67,8 @@ function T:Current() return self.THEMES[self:Key()] end
 -- was hard to read (the Overview counts; seen in the tour), so they are lifted there.
 -- The dungeon roles' colours (Rules/Journey.lua ROLE_COLOR) too: Bridge in dark blue was hard to read (28 Oct 2026).
 T.DARK_LIFT = { ["3E7A3A"] = "7FD08A", ["2E7A3E"] = "7FD08A", ["B0321E"] = "F07A64", ["B8742A"] = "E8A85A",
-  ["2E6FA8"] = "7FB4E8", ["A8761E"] = "F0C860", ["2F6FAE"] = "8CC0F0", ["4F7F3F"] = "A8D090", ["963A0E"] = "F4C477" }
+  ["2E6FA8"] = "7FB4E8", ["A8761E"] = "F0C860", ["2F6FAE"] = "8CC0F0", ["4F7F3F"] = "A8D090", ["963A0E"] = "F4C477",
+  ["80501A"] = "E8A85A" }
 
 -- The colour a hex string is drawn in on this theme (for |cff colour codes in text).
 function T:HexFor(hex)
@@ -71,13 +78,19 @@ end
 
 function T:RGBA(role, alpha)
   local v
-  if role == "accentText" and not self:Current().light then
-    -- Text in the accent colour on the Night theme's dark pages: lifted halfway to white ("Leader" in dark green or
-    -- red could hardly be read; 28 Oct 2026).
+  if role == "accentText" then
     local r, g, b = ns.Hex(self.accent)
-    return r + (1 - r) * 0.5, g + (1 - g) * 0.5, b + (1 - b) * 0.5, alpha or 1
+    if not self:Current().light then
+      -- Text in the accent colour on the Night theme's dark pages: lifted halfway to white ("Leader" in dark green or
+      -- red could hardly be read; 28 Oct 2026).
+      return r + (1 - r) * 0.5, g + (1 - g) * 0.5, b + (1 - b) * 0.5, alpha or 1
+    end
+    -- On parchment a pale accent (the journey's gold, a gold banner) is darkened until it reads: the gold headings
+    -- measured 1.6 to 1 against the page in the check of 18 Nov 2026. Darker accents stay as they are.
+    local k = math.min(1, T.ACCENT_INK / (0.2126 * r + 0.7152 * g + 0.0722 * b))
+    return r * k, g * k, b * k, alpha or 1
   end
-  if role == "accent" or role == "accentText" then v = self.accent
+  if role == "accent" then v = self.accent
   else
     v = self:Current()[role] or self.FIXED[role] or role
     if type(v) == "string" and not self:Current().light then v = self.DARK_LIFT[v:upper()] or v end

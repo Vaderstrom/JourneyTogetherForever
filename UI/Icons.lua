@@ -168,6 +168,10 @@ end
 -- The Adventure Guide's book (both pages), and the part of the file that is the book.
 ns.EJ_BOOK = "Interface\\EncounterJournal\\UI-EJ-JournalBG"
 ns.EJ_BOOK_BOX = { 0, 0.766601562, 0, 0.830078125 }
+-- U261: the game's spell book (The War Within's, 2048x1024): its left and right page, the paper only (no binding,
+-- ribbon or wood).
+ns.SPELL_BOOK = "Interface\\SPELLBOOK\\SpellbookBackgroundEvergreen"
+ns.SPELL_PAGES = { left = { 0, 796 / 2048, 70 / 1024, 866 / 1024 }, right = { 928 / 2048, 1720 / 2048, 70 / 1024, 866 / 1024 } }
 
 -- Small state marks in lists (the mockup's ✓ ◆ 🔒).
 ns.MARKS = {

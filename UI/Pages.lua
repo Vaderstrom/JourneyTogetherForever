@@ -15,7 +15,7 @@ P.ART_HORDE = {
   land = P.ART.land, hall = { "HordeHall", 2 }, heroes = { "HordeRoster", 4 },
   council = { "HordeCouncil", 4 }, arena = { "HordeArena", 4 }, board = { "HordeBoard", 4 },
 }
-P.PAGE_ART = { chronicle = "board", moments = "board", history = "hall", gatherings = "board", overview = "land", chapter = "land", quests = "board", heroes = "heroes", manage = "council",
+P.PAGE_ART = { chronicle = "board", moments = "board", history = "hall", gatherings = "board", overview = "land", chapter = "land", quests = "board", heroes = "heroes",
   tourney = "arena", raids = "land", dungeons = "land", setup = "hall", since = "land", admin = "board", rules = "council",
   rulesadmin = "council", create = "hall", welcome = "land", join = "heroes", settings = "hall" }
 
@@ -34,8 +34,6 @@ function P:Get(id) return self.pages[id] end
 function P:Context()
   local ctx = ns.Fellowship:Context()
   ctx.playerName = UnitName("player")
-  -- Manage is the Leader's, in Admin; Adventurers invite on the Adventurers page (27 Oct 2026).
-  ctx.canManage = ctx.isLeader or false
   ctx.canAdmin = ctx.isLeader or false
   ctx.solo = ctx.f and ctx.f.solo or nil -- on your own (U241)
   if ns.Dev and ns.Dev.tourney and ctx.inFellow then ctx.tActive = true end
@@ -45,7 +43,7 @@ function P:Context()
     ctx.demo, ctx.tActive = true, false
   elseif ns.Watch and ns.Watch.rendering and ctx.inFellow then
     ctx.watching, ctx.watchAs = true, ns.Watch.as
-    ctx.isLeader, ctx.canManage, ctx.canAdmin, ctx.tActive = false, false, false, false
+    ctx.isLeader, ctx.canAdmin, ctx.tActive = false, false, false
   end
   return ctx
 end
@@ -57,12 +55,15 @@ local function raidsShown(f) return f and ns.Endgame and (ns.Endgame:Open(f) or 
 -- Sidebar groups for ctx (empty outside a fellowship).
 function P:Nav(ctx)
   if not ctx.inFellow then return {} end
-  -- On your own (U241): the journey's pages, and Found or join (Welcome) to found or join a fellowship instead.
+  -- On your own (U241): the journey's pages, and Found or join (Welcome) to found or join a fellowship instead. The
+  -- Chronicle, the Rules (your challenges) and Journey Admin too (U272, the owner, 19 Nov 2026: "same functionality
+  -- ... even if it's a solo journey").
   if ctx.solo then
-    local journey = { "chapter", "dungeons", "quests" }
+    local journey = { "chapter", "dungeons", "quests", "chronicle", "rules" }
     if raidsShown(ctx.f) then table.insert(journey, 3, "raids") end
     return { { label = L.NAV_JOURNEY, items = journey },
-      { label = L.NAV_FELLOWSHIP, items = { "welcome" }, labels = { welcome = L.NAV_FIND } } }
+      { label = L.NAV_FELLOWSHIP, items = { "welcome" }, labels = { welcome = L.NAV_FIND } },
+      { label = L.NAV_ADMIN_GROUP, items = { "admin" } } }
   end
   -- Watching: the pages to follow the fellowship by, nothing to act on. The rules read only (28 Oct 2026).
   if ctx.watching then
@@ -82,9 +83,9 @@ function P:Nav(ctx)
     { label = L.NAV_JOURNEY, items = journey },
     { label = L.NAV_FELLOWSHIP, items = fellowship },
   }
-  -- The Leader's Admin: Manage (the Adventurers and the fellowship on one spread since U197) and
-  -- Journey Admin. The journey and the rules are each edited as a draft and published.
-  if ctx.isLeader then nav[#nav + 1] = { label = L.NAV_ADMIN_GROUP, items = { "manage", "admin" } } end
+  -- The Leader's Admin: Journey Admin (Manage went with U202: its tools are on the Adventurers page). The journey and
+  -- the rules are each edited as a draft and published.
+  if ctx.isLeader then nav[#nav + 1] = { label = L.NAV_ADMIN_GROUP, items = { "admin" } } end
   return nav
 end
 
@@ -125,10 +126,10 @@ function P:Resolve(page, startView, ctx)
   return startView or "welcome"
 end
 
--- Accent colour of a page: leader red for Journey Admin and Manage, the fellowship's colour for Adventurers and Rules.
+-- Accent colour of a page: leader red for Journey Admin, the fellowship's colour for Adventurers and Rules.
 function P:Accent(page, ctx)
   local A = ns.Theme.ACCENT
-  if page == "admin" or self:NavItem(page) == "manage" then return A.leader end
+  if page == "admin" then return A.leader end
   if page == "heroes" or page == "rules" then return ctx.color or A.journey end
   return A.journey
 end

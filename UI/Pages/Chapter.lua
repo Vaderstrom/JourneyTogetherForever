@@ -79,7 +79,8 @@ local function build(pf)
     n.label:SetPoint("TOP", n.ring, "BOTTOM", 0, -4)
     return n
   end)
-  pf.links = UI.Pool(function() local t = pf.track:CreateTexture(nil, "BORDER"); t:SetHeight(2); return t end)
+  -- Between the stages, the book's bar (U262), green once the stage before it is done.
+  pf.links = UI.Pool(function() return UI.Bar(pf.track, 8, true) end)
   -- All chapters (U140, the Overview's contents until the rebuild): every chapter, folded until asked for.
   pf.allBtn = UI.TextButton(Lc, "", function() pf.allCh = not pf.allCh; W:Refresh() end, "link", 13)
   pf.toc = UI.Pool(function()
@@ -443,15 +444,14 @@ local function layoutTrack(pf, nodes, color, width)
     node.label:SetTextColor(Theme:RGBA(x.state == "current" and "ink" or "ink2", x.state == "todo" and 0.8 or 1))
     node.state = x.state
     node:Show()
-    -- The line to the next node, from ring edge to ring edge; green once this stage is done.
+    -- The bar to the next node, from ring edge to ring edge; filled once this stage is done.
     if i < n then
       local link = pf.links:Get(i)
       if link then
         local cx = x0 + (i - 1) * nodeW + nodeW / 2
-        link:ClearAllPoints(); link:SetPoint("TOPLEFT", pf.track, "TOPLEFT", cx + 16, -14)
-        link:SetWidth(nodeW - 32)
-        link:SetColorTexture(Theme:RGBA(x.state == "done" and NODE_DONE or NODE_TODO, 0.9))
-        link:SetHeight(x.state == "done" and 3 or 2)
+        link:ClearAllPoints(); link:SetPoint("LEFT", pf.track, "TOPLEFT", cx + 15, -15)
+        link:SetColor(NODE_DONE) -- (each draw: the green is lifted on the Night theme)
+        link:Set(nodeW - 30, x.state == "done" and 1 or 0)
         link:Show()
       end
     end
@@ -534,7 +534,7 @@ local function refresh(pf, ctx)
     b.name:SetText(hidden and L.HIDDEN_CHAPTER or c.name)
     b.range:SetText(hidden and "" or (c.floor .. "–" .. c.cap))
     b.mark:SetMark(done and "done" or (now and "current" or (hidden and "locked" or nil)))
-    local color = done and "3E7A3A" or (now and "B8742A" or "ink2") -- (pale "accent" was hard to read)
+    local color = done and "3E7A3A" or (now and "amberText" or "ink2") -- (pale "accent" was hard to read)
     b.num:SetTextColor(Theme:RGBA(color)); b.name:SetTextColor(Theme:RGBA(color))
     b.bg:SetShown(n == view)
     b:SetEnabled(not hidden)
@@ -711,7 +711,8 @@ local function refresh(pf, ctx)
   if not ctx.solo then
     r:Place(pf.head, pf.head:GetHeight(), 4)
     local room = view == cur and not ctx.watching and ns.Room:Chapter(f, ns.Me()) or nil
-    local th = pf.levelTrack:Set(f, view, 6, room and room.stop)
+    -- (No lines of names under it, U257: the groups below name everyone, each with the track's class icon.)
+    local th = pf.levelTrack:Set(f, view, room and room.stop)
     if th > 0 then r:Place(pf.levelTrack, th, 12) end
     pf.stand:Set(f, view, r)
   end

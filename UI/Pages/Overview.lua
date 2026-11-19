@@ -337,7 +337,7 @@ local function refreshStand(pf, f, cur, ch, watching, focus)
   local room = not watching and not friend and ns.Room:Chapter(f, ns.Me()) or nil
   -- The stop point on the track whenever the line names it, with room to spare too (U179, the owner, 10 Nov 2026: "mark
   -- in the overview where you should stop questing"); the Chapter page's track keeps it for the last half level.
-  local th = st.track:Set(f, cur, 0, room and (room.stopAt or room.stop))
+  local th = st.track:Set(f, cur, room and (room.stopAt or room.stop))
   st.track:ClearAllPoints(); st.track:SetPoint("TOPLEFT", 12, -y)
   y = y + th + 2
   local line = standLine(f, cur, focus.namesBelow)

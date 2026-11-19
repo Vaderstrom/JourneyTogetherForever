@@ -20,9 +20,9 @@ local OUT_L, OUT_T, OUT_R, OUT_B = 64, 54, FRAME_CORNER - FRAME_IN, FRAME_CORNER
 -- name and chip move right to make room for it.
 local LOGO, LOGO_FULL, HEAD_SHIFT = 156, 118, 48
 -- A sidebar entry's height: 46, or less when more entries are shown than fit (12 with Dungeons, Raids, the tournament
--- and Admin: 42; 29 Oct 2026, U157). NAV_SPACE is the sidebar's height, GROUP_H what a group label takes with its gap.
+-- and Admin were 42, U157; 11 at most since Manage went, U202, and they fit). NAV_SPACE is the sidebar's height, GROUP_H what a group label takes with its gap.
 local NAV_ROW, NAV_SPACE, GROUP_H = 46, 600, 26
-local NAV_IDS = { "overview", "chapter", "dungeons", "raids", "quests", "chronicle", "heroes", "gatherings", "manage", "tourney", "admin",
+local NAV_IDS = { "overview", "chapter", "dungeons", "raids", "quests", "chronicle", "heroes", "gatherings", "tourney", "admin",
   "rules", "history", "welcome" }
 W.WIDTH, W.HEIGHT = WIDTH, HEIGHT
 -- Width for content on one page: with the sidebar (pages of a fellowship) and without (start pages). Half the book
@@ -444,8 +444,9 @@ end
 local SHEET_W = (WIDTH - 18 - 182 - 8) / 2 -- one page of the book
 
 -- One page's paper on frame t: the theme's colours, the game's parchment over them, tinted per theme, a wash and a
--- shadow towards the spine. The Journal theme uses the Adventure Guide's book instead (its left or right half), when
--- the game has it. Drawn on the page, and again on the copies its scrolling lists fade into (UI.Scroll).
+-- shadow towards the spine. The game's spell book page instead, in every theme (U261), when the game has it; without
+-- it the Journal theme uses the Adventure Guide's book (its left or right half). Drawn on the page, and again on the
+-- copies its scrolling lists fade into (UI.Scroll).
 -- book: the book of a page (its paper hides on the flat sheet); nil for a copy. Returns the textures to hide on the
 -- flat sheet, every texture, and the painter.
 local function pagePaper(t, left, book)
@@ -474,16 +475,26 @@ local function pagePaper(t, left, book)
   local hasGuide = guide:SetTexture(ns.EJ_BOOK) ~= false
   if left then guide:SetTexCoord(b[1], half, b[3], b[4]) else guide:SetTexCoord(half, b[2], b[3], b[4]) end
   guide:Hide()
-  local all, paint = { mid, out, spine, paper, guide }, nil
-  if ns.SetPaper(paper) or hasGuide then
+  local spell = t:CreateTexture(nil, "BACKGROUND", nil, 2)
+  spell:SetAllPoints()
+  local hasSpell = spell:SetTexture(ns.SPELL_BOOK) ~= false
+  spell:SetTexCoord(unpack(ns.SPELL_PAGES[left and "left" or "right"]))
+  spell:Hide()
+  t.spell = spell
+  local all, paint = { mid, out, spine, paper, guide, spell }, nil
+  local hasPaper = ns.SetPaper(paper)
+  if hasSpell or hasPaper or hasGuide then
     paint = function()
-      local useGuide = hasGuide and Theme:Key() == "journal"
+      local useGuide = not hasSpell and hasGuide and Theme:Key() == "journal"
       local flat = book ~= nil and book.flat
-      guide:SetShown(useGuide and not flat); paper:SetShown(not useGuide and not flat)
-      paper:SetVertexColor(unpack(Theme.PAPER_TINT[Theme:Key()] or Theme.PAPER_TINT.journal))
+      spell:SetShown(hasSpell and not flat)
+      guide:SetShown(useGuide and not flat); paper:SetShown(not hasSpell and not useGuide and not flat)
+      local tint = Theme.PAPER_TINT[Theme:Key()] or Theme.PAPER_TINT.journal
+      paper:SetVertexColor(unpack(tint)); spell:SetVertexColor(unpack(tint))
     end
     Theme:Register(paint)
-    local wash = UI.Solid(t, "BACKGROUND", "page1", Theme.PAPER_WASH, 3)
+    -- (The spell book's art is made to be read on: a lighter wash lets it show.)
+    local wash = UI.Solid(t, "BACKGROUND", "page1", hasSpell and Theme.SPELL_WASH or Theme.PAPER_WASH, 3)
     wash:SetAllPoints()
     local shade = UI.GradientTex(t, "BACKGROUND", "HORIZONTAL", left and { "000000", 0 } or { "000000", 0.28 },
       left and { "000000", 0.28 } or { "000000", 0 }, 4)
@@ -917,7 +928,7 @@ function W:Open(page)
       -- open (the Overview stayed half-scrolled after a chapter unlocked; seen in the tour).
       W.page = page
       local pf = W.pageFrames[page]
-      if pf then pf.sel = nil end
+      if pf then pf.sel, pf.editing = nil, nil end
       if pf then UI.ScrollsToTop(pf) end
     end
     if W.frame:IsShown() then W:Refresh() else W.frame:Show() end
@@ -942,7 +953,7 @@ function W:ShowPage(id, tab)
   local turned = id ~= self.current
   self.page = id
   local pf = self.pageFrames[id]
-  if pf then pf.sel = nil end
+  if pf then pf.sel, pf.editing = nil, nil end
   if pf and tab then pf.tab = tab end
   if pf and turned then UI.ScrollsToTop(pf) end
   self:Refresh()

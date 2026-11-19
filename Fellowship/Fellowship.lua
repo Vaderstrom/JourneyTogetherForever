@@ -303,6 +303,7 @@ function F:Create(o)
   if o.solo then
     -- (Invitations stay: accepting one replaces it.)
     f.solo, f.rules.minHeroes, f.rules.clearMode = true, 1, "one"
+    self:Log(f, L.CHR_SOLO:format(ns.Short(me)), now, "founded", me) -- (U272: the Chronicle is on your own too)
     ns.char.solo = f
   else
     self:Log(f, L.CHR_FOUNDED:format(f.name, ns.Short(me)), now, "founded", me)

@@ -69,6 +69,8 @@ function ns.ChronicleTabs(pf)
   for i, t in ipairs(TABS) do opts[i] = { L[t[1]], t[2], t[3] } end
   pf.tabs = UI.Tabs(pf.left, opts, function() return W.current end, function(id) W:ShowPage(id) end, W.PAGE_W - 8)
   pf.tabs:SetPoint("TOPLEFT", 0, 0)
+  -- On your own (U272): no fellowship, so no The fellowship tab.
+  function pf.tabs.hidden(id) local f = ns.Fellowship:Current(); return id == "history" and f ~= nil and f.solo == true end
   return 40
 end
 

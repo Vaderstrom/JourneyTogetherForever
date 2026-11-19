@@ -43,12 +43,14 @@ function A:Publish(f)
   self:Own(f)
   if not self.jd then return false end
   -- Never silently: a journey that cannot be published says so (a 60-60 chapter did nothing; seen in game).
+  -- (On your own nobody else gets it: saved, U272.)
+  local solo = f and f.solo
   if not F:PublishJourney(self.jd) then
-    ns:Toast(nil, L.JOURNEY_NOT_PUBLISHED, L.JOURNEY_NOT_PUBLISHED_TEXT)
+    ns:Toast(nil, solo and L.JOURNEY_NOT_SAVED or L.JOURNEY_NOT_PUBLISHED, solo and L.JOURNEY_NOT_SAVED_TEXT or L.JOURNEY_NOT_PUBLISHED_TEXT)
     return false
   end
   self.jd = nil
-  ns:Toast(nil, L.JOURNEY_PUBLISHED, L.JOURNEY_PUBLISHED_TEXT)
+  ns:Toast(nil, solo and L.JOURNEY_SAVED or L.JOURNEY_PUBLISHED, solo and L.JOURNEY_SAVED_TEXT or L.JOURNEY_PUBLISHED_TEXT)
   ns.Window:Refresh()
   return f ~= nil
 end
@@ -349,7 +351,8 @@ local function build(pf)
     pf.msNone:SetShown(#ms == 0)
     if #ms == 0 then r:Place(pf.msNone, pf.msNone:GetStringHeight(), 6) end
     r:Place(pf.msAdd, 28, 16)
-    local earlier = A.sel < ns.Journey:CurrentIndex(f) and f.journey.chapters[A.sel] ~= nil
+    -- (On your own the chapter follows your level: no going back, U272.)
+    local earlier = not f.solo and A.sel < ns.Journey:CurrentIndex(f) and f.journey.chapters[A.sel] ~= nil
     local why = earlier and pf.backBlocked(f, A.sel)
     pf.back:SetShown(earlier); pf.backWhy:SetShown(why and true or false)
     if earlier then
@@ -392,7 +395,10 @@ local function build(pf)
     local f = cur()
     if not f then return end
     local n = A:Changes(f)
-    pf.draftText:SetText(A.jd and (n == 1 and L.DRAFT_1 or L.DRAFT_N:format(n)) or L.PUBLISHED)
+    local d1, dn, done = L.DRAFT_1, L.DRAFT_N, L.PUBLISHED
+    if f.solo then d1, dn, done = L.DRAFT_1_SOLO, L.DRAFT_N_SOLO, L.SAVED_ALL end
+    pf.draftText:SetText(A.jd and (n == 1 and d1 or dn:format(n)) or done)
+    pf.publish:SetLabel(f.solo and L.SAVE or L.PUBLISH)
     pf.publish:SetShown(A.jd ~= nil); pf.discard:SetShown(A.jd ~= nil)
     pf.bar:SetSelected(A.jd ~= nil)
   end

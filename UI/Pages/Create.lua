@@ -23,6 +23,7 @@ function C:Reset()
   -- Challenges (SPEC §9, 31 Oct 2026): none by default; they combine. lives: the shared lives chosen (nil: what the
   -- size suggests); gold: Pauper's limit (nil: 10).
   self.challenges, self.lives, self.pvp, self.gold = {}, nil, nil, nil
+  self.solo = false -- On your own (U272): Create for one
 end
 
 -- The steps, by key (C.step is a number into this list). Your own journey adds Chapters.
@@ -30,7 +31,15 @@ C.STEPS = { "fellowship", "style", "journey", "challenges", "review" }
 C.STEPS_OWN = { "fellowship", "style", "journey", "chapters", "challenges", "review" }
 C.STEP_LABELS = { fellowship = "STEP_FELLOWSHIP", style = "STEP_STYLE", journey = "STEP_JOURNEY", chapters = "STEP_CHAPTERS",
   challenges = "STEP_CHALLENGES", review = "STEP_REVIEW" }
-function C:Steps() return self.own and self.STEPS_OWN or self.STEPS end
+-- On your own (U272, the owner, 19 Nov 2026): Create for one, from Welcome's third tile. The journey, the
+-- challenges one player can take on, the review; no name, size, role or play style (no floor or cap holds you).
+C.STEPS_SOLO = { "journey", "challenges", "review" }
+C.STEPS_SOLO_OWN = { "journey", "chapters", "challenges", "review" }
+function C:Steps()
+  if self.solo then return self.own and self.STEPS_SOLO_OWN or self.STEPS_SOLO end
+  return self.own and self.STEPS_OWN or self.STEPS
+end
+function C:StartSolo() self:Reset(); self.solo = true end
 function C:StepKey() local s = self:Steps(); return s[ns.Clamp(self.step, 1, #s)] end
 function C:Goto(key)
   for i, k in ipairs(self:Steps()) do if k == key then self.step = i end end
@@ -69,7 +78,8 @@ function C:Included(key) return self.challenges.ironman and ns.Challenges:Includ
 function C:Blocked(key)
   if key == "nohealers" and self.role == "Healer" then return L.CHAL_HEALER_YOU, L.CHAL_HEALER_LEADER end
   local other = ns.Challenges.APART[key]
-  if other and self.challenges[other] then return L.CHAL_NOT_WITH:format(L["CHAL_" .. other:upper()]), L.CHAL_APART end
+  local Ch = ns.Challenges
+  if other and self.challenges[other] then return L.CHAL_NOT_WITH:format(Ch:Name(other)), L.CHAL_APART:format(Ch:Name("ironman"), Ch:Name("crafted")) end
 end
 function C:ToggleChallenge(key)
   if self:Included(key) or self:Blocked(key) then return end
@@ -94,7 +104,9 @@ end
 -- Leader's.)
 function C:Challenges()
   local out = {}
-  for k in pairs(self.challenges) do if not self:Blocked(k) then out[k] = true end end
+  for k in pairs(self.challenges) do
+    if not self:Blocked(k) and not (self.solo and ns.Challenges.NOT_ALONE[k]) then out[k] = true end
+  end
   if out.ironman then out.hardcore, out.white = true, true end
   if out.hardcore and self.pvp then out.hardcore = "pvp" end
   if out.shared then out.shared = self:Lives() end
@@ -278,9 +290,10 @@ function C:Review()
 end
 
 function C:Create()
-  local f = ns.Fellowship:Create({ name = self.name, color = self.color, emblem = self.emblem, role = self.role, preset = self.preset,
-    journey = self.own and self.journey or nil, rules = self.rules, challenges = self:Challenges() })
-  return f
+  local solo = self.solo or nil
+  return ns.Fellowship:Create({ solo = solo, name = solo and L.SOLO or self.name, color = self.color, emblem = self.emblem,
+    role = self.role, preset = self.preset, journey = self.own and self.journey or nil, rules = not solo and self.rules or nil,
+    challenges = self:Challenges() })
 end
 
 local ROLES = { { L.ROLE_TANK, "Tank" }, { L.ROLE_HEALER, "Healer" }, { L.ROLE_DPS, "DPS" } }
@@ -659,6 +672,7 @@ local function build(pf)
   cp:SetPoint("TOPLEFT"); cp:SetText(L.CHAL_PICK)
   local cIntro = UI.WrapText(s5, 13, "ink2", width, "book")
   cIntro:SetPoint("TOPLEFT", 0, -24); cIntro:SetText(L.CHAL_INTRO)
+  pf.chalIntro = cIntro
   local cy = 24 + math.max(cIntro:GetStringHeight(), 32) + 10
   local Ch = ns.Challenges
   local gap = 12
@@ -769,14 +783,15 @@ local function build(pf)
     b:SetPoint("BOTTOMRIGHT", h, "BOTTOMRIGHT", 0, 6)
     return h, b
   end
-  pf.changeFellowship = select(2, section(L.REVIEW_FELLOWSHIP, "fellowship", 0))
+  local fHead, rHead
+  fHead, pf.changeFellowship = section(L.REVIEW_FELLOWSHIP, "fellowship", 0)
   pf.reviewCrest = UI.Crest(s4, 52, 52)
   pf.reviewCrest:SetPoint("TOPLEFT", 2, -38)
   pf.reviewName = UI.Text(s4, 18, "ink", "title")
   pf.reviewName:SetPoint("TOPLEFT", 68, -44); pf.reviewName:SetWidth(width - 68)
   pf.reviewLine = UI.Text(s4, 13, "ink2")
   pf.reviewLine:SetPoint("TOPLEFT", pf.reviewName, "BOTTOMLEFT", 0, -6)
-  pf.changeRules = select(2, section(L.REVIEW_RULES, "style", 104))
+  rHead, pf.changeRules = section(L.REVIEW_RULES, "style", 104)
   pf.reviewStyle = UI.Text(s4, 15, "ink", "book")
   pf.reviewStyle:SetPoint("TOPLEFT", 0, -142)
   pf.reviewRows = {}
@@ -788,9 +803,15 @@ local function build(pf)
     pf.reviewRows[i] = { k = k, v = v }
   end
   -- The challenges (or None), under the rules' seven rows.
-  pf.changeChal = select(2, section(L.REVIEW_CHALLENGES, "challenges", 330))
+  pf.chalHead, pf.changeChal = section(L.REVIEW_CHALLENGES, "challenges", 330)
   pf.reviewChal = UI.WrapText(s4, 13, "ink", width, "book")
   pf.reviewChal:SetPoint("TOPLEFT", 0, -366)
+  -- On your own (U272): no fellowship or rules to review; how a journey of one goes, the challenges under it.
+  pf.groupOnly = { fHead, pf.changeFellowship, pf.reviewCrest, pf.reviewName, pf.reviewLine, rHead, pf.changeRules, pf.reviewStyle }
+  pf.soloHead = UI.SectionHeader(s4, width)
+  pf.soloHead:SetText(L.SOLO_HOW); pf.soloHead:SetPoint("TOPLEFT")
+  pf.soloText = UI.WrapText(s4, 13, "ink", width, "book")
+  pf.soloText:SetPoint("TOPLEFT", 0, -38); pf.soloText:SetText(L.SOLO_REVIEW)
 
   -- Footer: Back on the left page, Next / Create the fellowship on the right.
   pf.prev = UI.TextButton(left, L.BACK, function() C.step = math.max(1, C.step - 1); C.fine = false; W:Refresh() end, "plain", 14)
@@ -798,7 +819,7 @@ local function build(pf)
   pf.next = UI.TextButton(right, L.NEXT, function() C.step = math.min(#C:Steps(), C.step + 1); C.fine = false; W:Refresh() end, "primary", 14)
   pf.next:SetPoint("BOTTOMRIGHT", 0, 0)
   pf.create = UI.TextButton(right, L.CREATE, function()
-    W.page = "heroes"
+    W.page = C.solo and "chapter" or "heroes"
     if not C:Create() then return end
     C:Reset()
     W.startView = "welcome"
@@ -814,7 +835,8 @@ local function refresh(pf)
   C.step = ns.Clamp(C.step, 1, #steps)
   local step, key = C.step, C:StepKey()
   local width = ns.Window.PAGE_W_WIDE
-  pf.head:Set(L.FOUND, #steps == 6 and L.CREATE_SUB_6 or L.CREATE_SUB)
+  if C.solo then pf.head:Set(L.SOLO, #steps == 4 and L.SOLO_SUB_4 or L.SOLO_SUB)
+  else pf.head:Set(L.FOUND, #steps == 6 and L.CREATE_SUB_6 or L.CREATE_SUB) end
   -- Six steps (Your own journey): each label as wide as it is, with the room left shared out (an even sixth cut
   -- "Challenges" into the next disc). Up to five: even slots.
   local even, widths, total = #steps <= 5, {}, 0
@@ -902,35 +924,41 @@ local function refresh(pf)
       local hs, sum = {}, 0
       for i, r in ipairs(b.rows) do
         local k = r.key
-        local included = C:Included(k)
-        local blocked, why = C:Blocked(k)
-        local on = C:Chosen(k) and not blocked
-        r.chosen = on
-        r.check:SetShown(on)
-        r.check:SetDesaturated(included); r.check:SetAlpha(included and 0.6 or 1)
-        r.tint:SetShown(on)
-        r:SetAlpha(blocked and 0.55 or 1)
-        local name = k == "hardcore" and Ch:Name("hardcore", C.pvp and "pvp") or L["CHAL_" .. k:upper()]
-        r.name:SetText(name)
-        r.name:SetTextColor(Theme:RGBA(on and "goldText" or "chipText"))
-        local sub = (included and L.CHAL_WITH_IRONMAN) or blocked
-          or (k == "oneclass" and on and chosen and L.CHAL_CLASS_YOURS:format(Ch.ClassName(chosen.oneclass))) or nil
-        r.sub:SetText(sub or ""); r.sub:SetShown(sub ~= nil)
-        -- The tooltip: the rule as it would be now (the lives, the gold, your class).
-        local v = (k == "hardcore" and C.pvp and "pvp") or (k == "shared" and C:Lives()) or (k == "pauper" and C:Gold())
-          or (k == "oneclass" and ns.Fellowship:MyInfo().class) or true
-        r.tipTitle, r.tipText = Ch:Name(k, v), Ch:Rule(k, v)
-        r.tipNote = (included and L.CHAL_INCLUDED) or why or nil
-        local h = math.max(ROW_MIN, 4 + r.name:GetStringHeight() + (sub and 2 + r.sub:GetStringHeight() or 0) + 4)
-        if r.extra then
-          r.extra:SetShown(on)
-          if on then
-            r.extra:ClearAllPoints(); r.extra:SetPoint("TOPLEFT", 24, -h)
-            r.extra:Refresh()
-            h = h + r.extra:GetHeight() + 4
+        local out = C.solo and Ch.NOT_ALONE[k]
+        r:SetShown(not out)
+        if out then
+          hs[i] = false
+        else
+          local included = C:Included(k)
+          local blocked, why = C:Blocked(k)
+          local on = C:Chosen(k) and not blocked
+          r.chosen = on
+          r.check:SetShown(on)
+          r.check:SetDesaturated(included); r.check:SetAlpha(included and 0.6 or 1)
+          r.tint:SetShown(on)
+          r:SetAlpha(blocked and 0.55 or 1)
+          r.name:SetText(Ch:Name(k, k == "hardcore" and C.pvp and "pvp" or nil))
+          r.name:SetTextColor(Theme:RGBA(on and "goldText" or "chipText"))
+          local sub = (included and L.CHAL_WITH_IRONMAN:format(Ch:Name("ironman"))) or blocked
+            or (k == "oneclass" and on and chosen and L.CHAL_CLASS_YOURS:format(Ch.ClassName(chosen.oneclass))) or nil
+          r.sub:SetText(sub or ""); r.sub:SetShown(sub ~= nil)
+          -- The tooltip: the rule as it would be now (the lives, the gold, your class).
+          local v = (k == "hardcore" and C.pvp and "pvp") or (k == "shared" and C:Lives()) or (k == "pauper" and C:Gold())
+            or (k == "oneclass" and ns.Fellowship:MyInfo().class) or true
+          r.tipTitle, r.tipText = Ch:Name(k, v), Ch:Rule(k, v)
+          r.tipNote = (included and L.CHAL_INCLUDED:format(Ch:Name("ironman"))) or why or nil
+          local h = math.max(ROW_MIN, 4 + r.name:GetStringHeight() + (sub and 2 + r.sub:GetStringHeight() or 0) + 4)
+          if k == "hardcore" then pf.pvp.label:SetText(C.solo and L.CHAL_PVP_REALM_SOLO or L.CHAL_PVP_REALM) end
+          if r.extra then
+            r.extra:SetShown(on)
+            if on then
+              r.extra:ClearAllPoints(); r.extra:SetPoint("TOPLEFT", 24, -h)
+              r.extra:Refresh()
+              h = h + r.extra:GetHeight() + 4
+            end
           end
+          hs[i], sum = h, sum + h + 2
         end
-        hs[i], sum = h, sum + h + 2
       end
       -- Many chosen (Gear, Gold & More with all it asks; the check of 8 Nov 2026): the rows close up rather than
       -- run past the cloth.
@@ -938,10 +966,12 @@ local function refresh(pf)
       local tight = room > 0 and sum > room
       local y = BANNER_HEAD + BANNER_PAD
       for i, r in ipairs(b.rows) do
-        local h = tight and hs[i] - 2 or hs[i]
-        r:SetHeight(h)
-        r:ClearAllPoints(); r:SetPoint("TOPLEFT", b, "TOPLEFT", BANNER_PAD, -y)
-        y = y + h + (tight and 0 or 2)
+        if hs[i] then
+          local h = tight and hs[i] - 2 or hs[i]
+          r:SetHeight(h)
+          r:ClearAllPoints(); r:SetPoint("TOPLEFT", b, "TOPLEFT", BANNER_PAD, -y)
+          y = y + h + (tight and 0 or 2)
+        end
       end
     end
     local shared = C:Chosen("shared")
@@ -970,7 +1000,10 @@ local function refresh(pf)
     pf.chalList:SetHeight(math.max(1, n * (rh + rgap)))
     local above = chosen and pf.chalList or pf.chalText
     local held = chosen and (chosen.oneclass or chosen.nohealers)
-    pf.chalNote:SetText(held and (L.CHAL_NOTE .. " " .. L.CHAL_NOTE_HELD) or L.CHAL_NOTE)
+    local note = C.solo and L.CHAL_NOTE_SOLO or L.CHAL_NOTE
+    pf.chalNote:SetText(held and (note .. " " .. L.CHAL_NOTE_HELD) or note)
+    pf.chalLater:SetText(C.solo and L.CHAL_LATER_SOLO or L.CHAL_LATER)
+    pf.chalIntro:SetText(C.solo and L.CHAL_INTRO_SOLO or L.CHAL_INTRO)
     pf.chalNote:SetShown(chosen ~= nil)
     pf.chalLives:SetShown(shared)
     pf.chalNote:ClearAllPoints()
@@ -993,8 +1026,13 @@ local function refresh(pf)
     pf.reviewName:SetText(rv.name)
     pf.reviewLine:SetText(rv.line)
     pf.reviewStyle:SetText(rv.style)
+    for _, w in ipairs(pf.groupOnly) do w:SetShown(not C.solo) end
+    pf.soloHead:SetShown(C.solo); pf.soloText:SetShown(C.solo)
+    local cy = C.solo and 38 + pf.soloText:GetStringHeight() + 24 or 330
+    pf.chalHead:ClearAllPoints(); pf.chalHead:SetPoint("TOPLEFT", 0, -cy)
+    pf.reviewChal:ClearAllPoints(); pf.reviewChal:SetPoint("TOPLEFT", 0, -(cy + 36))
     for i, row in ipairs(pf.reviewRows) do
-      local item = rv.rules[i]
+      local item = not C.solo and rv.rules[i] or nil
       row.k:SetShown(item ~= nil); row.v:SetShown(item ~= nil)
       if item then row.k:SetText(item[1]); row.v:SetText(item[2]) end
     end
@@ -1005,6 +1043,7 @@ local function refresh(pf)
   pf.prev:SetShown(step > 1)
   pf.next:SetShown(step < #steps)
   pf.create:SetShown(key == "review")
+  pf.create:SetLabel(C.solo and L.SOLO_START or L.CREATE)
 end
 
 ns.Pages:Register({ id = "create", label = L.TITLE_CREATE, header = "none", build = build, refresh = refresh,

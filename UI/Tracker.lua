@@ -6,8 +6,10 @@
 -- Under the game's quest tracker (Settings, on by default; the owner, 2 Nov 2026): one more section under the
 -- game's quest list, with the game's own section header and fold button, its fonts and its background. A real
 -- section of the game's tracker would taint it (its quest item buttons then fail in combat), so this is our own
--- frame anchored under it and following it with hooks only: nothing of the game's tracker is changed. With ForeverCore
--- (U255) it is a section of ForeverCore's column instead (TK:Column).
+-- frame anchored under it and following it with hooks only: nothing of the game's tracker is changed. Also with
+-- ForeverCore (U260): since its 1.15.0 the quests are in the game's tracker again and its column sits beside it.
+-- shortcut: a ForeverCore before 1.15 that shows its own quest list hides the game's tracker, and ours then sits where
+-- that tracker stood, over the list; CurseForge moves players to 1.15, so nothing is done for it.
 local _, ns = ...
 local L = ns.L
 local UI, Theme, Combat, Settings = ns.UI, ns.Theme, ns.Combat, ns.Settings
@@ -164,9 +166,7 @@ function TK:StopMove()
   self.moving = nil
   local fr = self.frame
   fr:StopMovingOrSizing()
-  -- (In UIParent's units: in ForeverCore's column ours has the column's scale, U255.)
-  local s = fr:GetEffectiveScale() / UIParent:GetEffectiveScale()
-  ns.char.trackerPos = { point = "TOPLEFT", rel = "BOTTOMLEFT", x = fr:GetLeft() * s, y = fr:GetTop() * s }
+  ns.char.trackerPos = { point = "TOPLEFT", rel = "BOTTOMLEFT", x = fr:GetLeft(), y = fr:GetTop() }
   if not self:Docked() then return self:Place() end
   Settings:Set("trackerDock", false)
   -- (An open Settings page shows the box turned off.)
@@ -243,63 +243,20 @@ function TK:Docked()
 end
 
 function TK:DockWidth()
-  local w = (self:InColumn() and self.section or self:GameTracker()):GetWidth()
+  local w = self:GameTracker():GetWidth()
   return (w and w >= 200 and w <= 400) and math.floor(w + 0.5) or 260
 end
 
--- ForeverCore's column (U255, the owner, 17 Nov 2026): with ForeverCore, Under the game's quest tracker puts ours in
--- its column as one section under the quests, the way every Forever addon adds its own (since its 1.14.2 ForeverCore
--- hides the game's tracker and draws its own quest list there). ForeverCore lays the section out: its place, width,
--- scale, background and lock. The section is an empty frame ours sits in, as high as ours; ForeverCore cannot take a
--- section back, so with the setting off it is 0 high. nil without ForeverCore, or until it took the section.
-function TK:Column()
-  local fc = ForeverCore
-  local api = type(fc) == "table" and type(fc.TrackerHost) == "table" and fc.TrackerHost or nil
-  if not (api and type(api.Attach) == "function" and type(api.IsAttached) == "function") then return nil end
-  local sec = self.section
-  if not sec then
-    if InCombatLockdown() then return nil end
-    sec = CreateFrame("Frame", nil, UIParent)
-    sec:SetSize(1, 1)
-    function sec.Update() end
-    function sec.GetContentsHeight() sec.reported = TK:SectionHeight(); return sec.reported end
-    -- The column's width changed: our lines wrap to it.
-    sec:SetScript("OnSizeChanged", function(_, w)
-      if math.abs((w or 0) - (sec.w or 0)) > 0.5 then sec.w = w; if TK:InColumn() then TK:Refresh() end end
-    end)
-    self.section = sec
-    pcall(api.Attach, sec)
-  end
-  return api.IsAttached(sec) and sec or nil
-end
-
-function TK:InColumn()
-  return self.section ~= nil and self.frame ~= nil and self.frame:GetParent() == self.section
-end
-
--- How high ours is in the column (0 when it is not there or hidden).
-function TK:SectionHeight()
-  return (self:InColumn() and self.frame:IsShown()) and math.floor(self.frame:GetHeight() + 0.5) or 0
-end
-
 -- Where the tracker is: its own place, or docked right under the game's quest list (where its background ends; under
--- its header when the list is empty, as in Edit Mode; in its place when the game's tracker is hidden; a section of
--- ForeverCore's column when it is there, U255). Anchored to the game's tracker, so it follows it as it grows, shrinks
--- and moves.
+-- its header when the list is empty, as in Edit Mode; in its place when the game's tracker is hidden). Anchored to the
+-- game's tracker, so it follows it as it grows, shrinks and moves.
 function TK:Place()
   local fr = self.frame
   -- (Not while it is dragged: anchored again to the game's tracker, it jumped from under the mouse.)
   if not fr or self.moving then return end
-  local docked = self:Docked()
-  local sec = docked and self:Column() or nil
-  -- In ForeverCore's column ours is the section's child: the column's scale, shown and hidden with it (U255).
-  if fr:GetParent() ~= (sec or UIParent) then fr:SetParent(sec or UIParent) end
-  fr:SetFrameStrata(sec and sec:GetFrameStrata() or (docked and "LOW" or "MEDIUM"))
-  if not docked then place(fr) return end
-  fr:ClearAllPoints()
-  -- (Both edges: as wide as the column, whatever width ForeverCore gives it.)
-  if sec then fr:SetPoint("TOPLEFT", sec, "TOPLEFT"); fr:SetPoint("TOPRIGHT", sec, "TOPRIGHT") return end
+  if not self:Docked() then place(fr) return end
   local ot = self:GameTracker()
+  fr:ClearAllPoints()
   -- With no quests the game hides its tracker, and its layout then leaves it without a place: anchored to it, ours
   -- went to the top left corner of the screen (the owner, 6 Nov 2026). It stays where the game's tracker last stood
   -- (kept per character, for a login without quests), else in its own place.
@@ -326,6 +283,7 @@ function TK:Restyle(docked)
   local head = docked and fr.dock or fr.bar
   fr.bar:SetShown(not docked)
   if fr.dock then fr.dock:SetShown(docked) end
+  fr:SetFrameStrata(docked and "LOW" or "MEDIUM")
   fr:SetWidth(docked and self:DockWidth() or self.WIDTH)
   fr.xp:ClearAllPoints()
   fr.xp:SetPoint("TOPLEFT", head, "BOTTOMLEFT", 1, docked and -2 or 0)
@@ -354,8 +312,7 @@ end
 function TK:PaintDocked()
   local fr, ot = self.frame, self:GameTracker()
   if not (fr and fr.docked and ot) then return end
-  -- (In ForeverCore's column: its own background, none of ours, U255.)
-  fr:SetBackdropColor(0, 0, 0, self:InColumn() and 0 or self.DOCK_SHADE * (ot.NineSlice:GetAlpha() or 0))
+  fr:SetBackdropColor(0, 0, 0, self.DOCK_SHADE * (ot.NineSlice:GetAlpha() or 0))
   fr:SetBackdropBorderColor(0, 0, 0, 0)
   for _, b in ipairs(fr.lines) do
     if b.key ~= "status" then b.text:SetTextColor(unpack(self.DOCK_COLORS[b.role] or self.DOCK_COLORS.toastText)) end
@@ -479,13 +436,6 @@ local ALIAS = { stop = "you", early2 = "early", early3 = "early" }
 local function lineOn(key) return Settings:TrackerLineOn(ALIAS[key] or key) end
 
 function TK:Refresh()
-  self:Draw()
-  -- In ForeverCore's column, its layout learns our new height (U255).
-  local sec = self.section
-  if sec and sec.parentContainer and self:SectionHeight() ~= (sec.reported or 0) then sec.parentContainer:MarkDirty() end
-end
-
-function TK:Draw()
   local fr = self.frame
   if not fr then return end
   local f = ns.Fellowship:Current()
@@ -493,15 +443,13 @@ function TK:Draw()
   if not c then fr:Hide() return end
   if Settings:Get("trackerDock") and not fr.dock then self:BuildDock() end
   local docked = self:Docked()
-  -- (Or ForeverCore's column can take ours now: docked in combat, the section is made after it, at a redraw, U255.)
-  if docked ~= (fr.docked or false) or (docked and not self:InColumn() and self:Column()) then
+  if docked ~= (fr.docked or false) then
     fr.docked = docked
     self:Restyle(docked)
     self:Place()
   end
-  -- Docked, it folds away with the game's tracker, like the game's own sections. (In ForeverCore's column the column
-  -- does that; the game's tracker ForeverCore hid can stay folded, with no button left to unfold it, U255.)
-  if docked and not self:InColumn() and self:GameTracker():IsCollapsed() then fr:Hide() return end
+  -- Docked, it folds away with the game's tracker, like the game's own sections.
+  if docked and self:GameTracker():IsCollapsed() then fr:Hide() return end
   local folded = ns.char.trackerFolded == true
   if docked then
     fr.dock.Text:SetText(c.title)

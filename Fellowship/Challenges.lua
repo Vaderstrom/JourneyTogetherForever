@@ -63,6 +63,18 @@ C.SHARED_SUGGEST = { duo = 4, trio = 6, party = 10, large = 15 }
 C.INCLUDES = { ironman = { "hardcore", "white" } }
 -- Never chosen together: Ironman Fellowship allows no professions, so nobody could craft (X7).
 C.APART = { crafted = "ironman", ironman = "crafted" }
+-- On your own (U272, the owner, 19 Nov 2026): every challenge one player can take on. These three need others.
+C.NOT_ALONE = { shared = true, oneclass = true, nohealers = true }
+-- On your own (the journey, or Create for one) the challenges that say "fellowship" have their own names and rules.
+-- (On the Create page its choice decides: from a journey of one you may be creating a fellowship.)
+-- shortcut: reads the open page, so during Create every caller gets Create's words; pass solo in if a caller outside
+-- Create ever needs a fellowship's words then.
+C.ALONE = { fellowfound = "SELFFOUND", crafted = "SELFCRAFTED", hardcore = "HARDCORE_SOLO", ironman = "IRONMAN_SOLO", race = "RACE_SOLO" }
+function C.Alone()
+  if ns.Window and ns.Window.current == "create" and ns.CreateState then return ns.CreateState.solo == true end
+  local f = F:Current()
+  return f ~= nil and f.solo == true
+end
 -- What an Adventurer did, and the challenge it breaks (op "broke"; Fellowship/ChallengeWatch.lua notices them).
 C.WHAT = { trade = "fellowfound", mail = "fellowfound", mailto = "fellowfound", ah = "fellowfound", gear = "white", craft = "crafted",
   gold = "pauper", taxi = "walk", hearth = "walk", quest = "questless", xp = "dungeons", talent = "ironman",
@@ -533,8 +545,9 @@ function C:Name(key, v)
   if key == "shared" and tonumber(v) then return L.CHAL_SHARED_N:format(v) end
   if key == "pauper" and tonumber(v) then return L.CHAL_PAUPER_N:format(v) end
   if key == "oneclass" and type(v) == "string" then return L.CHAL_ONECLASS_N:format(C.ClassName(v)) end
-  if key == "hardcore" and v == "pvp" then return L.CHAL_HARDCORE_PVP end
-  return L["CHAL_" .. key:upper()] or key
+  local alone = C.Alone()
+  if key == "hardcore" and v == "pvp" then return alone and L.CHAL_HARDCORE_PVP_SOLO or L.CHAL_HARDCORE_PVP end
+  return L["CHAL_" .. (alone and C.ALONE[key] or key:upper())] or key
 end
 
 -- The challenges of f (or of a choice { key = value }) as one line: "Hardcore Fellowship · Shared lives (10)"; nil
@@ -551,8 +564,9 @@ function C:Rule(key, v)
   if key == "shared" then return L.CHAL_SHARED_RULE:format(tonumber(v) or 0) end
   if key == "pauper" then return L.CHAL_PAUPER_RULE:format(tonumber(v) or self.PAUPER_SUGGEST) end
   if key == "oneclass" then return L.CHAL_ONECLASS_RULE:format(C.ClassName(v or "")) end
-  if key == "hardcore" and v == "pvp" then return L.CHAL_HARDCORE_PVP_RULE end
-  return L["CHAL_" .. key:upper() .. "_RULE"]
+  local alone = C.Alone()
+  if key == "hardcore" and v == "pvp" then return alone and L.CHAL_HARDCORE_PVP_SOLO_RULE or L.CHAL_HARDCORE_PVP_RULE end
+  return L["CHAL_" .. (alone and C.ALONE[key] or key:upper()) .. "_RULE"]
 end
 
 -- "2 Nov 2026"
@@ -854,12 +868,13 @@ function C:Book(f, hl)
   local fallen = {}
   for _, e in ipairs(f.falls or {}) do if e.fatal then fallen[#fallen + 1] = ns.Short(e.who) end end
   if #fallen > 0 then after[#after + 1] = L.CHAL_BOOK_FALLEN:format(table.concat(fallen, ", ")) end
-  if self:Survival(f) then after[#after + 1] = L.CHAL_BOOK_ANEW end
+  if self:Survival(f) and not f.solo then after[#after + 1] = L.CHAL_BOOK_ANEW end
   for _, k in ipairs(self.LIST) do
     local o = f.challengesOff and f.challengesOff[k]
     if o then after[#after + 1] = L.CHAL_BOOK_OFF:format(self:Name(k, o.v), day(o.t), ns.Short(o.by or f.leader)) end
   end
-  local parts = { L.CHAL_BOOK_INTRO }
+  local intro = f.solo and L.CHAL_BOOK_INTRO_SOLO or L.CHAL_BOOK_INTRO
+  local parts = { intro }
   for _, it in ipairs(items) do
     parts[#parts + 1] = L.CHAL_BOOK_ONE:format(it.name, it.rule)
     if it.broken then parts[#parts + 1] = it.broken end
@@ -867,6 +882,6 @@ function C:Book(f, hl)
     if it.roadText then parts[#parts + 1] = it.roadText end
   end
   for _, line in ipairs(after) do parts[#parts + 1] = line end
-  return { title = L.CHAL_BOOK, intro = L.CHAL_BOOK_INTRO, items = items, after = after, text = table.concat(parts, " ") }
+  return { title = L.CHAL_BOOK, intro = intro, items = items, after = after, text = table.concat(parts, " ") }
 end
 

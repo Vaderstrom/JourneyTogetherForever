@@ -106,7 +106,7 @@ local function column(pf, parent, width)
   -- the whole group on or off (U116), in line with the ticks under it.
   function c:Sub(text, get, set)
     local sec = self.cur
-    local t = UI.Text(sec.body, 11, "accent", "title")
+    local t = UI.Text(sec.body, 11, "accentText", "title")
     t:SetPoint("TOPLEFT", get and 21 or 0, -(sec.y + 6)); t:SetText(text:upper())
     if get then
       t.box = UI.Checkbox(sec.body, get, set)
@@ -231,7 +231,7 @@ local function build(pf)
   local helpSec = left.cur
   for i, cmd in ipairs(ns.COMMANDS) do
     local x, y = ((i - 1) % 2) * width / 2, -(helpSec.y + math.floor((i - 1) / 2) * 15)
-    local code = UI.Text(helpSec.body, 12, "accent")
+    local code = UI.Text(helpSec.body, 12, "accentText")
     code:SetPoint("TOPLEFT", x, y)
     code:SetText(cmd[1])
     local what = UI.Text(helpSec.body, 12, "ink2")
@@ -378,6 +378,9 @@ local function build(pf)
   pf.trackerPeek = opt(L.TRACKER_PEEK, "trackerPeek", L.TRACKER_PEEK_HINT, true)
   pf.trackerCombat = opt(L.TRACKER_HIDE_COMBAT, "trackerHideCombat")
   pf.trackerInstance = opt(L.TRACKER_HIDE_INSTANCE, "trackerHideInstance", L.TRACKER_HIDE_INSTANCE_HINT)
+  -- Everything the addon adds to the game's quest log and world map (U268, the owner: "add a setting to toggle it off"),
+  -- beside the tracker's place under the game's quest tracker; not faded with the tracker (the left page had no room).
+  right:Tick(L.SET_QLOG, check("questLog"), function(v) Settings:Set("questLog", v) end, L.SET_QLOG_HINT)
   -- Dungeons and raids (U164, U165; "Other addons" until then: the left page had no room): what the Dungeons and Raids
   -- pages show, and whose stories the dungeons' story button tells (6 Nov 2026). It takes turns with the toasts and
   -- the tracker, so the page still needs no scrolling. (The id stays "addons": what is folded is kept by it.)

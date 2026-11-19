@@ -39,6 +39,7 @@ Fellowship\Firsts.lua
 Fellowship\Challenges.lua
 Fellowship\ChallengeWatch.lua
 Fellowship\Quests.lua
+Fellowship\Spots.lua
 Fellowship\QuestLists.lua
 Fellowship\Room.lua
 Fellowship\Ready.lua
@@ -68,13 +69,13 @@ UI\CharacterList.lua
 UI\Models.lua
 UI\OtherAddons.lua
 UI\MapMark.lua
+UI\BookMap.lua
 UI\Pages.lua
 UI\Pages\Welcome.lua
 UI\Pages\Create.lua
 UI\Pages\Join.lua
 UI\Pages\Heroes.lua
 UI\Pages\Gatherings.lua
-UI\Pages\Manage.lua
 UI\Pages\Rules.lua
 UI\Pages\Overview.lua
 UI\Pages\Setup.lua

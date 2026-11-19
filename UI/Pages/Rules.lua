@@ -8,6 +8,8 @@
 --   rulesadmin  the Leader's editing of the Rules page (parent = "rules"): the form on a draft, then Publish
 --               (everyone gets a toast and a line in the Chronicle's The fellowship) or Discard, which end the
 --               editing. Like Journey Admin.
+-- On your own (U272) the rulebook is a journey of one's: how it goes, the challenges; on the right page no votes, the
+-- challenges with Turn off.
 local _, ns = ...
 local L = ns.L
 local UI, Theme = ns.UI, ns.Theme
@@ -182,6 +184,52 @@ local function chalBlock(parent, width)
   return b
 end
 
+-- The challenges chosen at founding (SPEC §9): none can be added; each on can be turned off, for good (asks first);
+-- the ones turned off with their day. The Leader's rules editor, and the Rules page on your own (U272).
+local function chalOffRows(parent, width)
+  local W = ns.Window
+  return UI.Pool(function()
+    local r = CreateFrame("Frame", nil, parent)
+    r:SetSize(width, 28)
+    r.name = UI.Text(r, 13, "ink")
+    r.name:SetPoint("LEFT", 4, 0)
+    r.off = UI.TextButton(r, L.MG_CHAL_TURN_OFF, function()
+      local key = r.key
+      if not key then return end
+      W:Confirm(L.MG_CHAL_CONFIRM:format(ns.Challenges:Name(key, r.v)), L.MG_CHAL_TURN_OFF, function()
+        ns.Challenges:TurnOff(key)
+        W:Refresh()
+      end)
+    end, "plain", 12)
+    r.off:SetPoint("RIGHT")
+    -- (One Ironman Fellowship holds: not turned off while it is on.)
+    r.held = UI.Text(r, 12, "ink2", nil, "RIGHT")
+    r.held:SetPoint("RIGHT", -4, 0)
+    return r
+  end)
+end
+local function placeChalOff(rows, f, s, ctx)
+  local Ch, n = ns.Challenges, 0
+  for _, k in ipairs(Ch.LIST) do
+    local on, was = Ch:Has(f, k), f.challengesOff and f.challengesOff[k]
+    if on or was then
+      local r = rows:Get(n + 1)
+      if not r then break end
+      n = n + 1
+      r.key, r.v = on and k or nil, on and f.challenges[k] or nil
+      r.name:SetText(on and Ch:Name(k, f.challenges[k]) or L.MG_CHAL_WAS_OFF:format(Ch:Name(k, was.v), Ch.Day(was.t)))
+      r.name:SetTextColor(Theme:RGBA(on and "ink" or "ink2"))
+      local held = on and Ch:IncludedBy(f, k) ~= nil
+      r.off:SetShown(on and not held and not ctx.watching)
+      r.held:SetShown(held)
+      r.held:SetText(L.MG_CHAL_INCLUDED:format(Ch:Name("ironman")))
+      r:Show()
+      s:Place(r, 28, 2)
+    end
+  end
+  rows:HideFrom(n + 1)
+end
+
 local function buildBook(pf)
   local W = ns.Window
   local width = W.PAGE_W - 10
@@ -249,6 +297,10 @@ local function buildBook(pf)
   pf.friendText:SetText(L.PROPOSE_FRIEND)
   pf.dHead = UI.SectionHeader(Rc, width)
   pf.dHead:SetText(L.DECIDED_VOTES)
+  pf.voteParts = { pf.openHead, pf.vNone, pf.pHead, pf.ruleLabel, pf.rule, pf.valueLabel, pf.value, pf.propose, pf.now,
+    pf.pNote, pf.friendText, pf.dHead }
+  -- On your own: the challenges, each with Turn off.
+  pf.offRows = chalOffRows(Rc, width)
 end
 
 local function refreshBook(pf, ctx)
@@ -260,10 +312,11 @@ local function refreshBook(pf, ctx)
   -- Following another character (the walkthrough's sample is drawn the same way, but shows the page as its rank
   -- sees it: it said "From another character..." where the tour says "propose a change"; seen in the seventh check).
   local follow = ctx.watching == true and not ctx.demo
+  local solo = f.solo == true
 
   -- Left page.
   local s = UI.Stack(pf.lscroll.child)
-  local edit = ctx.isLeader and not follow
+  local edit = ctx.isLeader and not follow and not solo
   pf.editBar:SetShown(edit)
   if edit then
     pf.editBar.text:SetText(L.RULES_EDIT_BAR:format(hl(L.RULES_EDIT_HERE)))
@@ -273,13 +326,15 @@ local function refreshBook(pf, ctx)
     s:Place(pf.editBar, h, 10)
   end
   -- (Viewing from another character: who sets the rules; the bar at the top says read only and how fresh, U207.)
-  pf.who:SetText((follow and L.BOOK_WHO_WATCH or L.BOOK_WHO):format(ns.Short(f.leader)))
+  pf.who:SetText(solo and L.BOOK_WHO_SOLO or (follow and L.BOOK_WHO_WATCH or L.BOOK_WHO):format(ns.Short(f.leader)))
   s:Place(pf.who, pf.who:GetStringHeight(), 8)
   local count, made = F:Count(f), R.SizeOf(f.rules)
   local size = made == "custom" and L.BOOK_SIZE_CUSTOM:format(count) or L.BOOK_SIZE:format(hl(R.SizeWord(made)), count)
-  pf.intro:SetText(L.BOOK_STYLE:format(hl(R.StyleName(R.StyleOf(f.rules)))) .. " " .. size)
+  pf.intro:SetText(solo and L.BOOK_SOLO or (L.BOOK_STYLE:format(hl(R.StyleName(R.StyleOf(f.rules)))) .. " " .. size))
   s:Place(pf.intro, pf.intro:GetStringHeight(), 12)
-  for i, a in ipairs(R.Book(f.rules, hl)) do
+  -- (On your own no floor, cap, runs or votes hold: no articles, the challenges are the first.)
+  for _, art in ipairs(pf.articles) do art.head:SetShown(not solo); art.text:SetShown(not solo) end
+  for i, a in ipairs(solo and {} or R.Book(f.rules, hl)) do
     local art = pf.articles[i]
     art.head:SetText(ns.Journey.Roman(i) .. ".  " .. a.title)
     s:Place(art.head, 29, 4)
@@ -297,7 +352,7 @@ local function refreshBook(pf, ctx)
   c.lives:Hide()
   local nb = 0
   if chal then
-    c.head:SetText(ns.Journey.Roman(#R.BOOK + 1) .. ".  " .. chal.title)
+    c.head:SetText(ns.Journey.Roman(solo and 1 or #R.BOOK + 1) .. ".  " .. chal.title)
     s:Place(c.head, 29, 4)
     c.intro:SetText(chal.intro)
     s:Place(c.intro, c.intro:GetStringHeight(), 12)
@@ -324,6 +379,16 @@ local function refreshBook(pf, ctx)
 
   -- Right page: how a change is made, the open votes, Propose (or the Leader's way), the votes decided this week.
   local t = UI.Stack(pf.rscroll.child)
+  pf.offRows:HideFrom(1)
+  if solo then
+    pf.cHead:Set(L.CHANGE_RULE_SOLO, ns.Challenges:Ever(f) and L.CHANGE_HOW_SOLO or L.CHANGE_HOW_SOLO_NONE)
+    t:Place(pf.cHead, pf.cHead:GetHeight(), 8)
+    for _, w in ipairs(pf.voteParts) do w:Hide() end
+    pf.vRows:HideFrom(1)
+    placeChalOff(pf.offRows, f, t, ctx)
+    pf.rscroll:SetContentHeight(t.y + 8)
+    return
+  end
   local need = math.floor(#ns.Journey:Counted(f) / 2) + 1
   pf.cHead:Set(L.CHANGE_RULE, need == 1 and L.CHANGE_HOW_1 or L.CHANGE_HOW:format(need))
   t:Place(pf.cHead, pf.cHead:GetHeight(), 4)
@@ -512,25 +577,7 @@ local function buildAdmin(pf)
   pf.chalHead:SetText(L.MG_CHAL_HEAD)
   pf.chalText = UI.WrapText(Lc, 12, "ink2", width, "book")
   pf.chalText:SetText(L.MG_CHAL_TEXT)
-  pf.chalRows = UI.Pool(function()
-    local r = CreateFrame("Frame", nil, Lc)
-    r:SetSize(width, 28)
-    r.name = UI.Text(r, 13, "ink")
-    r.name:SetPoint("LEFT", 4, 0)
-    r.off = UI.TextButton(r, L.MG_CHAL_TURN_OFF, function()
-      local key = r.key
-      if not key then return end
-      W:Confirm(L.MG_CHAL_CONFIRM:format(ns.Challenges:Name(key, r.v)), L.MG_CHAL_TURN_OFF, function()
-        ns.Challenges:TurnOff(key)
-        W:Refresh()
-      end)
-    end, "plain", 12)
-    r.off:SetPoint("RIGHT")
-    -- (One Ironman Fellowship holds: not turned off while it is on.)
-    r.held = UI.Text(r, 12, "ink2", nil, "RIGHT")
-    r.held:SetPoint("RIGHT", -4, 0); r.held:SetText(L.MG_CHAL_INCLUDED)
-    return r
-  end)
+  pf.chalRows = chalOffRows(Lc, width)
   -- Fellowship size and play style (27 Oct 2026), each one choice above the full form: the size sets the numbers
   -- (Adventurers per run, who must clear, away time), the style the slack. Both go into the draft.
   local function apply(set, group)
@@ -592,29 +639,14 @@ local function refreshAdmin(pf, ctx)
   local Ch = ns.Challenges
   local ever = Ch:Ever(f)
   pf.chalHead:SetShown(ever); pf.chalText:SetShown(ever)
-  local n = 0
   if ever then
     s:Place(pf.chalHead, 29, 6)
     s:Place(pf.chalText, pf.chalText:GetStringHeight(), 6)
-    for _, k in ipairs(Ch.LIST) do
-      local on, was = Ch:Has(f, k), f.challengesOff and f.challengesOff[k]
-      if on or was then
-        local r = pf.chalRows:Get(n + 1)
-        if not r then break end
-        n = n + 1
-        r.key, r.v = on and k or nil, on and f.challenges[k] or nil
-        r.name:SetText(on and Ch:Name(k, f.challenges[k]) or L.MG_CHAL_WAS_OFF:format(Ch:Name(k, was.v), Ch.Day(was.t)))
-        r.name:SetTextColor(Theme:RGBA(on and "ink" or "ink2"))
-        local held = on and Ch:IncludedBy(f, k) ~= nil
-        r.off:SetShown(on and not held and not ctx.watching)
-        r.held:SetShown(held)
-        r:Show()
-        s:Place(r, 28, 2)
-      end
-    end
+    placeChalOff(pf.chalRows, f, s, ctx)
     s:Skip(10)
+  else
+    pf.chalRows:HideFrom(1)
   end
-  pf.chalRows:HideFrom(n + 1)
   -- The size (how many you are, and which size the rules were made for), the play style, then the full form.
   local rules = shown(pf, f)
   s:Place(pf.sizeHead, 29, 6)
@@ -635,6 +667,9 @@ local function refreshAdmin(pf, ctx)
 end
 
 ns.Pages:Register({ id = "rules", label = L.NAV_RULES, build = buildBook, refresh = refreshBook,
-  title = function() return L.TITLE_RULES, L.SUB_RULES end })
+  title = function(ctx)
+    if ctx and ctx.f and ctx.f.solo then return L.TITLE_RULES_SOLO, L.SUB_RULES_SOLO end -- (on your own, U272)
+    return L.TITLE_RULES, L.SUB_RULES
+  end })
 ns.Pages:Register({ id = "rulesadmin", label = L.NAV_RULES, icon = "rules", parent = "rules", leader = true,
   build = buildAdmin, refresh = refreshAdmin, title = function() return L.TITLE_RULES, L.SUB_RULES_ADMIN end })

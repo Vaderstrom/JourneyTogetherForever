@@ -23,7 +23,7 @@ Built for **WoW Forever**.
 - **A group photo**: the whole fellowship in 3D on the whole screen, with poses and backdrops.
 - **Your fellowship, your way**: your own journey, a rulebook anyone can propose changes to, Gatherings, a Guild
   Master tournament and posts to your Discord.
-- **Or on your own**: follow the journey alone, chapter by your level, until you find a fellowship.
+- **Or on your own**: follow the journey alone, with your own journey and challenges, until you find a fellowship.
 
 - [How it works](#how-it-works)
 - [Features](#features):
@@ -32,7 +32,7 @@ Built for **WoW Forever**.
     [Gatherings](#gatherings), [raids](#the-endgame-and-raids)
   - [Challenge modes](#challenge-modes)
   - [Lead the fellowship](#lead-the-fellowship): [creating a fellowship](#create-a-fellowship),
-    [the journey](#shape-the-journey), [managing it](#manage-the-fellowship), [rules and votes](#the-rulebook-and-votes),
+    [the journey](#shape-the-journey), [the Leader's tools](#the-leaders-tools), [rules and votes](#the-rulebook-and-votes),
     [tournament](#guild-master-tournament)
   - [Memories](#memories): [Chronicle and Moments](#chronicle-moments-and-history), [group photo](#group-photo),
     [Discord](#discord)
@@ -59,9 +59,11 @@ Built for **WoW Forever**.
 - **Joining**: someone in a fellowship invites you by name, and the invitation shows on the **Join a fellowship** page
   and in your inbox. Choose your role and **Accept**. **Leaving** is a button on the Adventurers page; when the Leader
   leaves, the next Adventurer leads and the journey goes on for everyone else.
-- **On your own**, the third way in on the Welcome page: follow the WoW Forever journey alone on this character. The
-  chapter follows your level, with no floor or cap, and each dungeon, once open at your level, has its quests to pick
-  up and its run. Nothing is sent to anyone; founding or joining a fellowship replaces it.
+- **On your own**, the third way in on the Welcome page: **Create for one**. Choose your journey (WoW Forever,
+  Classic, Short, Long or your own chapters) and the challenges one player can take on, then start. The chapter follows
+  your level, with no floor or cap, and each dungeon, once open at your level, has its quests to pick up and its run.
+  The Chronicle, the Rules (your challenges, each with Turn off) and Journey Admin are yours too. Nothing is sent to
+  anyone; founding or joining a fellowship replaces it.
 
 ## Features
 
@@ -124,8 +126,9 @@ fellowship).
   chain share one row.
   Every dungeon's quests, where they start and the chains before them are built in, the same for everyone in the
   fellowship. A toast tells you when a dungeon's
-  first quest opens to you. **Show on map** opens the world map with a gold ring where a quest starts, and a numbered
-  ring for each step of its chain (the next one glows). Click a ring to set a waypoint and follow it.
+  first quest opens to you. **Show on map** opens a map of the zone in the book, under the quest, with a gold ring where
+  it starts, a numbered ring for each step of its chain (the next one glows) and the faces of the Adventurers on it;
+  each step has its own button too. Click a ring to set a waypoint and follow it, or open the game's map.
 
 ![The Deadmines' page: the story, the bosses, Who is ready, and Destruction in Deadmines' nine prequest steps](.github/screenshots/dungeon-page.jpg)
 
@@ -166,21 +169,27 @@ fellowship).
 ![The Adventurers page](.github/screenshots/adventurers.jpg)
 
 #### Quests and attunements
-The **Quests** page has four tabs:
-- **Shared quests**: quests you and other Adventurers have (**Together now**) and quests they have that you could
-  pick up (**Pick up and join**), grouped by zone with the zone you are in first, with everyone's progress and what you can do: **Ask to group up**, Invite to group, or
-  the game's **Share quest**.
-- **Quest chains** learned as the fellowship plays, or all of them from the start with Questie installed.
+The **Quests** page has three tabs:
+- **Together**: the quests and chains you share with other Adventurers, in three parts: **Do together now**, **You
+  could join** and **They could join you** (your quests another Adventurer could pick up). Each is a short row with its
+  level or step and the faces of who has it. A quest's page starts with the answer (who to do it with, or for a chain
+  how far apart you are), then **Ask to group up**, Invite to group or the game's **Share quest**, a map of its zone
+  with everyone on it, and where everyone stands.
 - **Dungeon quests**: your dungeon quest log. **First** lists this chapter's chains and quests, to finish first, and
   **Start early** the later chapters' you have started or can start at your level, in the order of the journey. In
-  each dungeon the ones you have started come first, each with your next step and where it starts.
+  each dungeon the ones you have started come first, each as on its dungeon's page: where it starts, and every step of
+  its chain.
 - **Attunements and keys** up to 60 (Onyxia, Upper Blackrock Spire, Scholomance,
   Blackrock Depths, Stratholme, Dire Maul and more): a grid of who has done what, and each one's steps.
 
 The game's quest log marks each quest that matters to the journey (a dungeon quest, a step of its chain or a goal),
-and its tooltip names the dungeon and chapter, or the goal.
+and its tooltip names the dungeon and chapter, or the goal. A quest you share has a small fellowship crest after its
+title, and a short Journey Together section in its text: who has it, how far each one is, who could join you, the
+answer and **Ask to group up**. The world map shows the Adventurers on that quest where they stand, and the
+fellowship's crest in its top right corner opens the book at the Chapter or Quests page. Settings → **In the game's
+quest log and map** turns it all off.
 
-![Quests: the quests you share, by zone, with everyone's progress](.github/screenshots/quests.jpg)
+![Quests: the Together tab, the quests you share by zone with the faces of who has them](.github/screenshots/quests.jpg)
 
 ![Attunements: who has done which steps](.github/screenshots/attunements.jpg)
 
@@ -224,6 +233,8 @@ honest from level 1.
 
 ![The rulebook's challenges: who broke what, the Ring-bearer, the race clock, and where the challenges stand](.github/screenshots/challenges-rulebook.jpg)
 
+- **On your own**, the challenges one player can take on have their own names: **Self-found**, **Self-crafted**,
+  **Hardcore** and **Ironman**.
 - **The Fallen**: an Adventurer whose last life is spent stays in the fellowship, honoured with a memorial page, and
   may bring a new character who starts at level 1. Each Adventurer can light a candle on the memorial once.
 
@@ -263,9 +274,10 @@ Five steps, and you can change everything later except the challenges:
 
 ![Journey Admin: the ruler, the chapters with their dungeons, and the chosen chapter](.github/screenshots/journey-editor.jpg)
 
-#### Manage the fellowship
-The Leader's **Manage** page: every Adventurer with **Make leader**, **Mark away** and **Remove** (each asks first),
-and the fellowship's name, banner colour and emblem. Invites are on the Adventurers page.
+#### The Leader's tools
+On the Adventurers page, each card has a **⋯** for the Leader: **Mark away**, **Make a Friend of the fellowship**,
+**Make leader** and **Remove** (each asks first). A click on the fellowship's banner changes its name, banner colour
+and emblem. Invites are on the same page, for everyone.
 
 What needs the Leader's attention is in the inbox; the rules are edited on [the Rules page](#the-rulebook-and-votes).
 
@@ -344,8 +356,7 @@ log out; the app reads it from your saved data and posts nothing you have not ch
   questing), Focus now, **For the journey** (up to three next steps for your dungeon quests and the chapter's goals), dungeons cleared, who is online, the next Gathering, shared quests, your next duel and
   your inbox, each line with its icon. It starts as a panel you drag anywhere, which can hide until you point at it;
   or put it under the game's quest tracker, as one more section in the game's own look that moves and folds with the
-  game's list. Hold Ctrl to drag it by any line, or out from under the game's list. With ForeverCore it is one
-  section of ForeverCore's quest column, under the quests.
+  game's list. Hold Ctrl to drag it by any line, or out from under the game's list.
 - **Picture after a final boss**: Take a picture (with or without the interface) or open the group photo, right
   there in the dungeon.
 - The **inbox** in the header: invitations, votes, Gatherings, asks to group up, the tournament, and for the Leader
@@ -357,7 +368,8 @@ log out; the app reads it from your saved data and posts nothing you have not ch
 ![The tracker under the game's quest tracker](.github/screenshots/tracker.jpg)
 
 #### Look and settings
-- The book: a leather book with parchment pages and art for every page, in the game's own look (its fonts, buttons
+- The book: a leather book whose pages are the game's own spell book paper (the one-sheet pages keep the parchment),
+  with art for every page, in the game's own look (its fonts, buttons
   and frames). Drag the corner to resize it (80% to 120%), or go **full screen**, edge to edge.
 - **Themes**: Journal, Night, and Faction (Alliance blue or Horde red).
 - A **setup guide** the first time (it asks where you want the tracker), then **Show me around**: a short first tour
