@@ -1,6 +1,6 @@
 # Changelog
 
-## 2.1.0 (21 November 2026)
+## 2.1.0 (20 November 2026)
 What's New shows once after this update: quests together, the quest's map, and the game's quest log.
 
 New files: a full game restart is needed (a /reload is not enough).
